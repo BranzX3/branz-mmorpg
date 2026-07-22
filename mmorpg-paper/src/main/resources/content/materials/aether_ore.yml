@@ -1,0 +1,7 @@
+type: material
+id: branz:aether_ore
+display-name: Aether Ore
+category: crafting_material
+rarity: uncommon
+tradable: true
+max-stack-size: 64

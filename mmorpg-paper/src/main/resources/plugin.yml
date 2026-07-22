@@ -1,0 +1,15 @@
+name: BranzMMORPG
+version: '1.0.0-SNAPSHOT'
+main: com.branz.mmorpg.paper.BranzMMORPGPlugin
+api-version: '1.21.11'
+author: Branz
+description: High-performance MMORPG System Plugin for Paper Minecraft
+commands:
+  branz:
+    description: Branz MMORPG administration command
+    usage: /branz <reload|status>
+    permission: branz.admin
+permissions:
+  branz.admin:
+    description: Allows administration of Branz MMORPG
+    default: op

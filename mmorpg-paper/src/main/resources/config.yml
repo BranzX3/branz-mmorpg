@@ -1,0 +1,12 @@
+database:
+  enabled: false
+  host: localhost
+  port: 3306
+  name: branz_mmorpg
+  username: branz
+  password: change-me
+  pool-size: 10
+  connection-timeout-millis: 5000
+
+content:
+  directory: content

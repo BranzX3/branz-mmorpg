@@ -14,6 +14,10 @@ Standalone, modular MMORPG framework for Paper 26.2 and Java 25.
 
 - [System Specification](docs/SPECIFICATION.md)
 - [Phase 1 Foundation](docs/PHASE_1_FOUNDATION.md)
+- [Development Ownership and Contracts](docs/DEVELOPMENT_OWNERSHIP_AND_CONTRACTS.md)
+- [Core MMO Specification](docs/CORE_MMO_SPECIFICATION.md)
+- [Quest, Dialogue, and Cutscene Specification](docs/QUEST_DIALOGUE_CUTSCENE_SPECIFICATION.md)
+- [Parallel Implementation Roadmap](docs/IMPLEMENTATION_ROADMAP.md)
 
 ## Build
 

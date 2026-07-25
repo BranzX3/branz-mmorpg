@@ -2,9 +2,16 @@ package com.branz.mmorpg.paper;
 
 import com.branz.mmorpg.api.content.ContentReloadResult;
 import com.branz.mmorpg.api.content.ContentService;
+import com.branz.mmorpg.api.runtime.Scheduler;
+import com.branz.mmorpg.api.runtime.TransactionRunner;
+import com.branz.mmorpg.api.service.ServiceStatus;
 import com.branz.mmorpg.content.AtomicContentService;
+import com.branz.mmorpg.core.runtime.ExecutorScheduler;
+import com.branz.mmorpg.core.service.ServiceContainer;
 import com.branz.mmorpg.storage.DatabaseConfig;
 import com.branz.mmorpg.storage.DatabaseManager;
+import com.branz.mmorpg.storage.JdbcTransactionRunner;
+import java.time.Duration;
 import java.nio.file.Path;
 import java.util.Objects;
 import org.bukkit.command.Command;
@@ -16,6 +23,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class BranzMMORPGPlugin extends JavaPlugin {
     private AtomicContentService contentService;
     private DatabaseManager databaseManager;
+    private ServiceContainer serviceContainer;
+    private Scheduler scheduler;
+    private TransactionRunner transactionRunner;
     private Path contentDirectory;
 
     @Override
@@ -37,10 +47,19 @@ public class BranzMMORPGPlugin extends JavaPlugin {
 
             if (getConfig().getBoolean("database.enabled", false)) {
                 databaseManager = DatabaseManager.connect(readDatabaseConfig());
+                transactionRunner = new JdbcTransactionRunner(databaseManager);
                 getLogger().info("Database connected and migrations applied.");
             } else {
                 getLogger().warning("Database is disabled; persistent gameplay services must remain offline.");
             }
+
+            // Registration order is dependency order; the container rolls back
+            // everything it started if any service fails.
+            serviceContainer = new ServiceContainer();
+            scheduler = serviceContainer.register(new ExecutorScheduler(
+                    getConfig().getInt("core.async-pool-size", 4),
+                    runnable -> getServer().getScheduler().runTask(this, runnable)));
+            serviceContainer.startAll();
 
             getServer().getServicesManager().register(
                     ContentService.class, contentService, this, ServicePriority.Normal);
@@ -57,6 +76,16 @@ public class BranzMMORPGPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         getServer().getServicesManager().unregisterAll(this);
+        if (scheduler != null && !scheduler.drainAndShutdown(Duration.ofSeconds(10))) {
+            getLogger().warning("Scheduler did not drain within 10s; remaining work was abandoned.");
+        }
+        if (serviceContainer != null) {
+            // Storage closes last: draining work above may still need it.
+            serviceContainer.stopAll();
+            serviceContainer = null;
+            scheduler = null;
+        }
+        transactionRunner = null;
         if (databaseManager != null) {
             databaseManager.close();
             databaseManager = null;
@@ -98,6 +127,16 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 sender.sendMessage("Branz MMORPG: content revision " + snapshot.revision()
                         + ", definitions " + snapshot.definitions().size()
                         + ", database " + (databaseManager == null ? "disabled" : "connected"));
+                var health = serviceContainer == null ? null : serviceContainer.health();
+                sender.sendMessage("Core: " + (health == null
+                        ? "not started"
+                        : (health.ready() ? "ready" : "DEGRADED")));
+                if (health != null) {
+                    for (ServiceStatus status : health.services()) {
+                        sender.sendMessage(" - " + status.name() + ": " + status.state()
+                                + (status.detail() == null ? "" : " (" + status.detail() + ")"));
+                    }
+                }
                 return true;
             }
             if (args[0].equalsIgnoreCase("reload")) {

@@ -88,8 +88,10 @@ Rules:
    restart must yield the same string.
 2. The same string is passed verbatim as `transactionId` to `adjustCredit`, and
    as `idempotencyKey` to `hybridPay`.
-3. Max length 128 characters; charset `[a-z0-9:_]`. `ContentId` colons are
-   rewritten to `_` inside a segment so the segment separator stays unambiguous.
+3. Max length 128 characters; charset `[a-z0-9:_-]` (the hyphen appears in the
+   UUID segment). Anything else inside a segment — notably the `:` of a
+   `ContentId` — is rewritten to `_`, so a segment can never be mistaken for a
+   separator. Enforced by `com.branz.mmorpg.api.operation.OperationId`.
 4. `addCoins` is *not* idempotent by itself. Any Coin grant that could be
    replayed (quest reward, milestone payout) must be guarded by an MMORPG-side
    operation record committed in the same transaction as the gameplay effect,

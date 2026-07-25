@@ -1,5 +1,17 @@
 # Branz MMORPG - Legacy Product Direction
-**Status**: Historical gameplay direction; locked engineering decisions live in `PHASE_1_FOUNDATION.md` and override conflicts in this document.  
+> [!WARNING]
+> This document is superseded and retained only as historical product context.
+> Do not use its architecture, database, module, dependency, or roadmap sections
+> as implementation requirements.
+
+**Status**: Archived legacy direction
+
+**Authoritative documents**: `PHASE_1_FOUNDATION.md`,
+`DEVELOPMENT_OWNERSHIP_AND_CONTRACTS.md`, `CORE_MMO_SPECIFICATION.md`,
+`COMBAT_MASTERY_CLASSLESS_BUILD_SPECIFICATION.md`,
+`SURVIVAL_SKILL_MASTERY_SPECIFICATION.md`,
+`QUEST_DIALOGUE_CUTSCENE_SPECIFICATION.md`, and `IMPLEMENTATION_ROADMAP.md`
+
 **Target Platform**: Paper 26.2  
 **Target Java Version**: Java 25  
 
@@ -57,6 +69,9 @@ branz-mmorpg/
 ---
 
 ## 4. แผนการดำเนินงาน (Implementation Roadmap)
+
+The checklist below is historical and is not current project status. Current
+milestones are defined only in `IMPLEMENTATION_ROADMAP.md`.
 
 - [x] Phase 0: กำหนด System Specification ผ่าน /grill-me & ออกแบบ Architecture
 - [x] Phase 1: สถาปนา Gradle Multi-Module Project Structure (`mmorpg-api`, `mmorpg-core`, `mmorpg-paper`)

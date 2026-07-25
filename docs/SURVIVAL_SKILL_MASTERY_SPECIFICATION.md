@@ -92,17 +92,85 @@ XP, unless the source definition requires the break to be rejected entirely.
 Anti-farm rejection stores an internal reason such as `PLACED_BLOCK`,
 `DUPLICATE_OPERATION`, `INVALID_TOOL`, `SOURCE_COOLDOWN`, or `RATE_LIMITED`.
 
+### 5.1 Authoritative block origin
+
+Core consumes block provenance through a platform port:
+
+    interface BlockOriginPort {
+        BlockOrigin origin(BlockPosition position);
+        void recordPlacement(BlockPosition position, BlockOrigin origin);
+        void recordRemoval(BlockPosition position, OperationId operationId);
+        void move(BlockPosition from, BlockPosition to, OperationId operationId);
+    }
+
+The platform-independent origin values are:
+
+    NATURAL
+    PLAYER_PLACED
+    REGISTERED_NODE
+    PLUGIN_CREATED
+    RESTORED
+    UNKNOWN
+
+`UNKNOWN` fails closed for rare, epic, and legendary XP. Common sources may use
+the configured conservative fallback, which cannot exceed common-tier XP.
+
+The Paper adapter must define behavior for:
+
+- Player placement, piston movement, falling blocks, and block transformation
+- Silk Touch placement and movement of mined blocks
+- Explosion, TNT, fire, fluid, and entity-caused removal
+- WorldEdit or other plugin-created and restored blocks
+- Chunk unload/reload and server restart
+- World regeneration and deletion
+- Registered node depletion and respawn
+
+Moving a tracked block moves its origin; it never converts a placed block into a
+natural block. Explosion or indirect destruction attributes the action to a
+player only when a trusted server-side cause chain exists. Otherwise it grants
+no Survival XP.
+
+Origin records for non-natural blocks and registered nodes survive chunk unload
+and restart. Cleanup is keyed by world identity, chunk, block coordinates, and
+world-generation epoch so stale records cannot affect a recreated world.
+
 ## 6. Levels and Skill Points
 
 Each Survival Skill stores independent total XP, level, unspent points, unlocked
 nodes, and content revision.
 
-Suggested initial level curve:
+The level curve is a **cumulative total-XP threshold**. A player reaches level
+`L` when `total_xp >= total_xp_required(L)`.
 
-    xp_required(level) = round(75 * level ^ 1.55)
+    total_xp_required(level) = round(75 * level ^ 1.55)
+
+Initial golden values:
+
+| Level | Required total XP |
+|---:|---:|
+| 1 | 75 |
+| 2 | 220 |
+| 3 | 412 |
+| 4 | 643 |
+| 5 | 909 |
+| 6 | 1,206 |
+| 7 | 1,531 |
+| 8 | 1,883 |
+| 9 | 2,260 |
+| 10 | 2,661 |
 
 The level cap and thresholds are content-driven. Configured level milestones
 grant Survival Skill Points. Levels and unlocked nodes never decrease on death.
+Total XP uses a signed 64-bit integer, cannot be negative, and uses checked
+arithmetic. A grant may cross multiple levels in one transaction; every crossed
+milestone grants its configured points exactly once. One committed operation
+emits one XP event and zero or more ordered level-change events.
+
+At level cap, XP is clamped to the configured cap threshold unless prestige is
+enabled. Overflow, negative grants through the normal gameplay API, NaN
+multipliers, and non-finite formula inputs are rejected. Administrative revoke
+or repair is a separate audited operation and cannot reduce a level or invalidate
+an unlocked node unless an explicit reset policy permits it.
 
 A respec, if enabled, must be transactional, audited, have an explicit cost,
 and never leave the player with a partially reset tree.
@@ -141,6 +209,27 @@ Suggested effects:
 
 Tree effects cannot bypass region protection, mint arbitrary currency, execute
 console commands, or create unbounded item, speed, XP, or damage multipliers.
+
+### 7.1 Tree revision and migration
+
+Published tree definitions have an immutable revision. Existing player progress
+stores the revision under which it was last validated.
+
+Content reload validates a migration plan before activating a tree change:
+
+- Added nodes require no player migration.
+- Renamed nodes require an explicit stable-ID alias.
+- Removed nodes require `REFUND`, `REPLACE`, or `RETAIN_DISABLED` policy.
+- Increased costs never create a negative point balance.
+- Decreased costs refund the configured difference exactly once.
+- Changed prerequisites cannot silently remove an unlocked rank.
+- Changed effects are removed and reapplied once from the new validated snapshot.
+
+If no safe migration plan exists, reload is rejected and the previous snapshot
+remains active. Migration is idempotent per player, skill, source revision, and
+target revision. A failed player migration leaves that player on the previous
+revision and disables new tree mutations until repair; it does not partially
+apply ranks, effects, or refunds.
 
 ## 8. Content Definitions
 
@@ -186,6 +275,7 @@ Skill progress is keyed by player UUID and skill ID:
     level
     total_xp
     unspent_points
+    schema_version
     tree_revision
     updated_at
 
@@ -196,18 +286,25 @@ operation IDs. Progress, audit data, and domain events are committed atomically.
 Retrying an operation returns its original result without granting anything
 twice.
 
+Operation-result and outbox retention must be longer than the maximum supported
+retry/recovery window. Purging requires a recorded high-water mark and cannot
+remove an operation that may still be retried by an active recovery job.
+
 Database failure follows the normal fail-closed player-session policy. The
 system must not substitute a blank profile or grant speculative XP.
 
 ## 10. Events and API
 
-Core publishes immutable events after the authoritative transaction commits:
+Core publishes immutable events after the authoritative transaction commits.
+All events use the common envelope from
+`DEVELOPMENT_OWNERSHIP_AND_CONTRACTS.md`, including event ID, operation ID,
+event version, timestamp, aggregate sequence, and content revision.
 
-| Event | Required data |
+| Event | Payload data |
 |---|---|
-| SurvivalXpGranted | Event ID, operation ID, player, skill, source, XP, timestamp |
-| SurvivalSkillLevelChanged | Player, skill, old/new level, total XP |
-| SurvivalSkillNodeUnlocked | Player, skill, node, rank, remaining points |
+| SurvivalXpGranted | Player, skill, source, base XP, multipliers, awarded XP, resulting total XP |
+| SurvivalSkillLevelChanged | Player, skill, old/new level, total XP, points granted |
+| SurvivalSkillNodeUnlocked | Player, skill, node, old/new rank, points spent, points remaining |
 
 Quest and Paper consume public contracts from `mmorpg-api` and must not import
 Core implementation classes.
@@ -228,7 +325,25 @@ Required admin commands:
 Mutation commands require permission, reason, and audit records. Reset requires
 explicit confirmation.
 
-## 12. Acceptance Criteria
+## 12. Performance Budget
+
+- Survival processing attributable to one accepted block break targets under
+  0.25 ms at p95 on the owning Paper thread, excluding vanilla block handling.
+- No SQL, filesystem access, YAML parsing, or blocking wait occurs on the owning
+  Paper thread.
+- One player, block, or anti-farm window does not create an individual scheduler
+  task; expiry uses bounded buckets or periodic batch cleanup.
+- Origin lookup for a loaded chunk is memory-backed and targets under 0.10 ms at
+  p95. Persistence flush is asynchronous and bounded.
+- With 50 concurrent players and 20 eligible actions per second in aggregate,
+  the persistence queue remains bounded and exposes depth, oldest age, failures,
+  and retry count.
+- Logout and shutdown drain or durably record pending mutations within the
+  configured shutdown budget. No accepted operation is silently discarded.
+- A soak test covers at least 100,000 synthetic actions, chunk unload/reload,
+  origin movement, duplicate operations, and tree effect recalculation.
+
+## 13. Acceptance Criteria
 
 - Natural stone broken with a valid pickaxe grants exactly 1 configured XP.
 - Configured rare ores grant more XP than common stone.
@@ -236,9 +351,14 @@ explicit confirmation.
 - Cancelled block-break events grant no XP.
 - Fortune and Silk Touch cannot duplicate XP.
 - Duplicate operation IDs cannot grant XP or skill points twice.
+- A single grant crossing multiple levels awards every milestone exactly once.
+- XP overflow and negative gameplay grants are rejected.
 - Level-up and skill-point grants are atomic.
 - Node purchase cannot consume points without granting the node rank.
 - Content validation rejects cycles and broken prerequisites.
+- Tree revision migration is idempotent and cannot partially refund or apply ranks.
+- Piston movement preserves placed-block origin across source and destination.
+- Unknown rare-source origin grants no rare-tier XP.
 - Logout, reconnect, reload, failed save, and shutdown preserve progress.
 - Pure Java tests cover formulas, levels, trees, and idempotency.
 - Paper smoke tests cover valid, invalid, placed, and cancelled block breaks.

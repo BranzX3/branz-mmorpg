@@ -10,6 +10,7 @@ Dependency rule: Core publishes services/events; it does not depend on Quest.
 1. Standalone classless action MMORPG.
 2. Weapon choice defines primary combat identity.
 3. Using a weapon or skill advances its mastery.
+   Survival activities use the separate Survival Skill Mastery contract.
 4. Active play always provides a complete source for every required material.
 5. Branz Idle is optional and may only provide alternative crafting materials through a future bridge.
 6. Server is authoritative for stats, combat, item ownership, rewards, and progression.
@@ -381,6 +382,9 @@ commands are forbidden in content.
 
 # Phase C6 — Weapon, loadout, and mastery
 
+Detailed Combat Mastery and classless build rules are defined in
+`COMBAT_MASTERY_CLASSLESS_BUILD_SPECIFICATION.md`.
+
 ## Build structure
 
     Basic attack
@@ -513,6 +517,9 @@ Rolls resolve once using a stored roll ID. Reopening UI cannot reroll.
 - Future Idle bridge can request material creation through API, but Core has no Idle dependency.
 
 # Phase C8 — Gathering, crafting, profession, and economy
+
+Survival activity progression within gathering follows
+`SURVIVAL_SKILL_MASTERY_SPECIFICATION.md`.
 
 ## Gathering
 

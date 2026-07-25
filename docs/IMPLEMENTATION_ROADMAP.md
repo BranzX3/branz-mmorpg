@@ -5,6 +5,7 @@ Related specifications:
 
 - DEVELOPMENT_OWNERSHIP_AND_CONTRACTS.md
 - CORE_MMO_SPECIFICATION.md
+- COMBAT_MASTERY_CLASSLESS_BUILD_SPECIFICATION.md
 - SURVIVAL_SKILL_MASTERY_SPECIFICATION.md
 - QUEST_DIALOGUE_CUTSCENE_SPECIFICATION.md
 - PHASE_1_FOUNDATION.md
@@ -18,7 +19,7 @@ Core and Quest proceed in parallel after agreeing on API contracts.
 | M0 | C0 Foundation adoption | Q0 Module/contracts | Dependency and ownership checks |
 | M1 | C1 Player session, C2 Attributes; Survival Skill profile contract | Q1 Compiler, Q2 State machine | Player identity, lifecycle, and immutable skill snapshot contract |
 | M2 | C3 Status, C4 Combat | Q3 Objectives, Q4 Conditions/actions | Domain-event envelopes and fake adapters |
-| M3 | C5 Skills, C6 Combat Mastery; S1 Survival progression engine and tree | Q5 Persistence/migration | Mastery query/event, tree snapshot, and operation ID |
+| M3 | C5 Skills, C6 Classless Build and Combat Mastery; S1 Survival progression engine and tree | Q5 Persistence/migration | Typed mastery query/event, build/tree snapshot, and operation ID |
 | M4 | C7 Items/loot | Q6 Dialogue engine, Q7 Renderer/history | Item query/reward and player audience |
 | M5 | C8 Gathering/crafting/economy; S2 Mining XP and anti-farm | Q8 NPC/world integration | Gathering, Survival XP, craft, item, region, and interaction events |
 | M6 | C9 Mob AI, C10 Encounter/boss | Q9 Tracker/journal, Q10 Cutscene | Mob/boss events and actor/camera adapters |
@@ -189,3 +190,44 @@ For Survival Skill Mastery, final additionally means:
 
 Final does not mean balance values or content quantities can never change.
 Those remain data-driven.
+
+## 8. Launch MVP boundary
+
+The first playable release is intentionally smaller than the complete C0–C13
+and Q0–Q15 vision.
+
+### Required for launch
+
+- C0–C2 foundation, player sessions, attributes, and resources
+- C3–C4 initial statuses and deterministic basic combat
+- C5 with one complete weapon kit and two or three active skills
+- C6 one combat mastery family and one valid loadout
+- C7 authoritative item ownership, equipment, basic loot, and pending delivery
+- C8 Mining Survival Skill, basic gathering, one crafting profession, and Coins
+- C9 one mob family with vanilla presentation fallback
+- C10 one three-phase reference boss or encounter
+- C12 essential HUD, status, inspect, grant, audit, and repair operations
+- Q0–Q9 quest compiler/runtime, objectives, persistence, dialogue, NPC/world
+  integration, tracker, and journal
+- One complete reference quest and the Survival Skill reference scenario
+- Required C13/Q15 correctness, recovery, migration, smoke, and performance gates
+
+### Post-launch
+
+- Additional weapons, Survival Skills, professions, mobs, and encounters
+- Advanced cutscene camera and private actor features
+- Direct trade after authoritative item operations are proven stable
+- Expanded accessibility, analytics, authoring, and QA tools
+
+### Optional/deferred
+
+- Visual local quest editor
+- Player market
+- Cross-server synchronization
+- Mandatory ModelEngine or packet-library presentation
+- Branz Idle bridge
+- PvP ranking, seasons, guild, and territory systems
+
+An optional or post-launch feature cannot block the launch build unless a
+required feature has taken a hard dependency on it. Such a dependency must be
+removed or explicitly approved as a roadmap change.

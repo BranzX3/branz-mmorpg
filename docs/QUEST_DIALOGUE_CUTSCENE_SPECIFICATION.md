@@ -299,7 +299,8 @@ Objective reducers are deterministic and side-effect free.
 | enter-region | RegionEntered |
 | use-skill | SkillUsed with valid effect |
 | craft | CraftCompleted |
-| reach-mastery | MasteryChanged or current snapshot |
+| reach-combat-mastery | CombatMasteryLevelChanged or current Combat Mastery snapshot |
+| reach-survival-skill | SurvivalSkillLevelChanged or current Survival Skill snapshot |
 | wait | QuestScheduler/game clock |
 | choose | Dialogue choice result |
 
@@ -372,7 +373,8 @@ Initial actions:
     start/advance/complete quest
     grant/take item
     grant currency
-    grant mastery XP
+    grant combat mastery XP
+    grant Survival Skill XP
     unlock content
     start dialogue
     start cutscene

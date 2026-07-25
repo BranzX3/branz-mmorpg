@@ -301,6 +301,7 @@ Objective reducers are deterministic and side-effect free.
 | craft | CraftCompleted |
 | reach-combat-mastery | CombatMasteryLevelChanged or current Combat Mastery snapshot |
 | reach-survival-skill | SurvivalSkillLevelChanged or current Survival Skill snapshot |
+| reach-class-level | CharacterClassLevelChanged or current Character Class snapshot |
 | wait | QuestScheduler/game clock |
 | choose | Dialogue choice result |
 
@@ -348,6 +349,7 @@ Initial pure conditions:
     flag value
     item possession
     mastery level
+    permanent character class and class level
     player/world/region
     permission/entitlement
     time window

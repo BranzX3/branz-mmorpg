@@ -21,6 +21,7 @@ Cross-system calls must go through mmorpg-api or mmorpg-quest-api.
 Core-owned packages:
 
     com.branz.mmorpg.api.player
+    com.branz.mmorpg.api.character
     com.branz.mmorpg.api.stat
     com.branz.mmorpg.api.combat
     com.branz.mmorpg.api.skill
@@ -46,6 +47,8 @@ Shared packages require coordination:
 ## 3. Stable identity rules
 
 - Players are identified by UUID, never display name.
+- Permanent character classes use stable typed content IDs and one selected
+  class is stored per player profile.
 - Every content object uses ContentId in namespace:value format.
 - Runtime entity UUIDs are not content IDs.
 - Unique equipment uses a persistent item-instance UUID in addition to its definition ID.
@@ -58,6 +61,7 @@ Quest depends on narrow capabilities rather than the complete Core implementatio
 
     public interface QuestGamePort {
         PlayerSnapshot player(UUID playerId);
+        CharacterClassSnapshot characterClass(UUID playerId);
         SurvivalSkillSnapshot survivalSkill(UUID playerId, ContentId skillId);
         boolean hasItem(UUID playerId, ContentId itemId, long amount);
         CompletionStage<MutationResult> takeItem(
@@ -118,6 +122,11 @@ ordering.
 | CombatMasteryLevelChanged | event ID, operation ID, player, mastery ID/kind, old/new level, total XP |
 | CombatMasteryNodeUnlocked | event ID, operation ID, player, mastery ID, node ID, rank, points remaining |
 | ActiveBuildChanged | event ID, operation ID, player, previous/new build revision, weapon and skill IDs |
+| CharacterClassSelected | event ID, operation ID, player, class ID, starter loadout revision |
+| CharacterClassLevelChanged | event ID, operation ID, player, class ID, old/new level, total XP |
+| ClassSkillPointsGranted | event ID, operation ID, player, class ID, amount, points remaining |
+| ClassSkillNodeUnlocked | event ID, operation ID, player, class ID, node ID, rank, points remaining |
+| ClassSkillTreeRespecced | event ID, operation ID, player, class ID, refunded points and cost |
 | SurvivalXpGranted | event ID, operation ID, player, skill ID, source ID, awarded XP, timestamp |
 | SurvivalSkillLevelChanged | event ID, operation ID, player, skill ID, old/new level, total XP |
 | SurvivalSkillNodeUnlocked | event ID, operation ID, player, skill ID, node ID, rank, points remaining |
@@ -165,6 +174,8 @@ or administratively previewed actions unless explicitly marked.
 - Currency, item consumption, crafting, trade, and quest rewards are audited.
 - Combat Mastery and Survival Skill mutations are audited and stored with their
   operation result so retries return the original outcome.
+- Permanent class selection and administrative class repair are transactional,
+  idempotent, and audited.
 
 ## 9. Content reload contract
 

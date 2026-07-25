@@ -1,4 +1,4 @@
-# Branz MMORPG — Combat Mastery and Classless Build Specification
+# Branz MMORPG — Combat Mastery and Character Build Specification
 
 Status: Proposed workstream contract  
 Owner: Core MMO developer  
@@ -6,13 +6,12 @@ Depends on: Player Session, Attributes, Combat, Skills, Items, Equipment, and Co
 
 ## 1. Purpose
 
-Branz MMORPG is classless. A player never permanently chooses Warrior, Mage,
-Archer, or another fixed character class. Combat identity is produced by the
-player's current weapon, equipped skills, armor and utility choices, passive
-specialization, and earned Combat Mastery.
+Each character permanently selects Warrior, Mage, or Rogue. Combat identity is
+produced by that class together with the current weapon, equipped skills, armor
+and utility choices, specialization, and earned Combat Mastery.
 
-Changing a valid loadout changes the player's current combat role without
-creating a new character or deleting previous progression.
+Changing a valid loadout changes the build within the selected class. It does
+not change the permanent class or grant another class's skills.
 
 Combat Mastery is separate from Survival Skill Mastery:
 
@@ -20,11 +19,12 @@ Combat Mastery is separate from Survival Skill Mastery:
 - Survival Skill Mastery advances through gathering and survival activities.
 - The two systems use separate IDs, trees, caps, events, and balance budgets.
 
-## 2. Classless Build Model
+## 2. Character Build Model
 
 A combat build contains:
 
     active weapon
+    permanent character class
     weapon family
     weapon type
     basic attack
@@ -41,9 +41,9 @@ its own attributes, mastery rank, role, or skill effects.
 
 ### 2.1 Build identity
 
-The UI may show a descriptive build title such as `Flame Duelist`,
-`Guardian Archer`, or `Battle Mage`. This title is presentation metadata derived
-from tags and does not create a fixed class or grant hidden statistics.
+The UI shows the permanent class and may also show a descriptive build title
+such as `Flame Vanguard`, `Arcane Scholar`, or `Shadow Duelist`. The title is
+presentation metadata derived from tags and grants no hidden statistics.
 
 Example:
 
@@ -51,14 +51,15 @@ Example:
     + counter specialization
     + medium armor
     + mobility utility
-    = Flame Duelist presentation
+    + Warrior
+    = Flame Vanguard presentation
 
 Changing the loadout recalculates the title and effects from the new immutable
 snapshot.
 
 ### 2.2 Role model
 
-Roles are soft capabilities rather than class restrictions:
+Roles describe build capabilities inside the permanent class:
 
     DAMAGE
     TANK
@@ -66,8 +67,8 @@ Roles are soft capabilities rather than class restrictions:
     CONTROL
     HYBRID
 
-A build may have several role weights. Role tags support party UI, matchmaking,
-recommendations, and telemetry, but they do not prevent unconventional builds.
+A build may have several role weights. Class weapon/skill restrictions remain
+authoritative even when a build has unconventional role weights.
 
 ## 3. Combat Mastery Hierarchy
 
@@ -208,8 +209,8 @@ Example Broadsword tree:
        ├─ Ember Edge
        └─ Controlled Burn
 
-Branch names are specializations, not permanent classes. A player may respec
-according to policy or level another weapon type independently.
+Branch names are specializations inside the permanent class. A player may
+respec according to policy or level another class-compatible weapon type.
 
 Tree effects cannot:
 
@@ -335,8 +336,10 @@ All mutations require permission, reason, operation ID, and audit record.
 
 ## 13. Acceptance Criteria
 
-- A new player can equip any valid unlocked starter weapon without selecting a class.
+- A new player must select Warrior, Mage, or Rogue before combat progression.
+- A player can equip any valid unlocked starter weapon allowed by that class.
 - Switching weapon type changes the active build without deleting prior mastery.
+- Switching loadout cannot grant skills or weapons restricted to another class.
 - Valid damage, healing, mitigation, control, and objective contribution award
   configured mastery XP.
 - Misses, invalid targets, cancelled effects, and input spam award zero XP.

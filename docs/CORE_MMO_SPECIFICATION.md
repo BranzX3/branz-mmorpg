@@ -7,7 +7,8 @@ Dependency rule: Core publishes services/events; it does not depend on Quest.
 
 ## 1. Product principles
 
-1. Standalone classless action MMORPG.
+1. Standalone class-based action MMORPG with permanent Warrior, Mage, or Rogue
+   selection and flexible weapon/mastery builds inside each class.
 2. Weapon choice defines primary combat identity.
 3. Using a weapon or skill advances its mastery.
    Survival activities use the separate Survival Skill Mastery contract.
@@ -75,6 +76,8 @@ Persistent profile:
     schema_version
     created_at
     last_seen_at
+    class_id
+    class_selected_at
     selected_loadout_id
     respawn_point_id
     settings
@@ -128,6 +131,8 @@ Reload cannot discard dirty state without explicit confirmation.
 ## Acceptance
 
 - New, returning, simultaneous, failed-load, failed-save, logout, kick, and shutdown cases tested.
+- A new profile remains combat-locked until permanent class selection commits.
+- Class selection is idempotent and cannot duplicate its starter loadout.
 - Blank-profile fallback is impossible.
 - No Bukkit Player object is retained after logout.
 
@@ -321,6 +326,9 @@ at launch, but the damage context must support it without branching the entire e
 
 # Phase C5 — Skill execution engine
 
+Player input mapping, combo resolution, hold/charge behavior, and vanilla-action
+arbitration are defined in `COMBAT_SKILL_INPUT_SPECIFICATION.md`.
+
 ## Skill state machine
 
     READY
@@ -382,8 +390,9 @@ commands are forbidden in content.
 
 # Phase C6 — Weapon, loadout, and mastery
 
-Detailed Combat Mastery and classless build rules are defined in
-`COMBAT_MASTERY_CLASSLESS_BUILD_SPECIFICATION.md`.
+Permanent class rules are defined in `PERMANENT_CHARACTER_CLASS_SPECIFICATION.md`.
+Detailed Combat Mastery and character-build rules are defined in
+`COMBAT_MASTERY_AND_CHARACTER_BUILD_SPECIFICATION.md`.
 
 ## Build structure
 

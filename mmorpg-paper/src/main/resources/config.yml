@@ -10,3 +10,16 @@ database:
 
 content:
   directory: content
+
+core:
+  # Threads for off-tick work (profile loads, saves).
+  async-pool-size: 4
+
+player:
+  # What happens when a player logs in while a session for the same UUID is
+  # still live, which usually means an unclean disconnect left a ghost.
+  #   CLOSE_PREVIOUS - conflict the old session and let the new login proceed
+  #   REJECT_NEW     - refuse the new login until the old session is reaped
+  duplicate-login: CLOSE_PREVIOUS
+  # Periodic save of dirty sessions. Minimum 30s.
+  autosave-seconds: 300

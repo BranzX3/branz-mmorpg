@@ -2,16 +2,23 @@ package com.branz.mmorpg.paper;
 
 import com.branz.mmorpg.api.content.ContentReloadResult;
 import com.branz.mmorpg.api.content.ContentService;
+import com.branz.mmorpg.api.lifeskill.LifeSkillQuery;
+import com.branz.mmorpg.api.player.DuplicateLoginPolicy;
+import com.branz.mmorpg.api.player.PlayerSession;
 import com.branz.mmorpg.api.runtime.Scheduler;
 import com.branz.mmorpg.api.runtime.TransactionRunner;
 import com.branz.mmorpg.api.service.ServiceStatus;
 import com.branz.mmorpg.content.AtomicContentService;
+import com.branz.mmorpg.core.player.PlayerSessionService;
 import com.branz.mmorpg.core.runtime.ExecutorScheduler;
+import com.branz.mmorpg.core.runtime.SystemGameClock;
 import com.branz.mmorpg.core.service.ServiceContainer;
 import com.branz.mmorpg.storage.DatabaseConfig;
 import com.branz.mmorpg.storage.DatabaseManager;
+import com.branz.mmorpg.storage.JdbcPlayerProfileRepository;
 import com.branz.mmorpg.storage.JdbcTransactionRunner;
 import java.time.Duration;
+import java.util.Locale;
 import java.nio.file.Path;
 import java.util.Objects;
 import org.bukkit.command.Command;
@@ -26,6 +33,7 @@ public class BranzMMORPGPlugin extends JavaPlugin {
     private ServiceContainer serviceContainer;
     private Scheduler scheduler;
     private TransactionRunner transactionRunner;
+    private PlayerSessionService sessionService;
     private Path contentDirectory;
 
     @Override
@@ -59,8 +67,26 @@ public class BranzMMORPGPlugin extends JavaPlugin {
             scheduler = serviceContainer.register(new ExecutorScheduler(
                     getConfig().getInt("core.async-pool-size", 4),
                     runnable -> getServer().getScheduler().runTask(this, runnable)));
+            if (databaseManager != null) {
+                // Sessions require storage. Without it there is nowhere to load a
+                // profile from, and inventing a blank one is exactly what the
+                // fail-closed rule forbids.
+                sessionService = serviceContainer.register(new PlayerSessionService(
+                        new JdbcPlayerProfileRepository(databaseManager),
+                        scheduler,
+                        new SystemGameClock(),
+                        () -> contentService.snapshot().revision(),
+                        duplicateLoginPolicy()));
+            }
             serviceContainer.startAll();
 
+            if (sessionService != null) {
+                getServer().getPluginManager()
+                        .registerEvents(new PlayerSessionListener(this, sessionService), this);
+                startAutosaveTask();
+                getServer().getServicesManager().register(
+                        LifeSkillQuery.class, sessionService, this, ServicePriority.Normal);
+            }
             getServer().getServicesManager().register(
                     ContentService.class, contentService, this, ServicePriority.Normal);
             Objects.requireNonNull(getCommand("branz"), "branz command").setExecutor(new AdminCommand());
@@ -76,6 +102,7 @@ public class BranzMMORPGPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         getServer().getServicesManager().unregisterAll(this);
+        getServer().getScheduler().cancelTasks(this);
         if (scheduler != null && !scheduler.drainAndShutdown(Duration.ofSeconds(10))) {
             getLogger().warning("Scheduler did not drain within 10s; remaining work was abandoned.");
         }
@@ -84,6 +111,7 @@ public class BranzMMORPGPlugin extends JavaPlugin {
             serviceContainer.stopAll();
             serviceContainer = null;
             scheduler = null;
+            sessionService = null;
         }
         transactionRunner = null;
         if (databaseManager != null) {
@@ -91,6 +119,31 @@ public class BranzMMORPGPlugin extends JavaPlugin {
             databaseManager = null;
         }
         getLogger().info("Branz MMORPG disabled.");
+    }
+
+    private DuplicateLoginPolicy duplicateLoginPolicy() {
+        String configured = getConfig()
+                .getString("player.duplicate-login", DuplicateLoginPolicy.CLOSE_PREVIOUS.name())
+                .toUpperCase(Locale.ROOT);
+        try {
+            return DuplicateLoginPolicy.valueOf(configured);
+        } catch (IllegalArgumentException unknown) {
+            getLogger().warning("Unknown player.duplicate-login '" + configured
+                    + "'; falling back to " + DuplicateLoginPolicy.CLOSE_PREVIOUS);
+            return DuplicateLoginPolicy.CLOSE_PREVIOUS;
+        }
+    }
+
+    private void startAutosaveTask() {
+        long intervalTicks = Math.max(20L * 30, getConfig().getLong("player.autosave-seconds", 300) * 20L);
+        getServer().getScheduler().runTaskTimerAsynchronously(this, () -> {
+            try {
+                sessionService.flushAll();
+                sessionService.retryPendingSaves();
+            } catch (RuntimeException failure) {
+                getLogger().warning("Autosave pass failed: " + failure.getMessage());
+            }
+        }, intervalTicks, intervalTicks);
     }
 
     private void saveBundledContent() {
@@ -115,11 +168,63 @@ public class BranzMMORPGPlugin extends JavaPlugin {
         result.diagnostics().forEach(line -> getLogger().severe(" - " + line));
     }
 
+    private boolean playerCommand(CommandSender sender, String label, String[] args) {
+        if (sessionService == null) {
+            sender.sendMessage("Player sessions are offline; the database is disabled.");
+            return true;
+        }
+        if (args.length != 3) {
+            sender.sendMessage("Usage: /" + label + " player <inspect|save> <player>");
+            return true;
+        }
+        var target = getServer().getPlayerExact(args[2]);
+        if (target == null) {
+            sender.sendMessage("Player " + args[2] + " is not online.");
+            return true;
+        }
+        var session = sessionService.session(target.getUniqueId());
+        if (session.isEmpty()) {
+            sender.sendMessage("No MMO session for " + args[2] + ".");
+            return true;
+        }
+        PlayerSession live = session.get();
+        if (args[1].equalsIgnoreCase("inspect")) {
+            sender.sendMessage("Session " + live.token() + ": " + live.state()
+                    + ", content revision " + live.contentRevision());
+            if (live.state().playable()) {
+                sender.sendMessage("Profile: schema " + live.profile().schemaVersion()
+                        + ", created " + live.profile().createdAt()
+                        + ", trained skills " + live.lifeSkills().trainedSkills().size());
+            } else {
+                sender.sendMessage("Profile is not loaded; MMO features are disabled for this player.");
+            }
+            int pending = sessionService.pendingSaves().size();
+            if (pending > 0) {
+                sender.sendMessage("Pending saves awaiting recovery: " + pending);
+            }
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("save")) {
+            int saved = sessionService.flushAll();
+            sender.sendMessage("Flushed " + saved + " dirty session(s).");
+            return true;
+        }
+        sender.sendMessage("Usage: /" + label + " player <inspect|save> <player>");
+        return true;
+    }
+
     private final class AdminCommand implements CommandExecutor {
         @Override
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+            if (args.length == 0) {
+                sender.sendMessage("Usage: /" + label + " <reload|status|player>");
+                return true;
+            }
+            if (args[0].equalsIgnoreCase("player")) {
+                return playerCommand(sender, label, args);
+            }
             if (args.length != 1) {
-                sender.sendMessage("Usage: /" + label + " <reload|status>");
+                sender.sendMessage("Usage: /" + label + " <reload|status|player>");
                 return true;
             }
             if (args[0].equalsIgnoreCase("status")) {

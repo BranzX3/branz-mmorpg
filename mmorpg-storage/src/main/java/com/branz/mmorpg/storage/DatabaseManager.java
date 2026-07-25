@@ -32,6 +32,10 @@ public final class DatabaseManager implements AutoCloseable {
             Flyway.configure()
                     .dataSource(dataSource)
                     .locations("classpath:db/migration")
+                    // The network database is shared with BranzWallet and Branz
+                    // Idle, so the default flyway_schema_history name is not ours
+                    // to claim.
+                    .table("mmorpg_schema_history")
                     .validateMigrationNaming(true)
                     .load()
                     .migrate();

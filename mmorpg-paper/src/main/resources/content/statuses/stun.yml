@@ -1,0 +1,13 @@
+type: status
+id: branz:stun
+display-name: Stun
+category: negative
+stack-policy: replace_weaker
+max-stacks: 1
+duration-ms: 1500
+periodic-interval-ms: 0
+potency: 0.0
+modifiers: []
+dispel-tags: [control]
+crowd-control: stun
+offline-policy: tick_down

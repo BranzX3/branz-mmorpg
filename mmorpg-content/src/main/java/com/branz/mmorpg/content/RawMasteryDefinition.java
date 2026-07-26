@@ -11,5 +11,6 @@ record RawMasteryDefinition(
         @JsonProperty("maximum-level") int maximumLevel,
         @JsonProperty("curve-base") double curveBase,
         @JsonProperty("curve-exponent") double curveExponent,
-        @JsonProperty("maximum-power-bonus") double maximumPowerBonus) {
+        @JsonProperty("maximum-power-bonus") double maximumPowerBonus,
+        @JsonProperty("tree-revision") int treeRevision) {
 }

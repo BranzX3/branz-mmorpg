@@ -20,7 +20,12 @@ record RawCharacterClassDefinition(
         @JsonProperty("ultimate-skill") String ultimateSkill,
         @JsonProperty("passive-root-node") String passiveRootNode,
         @JsonProperty("starter-grant") RawStarterGrant starterGrant,
-        Set<String> tags) {
+        Set<String> tags,
+        @JsonProperty("maximum-level") int maximumLevel,
+        @JsonProperty("xp-curve-base") double xpCurveBase,
+        @JsonProperty("xp-curve-exponent") double xpCurveExponent,
+        @JsonProperty("bonus-skill-point-levels") Set<Integer> bonusSkillPointLevels,
+        @JsonProperty("tree-revision") int treeRevision) {
     record RawStarterGrant(
             String id,
             int revision,

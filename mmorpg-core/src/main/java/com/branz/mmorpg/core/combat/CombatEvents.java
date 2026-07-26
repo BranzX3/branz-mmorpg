@@ -2,6 +2,7 @@ package com.branz.mmorpg.core.combat;
 
 import com.branz.mmorpg.api.combat.DamageResult;
 import com.branz.mmorpg.api.combat.DamageType;
+import com.branz.mmorpg.api.combat.DeathContext;
 import com.branz.mmorpg.api.event.DomainEvent;
 import java.time.Instant;
 import java.util.UUID;
@@ -29,16 +30,22 @@ public final class CombatEvents {
     /**
      * A combatant died.
      *
-     * @param killerId  the killer, null for environmental death
-     * @param overkill  damage beyond what was needed; useful for telemetry
+     * <p>The context includes final-blow attribution plus the immutable
+     * contribution ledger used by rewards, mastery, and encounter consumers.
      */
     public record CombatantDied(
             UUID eventId,
             Instant occurredAt,
-            UUID victimId,
-            UUID killerId,
-            DamageType cause,
-            double overkill) implements DomainEvent {
+            DeathContext context) implements DomainEvent {
+
+        public CombatantDied {
+            java.util.Objects.requireNonNull(context, "context");
+        }
+
+        public UUID victimId() { return context.victimId(); }
+        public UUID killerId() { return context.killerId(); }
+        public DamageType cause() { return context.cause(); }
+        public double overkill() { return context.overkill(); }
     }
 
     /** A combatant entered or left combat state. */

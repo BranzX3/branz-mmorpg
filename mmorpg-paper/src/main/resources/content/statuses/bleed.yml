@@ -1,0 +1,13 @@
+type: status
+id: branz:bleed
+display-name: Bleed
+category: negative
+stack-policy: independent_stacks
+max-stacks: 5
+duration-ms: 8000
+periodic-interval-ms: 2000
+potency: 3.0
+modifiers: []
+dispel-tags: [physical, bleed]
+crowd-control: none
+offline-policy: tick_down

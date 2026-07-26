@@ -8,6 +8,7 @@ import com.branz.mmorpg.api.skill.SkillDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillNodeDefinition;
 import com.branz.mmorpg.api.mastery.MasteryDefinition;
+import com.branz.mmorpg.api.mastery.MasteryNodeDefinition;
 import com.branz.mmorpg.api.item.WeaponDefinition;
 import com.branz.mmorpg.api.item.LootDefinition;
 import com.branz.mmorpg.api.gathering.GatheringNodeDefinition;
@@ -16,6 +17,10 @@ import com.branz.mmorpg.api.crafting.RecipeDefinition;
 import com.branz.mmorpg.api.mob.MobDefinition;
 import com.branz.mmorpg.api.encounter.EncounterDefinition;
 import com.branz.mmorpg.api.character.CharacterClassDefinition;
+import com.branz.mmorpg.api.character.ClassSkillNodeDefinition;
+import com.branz.mmorpg.api.status.StatusDefinition;
+import com.branz.mmorpg.api.input.CombatInputProfileDefinition;
+import com.branz.mmorpg.api.input.CombatComboDefinition;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -31,6 +36,7 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
     private final Map<ContentId, LifeSkillDefinition> lifeSkills;
     private final Map<ContentId, LifeSkillNodeDefinition> lifeSkillNodes;
     private final Map<ContentId, MasteryDefinition> masteries;
+    private final Map<ContentId, MasteryNodeDefinition> masteryNodes;
     private final Map<ContentId, WeaponDefinition> weapons;
     private final Map<ContentId, LootDefinition> lootTables;
     private final Map<ContentId, GatheringNodeDefinition> gatheringNodes;
@@ -39,6 +45,10 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
     private final Map<ContentId, MobDefinition> mobs;
     private final Map<ContentId, EncounterDefinition> encounters;
     private final Map<ContentId, CharacterClassDefinition> characterClasses;
+    private final Map<ContentId, StatusDefinition> statuses;
+    private final Map<ContentId, ClassSkillNodeDefinition> classSkillNodes;
+    private final Map<ContentId, CombatInputProfileDefinition> combatInputProfiles;
+    private final Map<ContentId, CombatComboDefinition> combatCombos;
 
     ImmutableContentSnapshot(long revision, Instant loadedAt, Map<ContentId, ContentDefinition> definitions) {
         this.revision = revision;
@@ -70,6 +80,7 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
         this.lifeSkills = Map.copyOf(lifeSkillIndex);
         this.lifeSkillNodes = Map.copyOf(nodeIndex);
         Map<ContentId, MasteryDefinition> masteryIndex = new LinkedHashMap<>();
+        Map<ContentId, MasteryNodeDefinition> masteryNodeIndex = new LinkedHashMap<>();
         Map<ContentId, WeaponDefinition> weaponIndex = new LinkedHashMap<>();
         Map<ContentId, LootDefinition> lootIndex = new LinkedHashMap<>();
         Map<ContentId, GatheringNodeDefinition> gatheringIndex = new LinkedHashMap<>();
@@ -78,9 +89,15 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
         Map<ContentId, MobDefinition> mobIndex = new LinkedHashMap<>();
         Map<ContentId, EncounterDefinition> encounterIndex = new LinkedHashMap<>();
         Map<ContentId, CharacterClassDefinition> classIndex = new LinkedHashMap<>();
+        Map<ContentId, StatusDefinition> statusIndex = new LinkedHashMap<>();
+        Map<ContentId, ClassSkillNodeDefinition> classNodeIndex = new LinkedHashMap<>();
+        Map<ContentId, CombatInputProfileDefinition> inputProfileIndex = new LinkedHashMap<>();
+        Map<ContentId, CombatComboDefinition> comboIndex = new LinkedHashMap<>();
         definitions.forEach((id, definition) -> {
             if (definition instanceof MasteryDefinition mastery) {
                 masteryIndex.put(id, mastery);
+            } else if (definition instanceof MasteryNodeDefinition masteryNode) {
+                masteryNodeIndex.put(id, masteryNode);
             } else if (definition instanceof WeaponDefinition weapon) {
                 weaponIndex.put(id, weapon);
             } else if (definition instanceof LootDefinition loot) {
@@ -97,9 +114,18 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
                 encounterIndex.put(id, encounter);
             } else if (definition instanceof CharacterClassDefinition characterClass) {
                 classIndex.put(id, characterClass);
+            } else if (definition instanceof StatusDefinition status) {
+                statusIndex.put(id, status);
+            } else if (definition instanceof ClassSkillNodeDefinition node) {
+                classNodeIndex.put(id, node);
+            } else if (definition instanceof CombatInputProfileDefinition profile) {
+                inputProfileIndex.put(id, profile);
+            } else if (definition instanceof CombatComboDefinition combo) {
+                comboIndex.put(id, combo);
             }
         });
         this.masteries = Map.copyOf(masteryIndex);
+        this.masteryNodes = Map.copyOf(masteryNodeIndex);
         this.weapons = Map.copyOf(weaponIndex);
         this.lootTables = Map.copyOf(lootIndex);
         this.gatheringNodes = Map.copyOf(gatheringIndex);
@@ -108,6 +134,10 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
         this.mobs = Map.copyOf(mobIndex);
         this.encounters = Map.copyOf(encounterIndex);
         this.characterClasses = Map.copyOf(classIndex);
+        this.statuses = Map.copyOf(statusIndex);
+        this.classSkillNodes = Map.copyOf(classNodeIndex);
+        this.combatInputProfiles = Map.copyOf(inputProfileIndex);
+        this.combatCombos = Map.copyOf(comboIndex);
     }
 
     static ImmutableContentSnapshot empty() {
@@ -164,6 +194,10 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
         return masteries;
     }
 
+    @Override public Map<ContentId, MasteryNodeDefinition> masteryNodes() {
+        return masteryNodes;
+    }
+
     @Override
     public Map<ContentId, WeaponDefinition> weapons() {
         return weapons;
@@ -197,5 +231,21 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
 
     @Override public Map<ContentId, CharacterClassDefinition> characterClasses() {
         return characterClasses;
+    }
+
+    @Override public Map<ContentId, StatusDefinition> statuses() {
+        return statuses;
+    }
+
+    @Override public Map<ContentId, ClassSkillNodeDefinition> classSkillNodes() {
+        return classSkillNodes;
+    }
+
+    @Override public Map<ContentId, CombatInputProfileDefinition> combatInputProfiles() {
+        return combatInputProfiles;
+    }
+
+    @Override public Map<ContentId, CombatComboDefinition> combatCombos() {
+        return combatCombos;
     }
 }

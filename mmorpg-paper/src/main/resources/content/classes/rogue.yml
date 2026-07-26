@@ -21,8 +21,8 @@ primary-resource: energy
 secondary-resources: []
 allowed-weapon-tags: [bow, ranged]
 allowed-armor-tags: [light, medium]
-class-skills: [branz:precise_shot]
-ultimate-skill: branz:precise_shot
+class-skills: [branz:precise_shot, branz:smoke_veil]
+ultimate-skill: branz:shadow_step
 passive-root-node: branz:rogue_root
 starter-grant:
   id: branz:rogue_starter
@@ -31,3 +31,8 @@ starter-grant:
   unlocked-skills: [branz:basic_strike, branz:precise_shot]
   additional-items: {}
 tags: [physical, ranged, mobile]
+maximum-level: 100
+xp-curve-base: 100
+xp-curve-exponent: 1.65
+bonus-skill-point-levels: [10, 25, 50]
+tree-revision: 1

@@ -1,0 +1,13 @@
+type: status
+id: branz:poison
+display-name: Poison
+category: negative
+stack-policy: add_stack_refresh
+max-stacks: 5
+duration-ms: 12000
+periodic-interval-ms: 3000
+potency: 2.0
+modifiers: []
+dispel-tags: [poison]
+crowd-control: none
+offline-policy: tick_down

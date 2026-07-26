@@ -30,6 +30,9 @@ public record DamageRequest(
         boolean requiresLineOfSight,
         int maxHitsPerTarget) {
 
+    /** Hard safety bound; balance content is expected to be far below this. */
+    public static final double MAX_BASE_POWER = 1_000_000_000.0;
+
     public DamageRequest {
         Objects.requireNonNull(castId, "castId");
         Objects.requireNonNull(targetId, "targetId");
@@ -50,10 +53,14 @@ public record DamageRequest(
     }
 
     public boolean environmental() {
-        return attackerId == null || type == DamageType.ENVIRONMENTAL;
+        return type == DamageType.ENVIRONMENTAL;
     }
 
     public boolean validPower() {
-        return Double.isFinite(basePower) && basePower > 0.0;
+        return Double.isFinite(basePower) && basePower > 0.0 && basePower <= MAX_BASE_POWER;
+    }
+
+    public boolean validRange() {
+        return Double.isFinite(range) && range >= 0.0;
     }
 }

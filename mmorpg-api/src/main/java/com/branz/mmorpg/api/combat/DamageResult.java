@@ -29,8 +29,9 @@ public record DamageResult(
         boolean lethal) {
 
     public DamageResult {
-        if (rejection == null && applied < 0.0) {
-            throw new IllegalArgumentException("applied damage must not be negative");
+        if (rejection == null && (!valid(raw) || !valid(afterCrit) || !valid(mitigated)
+                || !valid(absorbed) || !valid(applied))) {
+            throw new IllegalArgumentException("damage stages must be finite and non-negative");
         }
     }
 
@@ -41,5 +42,9 @@ public record DamageResult(
 
     public boolean landed() {
         return rejection == null;
+    }
+
+    private static boolean valid(double value) {
+        return Double.isFinite(value) && value >= 0.0;
     }
 }

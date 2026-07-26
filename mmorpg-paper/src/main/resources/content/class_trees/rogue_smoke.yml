@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:rogue_smoke_veil
+class-id: branz:rogue
+tree-revision: 1
+branch-id: shadow
+node-type: active_unlock
+maximum-rank: 1
+point-cost-per-rank: 1
+required-class-level: 3
+prerequisites: {"branz:rogue_root": 1}
+unlocked-skill: branz:smoke_veil
+modifiers: []

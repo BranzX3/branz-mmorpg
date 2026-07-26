@@ -13,6 +13,7 @@ import com.branz.mmorpg.api.stat.AttributeSnapshot;
 import com.branz.mmorpg.api.stat.AttributeType;
 import com.branz.mmorpg.api.stat.ModifierAdded;
 import com.branz.mmorpg.api.stat.ModifierRemoved;
+import com.branz.mmorpg.api.stat.ModifierSource;
 import com.branz.mmorpg.api.stat.ResourceChanged;
 import com.branz.mmorpg.api.stat.ResourceDepleted;
 import com.branz.mmorpg.api.stat.ResourceSnapshot;
@@ -98,6 +99,22 @@ public final class PlayerAttributeService {
         publishAttributeChanges(playerId, before, block.attributes(clock));
         publishResourceChanges(playerId, resourcesBefore, block.resources(), "modifier_removed");
         return true;
+    }
+
+    /** Removes exactly the modifiers granted by one equipment/status/mastery source. */
+    public int removeSource(UUID playerId, ModifierSource source) {
+        PlayerStatBlock block = require(playerId);
+        List<AttributeModifier> removed = block.modifiers().stream()
+                .filter(modifier -> modifier.source().equals(source)).toList();
+        if (removed.isEmpty()) return 0;
+        AttributeSnapshot before = block.attributes(clock);
+        Map<ResourceType, ResourceSnapshot> resourcesBefore = block.resources();
+        block.removeSource(source);
+        removed.forEach(modifier -> events.publish(new ModifierRemoved(
+                UUID.randomUUID(), clock.now(), playerId, modifier)));
+        publishAttributeChanges(playerId, before, block.attributes(clock));
+        publishResourceChanges(playerId, resourcesBefore, block.resources(), "source_removed");
+        return removed.size();
     }
 
     public boolean spend(UUID playerId, Map<ResourceType, Double> costs, String reason) {

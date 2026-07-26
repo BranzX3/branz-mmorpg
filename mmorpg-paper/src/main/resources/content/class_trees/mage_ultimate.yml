@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:mage_meteor
+class-id: branz:mage
+tree-revision: 1
+branch-id: pyromancer
+node-type: ultimate_unlock
+maximum-rank: 1
+point-cost-per-rank: 1
+required-class-level: 5
+prerequisites: {"branz:mage_mana_shield": 1}
+unlocked-skill: branz:meteor
+modifiers: []

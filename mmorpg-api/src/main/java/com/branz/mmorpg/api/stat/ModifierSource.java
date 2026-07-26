@@ -19,6 +19,7 @@ public record ModifierSource(SourceType type, String id) {
     public enum SourceType {
         EQUIPMENT,
         SKILL,
+        CLASS_TREE,
         STATUS,
         MASTERY,
         LIFE_SKILL,

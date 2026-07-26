@@ -10,6 +10,7 @@ import com.branz.mmorpg.api.skill.SkillEffectType;
 import com.branz.mmorpg.api.lifeskill.LifeSkillDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillNodeDefinition;
 import com.branz.mmorpg.api.mastery.MasteryDefinition;
+import com.branz.mmorpg.api.mastery.MasteryNodeDefinition;
 import com.branz.mmorpg.api.item.WeaponDefinition;
 import com.branz.mmorpg.api.item.LootDefinition;
 import com.branz.mmorpg.api.item.LootEntry;
@@ -24,7 +25,21 @@ import com.branz.mmorpg.api.character.CharacterClassDefinition;
 import com.branz.mmorpg.api.character.CharacterClassId;
 import com.branz.mmorpg.api.character.CharacterClassRole;
 import com.branz.mmorpg.api.character.StarterGrantPlan;
+import com.branz.mmorpg.api.character.ClassSkillNodeDefinition;
+import com.branz.mmorpg.api.character.ClassSkillNodeType;
 import com.branz.mmorpg.api.stat.AttributeType;
+import com.branz.mmorpg.api.stat.AttributeModifier;
+import com.branz.mmorpg.api.stat.ModifierOperation;
+import com.branz.mmorpg.api.stat.ModifierSource;
+import com.branz.mmorpg.api.status.CrowdControlCategory;
+import com.branz.mmorpg.api.status.OfflinePolicy;
+import com.branz.mmorpg.api.status.StackPolicy;
+import com.branz.mmorpg.api.status.StatusCategory;
+import com.branz.mmorpg.api.status.StatusDefinition;
+import com.branz.mmorpg.api.input.CombatInputKey;
+import com.branz.mmorpg.api.input.SkillSlot;
+import com.branz.mmorpg.api.input.CombatInputProfileDefinition;
+import com.branz.mmorpg.api.input.CombatComboDefinition;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,6 +55,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.time.Duration;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 final class YamlContentLoader {
@@ -81,6 +98,7 @@ final class YamlContentLoader {
         }
 
         validateLifeSkillReferences(definitions, diagnostics);
+        validateCombatInputs(definitions, diagnostics);
 
         if (!diagnostics.isEmpty()) {
             throw new ContentLoadException(diagnostics);
@@ -118,6 +136,7 @@ final class YamlContentLoader {
             detectNodeCycle(nodeId, nodes, visiting, visited, diagnostics);
         }
         validateWeapons(definitions, diagnostics);
+        validateMasteryNodes(definitions, diagnostics);
         validateLoot(definitions, diagnostics);
         validateGathering(definitions, diagnostics);
         validateRecipes(definitions, diagnostics);
@@ -192,6 +211,69 @@ final class YamlContentLoader {
                 }
             });
         }
+        validateClassSkillTrees(definitions, classes, diagnostics);
+    }
+
+    private void validateClassSkillTrees(Map<ContentId, ContentDefinition> definitions,
+                                         List<CharacterClassDefinition> classes,
+                                         List<String> diagnostics) {
+        Map<ContentId, ClassSkillNodeDefinition> nodes = new LinkedHashMap<>();
+        definitions.forEach((id, definition) -> {
+            if (definition instanceof ClassSkillNodeDefinition node) nodes.put(id, node);
+        });
+        for (CharacterClassDefinition characterClass : classes) {
+            ClassSkillNodeDefinition root = nodes.get(characterClass.passiveRootNodeId());
+            if (root == null || !root.classId().equals(characterClass.id())) {
+                diagnostics.add(characterClass.id() + ": missing class tree root "
+                        + characterClass.passiveRootNodeId());
+            }
+        }
+        for (ClassSkillNodeDefinition node : nodes.values()) {
+            ContentDefinition owner = definitions.get(node.classId());
+            if (!(owner instanceof CharacterClassDefinition characterClass)) {
+                diagnostics.add(node.id() + ": unknown owning class " + node.classId());
+                continue;
+            }
+            if (node.treeRevision() != characterClass.treeRevision()) {
+                diagnostics.add(node.id() + ": tree revision does not match " + node.classId());
+            }
+            node.unlockedSkillId().ifPresent(skill -> {
+                if (!(definitions.get(skill) instanceof SkillDefinition)
+                        || (!characterClass.classSkillIds().contains(skill)
+                        && !characterClass.ultimateSkillId().equals(skill))) {
+                    diagnostics.add(node.id() + ": invalid class skill unlock " + skill);
+                }
+            });
+            node.prerequisites().forEach((requiredId, rank) -> {
+                ClassSkillNodeDefinition required = nodes.get(requiredId);
+                if (required == null || !required.classId().equals(node.classId())) {
+                    diagnostics.add(node.id() + ": invalid prerequisite " + requiredId);
+                } else if (rank > required.maximumRank()) {
+                    diagnostics.add(node.id() + ": prerequisite rank exceeds maximum " + requiredId);
+                }
+            });
+        }
+        Set<ContentId> visiting = new java.util.HashSet<>();
+        Set<ContentId> visited = new java.util.HashSet<>();
+        for (ContentId nodeId : nodes.keySet()) {
+            detectClassNodeCycle(nodeId, nodes, visiting, visited, diagnostics);
+        }
+    }
+
+    private void detectClassNodeCycle(ContentId nodeId,
+                                      Map<ContentId, ClassSkillNodeDefinition> nodes,
+                                      Set<ContentId> visiting, Set<ContentId> visited,
+                                      List<String> diagnostics) {
+        if (visited.contains(nodeId) || !nodes.containsKey(nodeId)) return;
+        if (!visiting.add(nodeId)) {
+            diagnostics.add(nodeId + ": class skill tree contains a cycle");
+            return;
+        }
+        for (ContentId required : nodes.get(nodeId).prerequisites().keySet()) {
+            detectClassNodeCycle(required, nodes, visiting, visited, diagnostics);
+        }
+        visiting.remove(nodeId);
+        visited.add(nodeId);
     }
 
     private void validateWeapons(Map<ContentId, ContentDefinition> definitions,
@@ -384,6 +466,8 @@ final class YamlContentLoader {
                     mapper.treeToValue(root, RawLifeSkillNodeDefinition.class));
             case "combat_mastery" -> parseMastery(
                     mapper.treeToValue(root, RawMasteryDefinition.class));
+            case "combat_mastery_node" -> parseMasteryNode(
+                    mapper.treeToValue(root, RawMasteryNodeDefinition.class));
             case "weapon" -> parseWeapon(mapper.treeToValue(root, RawWeaponDefinition.class));
             case "loot_table" -> parseLoot(
                     mapper.treeToValue(root, RawLootDefinition.class));
@@ -398,8 +482,154 @@ final class YamlContentLoader {
                     mapper.treeToValue(root, RawEncounterDefinition.class));
             case "character_class" -> parseCharacterClass(
                     mapper.treeToValue(root, RawCharacterClassDefinition.class));
+            case "status" -> parseStatus(mapper.treeToValue(root, RawStatusDefinition.class));
+            case "class_skill_node" -> parseClassSkillNode(
+                    mapper.treeToValue(root, RawClassSkillNodeDefinition.class));
+            case "combat_input_profile" -> parseCombatInputProfile(
+                    mapper.treeToValue(root, RawCombatInputProfileDefinition.class));
+            case "combat_combo" -> parseCombatCombo(
+                    mapper.treeToValue(root, RawCombatComboDefinition.class));
             default -> throw new IllegalArgumentException("unsupported content type '" + type + "'");
         };
+    }
+
+    private void validateMasteryNodes(Map<ContentId, ContentDefinition> definitions,
+                                      List<String> diagnostics) {
+        Map<ContentId, MasteryNodeDefinition> nodes = new LinkedHashMap<>();
+        definitions.forEach((id, definition) -> {
+            if (definition instanceof MasteryNodeDefinition node) nodes.put(id, node);
+        });
+        for (MasteryNodeDefinition node : nodes.values()) {
+            ContentDefinition owner = definitions.get(node.masteryId());
+            if (!(owner instanceof MasteryDefinition mastery)) {
+                diagnostics.add(node.id() + ": unknown mastery " + node.masteryId());
+                continue;
+            }
+            if (node.treeRevision() != mastery.treeRevision()) {
+                diagnostics.add(node.id() + ": tree revision does not match " + node.masteryId());
+            }
+            node.unlockedSkillId().ifPresent(skill -> {
+                if (!(definitions.get(skill) instanceof SkillDefinition)) {
+                    diagnostics.add(node.id() + ": unknown unlocked skill " + skill);
+                }
+            });
+            node.prerequisites().forEach((requiredId, rank) -> {
+                MasteryNodeDefinition required = nodes.get(requiredId);
+                if (required == null || !required.masteryId().equals(node.masteryId())) {
+                    diagnostics.add(node.id() + ": invalid mastery prerequisite " + requiredId);
+                } else if (rank > required.maximumRank()) {
+                    diagnostics.add(node.id() + ": prerequisite rank exceeds maximum " + requiredId);
+                }
+            });
+        }
+        Set<ContentId> visiting = new java.util.HashSet<>();
+        Set<ContentId> visited = new java.util.HashSet<>();
+        for (ContentId nodeId : nodes.keySet()) {
+            detectMasteryNodeCycle(nodeId, nodes, visiting, visited, diagnostics);
+        }
+    }
+
+    private void detectMasteryNodeCycle(ContentId nodeId,
+                                        Map<ContentId, MasteryNodeDefinition> nodes,
+                                        Set<ContentId> visiting, Set<ContentId> visited,
+                                        List<String> diagnostics) {
+        if (visited.contains(nodeId) || !nodes.containsKey(nodeId)) return;
+        if (!visiting.add(nodeId)) {
+            diagnostics.add(nodeId + ": combat mastery tree contains a cycle");
+            return;
+        }
+        for (ContentId required : nodes.get(nodeId).prerequisites().keySet()) {
+            detectMasteryNodeCycle(required, nodes, visiting, visited, diagnostics);
+        }
+        visiting.remove(nodeId);
+        visited.add(nodeId);
+    }
+
+    private StatusDefinition parseStatus(RawStatusDefinition raw) {
+        ContentId id = ContentId.parse(raw.id());
+        ModifierSource source = ModifierSource.of(ModifierSource.SourceType.STATUS, id.toString());
+        List<AttributeModifier> modifiers = raw.modifiers() == null ? List.of()
+                : raw.modifiers().stream().map(modifier -> new AttributeModifier(
+                        modifier.id(), AttributeType.fromContentKey(modifier.attribute()),
+                        ModifierOperation.valueOf(modifier.operation().toUpperCase(Locale.ROOT)),
+                        modifier.value(), source, modifier.stackingGroup(), modifier.priority(),
+                        Optional.<java.time.Instant>empty())).toList();
+        return new StatusDefinition(id, raw.displayName(),
+                StatusCategory.valueOf(raw.category().toUpperCase(Locale.ROOT)),
+                StackPolicy.valueOf(raw.stackPolicy().toUpperCase(Locale.ROOT)),
+                raw.maxStacks(), Duration.ofMillis(raw.durationMillis()),
+                Duration.ofMillis(raw.periodicIntervalMillis()), raw.potency(), modifiers,
+                raw.dispelTags() == null ? Set.of() : raw.dispelTags(),
+                CrowdControlCategory.valueOf(raw.crowdControl().toUpperCase(Locale.ROOT)),
+                OfflinePolicy.valueOf(raw.offlinePolicy().toUpperCase(Locale.ROOT)));
+    }
+
+    private ClassSkillNodeDefinition parseClassSkillNode(RawClassSkillNodeDefinition raw) {
+        ContentId id = ContentId.parse(raw.id());
+        ModifierSource source = ModifierSource.of(ModifierSource.SourceType.CLASS_TREE, id.toString());
+        List<AttributeModifier> modifiers = raw.modifiers() == null ? List.of()
+                : raw.modifiers().stream().map(modifier -> new AttributeModifier(
+                        modifier.id(), AttributeType.fromContentKey(modifier.attribute()),
+                        ModifierOperation.valueOf(modifier.operation().toUpperCase(Locale.ROOT)),
+                        modifier.value(), source, modifier.stackingGroup(), modifier.priority(),
+                        Optional.<java.time.Instant>empty())).toList();
+        Map<ContentId, Integer> prerequisites = new LinkedHashMap<>();
+        if (raw.prerequisites() != null) {
+            raw.prerequisites().forEach((required, rank) ->
+                    prerequisites.put(ContentId.parse(required), rank));
+        }
+        return new ClassSkillNodeDefinition(id, ContentId.parse(raw.classId()), raw.treeRevision(),
+                raw.branchId(), ClassSkillNodeType.valueOf(raw.nodeType().toUpperCase(Locale.ROOT)),
+                raw.maximumRank(), raw.pointCostPerRank(), raw.requiredClassLevel(), prerequisites,
+                Optional.ofNullable(raw.exclusionGroup()),
+                raw.unlockedSkill() == null || raw.unlockedSkill().isBlank()
+                        ? Optional.empty() : Optional.of(ContentId.parse(raw.unlockedSkill())),
+                modifiers);
+    }
+
+    private CombatInputProfileDefinition parseCombatInputProfile(
+            RawCombatInputProfileDefinition raw) {
+        Map<CombatInputKey, SkillSlot> bindings = new java.util.EnumMap<>(CombatInputKey.class);
+        if (raw.bindings() != null) raw.bindings().forEach((input, slot) -> bindings.put(
+                CombatInputKey.valueOf(input.toUpperCase(Locale.ROOT)),
+                SkillSlot.valueOf(slot.toUpperCase(Locale.ROOT))));
+        return new CombatInputProfileDefinition(ContentId.parse(raw.id()), raw.revision(), bindings,
+                raw.comboWindowMillis(), raw.inputBufferMillis());
+    }
+
+    private CombatComboDefinition parseCombatCombo(RawCombatComboDefinition raw) {
+        List<CombatComboDefinition.Step> steps = raw.steps() == null ? List.of()
+                : raw.steps().stream().map(step -> new CombatComboDefinition.Step(
+                        CombatInputKey.valueOf(step.input().toUpperCase(Locale.ROOT)),
+                        step.minimumDelayMillis(), step.maximumDelayMillis())).toList();
+        return new CombatComboDefinition(ContentId.parse(raw.id()),
+                raw.requiredTags() == null ? Set.of() : raw.requiredTags(), steps,
+                raw.resetTimeoutMillis(), raw.priority(), raw.consumesInput(),
+                ContentId.parse(raw.resultSkill()));
+    }
+
+    private void validateCombatInputs(Map<ContentId, ContentDefinition> definitions,
+                                      List<String> diagnostics) {
+        List<CombatComboDefinition> combos = definitions.values().stream()
+                .filter(CombatComboDefinition.class::isInstance)
+                .map(CombatComboDefinition.class::cast).toList();
+        for (CombatComboDefinition combo : combos) {
+            if (!(definitions.get(combo.resultSkillId()) instanceof SkillDefinition)) {
+                diagnostics.add(combo.id() + ": unknown combo result skill " + combo.resultSkillId());
+            }
+        }
+        for (int left = 0; left < combos.size(); left++) {
+            for (int right = left + 1; right < combos.size(); right++) {
+                CombatComboDefinition first = combos.get(left);
+                CombatComboDefinition second = combos.get(right);
+                if (first.priority() == second.priority()
+                        && first.requiredTags().equals(second.requiredTags())
+                        && first.steps().stream().map(CombatComboDefinition.Step::input).toList()
+                        .equals(second.steps().stream().map(CombatComboDefinition.Step::input).toList())) {
+                    diagnostics.add(first.id() + ": ambiguous combo with " + second.id());
+                }
+            }
+        }
     }
 
     private CharacterClassDefinition parseCharacterClass(RawCharacterClassDefinition raw) {
@@ -432,7 +662,12 @@ final class YamlContentLoader {
                 raw.classSkills() == null ? List.of()
                         : raw.classSkills().stream().map(ContentId::parse).toList(),
                 ContentId.parse(raw.ultimateSkill()), ContentId.parse(raw.passiveRootNode()),
-                starter, raw.tags() == null ? Set.of() : raw.tags());
+                starter, raw.tags() == null ? Set.of() : raw.tags(),
+                raw.maximumLevel() < 1 ? 100 : raw.maximumLevel(),
+                raw.xpCurveBase() <= 0 ? 100.0 : raw.xpCurveBase(),
+                raw.xpCurveExponent() <= 0 ? 1.65 : raw.xpCurveExponent(),
+                raw.bonusSkillPointLevels() == null ? Set.of() : raw.bonusSkillPointLevels(),
+                raw.treeRevision() < 1 ? 1 : raw.treeRevision());
     }
 
     private MobDefinition parseMob(RawMobDefinition raw) {
@@ -570,7 +805,27 @@ final class YamlContentLoader {
                 MasteryDefinition.Kind.valueOf(raw.kind().toUpperCase(Locale.ROOT)),
                 raw.parent() == null || raw.parent().isBlank() ? null : ContentId.parse(raw.parent()),
                 raw.maximumLevel(), raw.curveBase(), raw.curveExponent(),
-                raw.maximumPowerBonus());
+                raw.maximumPowerBonus(), raw.treeRevision() < 1 ? 1 : raw.treeRevision());
+    }
+
+    private MasteryNodeDefinition parseMasteryNode(RawMasteryNodeDefinition raw) {
+        ContentId id = ContentId.parse(raw.id());
+        ModifierSource source = ModifierSource.of(ModifierSource.SourceType.MASTERY, id.toString());
+        List<AttributeModifier> modifiers = raw.modifiers() == null ? List.of()
+                : raw.modifiers().stream().map(modifier -> new AttributeModifier(
+                        modifier.id(), AttributeType.fromContentKey(modifier.attribute()),
+                        ModifierOperation.valueOf(modifier.operation().toUpperCase(Locale.ROOT)),
+                        modifier.value(), source, modifier.stackingGroup(), modifier.priority(),
+                        Optional.<java.time.Instant>empty())).toList();
+        Map<ContentId, Integer> prerequisites = new LinkedHashMap<>();
+        if (raw.prerequisites() != null) raw.prerequisites().forEach((required, rank) ->
+                prerequisites.put(ContentId.parse(required), rank));
+        return new MasteryNodeDefinition(id, ContentId.parse(raw.masteryId()), raw.treeRevision(),
+                raw.branchId(), raw.maximumRank(), raw.pointCostPerRank(),
+                raw.requiredMasteryLevel(), prerequisites, Optional.ofNullable(raw.exclusionGroup()),
+                raw.unlockedSkill() == null || raw.unlockedSkill().isBlank()
+                        ? Optional.empty() : Optional.of(ContentId.parse(raw.unlockedSkill())),
+                modifiers);
     }
 
     private WeaponDefinition parseWeapon(RawWeaponDefinition raw) {
@@ -579,7 +834,12 @@ final class YamlContentLoader {
                 ContentId.parse(raw.basicAttackSkill()),
                 raw.activeSkills() == null ? List.of()
                         : raw.activeSkills().stream().map(ContentId::parse).toList(),
-                raw.tags() == null ? Set.of() : raw.tags(), raw.twoHanded());
+                raw.tags() == null ? Set.of() : raw.tags(), raw.twoHanded(),
+                raw.familyXpShare() == 0.0 && raw.typeXpShare() == 0.0
+                        && raw.skillXpShare() == 0.0 ? 0.40 : raw.familyXpShare(),
+                raw.familyXpShare() == 0.0 && raw.typeXpShare() == 0.0
+                        && raw.skillXpShare() == 0.0 ? 0.60 : raw.typeXpShare(),
+                raw.skillXpShare());
     }
 
     private LifeSkillDefinition parseLifeSkill(RawLifeSkillDefinition raw) {

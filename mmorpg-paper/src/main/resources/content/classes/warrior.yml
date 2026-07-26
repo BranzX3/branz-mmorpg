@@ -22,8 +22,8 @@ primary-resource: stamina
 secondary-resources: [rage]
 allowed-weapon-tags: [sword, melee]
 allowed-armor-tags: [heavy, medium]
-class-skills: [branz:heavy_slash]
-ultimate-skill: branz:heavy_slash
+class-skills: [branz:heavy_slash, branz:rallying_shout]
+ultimate-skill: branz:warbreaker
 passive-root-node: branz:warrior_root
 starter-grant:
   id: branz:warrior_starter
@@ -32,3 +32,8 @@ starter-grant:
   unlocked-skills: [branz:basic_strike, branz:heavy_slash]
   additional-items: {}
 tags: [physical, frontline]
+maximum-level: 100
+xp-curve-base: 100
+xp-curve-exponent: 1.65
+bonus-skill-point-levels: [10, 25, 50]
+tree-revision: 1

@@ -5,14 +5,19 @@ import com.branz.mmorpg.api.combat.DamageRequest;
 import com.branz.mmorpg.api.combat.DamageType;
 import com.branz.mmorpg.api.player.PlayerSession;
 import com.branz.mmorpg.core.combat.CombatEngine;
+import com.branz.mmorpg.core.combat.CombatEvents;
 import com.branz.mmorpg.core.event.SimpleEventBus;
 import com.branz.mmorpg.core.player.PlayerSessionService;
 import com.branz.mmorpg.core.runtime.SeededRandomSource;
 import com.branz.mmorpg.core.runtime.SystemGameClock;
+import com.branz.mmorpg.core.stat.PlayerAttributeService;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Level;
+import java.util.function.Consumer;
 import org.bukkit.entity.Entity;
+import org.bukkit.FluidCollisionMode;
+import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
@@ -24,6 +29,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.util.Vector;
 
 /**
  * First playable Paper adapter for C2-C4.
@@ -36,7 +42,9 @@ public final class PaperCombatRuntime implements Listener {
 
     private final JavaPlugin plugin;
     private final PlayerSessionService sessions;
+    private final PlayerAttributeService playerAttributes;
     private final CombatEngine engine;
+    private final SimpleEventBus events;
     private BasicAttackHandler basicAttacks;
 
     @FunctionalInterface
@@ -44,17 +52,24 @@ public final class PaperCombatRuntime implements Listener {
         void attack(Player attacker, LivingEntity target);
     }
 
-    public PaperCombatRuntime(JavaPlugin plugin, PlayerSessionService sessions, CombatPolicy policy) {
+    public PaperCombatRuntime(JavaPlugin plugin, PlayerSessionService sessions,
+                              PlayerAttributeService playerAttributes, CombatPolicy policy) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
-        SimpleEventBus events = new SimpleEventBus(failure ->
+        this.playerAttributes = Objects.requireNonNull(playerAttributes, "playerAttributes");
+        events = new SimpleEventBus(failure ->
                 plugin.getLogger().log(Level.WARNING, "Combat event subscriber failed", failure));
         this.engine = new CombatEngine(policy, new SystemGameClock(), SeededRandomSource.shared(),
-                events, this::combatant, CombatEngine.LineOfSight.always());
+                events, this::combatant, this::clearLineOfSight);
     }
 
     public CombatEngine engine() {
         return engine;
+    }
+
+    public void damageListener(Consumer<CombatEvents.DamageDealt> listener) {
+        events.subscribe(CombatEvents.DamageDealt.class,
+                Objects.requireNonNull(listener, "listener"));
     }
 
     public void basicAttackHandler(BasicAttackHandler handler) {
@@ -120,7 +135,8 @@ public final class PaperCombatRuntime implements Listener {
 
     private PaperCombatant combatant(UUID entityId) {
         Entity entity = plugin.getServer().getEntity(entityId);
-        return entity instanceof LivingEntity living ? new PaperCombatant(living) : null;
+        return entity instanceof LivingEntity living
+                ? new PaperCombatant(living, playerAttributes) : null;
     }
 
     private boolean owns(LivingEntity attacker, LivingEntity target) {
@@ -151,5 +167,18 @@ public final class PaperCombatRuntime implements Listener {
         // Projectile events have already been validated by Paper. A generous
         // value avoids treating their travel distance as melee reach.
         return attacker.getLocation().distanceSquared(target.getLocation()) > 36.0 ? 0.0 : 6.0;
+    }
+
+    private boolean clearLineOfSight(com.branz.mmorpg.api.combat.WorldPoint from,
+                                     com.branz.mmorpg.api.combat.WorldPoint to) {
+        if (!from.sameWorld(to)) return false;
+        var world = plugin.getServer().getWorld(from.worldId());
+        if (world == null) return false;
+        Vector direction = new Vector(to.x() - from.x(), to.y() - from.y(), to.z() - from.z());
+        double distance = direction.length();
+        if (distance <= 0.25) return true;
+        Location origin = new Location(world, from.x(), from.y(), from.z());
+        return world.rayTraceBlocks(origin, direction.normalize(), distance - 0.25,
+                FluidCollisionMode.NEVER, true) == null;
     }
 }

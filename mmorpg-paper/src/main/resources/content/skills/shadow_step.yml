@@ -1,0 +1,26 @@
+type: skill
+id: branz:shadow_step
+display-name: Shadow Step
+input-slot: ultimate
+tags: [class, rogue, ultimate, mobility]
+cast-ms: 0
+active-ms: 0
+recovery-ms: 250
+cooldown-ms: 25000
+cooldown-group: rogue-ultimate
+costs: {ENERGY: 60}
+interrupt-refund: 0
+range: 14
+requires-line-of-sight: true
+root-effect: sequence
+effects:
+  - id: sequence
+    type: sequence
+    children: [dash, hit]
+  - id: dash
+    type: dash
+    numbers: {strength: 1.8}
+  - id: hit
+    type: damage
+    numbers: {power: 80}
+    values: {type: physical}

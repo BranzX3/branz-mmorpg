@@ -1,0 +1,12 @@
+type: combat_input_profile
+id: branz:default_action_controls
+revision: 1
+bindings:
+  LMB: BASIC_ATTACK
+  RMB: WEAPON_SKILL_1
+  F: WEAPON_SKILL_2
+  SHIFT_LMB: CLASS_SKILL_1
+  SHIFT_RMB: CLASS_SKILL_2
+  SHIFT_F: ULTIMATE
+combo-window-millis: 450
+input-buffer-millis: 150

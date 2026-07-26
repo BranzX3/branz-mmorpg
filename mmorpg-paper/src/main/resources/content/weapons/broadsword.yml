@@ -7,3 +7,6 @@ basic-attack-skill: branz:basic_strike
 active-skills: [branz:heavy_slash]
 tags: [sword, melee]
 two-handed: false
+family-xp-share: 0.40
+type-xp-share: 0.60
+skill-xp-share: 0.0

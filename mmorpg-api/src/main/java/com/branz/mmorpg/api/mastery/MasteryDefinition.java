@@ -16,7 +16,8 @@ public record MasteryDefinition(
         int maximumLevel,
         double curveBase,
         double curveExponent,
-        double maximumPowerBonus) implements ContentDefinition {
+        double maximumPowerBonus,
+        int treeRevision) implements ContentDefinition {
 
     public enum Kind { FAMILY, WEAPON_TYPE, SKILL }
 
@@ -36,6 +37,14 @@ public record MasteryDefinition(
                 || maximumPowerBonus < 0.0 || maximumPowerBonus > 0.25) {
             throw invalid(id, "maximumPowerBonus must be in [0,0.25]");
         }
+        if (treeRevision < 1) throw invalid(id, "treeRevision must be positive");
+    }
+
+    public MasteryDefinition(ContentId id, String displayName, Kind kind, ContentId parentId,
+                             int maximumLevel, double curveBase, double curveExponent,
+                             double maximumPowerBonus) {
+        this(id, displayName, kind, parentId, maximumLevel, curveBase, curveExponent,
+                maximumPowerBonus, 1);
     }
 
     @Override

@@ -24,7 +24,12 @@ public record CharacterClassDefinition(
         ContentId ultimateSkillId,
         ContentId passiveRootNodeId,
         StarterGrantPlan starterGrantPlan,
-        Set<String> tags) implements ContentDefinition {
+        Set<String> tags,
+        int maximumLevel,
+        double xpCurveBase,
+        double xpCurveExponent,
+        Set<Integer> bonusSkillPointLevels,
+        int treeRevision) implements ContentDefinition {
     public CharacterClassDefinition {
         Objects.requireNonNull(id, "id");
         displayName = displayName == null || displayName.isBlank() ? id.toString() : displayName.trim();
@@ -39,6 +44,8 @@ public record CharacterClassDefinition(
         Objects.requireNonNull(passiveRootNodeId, "passiveRootNodeId");
         Objects.requireNonNull(starterGrantPlan, "starterGrantPlan");
         tags = Set.copyOf(Objects.requireNonNull(tags, "tags"));
+        bonusSkillPointLevels = Set.copyOf(Objects.requireNonNull(
+                bonusSkillPointLevels, "bonusSkillPointLevels"));
         if (schemaVersion < 1) throw new IllegalArgumentException("class schema version must be positive");
         if (roles.isEmpty() || allowedWeaponTags.isEmpty() || classSkillIds.isEmpty()) {
             throw new IllegalArgumentException("class roles, weapon tags, and skills must not be empty");
@@ -52,6 +59,31 @@ public record CharacterClassDefinition(
                 throw new IllegalArgumentException("invalid base attribute " + attribute);
             }
         });
+        if (maximumLevel < 1 || maximumLevel > 10_000
+                || !Double.isFinite(xpCurveBase) || xpCurveBase <= 0
+                || !Double.isFinite(xpCurveExponent) || xpCurveExponent <= 0
+                || treeRevision < 1) {
+            throw new IllegalArgumentException("class progression curve is invalid");
+        }
+        bonusSkillPointLevels.forEach(level -> {
+            if (level == null || level < 2 || level > maximumLevel) {
+                throw new IllegalArgumentException("invalid bonus Skill Point level " + level);
+            }
+        });
+    }
+
+    /** Compatibility constructor for code-defined fixtures created before K2. */
+    public CharacterClassDefinition(
+            ContentId id, String displayName, int schemaVersion,
+            Set<CharacterClassRole> roles, Map<String, Double> baseAttributes,
+            ResourceType primaryResource, Set<ResourceType> secondaryResources,
+            Set<String> allowedWeaponTags, Set<String> allowedArmorTags,
+            List<ContentId> classSkillIds, ContentId ultimateSkillId,
+            ContentId passiveRootNodeId, StarterGrantPlan starterGrantPlan, Set<String> tags) {
+        this(id, displayName, schemaVersion, roles, baseAttributes, primaryResource,
+                secondaryResources, allowedWeaponTags, allowedArmorTags, classSkillIds,
+                ultimateSkillId, passiveRootNodeId, starterGrantPlan, tags,
+                100, 100.0, 1.65, Set.of(), 1);
     }
 
     public CharacterClassId classId() {

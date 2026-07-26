@@ -1,0 +1,19 @@
+type: skill
+id: branz:mana_shield
+display-name: Mana Shield
+input-slot: class-2
+tags: [class, mage, defense]
+cast-ms: 0
+active-ms: 0
+recovery-ms: 200
+cooldown-ms: 10000
+cooldown-group: mage-defense
+costs: {MANA: 28}
+interrupt-refund: 0
+range: 0
+requires-line-of-sight: false
+root-effect: shield
+effects:
+  - id: shield
+    type: apply_status
+    values: {status: "branz:shield"}

@@ -1,0 +1,11 @@
+type: combat_mastery_node
+id: branz:pyromancer_burn
+mastery-id: branz:pyromancer_staff_mastery
+tree-revision: 1
+branch-id: flamebound
+maximum-rank: 3
+point-cost-per-rank: 1
+required-mastery-level: 2
+prerequisites: {}
+modifiers:
+  - {id: pyromancer_magic, attribute: magic_power, operation: add_percent, value: 0.02, stacking-group: "", priority: 0}

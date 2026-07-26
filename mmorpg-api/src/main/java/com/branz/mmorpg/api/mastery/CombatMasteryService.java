@@ -12,4 +12,9 @@ public interface CombatMasteryService {
     MasteryMutationCommit grantContribution(UUID playerId, ContentId masteryId,
                                             long baseXp, double antiFarmMultiplier,
                                             OperationId operationId);
+
+    MasteryMutationCommit purchaseNode(UUID playerId, ContentId masteryId, ContentId nodeId,
+                                       OperationId operationId);
+
+    MasteryMutationCommit respec(UUID playerId, ContentId masteryId, OperationId operationId);
 }

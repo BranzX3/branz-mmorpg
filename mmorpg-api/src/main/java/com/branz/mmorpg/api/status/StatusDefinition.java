@@ -1,6 +1,8 @@
 package com.branz.mmorpg.api.status;
 
 import com.branz.mmorpg.api.content.ContentId;
+import com.branz.mmorpg.api.content.ContentDefinition;
+import com.branz.mmorpg.api.content.ContentType;
 import com.branz.mmorpg.api.error.ErrorCode;
 import com.branz.mmorpg.api.error.MMOException;
 import com.branz.mmorpg.api.stat.AttributeModifier;
@@ -42,7 +44,7 @@ public record StatusDefinition(
         List<AttributeModifier> modifiers,
         Set<String> dispelTags,
         CrowdControlCategory crowdControl,
-        OfflinePolicy offlinePolicy) {
+        OfflinePolicy offlinePolicy) implements ContentDefinition {
 
     public StatusDefinition {
         Objects.requireNonNull(id, "id");
@@ -80,6 +82,11 @@ public record StatusDefinition(
 
     public boolean periodic() {
         return !periodicInterval.isZero();
+    }
+
+    @Override
+    public ContentType type() {
+        return ContentType.STATUS;
     }
 
     public boolean permanent() {

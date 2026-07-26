@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:mage_mana_shield
+class-id: branz:mage
+tree-revision: 1
+branch-id: protector
+node-type: active_unlock
+maximum-rank: 1
+point-cost-per-rank: 1
+required-class-level: 3
+prerequisites: {"branz:mage_root": 1}
+unlocked-skill: branz:mana_shield
+modifiers: []

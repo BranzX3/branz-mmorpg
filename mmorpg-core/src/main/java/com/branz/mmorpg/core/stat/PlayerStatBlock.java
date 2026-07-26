@@ -9,6 +9,7 @@ import com.branz.mmorpg.api.skill.ResourceType;
 import com.branz.mmorpg.api.stat.AttributeModifier;
 import com.branz.mmorpg.api.stat.AttributeSnapshot;
 import com.branz.mmorpg.api.stat.AttributeType;
+import com.branz.mmorpg.api.stat.ModifierSource;
 import com.branz.mmorpg.api.stat.ResourcePolicy;
 import com.branz.mmorpg.api.stat.ResourceSnapshot;
 import java.time.Instant;
@@ -90,6 +91,12 @@ public final class PlayerStatBlock {
         boolean changed = attributes.remove(modifierId);
         if (changed) reconcileMaximums();
         return changed;
+    }
+
+    public synchronized int removeSource(ModifierSource source) {
+        int removed = attributes.removeSource(source);
+        if (removed > 0) reconcileMaximums();
+        return removed;
     }
 
     public synchronized int purgeExpired(Instant now) {

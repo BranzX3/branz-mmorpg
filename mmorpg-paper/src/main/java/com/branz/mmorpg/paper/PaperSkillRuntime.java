@@ -2,8 +2,15 @@ package com.branz.mmorpg.paper;
 
 import com.branz.mmorpg.api.combat.DamageRequest;
 import com.branz.mmorpg.api.combat.DamageType;
+import com.branz.mmorpg.api.combat.WorldPoint;
+import com.branz.mmorpg.api.character.CharacterClassDefinition;
 import com.branz.mmorpg.api.content.ContentId;
 import com.branz.mmorpg.api.content.ContentService;
+import com.branz.mmorpg.api.input.CombatInputIntent;
+import com.branz.mmorpg.api.input.CombatInputKey;
+import com.branz.mmorpg.api.input.CombatInputProfileDefinition;
+import com.branz.mmorpg.api.input.InputResolution;
+import com.branz.mmorpg.api.input.SkillSlot;
 import com.branz.mmorpg.api.player.PlayerSession;
 import com.branz.mmorpg.api.skill.ResourceType;
 import com.branz.mmorpg.api.skill.SkillCastSnapshot;
@@ -15,6 +22,9 @@ import com.branz.mmorpg.api.stat.AttributeType;
 import com.branz.mmorpg.api.item.LoadoutService;
 import com.branz.mmorpg.api.telemetry.TelemetryService;
 import com.branz.mmorpg.core.player.PlayerSessionService;
+import com.branz.mmorpg.core.character.CharacterClassProgressionService;
+import com.branz.mmorpg.core.input.CombatComboResolver;
+import com.branz.mmorpg.core.input.CombatInputEngine;
 import com.branz.mmorpg.core.runtime.SystemGameClock;
 import com.branz.mmorpg.core.skill.SkillExecutionEngine;
 import com.branz.mmorpg.core.stat.PlayerAttributeService;
@@ -35,10 +45,13 @@ import org.bukkit.entity.Snowball;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
 
@@ -46,6 +59,8 @@ import org.bukkit.util.Vector;
 public final class PaperSkillRuntime implements Listener {
 
     private static final ContentId DEFAULT_WEAPON = ContentId.parse("branz:broadsword");
+    private static final ContentId DEFAULT_INPUT_PROFILE =
+            ContentId.parse("branz:default_action_controls");
 
     private final JavaPlugin plugin;
     private final PlayerSessionService sessions;
@@ -56,6 +71,9 @@ public final class PaperSkillRuntime implements Listener {
     private final PaperItemRuntime items;
     private final TelemetryService telemetry;
     private final PlayerAttributeService attributes;
+    private final CharacterClassProgressionService classProgression;
+    private final CombatComboResolver comboResolver = new CombatComboResolver();
+    private final CombatInputEngine inputEngine = new CombatInputEngine(comboResolver);
     private final Map<UUID, ProjectileCast> projectiles = new ConcurrentHashMap<>();
     private final SkillExecutionEngine engine;
     private volatile BiConsumer<UUID, ContentId> skillListener =
@@ -69,7 +87,8 @@ public final class PaperSkillRuntime implements Listener {
                              ContentService content, PaperCombatRuntime combat,
                              PaperStatusRuntime statuses, LoadoutService loadouts,
                              PaperItemRuntime items, TelemetryService telemetry,
-                             PlayerAttributeService attributes) {
+                             PlayerAttributeService attributes,
+                             CharacterClassProgressionService classProgression) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.content = Objects.requireNonNull(content, "content");
@@ -79,6 +98,7 @@ public final class PaperSkillRuntime implements Listener {
         this.items = Objects.requireNonNull(items, "items");
         this.telemetry = Objects.requireNonNull(telemetry, "telemetry");
         this.attributes = Objects.requireNonNull(attributes, "attributes");
+        this.classProgression = Objects.requireNonNull(classProgression, "classProgression");
         this.engine = new SkillExecutionEngine(new SystemGameClock(), this::execute);
     }
 
@@ -89,45 +109,19 @@ public final class PaperSkillRuntime implements Listener {
             return;
         }
         event.setCancelled(true);
-        var weapon = items.activeWeapon(player.getUniqueId())
-                .or(() -> loadouts.current(player.getUniqueId())).orElse(null);
-        if (weapon == null) {
-            LoadoutService.EquipResult defaultEquip =
-                    loadouts.equip(player.getUniqueId(), DEFAULT_WEAPON);
-            if (!defaultEquip.equipped()) {
-                player.sendActionBar(Component.text("Cannot equip default weapon: "
-                        + defaultEquip.rejection()));
-                return;
-            }
-            weapon = defaultEquip.weapon();
-        }
-        if (weapon == null || weapon.activeSkillIds().isEmpty()) {
-            player.sendActionBar(Component.text("No active weapon loadout."));
-            return;
-        }
-        SkillDefinition definition = content.snapshot().skills().get(weapon.activeSkillIds().get(0));
-        if (definition == null) {
-            player.sendActionBar(Component.text("Skill content is unavailable."));
-            return;
-        }
-        Entity selected = player.getTargetEntity(Math.max(1, (int) Math.ceil(definition.range())));
-        UUID targetId = selected instanceof LivingEntity ? selected.getUniqueId() : null;
-        if (targetId == null) {
-            player.sendActionBar(Component.text("No valid target."));
-            return;
-        }
-        var result = engine.begin(definition, caster(player), targetId,
-                content.snapshot().revision());
-        if (result.started()) {
-            skillListener.accept(player.getUniqueId(), definition.id());
-        }
-        telemetry.increment("skill.usage");
-        if (!result.started()) {
-            player.sendActionBar(Component.text("Cannot cast: "
-                    + result.rejection().name().toLowerCase(Locale.ROOT).replace('_', ' ')));
-        } else {
-            player.sendActionBar(Component.text(definition.displayName() + " — casting"));
-        }
+        routeInput(player, player.isSneaking() ? CombatInputKey.SHIFT_F : CombatInputKey.F, null);
+    }
+
+    /** RMB is owned only in air so block/container interactions retain priority. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onInteract(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND
+                || event.getAction() != Action.RIGHT_CLICK_AIR
+                || !playable(event.getPlayer())) return;
+        event.setCancelled(true);
+        Player player = event.getPlayer();
+        routeInput(player, player.isSneaking()
+                ? CombatInputKey.SHIFT_RMB : CombatInputKey.RMB, null);
     }
 
     @EventHandler
@@ -139,6 +133,8 @@ public final class PaperSkillRuntime implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
+        comboResolver.reset(playerId);
+        loadouts.forget(playerId);
         engine.activeCast(playerId).ifPresent(cast -> {
             engine.interrupt(cast.castId(), "logout");
             combat.engine().endCast(cast.castId());
@@ -192,6 +188,19 @@ public final class PaperSkillRuntime implements Listener {
     /** Routes vanilla melee intent through the same authoritative skill state machine. */
     public void basicAttack(Player player, LivingEntity target) {
         if (!playable(player)) return;
+        routeInput(player, player.isSneaking()
+                ? CombatInputKey.SHIFT_LMB : CombatInputKey.LMB, target);
+    }
+
+    private void routeInput(Player player, CombatInputKey key, LivingEntity suppliedTarget) {
+        var session = sessions.requirePlayable(player.getUniqueId());
+        var snapshot = content.snapshot();
+        CombatInputProfileDefinition profile =
+                snapshot.combatInputProfiles().get(DEFAULT_INPUT_PROFILE);
+        if (profile == null) {
+            player.sendActionBar(Component.text("Combat controls are unavailable."));
+            return;
+        }
         var weapon = items.activeWeapon(player.getUniqueId())
                 .or(() -> loadouts.current(player.getUniqueId())).orElse(null);
         if (weapon == null) {
@@ -203,14 +212,72 @@ public final class PaperSkillRuntime implements Listener {
             player.sendActionBar(Component.text("No usable weapon."));
             return;
         }
-        SkillDefinition definition =
-                content.snapshot().skills().get(weapon.basicAttackSkillId());
-        if (definition == null) {
-            player.sendActionBar(Component.text("Basic attack content is unavailable."));
+        var location = player.getLocation();
+        long loadoutRevision = loadouts.revision(player.getUniqueId());
+        CombatInputIntent intent = new CombatInputIntent(UUID.randomUUID(),
+                player.getUniqueId(), session.token(), key,
+                Math.max(0L, player.getTicksLived()), System.nanoTime(),
+                java.util.Optional.empty(),
+                java.util.Optional.ofNullable(suppliedTarget).map(Entity::getUniqueId),
+                new WorldPoint(location.getWorld().getUID(), location.getX(),
+                        location.getY(), location.getZ()),
+                profile.revision(), snapshot.revision(), loadoutRevision);
+        InputResolution resolution = inputEngine.accept(intent, profile,
+                snapshot.combatCombos().values(), new CombatInputEngine.Context(
+                        session.token(), session.playable(), snapshot.revision(),
+                        loadoutRevision, weapon.tags(), null));
+        if (resolution.outcome() == InputResolution.Outcome.REJECTED) {
+            telemetry.increment("input.rejected");
+            player.sendActionBar(Component.text("Cannot use input: " + resolution.rejection()));
             return;
         }
-        var result = engine.begin(definition, caster(player), target.getUniqueId(),
-                content.snapshot().revision());
+        if (resolution.outcome() == InputResolution.Outcome.COMBO_ADVANCED) return;
+        ContentId classId = session.profile().classId().orElseThrow();
+        var activeWeapon = weapon;
+        ContentId skillId = resolution.skillId().orElseGet(() -> resolution.slot()
+                .map(slot -> skillForSlot(classId, activeWeapon, slot)).orElse(null));
+        if (skillId == null) {
+            player.sendActionBar(Component.text("No skill is bound to that input."));
+            return;
+        }
+        if (classSkill(classId, skillId)
+                && !classProgression.skillUnlocked(player.getUniqueId(), skillId)) {
+            player.sendActionBar(Component.text(
+                    "Unlock this class skill in the Skill Tree first."));
+            return;
+        }
+        SkillDefinition definition = snapshot.skills().get(skillId);
+        if (definition == null) {
+            player.sendActionBar(Component.text("Skill content is unavailable."));
+            return;
+        }
+        LivingEntity target = suppliedTarget;
+        if (target == null) {
+            Entity selected = player.getTargetEntity(
+                    Math.max(1, (int) Math.ceil(definition.range())));
+            target = selected instanceof LivingEntity living ? living : null;
+        }
+        SkillEffectNode directDamage = firstDirectDamage(
+                definition, definition.effects().get(definition.rootEffect()));
+        if (directDamage != null) {
+            if (target == null) {
+                player.sendActionBar(Component.text("No valid target."));
+                return;
+            }
+            DamageType damageType = DamageType.valueOf(directDamage.values()
+                    .getOrDefault("type", "physical").toUpperCase(Locale.ROOT));
+            double power = directDamage.numbers().getOrDefault("power", 0.0);
+            var rejection = combat.engine().eligibility(new DamageRequest(UUID.randomUUID(),
+                    player.getUniqueId(), target.getUniqueId(), damageType, power,
+                    definition.range(), definition.requiresLineOfSight(), 1));
+            if (rejection != null) {
+                player.sendActionBar(Component.text("Cannot cast: "
+                        + rejection.name().toLowerCase(Locale.ROOT).replace('_', ' ')));
+                return;
+            }
+        }
+        var result = engine.begin(definition, caster(player),
+                target == null ? null : target.getUniqueId(), snapshot.revision());
         if (result.started()) {
             skillListener.accept(player.getUniqueId(), definition.id());
         }
@@ -218,7 +285,50 @@ public final class PaperSkillRuntime implements Listener {
         if (!result.started()) {
             telemetry.increment("skill.rejected." + result.rejection().name()
                     .toLowerCase(Locale.ROOT));
+            player.sendActionBar(Component.text("Cannot cast: "
+                    + result.rejection().name().toLowerCase(Locale.ROOT).replace('_', ' ')));
+        } else {
+            player.sendActionBar(Component.text(definition.displayName() + " - casting"));
         }
+    }
+
+    private ContentId skillForSlot(ContentId classId,
+                                   com.branz.mmorpg.api.item.WeaponDefinition weapon,
+                                   SkillSlot slot) {
+        CharacterClassDefinition definition = content.snapshot().characterClasses().get(classId);
+        if (definition == null) return null;
+        return switch (slot) {
+            case BASIC_ATTACK -> weapon.basicAttackSkillId();
+            case WEAPON_SKILL_1 -> weapon.activeSkillIds().isEmpty()
+                    ? null : weapon.activeSkillIds().get(0);
+            case WEAPON_SKILL_2 -> weapon.activeSkillIds().size() < 2
+                    ? null : weapon.activeSkillIds().get(1);
+            case CLASS_SKILL_1 -> definition.classSkillIds().isEmpty()
+                    ? null : definition.classSkillIds().get(0);
+            case CLASS_SKILL_2 -> definition.classSkillIds().size() < 2
+                    ? null : definition.classSkillIds().get(1);
+            case ULTIMATE -> definition.ultimateSkillId();
+        };
+    }
+
+    private boolean classSkill(ContentId classId, ContentId skillId) {
+        CharacterClassDefinition definition = content.snapshot().characterClasses().get(classId);
+        return definition != null && (definition.classSkillIds().contains(skillId)
+                || definition.ultimateSkillId().equals(skillId));
+    }
+
+    private static SkillEffectNode firstDirectDamage(
+            SkillDefinition definition, SkillEffectNode node) {
+        if (node == null || node.type() == com.branz.mmorpg.api.skill.SkillEffectType.SPAWN_PROJECTILE) {
+            return null;
+        }
+        if (node.type() == com.branz.mmorpg.api.skill.SkillEffectType.DAMAGE) return node;
+        for (String childId : node.children()) {
+            SkillEffectNode found = firstDirectDamage(
+                    definition, definition.effects().get(childId));
+            if (found != null) return found;
+        }
+        return null;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -336,10 +446,10 @@ public final class PaperSkillRuntime implements Listener {
                         .setY(node.numbers().getOrDefault("vertical", 0.25)));
             }
             case APPLY_STATUS -> {
-                if (target == null) return;
+                LivingEntity recipient = target == null ? caster : target;
                 String status = node.values().get("status");
                 if (status != null) {
-                    statuses.apply(target.getUniqueId(), ContentId.parse(status),
+                    statuses.apply(recipient.getUniqueId(), ContentId.parse(status),
                             caster.getUniqueId());
                 }
             }

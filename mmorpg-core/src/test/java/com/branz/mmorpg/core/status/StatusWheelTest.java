@@ -117,6 +117,17 @@ class StatusWheelTest {
     }
 
     @Test
+    void readOnlyQueriesDoNotRegisterEmptyTargets() {
+        StatusWheel wheel = new StatusWheel(catalog::get);
+        UUID unknown = UUID.randomUUID();
+
+        assertFalse(wheel.has(unknown, BuiltInStatuses.BURN));
+        assertTrue(wheel.active(unknown).isEmpty());
+        assertEquals(0, wheel.removeDefinition(unknown, BuiltInStatuses.BURN));
+        assertEquals(0, wheel.trackedTargets());
+    }
+
+    @Test
     void disconnectHonorsPauseTickDownAndClearPolicies() {
         FixedGameClock clock = FixedGameClock.at("2026-07-25T12:00:00Z");
         Map<ContentId, StatusDefinition> definitions = new java.util.HashMap<>(catalog);

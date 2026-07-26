@@ -5,6 +5,7 @@ import com.branz.mmorpg.core.stat.PlayerAttributeService;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Level;
+import java.util.function.Consumer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -29,12 +30,18 @@ public final class PlayerSessionListener implements Listener {
     private final JavaPlugin plugin;
     private final PlayerSessionService sessions;
     private final PlayerAttributeService attributes;
+    private final Consumer<UUID> playerActivator;
+    private final Consumer<UUID> sessionCleanup;
 
     public PlayerSessionListener(JavaPlugin plugin, PlayerSessionService sessions,
-                                 PlayerAttributeService attributes) {
+                                 PlayerAttributeService attributes,
+                                 Consumer<UUID> playerActivator,
+                                 Consumer<UUID> sessionCleanup) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.attributes = Objects.requireNonNull(attributes, "attributes");
+        this.playerActivator = Objects.requireNonNull(playerActivator, "playerActivator");
+        this.sessionCleanup = Objects.requireNonNull(sessionCleanup, "sessionCleanup");
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -47,7 +54,14 @@ public final class PlayerSessionListener implements Listener {
                         "MMO session load failed for " + name + " (" + playerId
                                 + "); MMO features stay disabled for this player", failure);
             } else if (session.profile().classId().isPresent()) {
-                attributes.activate(playerId);
+                try {
+                    playerActivator.accept(playerId);
+                } catch (RuntimeException activationFailure) {
+                    plugin.getLogger().log(Level.SEVERE,
+                            "MMO combat profile activation failed for " + name + " ("
+                                    + playerId + "); MMO combat stays disabled",
+                            activationFailure);
+                }
             }
         });
     }
@@ -55,6 +69,7 @@ public final class PlayerSessionListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
+        sessionCleanup.accept(playerId);
         attributes.forget(playerId);
         sessions.logout(playerId).whenComplete((ignored, failure) -> {
             if (failure != null) {

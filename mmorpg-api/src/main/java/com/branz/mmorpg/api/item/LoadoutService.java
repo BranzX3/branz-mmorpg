@@ -11,6 +11,15 @@ public interface LoadoutService {
 
     EquipResult equip(UUID playerId, ContentId weaponId);
 
+    /** Monotonic runtime revision used to invalidate buffered combat input. */
+    default long revision(UUID playerId) {
+        return 0L;
+    }
+
+    /** Releases per-session runtime state after logout. */
+    default void forget(UUID playerId) {
+    }
+
     record EquipResult(boolean equipped, String rejection, WeaponDefinition weapon) {
     }
 }

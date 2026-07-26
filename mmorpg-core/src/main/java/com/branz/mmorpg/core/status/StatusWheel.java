@@ -45,6 +45,23 @@ public final class StatusWheel {
         return containers.containsKey(targetId);
     }
 
+    /** Active instances without implicitly registering an empty target. */
+    public List<StatusInstance> active(UUID targetId) {
+        StatusContainer container = containers.get(Objects.requireNonNull(targetId, "targetId"));
+        return container == null ? List.of() : container.active();
+    }
+
+    public boolean has(UUID targetId, ContentId definitionId) {
+        StatusContainer container = containers.get(Objects.requireNonNull(targetId, "targetId"));
+        return container != null && container.has(Objects.requireNonNull(definitionId, "definitionId"));
+    }
+
+    public int removeDefinition(UUID targetId, ContentId definitionId) {
+        StatusContainer container = containers.get(Objects.requireNonNull(targetId, "targetId"));
+        return container == null ? 0
+                : container.removeDefinition(Objects.requireNonNull(definitionId, "definitionId"));
+    }
+
     /** Drops a target entirely. Called on death cleanup and on logout. */
     public List<StatusInstance> unregister(UUID targetId) {
         suspended.remove(targetId);

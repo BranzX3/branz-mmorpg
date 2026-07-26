@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:warrior_blood_momentum
+class-id: branz:warrior
+tree-revision: 1
+branch-id: berserker
+node-type: resource
+maximum-rank: 3
+point-cost-per-rank: 1
+required-class-level: 3
+prerequisites: {"branz:warrior_root": 1}
+modifiers:
+  - {id: rage_capacity, attribute: max_rage, operation: add_flat, value: 5, stacking-group: "", priority: 0}

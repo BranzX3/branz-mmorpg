@@ -22,6 +22,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -278,7 +280,54 @@ class CombatEngineTest {
         assertEquals(1, deaths.size());
         assertEquals(20.0, deaths.get(0).overkill(), 1e-9);
         assertEquals(attacker.id(), deaths.get(0).killerId());
+        assertEquals(1, deaths.get(0).context().contributions().size());
+        assertEquals(10.0, deaths.get(0).context().contributions().get(0).healthDamage(), 1e-9);
         assertFalse(engine.combatState().inCombat(target.id(), clock.now()));
+    }
+
+    @Test
+    void eligibilityPreflightIsReadOnlyAndDoesNotClaimTheHit() {
+        TestCombatant attacker = register(
+                TestCombatant.mob().with(AttributeType.PHYSICAL_POWER, 0.0));
+        TestCombatant target = register(TestCombatant.player().health(100.0));
+        CombatEngine engine = engine(CombatPolicy.defaults());
+        UUID castId = UUID.randomUUID();
+        DamageRequest request = DamageRequest.melee(castId, attacker.id(), target.id(),
+                DamageType.TRUE, 10.0, 10.0);
+
+        assertNull(engine.eligibility(request));
+        assertEquals(100.0, target.currentHealth());
+        assertEquals(0, engine.activeCasts());
+        assertTrue(engine.damage(request).applied() > 0.0);
+        assertEquals(1, engine.activeCasts());
+    }
+
+    @Test
+    void contributionAggregatesEffectiveDamageAndIsFrozenIntoDeathContext() {
+        TestCombatant first = register(TestCombatant.mob().with(AttributeType.PHYSICAL_POWER, 0.0));
+        TestCombatant second = register(TestCombatant.mob().with(AttributeType.PHYSICAL_POWER, 0.0));
+        TestCombatant target = register(TestCombatant.player().health(100.0).shield(10.0));
+        CombatEngine engine = engine(CombatPolicy.defaults());
+
+        engine.damage(DamageRequest.melee(UUID.randomUUID(), first.id(), target.id(),
+                DamageType.TRUE, 30.0, 10.0));
+        clock.advance(Duration.ofMillis(1));
+        engine.damage(DamageRequest.melee(UUID.randomUUID(), second.id(), target.id(),
+                DamageType.TRUE, 20.0, 10.0));
+        UUID killingCast = UUID.randomUUID();
+        engine.damage(DamageRequest.melee(killingCast, first.id(), target.id(),
+                DamageType.TRUE, 100.0, 10.0));
+
+        var context = deaths.get(0).context();
+        assertEquals(killingCast, context.castId());
+        assertEquals(first.id(), context.killerId());
+        assertEquals(2, context.contributions().size());
+        assertEquals(first.id(), context.contributions().get(0).contributorId());
+        assertEquals(80.0, context.contributions().get(0).healthDamage(), 1e-9);
+        assertEquals(10.0, context.contributions().get(0).shieldDamage(), 1e-9);
+        assertEquals(2, context.contributions().get(0).hitCount());
+        assertEquals(0, engine.contributions().trackedTargets(),
+                "a completed death ledger cannot leak into a respawn");
     }
 
     @Test
@@ -300,6 +349,52 @@ class CombatEngineTest {
     }
 
     @Test
+    void concurrentLethalAttemptsAreSerializedIntoExactlyOneDeath() throws Exception {
+        TestCombatant first = register(TestCombatant.mob().with(AttributeType.PHYSICAL_POWER, 0.0));
+        TestCombatant second = register(TestCombatant.mob().with(AttributeType.PHYSICAL_POWER, 0.0));
+        TestCombatant target = register(TestCombatant.player().health(10.0));
+        CombatEngine engine = engine(CombatPolicy.defaults());
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var one = pool.submit(() -> {
+                ready.countDown();
+                start.await();
+                return engine.damage(DamageRequest.melee(UUID.randomUUID(), first.id(), target.id(),
+                        DamageType.TRUE, 50.0, 10.0));
+            });
+            var two = pool.submit(() -> {
+                ready.countDown();
+                start.await();
+                return engine.damage(DamageRequest.melee(UUID.randomUUID(), second.id(), target.id(),
+                        DamageType.TRUE, 50.0, 10.0));
+            });
+            ready.await();
+            start.countDown();
+            List<DamageResult> results = List.of(one.get(), two.get());
+            assertEquals(1, results.stream().filter(DamageResult::lethal).count());
+            assertEquals(1, results.stream()
+                    .filter(value -> value.rejection() == RejectionReason.TARGET_DEAD).count());
+        }
+        assertEquals(1, deaths.size());
+    }
+
+    @Test
+    void malformedRangeAndMissingNonEnvironmentalAttackerFailClosed() {
+        TestCombatant target = register(TestCombatant.player().health(100.0));
+        CombatEngine engine = engine(CombatPolicy.defaults());
+
+        assertEquals(RejectionReason.INVALID_RANGE, engine.damage(new DamageRequest(
+                UUID.randomUUID(), null, target.id(), DamageType.ENVIRONMENTAL,
+                5.0, Double.NaN, false, 1)).rejection());
+        assertEquals(RejectionReason.ATTACKER_UNAVAILABLE, engine.damage(new DamageRequest(
+                UUID.randomUUID(), null, target.id(), DamageType.TRUE,
+                5.0, 0.0, false, 1)).rejection());
+        assertEquals(100.0, target.currentHealth(), 1e-9);
+    }
+
+    @Test
     void combatStateEntersOnDamageAndExpiresOnInactivity() {
         TestCombatant attacker = register(TestCombatant.mob().with(AttributeType.PHYSICAL_POWER, 0.0));
         TestCombatant target = register(TestCombatant.player().health(1000.0));
@@ -315,6 +410,7 @@ class CombatEngineTest {
         assertFalse(engine.combatState().inCombat(target.id(), clock.now()));
         assertEquals(2, engine.sweepCombatState().size());
         assertEquals(0, engine.combatState().tracked());
+        assertEquals(0, engine.contributions().trackedTargets());
         assertEquals(4, stateChanges.size(), "attacker and target both emitted leave events");
         assertFalse(stateChanges.get(2).inCombat());
         assertFalse(stateChanges.get(3).inCombat());

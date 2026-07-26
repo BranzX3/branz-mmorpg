@@ -13,5 +13,8 @@ record RawWeaponDefinition(
         @JsonProperty("basic-attack-skill") String basicAttackSkill,
         @JsonProperty("active-skills") List<String> activeSkills,
         Set<String> tags,
-        @JsonProperty("two-handed") boolean twoHanded) {
+        @JsonProperty("two-handed") boolean twoHanded,
+        @JsonProperty("family-xp-share") double familyXpShare,
+        @JsonProperty("type-xp-share") double typeXpShare,
+        @JsonProperty("skill-xp-share") double skillXpShare) {
 }

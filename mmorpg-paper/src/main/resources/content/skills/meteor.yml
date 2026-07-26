@@ -1,0 +1,26 @@
+type: skill
+id: branz:meteor
+display-name: Meteor
+input-slot: ultimate
+tags: [class, mage, ultimate, fire]
+cast-ms: 1000
+active-ms: 0
+recovery-ms: 500
+cooldown-ms: 30000
+cooldown-group: mage-ultimate
+costs: {MANA: 65}
+interrupt-refund: 0.75
+range: 20
+requires-line-of-sight: true
+root-effect: sequence
+effects:
+  - id: sequence
+    type: sequence
+    children: [hit, burn]
+  - id: hit
+    type: damage
+    numbers: {power: 100}
+    values: {type: magic}
+  - id: burn
+    type: apply_status
+    values: {status: "branz:burn"}

@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:rogue_root
+class-id: branz:rogue
+tree-revision: 1
+branch-id: assassin
+node-type: passive
+maximum-rank: 1
+point-cost-per-rank: 1
+required-class-level: 2
+prerequisites: {}
+modifiers:
+  - {id: exposed_flank, attribute: physical_power, operation: add_flat, value: 5, stacking-group: "", priority: 0}

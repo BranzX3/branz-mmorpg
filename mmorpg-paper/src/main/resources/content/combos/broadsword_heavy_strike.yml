@@ -1,0 +1,14 @@
+type: combat_combo
+id: branz:broadsword_heavy_strike
+required-tags: [sword]
+steps:
+  - input: LMB
+    minimum-delay-millis: 0
+    maximum-delay-millis: 0
+  - input: RMB
+    minimum-delay-millis: 20
+    maximum-delay-millis: 450
+reset-timeout-millis: 600
+priority: 100
+consumes-input: false
+result-skill: branz:heavy_slash

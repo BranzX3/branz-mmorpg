@@ -1,0 +1,19 @@
+type: skill
+id: branz:rallying_shout
+display-name: Rallying Shout
+input-slot: class-2
+tags: [class, warrior, support]
+cast-ms: 0
+active-ms: 0
+recovery-ms: 250
+cooldown-ms: 8000
+cooldown-group: warrior-support
+costs: {RAGE: 20}
+interrupt-refund: 0
+range: 0
+requires-line-of-sight: false
+root-effect: heal
+effects:
+  - id: heal
+    type: heal
+    numbers: {amount: 18}

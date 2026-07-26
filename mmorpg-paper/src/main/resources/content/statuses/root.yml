@@ -1,0 +1,13 @@
+type: status
+id: branz:root
+display-name: Root
+category: negative
+stack-policy: refresh_duration
+max-stacks: 1
+duration-ms: 2000
+periodic-interval-ms: 0
+potency: 0.0
+modifiers: []
+dispel-tags: [movement]
+crowd-control: root
+offline-policy: tick_down

@@ -4,6 +4,7 @@ import com.branz.mmorpg.api.combat.CombatPolicy;
 import com.branz.mmorpg.api.combat.Combatant;
 import com.branz.mmorpg.api.combat.DamageRequest;
 import com.branz.mmorpg.api.combat.DamageResult;
+import com.branz.mmorpg.api.combat.DeathContext;
 import com.branz.mmorpg.api.combat.RejectionReason;
 import com.branz.mmorpg.api.event.EventBus;
 import com.branz.mmorpg.api.runtime.GameClock;
@@ -38,6 +39,7 @@ public final class CombatEngine {
     private final Function<UUID, Combatant> combatants;
     private final LineOfSight lineOfSight;
     private final CombatStateTracker combatState;
+    private final ContributionTracker contributions = new ContributionTracker();
 
     /** Hits already delivered per cast, so one cast cannot hit a target twice. */
     private final Map<UUID, Map<UUID, Integer>> hitsByCast = new HashMap<>();
@@ -61,13 +63,38 @@ public final class CombatEngine {
         return combatState;
     }
 
+    public ContributionTracker contributions() {
+        return contributions;
+    }
+
+    /**
+     * Read-only eligibility check for a skill before its resource transaction.
+     * It does not claim a hit, touch combat state, mutate health, or publish events.
+     */
+    public synchronized RejectionReason eligibility(DamageRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (!request.validPower()) return RejectionReason.INVALID_POWER;
+        if (!request.validRange()) return RejectionReason.INVALID_RANGE;
+        Combatant target = combatants.apply(request.targetId());
+        if (target == null) return RejectionReason.TARGET_UNAVAILABLE;
+        Combatant attacker = request.environmental()
+                ? null : combatants.apply(request.attackerId());
+        if (!request.environmental() && attacker == null) {
+            return RejectionReason.ATTACKER_UNAVAILABLE;
+        }
+        return validate(request, attacker, target);
+    }
+
     /** Resolves one damage attempt end to end. */
-    public DamageResult damage(DamageRequest request) {
+    public synchronized DamageResult damage(DamageRequest request) {
         Objects.requireNonNull(request, "request");
         Instant now = clock.now();
 
         if (!request.validPower()) {
             return DamageResult.rejected(RejectionReason.INVALID_POWER);
+        }
+        if (!request.validRange()) {
+            return DamageResult.rejected(RejectionReason.INVALID_RANGE);
         }
 
         Combatant target = combatants.apply(request.targetId());
@@ -113,6 +140,9 @@ public final class CombatEngine {
 
         publishDamage(request, result, now);
         if (attacker != null) {
+            contributions.record(target.id(), attacker.id(), result, now);
+        }
+        if (attacker != null) {
             enterCombat(attacker.id(), now);
         }
         enterCombat(target.id(), now);
@@ -128,24 +158,26 @@ public final class CombatEngine {
      * <p>Without this the map grows for the lifetime of the server, so every cast
      * must be closed when its effects are finished.
      */
-    public void endCast(UUID castId) {
+    public synchronized void endCast(UUID castId) {
         hitsByCast.remove(castId);
     }
 
-    public int activeCasts() {
+    public synchronized int activeCasts() {
         return hitsByCast.size();
     }
 
     /** Removes all combat state for a combatant. Called on logout and on death. */
-    public void forget(UUID combatantId) {
+    public synchronized void forget(UUID combatantId) {
         combatState.clear(combatantId);
+        contributions.forgetTarget(combatantId);
     }
 
     /** Expires inactive combat state and publishes the matching leave events. */
-    public java.util.List<UUID> sweepCombatState() {
+    public synchronized java.util.List<UUID> sweepCombatState() {
         Instant now = clock.now();
         java.util.List<UUID> left = combatState.sweep(now);
         for (UUID combatantId : left) {
+            contributions.forgetTarget(combatantId);
             events.publish(new CombatEvents.CombatStateChanged(
                     UUID.randomUUID(), now, combatantId, false));
         }
@@ -215,8 +247,10 @@ public final class CombatEngine {
         // Combat state is cleared before the event so a consumer that inspects
         // the victim sees them out of combat, not fighting while dead.
         combatState.clear(target.id());
-        events.publish(new CombatEvents.CombatantDied(UUID.randomUUID(), now, target.id(),
-                request.attackerId(), request.type(), Math.max(0.0, overkill)));
+        DeathContext context = new DeathContext(target.id(), request.attackerId(), request.type(),
+                Math.max(0.0, overkill), request.castId(), now,
+                contributions.complete(target.id()));
+        events.publish(new CombatEvents.CombatantDied(UUID.randomUUID(), now, context));
     }
 
     /** Line-of-sight port. The Paper adapter ray-traces; tests answer directly. */

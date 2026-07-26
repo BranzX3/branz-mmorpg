@@ -21,8 +21,8 @@ primary-resource: mana
 secondary-resources: []
 allowed-weapon-tags: [staff, magic]
 allowed-armor-tags: [cloth, light]
-class-skills: [branz:fire_burst]
-ultimate-skill: branz:fire_burst
+class-skills: [branz:fire_burst, branz:mana_shield]
+ultimate-skill: branz:meteor
 passive-root-node: branz:mage_root
 starter-grant:
   id: branz:mage_starter
@@ -31,3 +31,8 @@ starter-grant:
   unlocked-skills: [branz:basic_strike, branz:fire_burst]
   additional-items: {}
 tags: [magic, ranged]
+maximum-level: 100
+xp-curve-base: 100
+xp-curve-exponent: 1.65
+bonus-skill-point-levels: [10, 25, 50]
+tree-revision: 1

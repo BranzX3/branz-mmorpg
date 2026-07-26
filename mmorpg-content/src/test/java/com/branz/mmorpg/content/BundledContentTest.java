@@ -41,6 +41,15 @@ class BundledContentTest {
         assertTrue(warrior.secondaryResources()
                 .contains(com.branz.mmorpg.api.skill.ResourceType.RAGE));
         assertEquals(140.0, warrior.baseAttributes().get("max_health"), 1e-9);
+        assertEquals(10, service.snapshot().statuses().size());
+        assertTrue(service.snapshot().statuses().containsKey(ContentId.parse("branz:burn")));
+        assertTrue(service.snapshot().statuses().containsKey(ContentId.parse("branz:shield")));
+        assertEquals(12, service.snapshot().classSkillNodes().size());
+        assertTrue(service.snapshot().classSkillNodes()
+                .containsKey(ContentId.parse("branz:warrior_root")));
+        assertEquals(1, service.snapshot().combatInputProfiles().size());
+        assertEquals(1, service.snapshot().combatCombos().size());
+        assertEquals(6, service.snapshot().masteryNodes().size());
     }
 
     private static Path locateBundle() {

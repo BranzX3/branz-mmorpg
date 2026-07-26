@@ -7,3 +7,6 @@ basic-attack-skill: branz:basic_strike
 active-skills: [branz:fire_burst]
 tags: [staff, magic, fire]
 two-handed: true
+family-xp-share: 0.40
+type-xp-share: 0.60
+skill-xp-share: 0.0

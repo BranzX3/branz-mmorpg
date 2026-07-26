@@ -1,0 +1,19 @@
+type: skill
+id: branz:smoke_veil
+display-name: Smoke Veil
+input-slot: class-2
+tags: [class, rogue, utility]
+cast-ms: 0
+active-ms: 0
+recovery-ms: 150
+cooldown-ms: 8000
+cooldown-group: rogue-utility
+costs: {ENERGY: 25}
+interrupt-refund: 0
+range: 0
+requires-line-of-sight: false
+root-effect: dash
+effects:
+  - id: dash
+    type: dash
+    numbers: {strength: 0.8}

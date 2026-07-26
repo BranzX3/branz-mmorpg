@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:mage_mana_efficiency
+class-id: branz:mage
+tree-revision: 1
+branch-id: arcanist
+node-type: resource
+maximum-rank: 3
+point-cost-per-rank: 1
+required-class-level: 3
+prerequisites: {"branz:mage_root": 1}
+modifiers:
+  - {id: mana_capacity, attribute: max_mana, operation: add_flat, value: 8, stacking-group: "", priority: 0}

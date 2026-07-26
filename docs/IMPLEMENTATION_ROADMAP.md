@@ -393,7 +393,7 @@ measured acceptance gate exist.
 Work proceeds in this order unless a fake port allows explicitly parallel pure
 Java development:
 
-Current execution status: **I0-I4 complete; I5 is next. I5-I10 contain merged
+Current execution status: **I0-I6 complete; I7 is next. I7-I10 contain merged
 implementations but remain pending until their gates are audited against the
 permanent-class integration.**
 
@@ -426,6 +426,35 @@ Rage starts empty and is generated, while Rogue Energy regenerates quickly.
 Attribute/resource/modifier events, atomic multi-resource costs, class-selection
 activation, logout cleanup, Skill runtime costs, cooldown recovery, and the
 class-aware HUD are connected without retaining Bukkit Player objects.
+
+I5 is complete: all ten launch statuses are validated YAML content in the atomic
+catalog and run through one central wheel with deterministic stack, refresh,
+immunity, cleanse, expiry, death, logout, and offline policies. Status attribute
+modifiers use per-instance identities and reconcile into the I4 class stat block;
+CC resistance is applied once at application. The authoritative combat pipeline
+now consumes permanent-class attributes, performs world/range/line-of-sight,
+safe-zone, faction, PvP, deduplication, critical, mitigation, shield, and lethal
+checks in fixed order, serializes simultaneous lethal attempts, and records a
+bounded damage/shield/threat contribution snapshot in a structured death
+context. Pure-Java golden tests cover invalid, duplicate, shielded, contributed,
+concurrent-lethal, cleanup, and 10,000-effect scheduler cases. Paper cancels
+owned vanilla damage and uses server-side block ray tracing for required sight.
+
+I6 is complete: immutable LMB/RMB/F/Shift intents carry session, content,
+profile, and loadout revisions into a deterministic combo FSM and the existing
+cast/cooldown/resource state machine. Paper input now resolves basic, weapon,
+class, and ultimate slots through that pipeline; direct-damage casts run a
+read-only combat eligibility preflight before resource payment. Warrior, Mage,
+and Rogue have revisioned permanent-class XP curves, Skill Points, validated
+tree DAGs, transactional node purchase/full respec, unlock-aware bindings, and
+session-cached progression. Weapon family/type mastery has content-driven XP
+splits, levels, points, validated trees, transactional ranks/respec, immutable
+server-derived build snapshots, and class-compatible loadout revisions. Only
+committed PvE damage emits async, idempotent class/mastery grants; input spam,
+rejected hits, PvP, and zero effective damage award nothing. Flyway V19/V20 and
+environment-gated MySQL round-trip/idempotency tests cover the new persistence.
+The clean release gate passed 264 tests with zero failures (13 environment-gated
+tests skipped) and produced the shaded Paper plugin JAR.
 
 | Order | Implementation package | Required output | Gate before next dependent package |
 |---:|---|---|---|

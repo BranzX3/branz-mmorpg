@@ -8,6 +8,7 @@ import com.branz.mmorpg.api.skill.SkillDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillNodeDefinition;
 import com.branz.mmorpg.api.mastery.MasteryDefinition;
+import com.branz.mmorpg.api.mastery.MasteryNodeDefinition;
 import com.branz.mmorpg.api.item.WeaponDefinition;
 import com.branz.mmorpg.api.item.LootDefinition;
 import com.branz.mmorpg.api.gathering.GatheringNodeDefinition;
@@ -16,6 +17,10 @@ import com.branz.mmorpg.api.crafting.RecipeDefinition;
 import com.branz.mmorpg.api.mob.MobDefinition;
 import com.branz.mmorpg.api.encounter.EncounterDefinition;
 import com.branz.mmorpg.api.character.CharacterClassDefinition;
+import com.branz.mmorpg.api.character.ClassSkillNodeDefinition;
+import com.branz.mmorpg.api.status.StatusDefinition;
+import com.branz.mmorpg.api.input.CombatInputProfileDefinition;
+import com.branz.mmorpg.api.input.CombatComboDefinition;
 
 public interface ContentSnapshot {
     long revision();
@@ -37,6 +42,8 @@ public interface ContentSnapshot {
     Map<ContentId, LifeSkillNodeDefinition> lifeSkillNodes();
 
     Map<ContentId, MasteryDefinition> masteries();
+
+    default Map<ContentId, MasteryNodeDefinition> masteryNodes() { return Map.of(); }
 
     Map<ContentId, WeaponDefinition> weapons();
 
@@ -65,6 +72,22 @@ public interface ContentSnapshot {
     }
 
     default Map<ContentId, CharacterClassDefinition> characterClasses() {
+        return Map.of();
+    }
+
+    default Map<ContentId, StatusDefinition> statuses() {
+        return Map.of();
+    }
+
+    default Map<ContentId, ClassSkillNodeDefinition> classSkillNodes() {
+        return Map.of();
+    }
+
+    default Map<ContentId, CombatInputProfileDefinition> combatInputProfiles() {
+        return Map.of();
+    }
+
+    default Map<ContentId, CombatComboDefinition> combatCombos() {
         return Map.of();
     }
 }

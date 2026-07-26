@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:mage_root
+class-id: branz:mage
+tree-revision: 1
+branch-id: arcanist
+node-type: passive
+maximum-rank: 1
+point-cost-per-rank: 1
+required-class-level: 2
+prerequisites: {}
+modifiers:
+  - {id: arcane_focus, attribute: magic_power, operation: add_flat, value: 5, stacking-group: "", priority: 0}

@@ -1,0 +1,13 @@
+type: status
+id: branz:silence
+display-name: Silence
+category: negative
+stack-policy: replace_weaker
+max-stacks: 1
+duration-ms: 3000
+periodic-interval-ms: 0
+potency: 0.0
+modifiers: []
+dispel-tags: [control, magic]
+crowd-control: silence
+offline-policy: tick_down

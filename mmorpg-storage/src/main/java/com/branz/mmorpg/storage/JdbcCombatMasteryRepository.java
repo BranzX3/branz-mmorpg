@@ -60,17 +60,23 @@ public final class JdbcCombatMasteryRepository implements CombatMasteryRepositor
                 }
                 try (PreparedStatement upsert = connection.prepareStatement(
                         "INSERT INTO mmorpg_combat_mastery "
-                                + "(player_uuid, mastery_id, level, total_xp, updated_at) "
-                                + "VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE "
+                                + "(player_uuid, mastery_id, level, total_xp, unspent_points, "
+                                + "tree_revision, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) "
+                                + "ON DUPLICATE KEY UPDATE "
                                 + "level = VALUES(level), total_xp = VALUES(total_xp), "
+                                + "unspent_points = VALUES(unspent_points), "
+                                + "tree_revision = VALUES(tree_revision), "
                                 + "updated_at = VALUES(updated_at)")) {
                     upsert.setBytes(1, bytes(playerId));
                     upsert.setString(2, masteryId.toString());
                     upsert.setInt(3, after.level());
                     upsert.setLong(4, after.totalXp());
-                    upsert.setTimestamp(5, Timestamp.from(after.updatedAt()));
+                    upsert.setInt(5, after.unspentPoints());
+                    upsert.setInt(6, after.treeRevision());
+                    upsert.setTimestamp(7, Timestamp.from(after.updatedAt()));
                     upsert.executeUpdate();
                 }
+                saveRanks(connection, playerId, masteryId, after.nodeRanks());
                 audit(connection, playerId, operationId);
                 return new MasteryMutationCommit(true, before, after, awardedXp);
             });
@@ -83,14 +89,16 @@ public final class JdbcCombatMasteryRepository implements CombatMasteryRepositor
             throws SQLException {
         Map<ContentId, MasterySnapshot> result = new LinkedHashMap<>();
         try (PreparedStatement select = connection.prepareStatement(
-                "SELECT mastery_id, level, total_xp, updated_at "
+                "SELECT mastery_id, level, total_xp, unspent_points, tree_revision, updated_at "
                         + "FROM mmorpg_combat_mastery WHERE player_uuid = ?")) {
             select.setBytes(1, bytes(playerId));
             try (ResultSet rows = select.executeQuery()) {
                 while (rows.next()) {
                     ContentId id = ContentId.parse(rows.getString("mastery_id"));
                     result.put(id, new MasterySnapshot(id, rows.getInt("level"),
-                            rows.getLong("total_xp"), rows.getTimestamp("updated_at").toInstant()));
+                            rows.getLong("total_xp"), rows.getInt("unspent_points"),
+                            rows.getInt("tree_revision"), loadRanks(connection, playerId, id),
+                            rows.getTimestamp("updated_at").toInstant()));
                 }
             }
         }
@@ -100,18 +108,61 @@ public final class JdbcCombatMasteryRepository implements CombatMasteryRepositor
     private static MasterySnapshot loadOne(Connection connection, UUID playerId, ContentId masteryId)
             throws SQLException {
         try (PreparedStatement select = connection.prepareStatement(
-                "SELECT level, total_xp, updated_at FROM mmorpg_combat_mastery "
+                "SELECT level, total_xp, unspent_points, tree_revision, updated_at "
+                        + "FROM mmorpg_combat_mastery "
                         + "WHERE player_uuid = ? AND mastery_id = ? FOR UPDATE")) {
             select.setBytes(1, bytes(playerId));
             select.setString(2, masteryId.toString());
             try (ResultSet row = select.executeQuery()) {
                 if (row.next()) {
                     return new MasterySnapshot(masteryId, row.getInt("level"),
-                            row.getLong("total_xp"), row.getTimestamp("updated_at").toInstant());
+                            row.getLong("total_xp"), row.getInt("unspent_points"),
+                            row.getInt("tree_revision"), loadRanks(connection, playerId, masteryId),
+                            row.getTimestamp("updated_at").toInstant());
                 }
             }
         }
         return MasterySnapshot.untrained(masteryId, Instant.now());
+    }
+
+    private static void saveRanks(Connection connection, UUID playerId, ContentId masteryId,
+                                  Map<ContentId, Integer> ranks) throws SQLException {
+        try (PreparedStatement delete = connection.prepareStatement(
+                "DELETE FROM mmorpg_combat_mastery_node_rank "
+                        + "WHERE player_uuid = ? AND mastery_id = ?")) {
+            delete.setBytes(1, bytes(playerId));
+            delete.setString(2, masteryId.toString());
+            delete.executeUpdate();
+        }
+        if (ranks.isEmpty()) return;
+        try (PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO mmorpg_combat_mastery_node_rank "
+                        + "(player_uuid, mastery_id, node_id, node_rank) VALUES (?, ?, ?, ?)")) {
+            for (Map.Entry<ContentId, Integer> rank : ranks.entrySet()) {
+                insert.setBytes(1, bytes(playerId));
+                insert.setString(2, masteryId.toString());
+                insert.setString(3, rank.getKey().toString());
+                insert.setInt(4, rank.getValue());
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
+    private static Map<ContentId, Integer> loadRanks(Connection connection, UUID playerId,
+                                                     ContentId masteryId) throws SQLException {
+        Map<ContentId, Integer> result = new LinkedHashMap<>();
+        try (PreparedStatement select = connection.prepareStatement(
+                "SELECT node_id, node_rank FROM mmorpg_combat_mastery_node_rank "
+                        + "WHERE player_uuid = ? AND mastery_id = ?")) {
+            select.setBytes(1, bytes(playerId));
+            select.setString(2, masteryId.toString());
+            try (ResultSet rows = select.executeQuery()) {
+                while (rows.next()) result.put(ContentId.parse(rows.getString("node_id")),
+                        rows.getInt("node_rank"));
+            }
+        }
+        return Map.copyOf(result);
     }
 
     private static boolean claim(Connection connection, UUID playerId, OperationId operation)

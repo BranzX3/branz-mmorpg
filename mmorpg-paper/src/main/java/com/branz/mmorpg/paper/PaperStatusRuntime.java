@@ -3,15 +3,21 @@ package com.branz.mmorpg.paper;
 import com.branz.mmorpg.api.combat.DamageRequest;
 import com.branz.mmorpg.api.combat.DamageType;
 import com.branz.mmorpg.api.content.ContentId;
+import com.branz.mmorpg.api.content.ContentService;
 import com.branz.mmorpg.api.stat.ModifierSource;
+import com.branz.mmorpg.api.stat.AttributeModifier;
+import com.branz.mmorpg.api.stat.AttributeType;
 import com.branz.mmorpg.api.status.StatusApplication;
 import com.branz.mmorpg.api.status.StatusDefinition;
 import com.branz.mmorpg.api.status.StatusInstance;
 import com.branz.mmorpg.core.runtime.SystemGameClock;
 import com.branz.mmorpg.core.status.BuiltInStatuses;
 import com.branz.mmorpg.core.status.StatusWheel;
+import com.branz.mmorpg.core.stat.PlayerAttributeService;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -20,6 +26,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -30,24 +37,38 @@ public final class PaperStatusRuntime implements Listener {
 
     private final JavaPlugin plugin;
     private final PaperCombatRuntime combat;
-    private final Map<ContentId, StatusDefinition> definitions = BuiltInStatuses.all();
-    private final StatusWheel wheel = new StatusWheel(definitions::get);
+    private final PlayerAttributeService playerAttributes;
+    private final ContentService content;
+    private final StatusWheel wheel;
     private final SystemGameClock clock = new SystemGameClock();
+    private final Map<UUID, java.util.Set<String>> appliedModifierIds = new HashMap<>();
 
-    public PaperStatusRuntime(JavaPlugin plugin, PaperCombatRuntime combat) {
+    public PaperStatusRuntime(JavaPlugin plugin, PaperCombatRuntime combat,
+                              PlayerAttributeService playerAttributes, ContentService content) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.combat = Objects.requireNonNull(combat, "combat");
+        this.playerAttributes = Objects.requireNonNull(playerAttributes, "playerAttributes");
+        this.content = Objects.requireNonNull(content, "content");
+        this.wheel = new StatusWheel(id -> this.content.snapshot().statuses().get(id));
     }
 
     public StatusApplication apply(UUID targetId, ContentId statusId, UUID sourceId) {
-        StatusDefinition definition = definitions.get(statusId);
+        StatusDefinition definition = content.snapshot().statuses().get(statusId);
         if (definition == null) {
             throw new IllegalArgumentException("unknown status " + statusId);
         }
+        double ccResistance = playerAttributes.find(targetId)
+                .map(ignored -> playerAttributes.attributes(targetId)
+                        .get(AttributeType.CROWD_CONTROL_RESISTANCE))
+                .orElse(0.0);
         StatusApplication result = wheel.container(targetId).apply(definition,
                 ModifierSource.of(ModifierSource.SourceType.SKILL, sourceId.toString()),
-                null, 0.0, clock.now());
-        if (result.applied() && statusId.equals(BuiltInStatuses.SHIELD)) {
+                null, ccResistance, clock.now());
+        if (result.applied()) {
+            syncModifiers(targetId);
+        }
+        if (result.outcome() == StatusApplication.Outcome.APPLIED
+                && statusId.equals(BuiltInStatuses.SHIELD)) {
             Entity target = plugin.getServer().getEntity(targetId);
             if (target instanceof LivingEntity living) {
                 living.setAbsorptionAmount(Math.min(2048.0,
@@ -58,15 +79,17 @@ public final class PaperStatusRuntime implements Listener {
     }
 
     public int remove(UUID targetId, ContentId statusId) {
-        return wheel.container(targetId).removeDefinition(statusId);
+        int removed = wheel.removeDefinition(targetId, statusId);
+        if (removed > 0) syncModifiers(targetId);
+        return removed;
     }
 
     public boolean has(UUID targetId, ContentId statusId) {
-        return wheel.container(targetId).has(statusId);
+        return wheel.has(targetId, statusId);
     }
 
     public java.util.List<StatusInstance> active(UUID targetId) {
-        return wheel.container(targetId).active();
+        return wheel.active(targetId);
     }
 
     public void tick() {
@@ -100,20 +123,36 @@ public final class PaperStatusRuntime implements Listener {
 
             @Override
             public void onExpire(UUID targetId, StatusInstance instance, StatusDefinition definition) {
-                // Attribute/status presentation cleanup is stateless for the
-                // current vanilla adapter.
+                syncModifiers(targetId);
             }
         });
+        // Also covers reconnects whose asynchronous Player Session activation
+        // completed after PlayerJoinEvent.
+        for (UUID targetId : List.copyOf(appliedModifierIds.keySet())) {
+            syncModifiers(targetId);
+        }
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         wheel.disconnect(event.getPlayer().getUniqueId(), clock.now());
+        syncModifiers(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         wheel.reconnect(event.getPlayer().getUniqueId(), clock.now());
+        // Session activation can complete after this event. The retained ID set
+        // is reconciled by the central tick once the stat block becomes active.
+        appliedModifierIds.computeIfAbsent(event.getPlayer().getUniqueId(), ignored -> new HashSet<>());
+    }
+
+    @EventHandler
+    public void onDeath(EntityDeathEvent event) {
+        UUID targetId = event.getEntity().getUniqueId();
+        wheel.unregister(targetId);
+        syncModifiers(targetId);
+        appliedModifierIds.remove(targetId);
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -133,5 +172,31 @@ public final class PaperStatusRuntime implements Listener {
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    private void syncModifiers(UUID targetId) {
+        if (playerAttributes.find(targetId).isEmpty()) return;
+        Map<String, AttributeModifier> desired = new HashMap<>();
+        for (StatusInstance instance : wheel.active(targetId)) {
+            StatusDefinition definition = content.snapshot().statuses().get(instance.definitionId());
+            if (definition == null) continue;
+            ModifierSource source = ModifierSource.of(
+                    ModifierSource.SourceType.STATUS, instance.modifierPrefix());
+            for (AttributeModifier template : definition.modifiers()) {
+                String id = instance.modifierPrefix() + ":" + template.id();
+                desired.put(id, new AttributeModifier(id, template.attribute(), template.operation(),
+                        template.value() * instance.stacks(), source, template.stackingGroup(),
+                        template.priority(), java.util.Optional.ofNullable(instance.expiresAt())));
+            }
+        }
+
+        java.util.Set<String> previous = appliedModifierIds
+                .computeIfAbsent(targetId, ignored -> new HashSet<>());
+        for (String oldId : new HashSet<>(previous)) {
+            if (!desired.containsKey(oldId)) playerAttributes.removeModifier(targetId, oldId);
+        }
+        desired.values().forEach(modifier -> playerAttributes.addModifier(targetId, modifier));
+        previous.clear();
+        previous.addAll(desired.keySet());
     }
 }

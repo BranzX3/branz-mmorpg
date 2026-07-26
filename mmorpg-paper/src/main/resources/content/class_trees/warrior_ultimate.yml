@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:warrior_warbreaker
+class-id: branz:warrior
+tree-revision: 1
+branch-id: warlord
+node-type: ultimate_unlock
+maximum-rank: 1
+point-cost-per-rank: 1
+required-class-level: 5
+prerequisites: {"branz:warrior_rallying_shout": 1}
+unlocked-skill: branz:warbreaker
+modifiers: []

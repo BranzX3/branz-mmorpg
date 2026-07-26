@@ -1,0 +1,13 @@
+type: status
+id: branz:burn
+display-name: Burn
+category: negative
+stack-policy: add_stack_refresh
+max-stacks: 3
+duration-ms: 6000
+periodic-interval-ms: 2000
+potency: 4.0
+modifiers: []
+dispel-tags: [magic, fire]
+crowd-control: none
+offline-policy: tick_down

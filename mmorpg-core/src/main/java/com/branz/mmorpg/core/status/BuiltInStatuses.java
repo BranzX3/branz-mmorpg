@@ -18,10 +18,8 @@ import java.util.Set;
 /**
  * The ten statuses CORE_MMO_SPECIFICATION §C3 requires at launch.
  *
- * <p>These are shipped as code for now because the content loader only
- * understands materials; they move to YAML unchanged when it learns the status
- * type. Their shape is already the definition record, so that move is a parser
- * change and not a redesign.
+ * <p>The live Paper catalog is YAML-backed. This code catalog remains the
+ * canonical ID list and a compact deterministic fixture for Core tests.
  *
  * <p>Values here are starting points, not balance decisions.
  */

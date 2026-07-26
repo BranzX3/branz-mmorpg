@@ -4,11 +4,13 @@ import com.branz.mmorpg.api.content.ContentId;
 import com.branz.mmorpg.api.content.ContentSnapshot;
 import com.branz.mmorpg.api.item.LoadoutService;
 import com.branz.mmorpg.api.item.WeaponDefinition;
+import com.branz.mmorpg.api.character.CharacterClassDefinition;
 import com.branz.mmorpg.core.player.PlayerSessionService;
 import com.branz.mmorpg.api.runtime.GameClock;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 import java.util.function.Supplier;
 
@@ -24,6 +26,7 @@ public final class DefaultLoadoutService implements LoadoutService {
     private final Supplier<ContentSnapshot> content;
     private final BiPredicate<UUID, java.time.Instant> inCombat;
     private final GameClock clock;
+    private final ConcurrentHashMap<UUID, Long> revisions = new ConcurrentHashMap<>();
 
     public DefaultLoadoutService(PlayerSessionService sessions,
                                  Supplier<ContentSnapshot> content,
@@ -38,8 +41,9 @@ public final class DefaultLoadoutService implements LoadoutService {
     @Override
     public Optional<WeaponDefinition> current(UUID playerId) {
         var profile = sessions.requirePlayable(playerId).profile();
+        revisions.putIfAbsent(playerId, Math.max(0L, profile.revision()));
         return profile.selectedLoadoutId().flatMap(id -> Optional.ofNullable(
-                content.get().weapons().get(id)));
+                content.get().weapons().get(id))).filter(weapon -> compatible(profile.classId(), weapon));
     }
 
     @Override
@@ -52,7 +56,39 @@ public final class DefaultLoadoutService implements LoadoutService {
         if (weapon == null) {
             return new EquipResult(false, "unknown weapon " + weaponId, null);
         }
+        if (session.profile().classId().isEmpty()) {
+            return new EquipResult(false, "permanent class must be selected before equipping", null);
+        }
+        if (!compatible(session.profile().classId(), weapon)) {
+            return new EquipResult(false, "weapon " + weaponId + " is incompatible with class "
+                    + session.profile().classId().orElseThrow(), null);
+        }
+        if (session.profile().selectedLoadoutId().filter(weaponId::equals).isPresent()) {
+            revisions.putIfAbsent(playerId, Math.max(0L, session.profile().revision()));
+            return new EquipResult(true, null, weapon);
+        }
         session.updateProfile(profile -> profile.withSelectedLoadout(weaponId));
+        revisions.compute(playerId, (ignored, current) -> current == null
+                ? Math.max(1L, session.profile().revision())
+                : Math.addExact(current, 1L));
         return new EquipResult(true, null, weapon);
+    }
+
+    @Override
+    public long revision(UUID playerId) {
+        var profile = sessions.requirePlayable(playerId).profile();
+        return revisions.computeIfAbsent(playerId, ignored -> Math.max(0L, profile.revision()));
+    }
+
+    @Override
+    public void forget(UUID playerId) {
+        revisions.remove(playerId);
+    }
+
+    private boolean compatible(Optional<ContentId> classId, WeaponDefinition weapon) {
+        if (classId.isEmpty()) return false;
+        CharacterClassDefinition characterClass = content.get().characterClasses().get(classId.get());
+        return characterClass != null && weapon.tags().stream()
+                .anyMatch(characterClass.allowedWeaponTags()::contains);
     }
 }

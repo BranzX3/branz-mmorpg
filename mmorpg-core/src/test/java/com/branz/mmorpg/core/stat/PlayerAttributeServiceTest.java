@@ -123,6 +123,22 @@ class PlayerAttributeServiceTest {
     }
 
     @Test
+    void statusSourceRemovalDropsOnlyThatInstancesModifiers() {
+        service.activate(PLAYER);
+        ModifierSource first = ModifierSource.of(ModifierSource.SourceType.STATUS, "status:slow:1");
+        ModifierSource second = ModifierSource.of(ModifierSource.SourceType.STATUS, "status:slow:2");
+        service.addModifier(PLAYER, AttributeModifier.percent(
+                "status:slow:1:speed", AttributeType.MOVEMENT_SPEED, -0.30, first));
+        service.addModifier(PLAYER, AttributeModifier.percent(
+                "status:slow:2:defense", AttributeType.DEFENSE, -0.10, second));
+
+        assertEquals(1, service.removeSource(PLAYER, first));
+        assertEquals(AttributeType.MOVEMENT_SPEED.defaultValue(),
+                service.attributes(PLAYER).get(AttributeType.MOVEMENT_SPEED), 1e-9);
+        assertTrue(service.find(PLAYER).orElseThrow().modifier("status:slow:2:defense").isPresent());
+    }
+
+    @Test
     void unselectedProfileCannotActivateCombatStats() throws Exception {
         UUID unselected = UUID.randomUUID();
         sessions.login(unselected, "PreviewOnly").get();

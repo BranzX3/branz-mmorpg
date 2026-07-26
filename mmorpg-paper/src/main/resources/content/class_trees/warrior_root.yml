@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:warrior_root
+class-id: branz:warrior
+tree-revision: 1
+branch-id: vanguard
+node-type: passive
+maximum-rank: 1
+point-cost-per-rank: 1
+required-class-level: 2
+prerequisites: {}
+modifiers:
+  - {id: iron_guard, attribute: defense, operation: add_flat, value: 5, stacking-group: "", priority: 0}

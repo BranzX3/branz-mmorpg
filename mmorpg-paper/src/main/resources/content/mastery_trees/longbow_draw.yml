@@ -1,0 +1,11 @@
+type: combat_mastery_node
+id: branz:longbow_draw
+mastery-id: branz:longbow_mastery
+tree-revision: 1
+branch-id: ranger
+maximum-rank: 3
+point-cost-per-rank: 1
+required-mastery-level: 2
+prerequisites: {}
+modifiers:
+  - {id: longbow_power, attribute: physical_power, operation: add_percent, value: 0.02, stacking-group: "", priority: 0}

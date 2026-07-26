@@ -1,0 +1,13 @@
+type: status
+id: branz:regeneration
+display-name: Regeneration
+category: positive
+stack-policy: refresh_duration
+max-stacks: 1
+duration-ms: 10000
+periodic-interval-ms: 2000
+potency: 5.0
+modifiers: []
+dispel-tags: [heal]
+crowd-control: none
+offline-policy: pause

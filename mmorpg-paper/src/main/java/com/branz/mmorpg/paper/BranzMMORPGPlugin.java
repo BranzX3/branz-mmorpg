@@ -43,6 +43,8 @@ import com.branz.mmorpg.api.service.ServiceStatus;
 import com.branz.mmorpg.content.AtomicContentService;
 import com.branz.mmorpg.core.player.PlayerSessionService;
 import com.branz.mmorpg.core.character.PermanentCharacterClassService;
+import com.branz.mmorpg.core.character.CharacterClassProgressionService;
+import com.branz.mmorpg.core.build.CharacterBuildService;
 import com.branz.mmorpg.core.event.SimpleEventBus;
 import com.branz.mmorpg.core.stat.PlayerAttributeService;
 import com.branz.mmorpg.core.lifeskill.LifeSkillProgressionService;
@@ -64,6 +66,7 @@ import com.branz.mmorpg.storage.DatabaseConfig;
 import com.branz.mmorpg.storage.DatabaseManager;
 import com.branz.mmorpg.storage.JdbcPlayerProfileRepository;
 import com.branz.mmorpg.storage.JdbcCharacterClassSelectionRepository;
+import com.branz.mmorpg.storage.JdbcCharacterClassProgressionRepository;
 import com.branz.mmorpg.storage.JdbcTransactionRunner;
 import com.branz.mmorpg.storage.FilePendingSessionSaveStore;
 import com.branz.mmorpg.storage.JdbcCombatMasteryRepository;
@@ -98,11 +101,13 @@ public class BranzMMORPGPlugin extends JavaPlugin {
     private PlayerSessionService sessionService;
     private PlayerProfileRepository profileRepository;
     private PermanentCharacterClassService characterClassService;
+    private CharacterClassProgressionService characterClassProgression;
     private SimpleEventBus characterClassEvents;
     private PlayerAttributeService attributeService;
     private LifeSkillProgressionService lifeSkillProgression;
     private DefaultCombatMasteryService combatMasteryService;
     private DefaultLoadoutService loadoutService;
+    private CharacterBuildService characterBuildService;
     private DefaultInventoryService inventoryService;
     private DefaultLootService lootService;
     private InventoryRepository inventoryRepository;
@@ -191,15 +196,19 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                         characterClassEvents, new SystemGameClock());
                 attributeService = new PlayerAttributeService(
                         sessionService, contentService, characterClassEvents, new SystemGameClock());
+                characterClassProgression = new CharacterClassProgressionService(
+                        sessionService, contentService,
+                        new JdbcCharacterClassProgressionRepository(databaseManager),
+                        attributeService, characterClassEvents, new SystemGameClock());
                 characterClassEvents.subscribe(
                         com.branz.mmorpg.api.character.CharacterClassSelected.class,
-                        selected -> attributeService.activate(selected.playerId()));
+                        selected -> activateCombatProfile(selected.playerId()));
                 lifeSkillProgression = new LifeSkillProgressionService(
                         profileRepository, sessionService, new SystemGameClock(),
                         contentService::snapshot);
                 combatMasteryService = new DefaultCombatMasteryService(
                         new JdbcCombatMasteryRepository(databaseManager),
-                        contentService::snapshot, new SystemGameClock());
+                        contentService::snapshot, new SystemGameClock(), characterClassEvents);
                 inventoryRepository = new JdbcInventoryRepository(databaseManager);
                 inventoryService = new DefaultInventoryService(
                         inventoryRepository,
@@ -233,12 +242,21 @@ public class BranzMMORPGPlugin extends JavaPlugin {
             if (sessionService != null) {
                 getServer().getPluginManager()
                         .registerEvents(new PlayerSessionListener(
-                                this, sessionService, attributeService), this);
-                combatRuntime = new PaperCombatRuntime(this, sessionService, combatPolicy());
+                                this, sessionService, attributeService,
+                                this::activateCombatProfile, playerId -> {
+                                    characterClassProgression.forget(playerId);
+                                    combatMasteryService.forget(playerId);
+                                }), this);
+                combatRuntime = new PaperCombatRuntime(
+                        this, sessionService, attributeService, combatPolicy());
                 loadoutService = new DefaultLoadoutService(sessionService,
                         contentService::snapshot,
                         (playerId, now) -> combatRuntime.engine().combatState()
                                 .inCombat(playerId, now),
+                        new SystemGameClock());
+                characterBuildService = new CharacterBuildService(
+                        sessionService, contentService, loadoutService,
+                        characterClassProgression, combatMasteryService,
                         new SystemGameClock());
                 equipmentService = new DefaultEquipmentService(
                         inventoryRepository, contentService::snapshot,
@@ -262,13 +280,16 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 getServer().getPluginManager().registerEvents(combatRuntime, this);
                 getServer().getScheduler().runTaskTimer(this,
                         combatRuntime::sweepCombatState, 20L, 20L);
-                statusRuntime = new PaperStatusRuntime(this, combatRuntime);
+                statusRuntime = new PaperStatusRuntime(
+                        this, combatRuntime, attributeService, contentService);
                 getServer().getPluginManager().registerEvents(statusRuntime, this);
                 getServer().getScheduler().runTaskTimer(this, statusRuntime::tick, 1L, 1L);
                 skillRuntime = new PaperSkillRuntime(
                         this, sessionService, contentService, combatRuntime, statusRuntime,
-                        loadoutService, itemRuntime, telemetryService, attributeService);
+                        loadoutService, itemRuntime, telemetryService, attributeService,
+                        characterClassProgression);
                 combatRuntime.basicAttackHandler(skillRuntime::basicAttack);
+                combatRuntime.damageListener(this::rewardCombatDamage);
                 getServer().getPluginManager().registerEvents(skillRuntime, this);
                 getServer().getScheduler().runTaskTimer(this, skillRuntime::tick, 1L, 1L);
                 hudRuntime = new PaperHudRuntime(this, skillRuntime, statusRuntime);
@@ -379,6 +400,61 @@ public class BranzMMORPGPlugin extends JavaPlugin {
         }
     }
 
+    /** Awards progression only from damage already committed by CombatEngine. */
+    private void rewardCombatDamage(
+            com.branz.mmorpg.core.combat.CombatEvents.DamageDealt event) {
+        if (event.attackerId() == null
+                || getServer().getPlayer(event.attackerId()) == null
+                || getServer().getPlayer(event.targetId()) != null) return;
+        double effectiveDamage = event.result().applied() + event.result().absorbed();
+        if (!Double.isFinite(effectiveDamage) || effectiveDamage <= 0.0) return;
+        PlayerSession session = sessionService.session(event.attackerId()).orElse(null);
+        if (session == null || !session.playable() || session.profile().classId().isEmpty()) return;
+        var weapon = itemRuntime.activeWeapon(event.attackerId())
+                .or(() -> loadoutService.current(event.attackerId())).orElse(null);
+        if (weapon == null) return;
+        long baseXp = Math.max(1L, Math.round(effectiveDamage));
+        var token = session.token();
+        ContentId classId = session.profile().classId().orElseThrow();
+        String eventKey = event.eventId().toString();
+        scheduler.async(() -> {
+            if (!sessionService.isLive(token)) return;
+            characterClassProgression.grantXp(event.attackerId(), baseXp,
+                    OperationId.of("classxp", classId.value(), event.attackerId(), eventKey));
+            long familyXp = Math.round(baseXp * weapon.familyXpShare());
+            long typeXp = Math.round(baseXp * weapon.typeXpShare());
+            if (familyXp > 0) {
+                combatMasteryService.grantContribution(event.attackerId(),
+                        weapon.familyMasteryId(), familyXp, 1.0,
+                        OperationId.of("mastery", weapon.familyMasteryId().value(),
+                                event.attackerId(), eventKey + "_family"));
+            }
+            if (typeXp > 0) {
+                combatMasteryService.grantContribution(event.attackerId(),
+                        weapon.typeMasteryId(), typeXp, 1.0,
+                        OperationId.of("mastery", weapon.typeMasteryId().value(),
+                                event.attackerId(), eventKey + "_type"));
+            }
+        }).exceptionally(failure -> {
+            getLogger().log(Level.WARNING,
+                    "Combat progression reward failed for " + event.attackerId(), failure);
+            return null;
+        });
+    }
+
+    /** Loads SQL-backed progression before exposing the in-memory combat stat block. */
+    private void activateCombatProfile(UUID playerId) {
+        characterClassProgression.activate(playerId);
+        combatMasteryService.activate(playerId);
+        if (sessionService.session(playerId).filter(PlayerSession::playable).isEmpty()) {
+            characterClassProgression.forget(playerId);
+            combatMasteryService.forget(playerId);
+            return;
+        }
+        attributeService.activate(playerId);
+        characterClassProgression.reconcileCached(playerId);
+    }
+
     @Override
     public void onDisable() {
         if (questRuntime != null) {
@@ -402,6 +478,7 @@ public class BranzMMORPGPlugin extends JavaPlugin {
             lifeSkillProgression = null;
             combatMasteryService = null;
             loadoutService = null;
+            characterBuildService = null;
             inventoryService = null;
             lootService = null;
             inventoryRepository = null;
@@ -485,6 +562,29 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 "content/skills/heavy_slash.yml",
                 "content/skills/precise_shot.yml",
                 "content/skills/fire_burst.yml",
+                "content/skills/rallying_shout.yml",
+                "content/skills/warbreaker.yml",
+                "content/skills/mana_shield.yml",
+                "content/skills/meteor.yml",
+                "content/skills/smoke_veil.yml",
+                "content/skills/shadow_step.yml",
+                "content/classes/warrior.yml",
+                "content/classes/mage.yml",
+                "content/classes/rogue.yml",
+                "content/class_trees/warrior_root.yml",
+                "content/class_trees/warrior_rally.yml",
+                "content/class_trees/warrior_momentum.yml",
+                "content/class_trees/warrior_ultimate.yml",
+                "content/class_trees/mage_root.yml",
+                "content/class_trees/mage_shield.yml",
+                "content/class_trees/mage_efficiency.yml",
+                "content/class_trees/mage_ultimate.yml",
+                "content/class_trees/rogue_root.yml",
+                "content/class_trees/rogue_smoke.yml",
+                "content/class_trees/rogue_combo.yml",
+                "content/class_trees/rogue_ultimate.yml",
+                "content/inputs/default.yml",
+                "content/combos/broadsword_heavy_strike.yml",
                 "content/life_skills/mining.yml",
                 "content/life_skills/mining_stoneworker.yml",
                 "content/masteries/sword.yml",
@@ -493,6 +593,12 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 "content/masteries/longbow.yml",
                 "content/masteries/fire_staff.yml",
                 "content/masteries/pyromancer_staff.yml",
+                "content/mastery_trees/sword_edge.yml",
+                "content/mastery_trees/broadsword_guard.yml",
+                "content/mastery_trees/bow_precision.yml",
+                "content/mastery_trees/longbow_draw.yml",
+                "content/mastery_trees/staff_focus.yml",
+                "content/mastery_trees/pyromancer_burn.yml",
                 "content/weapons/broadsword.yml",
                 "content/weapons/longbow.yml",
                 "content/weapons/fire_staff.yml",
@@ -501,7 +607,17 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 "content/professions/blacksmithing.yml",
                 "content/recipes/aether_ingot.yml",
                 "content/mobs/seal_guardian.yml",
-                "content/encounters/seal_guardian.yml")) {
+                "content/encounters/seal_guardian.yml",
+                "content/statuses/burn.yml",
+                "content/statuses/bleed.yml",
+                "content/statuses/poison.yml",
+                "content/statuses/slow.yml",
+                "content/statuses/root.yml",
+                "content/statuses/stun.yml",
+                "content/statuses/silence.yml",
+                "content/statuses/shield.yml",
+                "content/statuses/regeneration.yml",
+                "content/statuses/vulnerability.yml")) {
             if (!getDataFolder().toPath().resolve(resource).toFile().exists()) {
                 saveResource(resource, false);
             }

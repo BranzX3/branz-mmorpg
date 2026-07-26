@@ -16,7 +16,10 @@ public record WeaponDefinition(
         ContentId basicAttackSkillId,
         List<ContentId> activeSkillIds,
         Set<String> tags,
-        boolean twoHanded) implements ContentDefinition {
+        boolean twoHanded,
+        double familyXpShare,
+        double typeXpShare,
+        double skillXpShare) implements ContentDefinition {
 
     public WeaponDefinition {
         Objects.requireNonNull(id, "id");
@@ -28,10 +31,25 @@ public record WeaponDefinition(
         displayName = displayName == null || displayName.isBlank() ? id.value() : displayName.trim();
         activeSkillIds = List.copyOf(activeSkillIds);
         tags = Set.copyOf(tags);
+        if (!validShare(familyXpShare) || !validShare(typeXpShare) || !validShare(skillXpShare)
+                || Math.abs(familyXpShare + typeXpShare + skillXpShare - 1.0) > 1e-9) {
+            throw new IllegalArgumentException(id + ": mastery XP shares must total 1.0");
+        }
+    }
+
+    public WeaponDefinition(ContentId id, String displayName, ContentId familyMasteryId,
+                            ContentId typeMasteryId, ContentId basicAttackSkillId,
+                            List<ContentId> activeSkillIds, Set<String> tags, boolean twoHanded) {
+        this(id, displayName, familyMasteryId, typeMasteryId, basicAttackSkillId,
+                activeSkillIds, tags, twoHanded, 0.40, 0.60, 0.0);
     }
 
     @Override
     public ContentType type() {
         return ContentType.WEAPON;
+    }
+
+    private static boolean validShare(double value) {
+        return Double.isFinite(value) && value >= 0.0 && value <= 1.0;
     }
 }

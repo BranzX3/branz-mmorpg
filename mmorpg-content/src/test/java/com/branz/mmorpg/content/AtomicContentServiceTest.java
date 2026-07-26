@@ -105,6 +105,40 @@ class AtomicContentServiceTest {
     }
 
     @Test
+    void loadsADeclarativeStatusWithTypedModifier() throws IOException {
+        write("slow.yml", """
+                type: status
+                id: branz:slow
+                display-name: Slow
+                category: negative
+                stack-policy: replace_weaker
+                max-stacks: 1
+                duration-ms: 4000
+                periodic-interval-ms: 0
+                potency: 0
+                modifiers:
+                  - id: movement_speed
+                    attribute: movement_speed
+                    operation: add_percent
+                    value: -0.3
+                    stacking-group: movement_slow
+                    priority: 1
+                dispel-tags: [movement]
+                crowd-control: slow
+                offline-policy: tick_down
+                """);
+
+        AtomicContentService service = new AtomicContentService();
+        var result = service.reload(directory);
+
+        assertTrue(result.successful(), () -> String.join(", ", result.diagnostics()));
+        var status = service.snapshot().statuses().get(ContentId.parse("branz:slow"));
+        assertEquals(1, status.modifiers().size());
+        assertEquals(com.branz.mmorpg.api.stat.AttributeType.MOVEMENT_SPEED,
+                status.modifiers().get(0).attribute());
+    }
+
+    @Test
     void rejectsClassContentWithMissingStarterReferences() throws IOException {
         write("warrior.yml", """
                 type: character_class

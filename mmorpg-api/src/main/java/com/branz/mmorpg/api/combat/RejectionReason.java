@@ -39,6 +39,9 @@ public enum RejectionReason {
     /** This cast already hit this target as many times as its definition allows. */
     DUPLICATE_HIT,
 
+    /** The targeting range was negative or non-finite. */
+    INVALID_RANGE,
+
     /** The attempt carried a non-positive or non-finite power. */
     INVALID_POWER;
 

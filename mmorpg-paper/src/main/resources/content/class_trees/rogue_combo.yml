@@ -1,0 +1,12 @@
+type: class_skill_node
+id: branz:rogue_flowing_combo
+class-id: branz:rogue
+tree-revision: 1
+branch-id: duelist
+node-type: resource
+maximum-rank: 3
+point-cost-per-rank: 1
+required-class-level: 3
+prerequisites: {"branz:rogue_root": 1}
+modifiers:
+  - {id: energy_capacity, attribute: max_energy, operation: add_flat, value: 5, stacking-group: "", priority: 0}

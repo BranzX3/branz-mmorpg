@@ -6,6 +6,7 @@ import com.branz.mmorpg.api.stat.AttributeSnapshot;
 import com.branz.mmorpg.api.stat.AttributeType;
 import java.util.EnumMap;
 import java.util.UUID;
+import com.branz.mmorpg.core.stat.PlayerAttributeService;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.Team;
@@ -14,9 +15,11 @@ import org.bukkit.scoreboard.Team;
 final class PaperCombatant implements Combatant {
 
     private final LivingEntity entity;
+    private final PlayerAttributeService playerAttributes;
 
-    PaperCombatant(LivingEntity entity) {
+    PaperCombatant(LivingEntity entity, PlayerAttributeService playerAttributes) {
         this.entity = entity;
+        this.playerAttributes = playerAttributes;
     }
 
     @Override
@@ -26,6 +29,9 @@ final class PaperCombatant implements Combatant {
 
     @Override
     public AttributeSnapshot attributes() {
+        if (entity instanceof Player player) {
+            return playerAttributes.attributes(player.getUniqueId());
+        }
         EnumMap<AttributeType, Double> values = new EnumMap<>(AttributeType.class);
         for (AttributeType attribute : AttributeType.values()) {
             values.put(attribute, attribute.defaultValue());

@@ -32,6 +32,10 @@ public final class DatabaseManager implements AutoCloseable {
             Flyway.configure()
                     .dataSource(dataSource)
                     .locations("classpath:db/migration")
+                    // The network database is shared with BranzWallet and Branz
+                    // Idle, so the default flyway_schema_history name is not ours
+                    // to claim.
+                    .table("mmorpg_schema_history")
                     .validateMigrationNaming(true)
                     .load()
                     .migrate();
@@ -61,6 +65,9 @@ public final class DatabaseManager implements AutoCloseable {
                 }
                 if (exception instanceof SQLException sqlException) {
                     throw sqlException;
+                }
+                if (exception instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
                 }
                 throw new SQLException("Database transaction failed", exception);
             }

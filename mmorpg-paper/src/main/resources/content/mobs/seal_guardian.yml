@@ -1,0 +1,43 @@
+type: mob
+id: branz:seal_guardian
+display_name: Seal Guardian
+base_stats:
+  max_health: 600
+  physical_power: 35
+  armor: 40
+  resistance: 30
+scaling:
+  health_per_level: 0.08
+  power_per_level: 0.05
+  maximum_multiplier: 3
+faction: branz:old_ruins
+target_policy: hostile_players
+navigation:
+  movement_speed: 0.28
+  decision_interval_ms: 250
+  path_request_interval_ms: 500
+  can_swim: false
+abilities:
+  - skill: branz:heavy_slash
+    weight: 70
+    minimum_range: 0
+    maximum_range: 4.5
+    maximum_health_fraction: 1.0
+    required_target_tags: []
+  - skill: branz:fire_burst
+    weight: 30
+    minimum_range: 3
+    maximum_range: 16
+    maximum_health_fraction: 0.65
+    required_target_tags: []
+aggro_range: 18
+leash_range: 35
+reset_ms: 5000
+status_immunities: [branz:root]
+status_resistances:
+  "branz:stun": 0.5
+loot_table: branz:aether_cache
+minimum_contribution: 25
+presentation:
+  entity_type: minecraft:iron_golem
+  model_id: seal_guardian

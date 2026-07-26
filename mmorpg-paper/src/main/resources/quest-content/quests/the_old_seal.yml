@@ -1,0 +1,101 @@
+type: quest
+id: branz:the_old_seal
+version: 1
+title: quest.the_old_seal.title
+description: quest.the_old_seal.description
+category: storyline
+repeat_policy: never
+requirements: []
+start_trigger: npc
+start_stage: meet_keeper
+stages:
+  meet_keeper:
+    activation_actions: []
+    objectives:
+      - id: speak_keeper
+        objective_type: talk
+        target: branz:seal_keeper
+        amount: 1
+        credit_policy: personal
+    completion_policy: all
+    next: enter_ruins
+  enter_ruins:
+    activation_actions:
+      - id: opening_scene
+        action_type: start_cutscene
+        values: {id: "branz:seal_opening"}
+        required: false
+        idempotent: true
+        paper_thread: true
+    objectives:
+      - id: cross_gate
+        objective_type: enter_region
+        target: branz:old_ruins_gate
+        amount: 1
+        credit_policy: personal
+      - id: activate_pedestal
+        objective_type: interact
+        target: branz:seal_pedestal
+        amount: 1
+        credit_policy: personal
+    completion_policy: all
+    next: gather_key
+  gather_key:
+    activation_actions: []
+    objectives:
+      - id: defeat_guard
+        objective_type: kill
+        target: branz:seal_guardian
+        amount: 1
+        credit_policy: party_in_range
+      - id: possess_ore
+        objective_type: possess
+        target: branz:aether_ore
+        amount: 3
+        credit_policy: personal
+      - id: consume_ore
+        objective_type: consume
+        target: branz:aether_ore
+        amount: 3
+        credit_policy: personal
+    completion_policy: all
+    completion_actions:
+      - id: consume_key_material
+        action_type: take_item
+        values: {id: "branz:aether_ore"}
+        numbers: {amount: 3}
+        required: true
+        idempotent: true
+    next: break_seal
+  break_seal:
+    activation_actions:
+      - id: start_seal_encounter
+        action_type: start_encounter
+        values:
+          id: "branz:seal_guardian_encounter"
+          location: "branz:seal_pedestal"
+        required: true
+        idempotent: true
+        paper_thread: true
+    objectives:
+      - id: defeat_seal_encounter
+        objective_type: defeat_boss
+        target: branz:seal_guardian_encounter
+        amount: 1
+        credit_policy: encounter_eligible
+    completion_policy: all
+    completion_actions:
+      - id: mark_complete
+        action_type: complete_quest
+        required: true
+        idempotent: true
+rewards:
+  - id: reward_ore
+    action_type: grant_item
+    values: {id: "branz:aether_ore"}
+    numbers: {amount: 5}
+    required: true
+    idempotent: true
+migration_policy: safe
+tags: [launch, storyline, boss]
+tracking_priority: 100

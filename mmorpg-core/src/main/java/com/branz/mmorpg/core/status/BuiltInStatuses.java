@@ -63,7 +63,7 @@ public final class BuiltInStatuses {
     public static StatusDefinition bleed() {
         // Independent stacks: three attackers each keep credit for their own bleed.
         return new StatusDefinition(BLEED, "Bleed", StatusCategory.NEGATIVE,
-                StackPolicy.INDEPENDENT_STACKS, 1, Duration.ofSeconds(8), Duration.ofSeconds(2),
+                StackPolicy.INDEPENDENT_STACKS, 5, Duration.ofSeconds(8), Duration.ofSeconds(2),
                 3.0, List.of(), Set.of("physical", "bleed"), CrowdControlCategory.NONE,
                 OfflinePolicy.TICK_DOWN);
     }

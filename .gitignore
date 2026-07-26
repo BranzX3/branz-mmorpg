@@ -25,3 +25,7 @@ logs/
 plugins/
 *.jar
 *.log
+
+# Local quest editor
+node_modules/
+dist/

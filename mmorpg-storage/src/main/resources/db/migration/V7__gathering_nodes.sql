@@ -1,0 +1,23 @@
+CREATE TABLE mmorpg_gathering_node (
+    node_uuid BINARY(16) NOT NULL,
+    definition_id VARCHAR(128) NOT NULL,
+    world_uuid BINARY(16) NOT NULL,
+    block_x INT NOT NULL,
+    block_y INT NOT NULL,
+    block_z INT NOT NULL,
+    node_state VARCHAR(16) NOT NULL,
+    reservation_sequence BIGINT NOT NULL DEFAULT 0,
+    respawn_at TIMESTAMP(6) NULL,
+    reserved_by BINARY(16) NULL,
+    reserved_until TIMESTAMP(6) NULL,
+    last_harvested_by BINARY(16) NULL,
+    last_harvested_at TIMESTAMP(6) NULL,
+    created_by BINARY(16) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    PRIMARY KEY (node_uuid),
+    UNIQUE KEY uq_mmorpg_gathering_position (world_uuid, block_x, block_y, block_z),
+    KEY idx_mmorpg_gathering_state_respawn (node_state, respawn_at),
+    KEY idx_mmorpg_gathering_reservation (reserved_by, reserved_until),
+    KEY idx_mmorpg_gathering_definition (definition_id),
+    CONSTRAINT ck_mmorpg_gathering_sequence CHECK (reservation_sequence >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

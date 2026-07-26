@@ -1,0 +1,34 @@
+type: loot_table
+id: branz:aether_cache
+display-name: Aether Cache
+ownership: personal
+weighted-rolls: 1
+contribution-required: true
+entries:
+  - id: guaranteed_ore
+    item-id: branz:aether_ore
+    weight: 0
+    guaranteed: true
+    minimum-quantity: 2
+    maximum-quantity: 4
+    required-conditions: []
+    pity-after: 0
+    per-roll-cap: 4
+  - id: bonus_ore
+    item-id: branz:aether_ore
+    weight: 90
+    guaranteed: false
+    minimum-quantity: 1
+    maximum-quantity: 3
+    required-conditions: []
+    pity-after: 0
+    per-roll-cap: 3
+  - id: broadsword
+    item-id: branz:broadsword
+    weight: 10
+    guaranteed: false
+    minimum-quantity: 1
+    maximum-quantity: 1
+    required-conditions: [boss]
+    pity-after: 10
+    per-roll-cap: 1

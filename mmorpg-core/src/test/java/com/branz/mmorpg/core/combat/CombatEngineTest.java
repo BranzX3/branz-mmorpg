@@ -313,8 +313,11 @@ class CombatEngineTest {
 
         clock.advance(Duration.ofSeconds(7));
         assertFalse(engine.combatState().inCombat(target.id(), clock.now()));
-        assertEquals(2, engine.combatState().sweep(clock.now()).size());
+        assertEquals(2, engine.sweepCombatState().size());
         assertEquals(0, engine.combatState().tracked());
+        assertEquals(4, stateChanges.size(), "attacker and target both emitted leave events");
+        assertFalse(stateChanges.get(2).inCombat());
+        assertFalse(stateChanges.get(3).inCombat());
     }
 
     @Test

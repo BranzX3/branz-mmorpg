@@ -1,0 +1,13 @@
+type: life_skill_node
+id: branz:mining_stoneworker
+skill: branz:mining
+display-name: Stoneworker
+max-rank: 3
+point-cost-per-rank: 1
+requires-level: 2
+prerequisites: {}
+effect:
+  type: harvest_time_reduction
+  target-tags: [branz:common_mining]
+  percent-per-rank: 2
+  cap-percent: 6

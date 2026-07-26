@@ -122,6 +122,14 @@ public final class ExecutorScheduler extends AbstractService implements Schedule
         return drained;
     }
 
+    @Override public int queueDepth() {
+        ExecutorService pool = asyncPool;
+        if (pool instanceof java.util.concurrent.ThreadPoolExecutor executor) {
+            return executor.getQueue().size();
+        }
+        return -1;
+    }
+
     private <T extends ExecutorService> T requireAccepting(T pool) {
         if (!accepting || pool == null) {
             throw new MMOException(ErrorCode.SHUTTING_DOWN, "scheduler is not accepting work");

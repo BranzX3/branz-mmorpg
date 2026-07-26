@@ -66,6 +66,9 @@ public final class DatabaseManager implements AutoCloseable {
                 if (exception instanceof SQLException sqlException) {
                     throw sqlException;
                 }
+                if (exception instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                }
                 throw new SQLException("Database transaction failed", exception);
             }
         }

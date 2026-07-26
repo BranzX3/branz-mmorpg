@@ -1,0 +1,9 @@
+quest.the_old_seal.title: The Old Seal
+quest.the_old_seal.description: Help the Seal Keeper investigate the old ruins.
+npc.seal_keeper.name: Seal Keeper
+dialogue.keeper.warning: The seal beneath the ruins is weakening.
+dialogue.choice.accept: I will investigate.
+dialogue.choice.ask: What lies beyond the gate?
+dialogue.keeper.explanation: An old guardian protects the fractured seal.
+dialogue.keeper.accepted: Return when the guardian is defeated.
+cutscene.seal.warning: The old seal answers your presence.

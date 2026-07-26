@@ -1,0 +1,6 @@
+type: profession
+id: branz:blacksmithing
+display_name: Blacksmithing
+maximum_level: 100
+curve_base: 100
+curve_exponent: 1.6

@@ -1,0 +1,26 @@
+type: skill
+id: branz:fire_burst
+display-name: Fire Burst
+input-slot: weapon-1
+tags: [weapon, fire, magic]
+cast-ms: 500
+active-ms: 0
+recovery-ms: 300
+cooldown-ms: 3000
+cooldown-group: fire-primary
+costs: {MANA: 18}
+interrupt-refund: 0.75
+range: 16
+requires-line-of-sight: true
+root-effect: combo
+effects:
+  - id: combo
+    type: sequence
+    children: [hit, burn]
+  - id: hit
+    type: damage
+    numbers: {power: 30}
+    values: {type: magic}
+  - id: burn
+    type: apply_status
+    values: {status: "branz:burn"}

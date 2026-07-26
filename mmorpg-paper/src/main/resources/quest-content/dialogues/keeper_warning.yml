@@ -1,0 +1,45 @@
+type: dialogue
+id: branz:keeper_warning
+version: 1
+start_node: warning
+interruption_policy: pause_on_combat
+history_policy: lines_and_choices
+presentation_defaults:
+  portrait_style: vanilla
+nodes:
+  warning:
+    node_type: line
+    speaker: npc.seal_keeper.name
+    text: dialogue.keeper.warning
+    portrait: concerned
+    advance_mode: manual
+    next: approach
+  approach:
+    node_type: choice
+    advance_mode: choice
+    choices:
+      - id: accept
+        text: dialogue.choice.accept
+        next: accepted
+        record_history: true
+      - id: ask
+        text: dialogue.choice.ask
+        next: explanation
+        record_history: true
+  explanation:
+    node_type: line
+    speaker: npc.seal_keeper.name
+    text: dialogue.keeper.explanation
+    portrait: serious
+    advance_mode: manual
+    next: accepted
+  accepted:
+    node_type: line
+    speaker: npc.seal_keeper.name
+    text: dialogue.keeper.accepted
+    portrait: hopeful
+    advance_mode: manual
+    next: end
+  end:
+    node_type: end
+    advance_mode: manual

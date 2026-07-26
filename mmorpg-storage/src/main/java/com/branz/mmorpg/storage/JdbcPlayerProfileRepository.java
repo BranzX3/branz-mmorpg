@@ -6,6 +6,8 @@ import com.branz.mmorpg.api.error.MMOException;
 import com.branz.mmorpg.api.lifeskill.LifeSkillProfile;
 import com.branz.mmorpg.api.lifeskill.LifeSkillProgress;
 import com.branz.mmorpg.api.lifeskill.LifeSkillSnapshot;
+import com.branz.mmorpg.api.lifeskill.LifeSkillMutationCommit;
+import com.branz.mmorpg.api.operation.OperationId;
 import com.branz.mmorpg.api.player.PlayerProfile;
 import com.branz.mmorpg.api.player.PlayerProfileRepository;
 import java.nio.ByteBuffer;
@@ -21,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 /**
  * JDBC {@link PlayerProfileRepository}.
@@ -75,33 +78,59 @@ public final class JdbcPlayerProfileRepository implements PlayerProfileRepositor
     public LifeSkillProfile loadLifeSkills(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         try {
-            return databaseManager.inTransaction(connection -> {
-                Map<ContentId, Map<ContentId, Integer>> ranks = readNodeRanks(connection, playerId);
-                Map<ContentId, LifeSkillSnapshot> skills = new LinkedHashMap<>();
-                try (PreparedStatement select = connection.prepareStatement(
-                        "SELECT skill_id, level, total_xp, unspent_points, tree_revision, updated_at "
-                                + "FROM mmorpg_life_skill_progress WHERE player_uuid = ?")) {
-                    select.setBytes(1, toBytes(playerId));
-                    try (ResultSet rows = select.executeQuery()) {
-                        while (rows.next()) {
-                            ContentId skillId = ContentId.parse(rows.getString("skill_id"));
-                            LifeSkillProgress progress = new LifeSkillProgress(
-                                    skillId,
-                                    rows.getInt("level"),
-                                    rows.getLong("total_xp"),
-                                    rows.getInt("unspent_points"),
-                                    rows.getLong("tree_revision"),
-                                    rows.getTimestamp("updated_at").toInstant());
-                            skills.put(skillId, new LifeSkillSnapshot(
-                                    progress, ranks.getOrDefault(skillId, Map.of())));
-                        }
-                    }
-                }
-                return new LifeSkillProfile(playerId, skills, Instant.now());
-            });
+            return databaseManager.inTransaction(connection -> readLifeSkills(connection, playerId));
         } catch (SQLException exception) {
             throw new MMOException(ErrorCode.STORAGE_FAILURE,
                     "failed to load life skills for " + playerId, exception);
+        }
+    }
+
+    @Override
+    public LifeSkillMutationCommit mutateLifeSkill(
+            UUID playerId, ContentId skillId, OperationId operationId,
+            UnaryOperator<LifeSkillSnapshot> mutation) {
+        Objects.requireNonNull(playerId, "playerId");
+        Objects.requireNonNull(skillId, "skillId");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(mutation, "mutation");
+        if (!playerId.equals(operationId.playerUuid())) {
+            throw new MMOException(ErrorCode.INVALID_ARGUMENT,
+                    "operation player does not match mutation player");
+        }
+        try {
+            return databaseManager.inTransaction(connection -> {
+                lockPlayer(connection, playerId);
+                LifeSkillProfile currentProfile = readLifeSkills(connection, playerId);
+                LifeSkillSnapshot before = currentProfile.skill(skillId);
+                try (PreparedStatement claim = connection.prepareStatement(
+                        "INSERT IGNORE INTO mmorpg_processed_operation "
+                                + "(operation_id, player_uuid, subsystem) VALUES (?, ?, ?)")) {
+                    claim.setString(1, operationId.value());
+                    claim.setBytes(2, toBytes(playerId));
+                    claim.setString(3, operationId.subsystem());
+                    if (claim.executeUpdate() == 0) {
+                        return new LifeSkillMutationCommit(false, before, before);
+                    }
+                }
+                LifeSkillSnapshot after = Objects.requireNonNull(
+                        mutation.apply(before), "Life Skill mutation returned null");
+                if (!after.skillId().equals(skillId)) {
+                    throw new MMOException(ErrorCode.INVALID_ARGUMENT,
+                            "Life Skill mutation changed the skill ID");
+                }
+                writeLifeSkills(connection, currentProfile.with(after));
+                try (PreparedStatement audit = connection.prepareStatement(
+                        "INSERT INTO mmorpg_audit_log (actor_uuid, action, subject) VALUES (?, ?, ?)")) {
+                    audit.setBytes(1, toBytes(playerId));
+                    audit.setString(2, "life_skill_mutation");
+                    audit.setString(3, operationId.value());
+                    audit.executeUpdate();
+                }
+                return new LifeSkillMutationCommit(true, before, after);
+            });
+        } catch (SQLException exception) {
+            throw new MMOException(ErrorCode.STORAGE_FAILURE,
+                    "failed Life Skill operation " + operationId, exception);
         }
     }
 
@@ -110,28 +139,115 @@ public final class JdbcPlayerProfileRepository implements PlayerProfileRepositor
         Objects.requireNonNull(profile, "profile");
         try {
             databaseManager.inTransaction(connection -> {
-                try (PreparedStatement update = connection.prepareStatement(
-                        "UPDATE mmorpg_player_profile SET last_known_name = ?, schema_version = ?, "
-                                + "last_seen_at = ?, selected_loadout_id = ?, respawn_point_id = ? "
-                                + "WHERE player_uuid = ?")) {
-                    update.setString(1, profile.lastKnownName());
-                    update.setInt(2, profile.schemaVersion());
-                    update.setTimestamp(3, Timestamp.from(profile.lastSeenAt()));
-                    update.setString(4, profile.selectedLoadoutId().map(ContentId::toString).orElse(null));
-                    update.setString(5, profile.respawnPointId().map(ContentId::toString).orElse(null));
-                    update.setBytes(6, toBytes(profile.playerId()));
-                    if (update.executeUpdate() == 0) {
-                        throw new MMOException(ErrorCode.STORAGE_FAILURE,
-                                "no profile row for " + profile.playerId() + "; refusing to create one "
-                                        + "during save so a failed load cannot become a blank profile");
-                    }
-                }
-                writeSettings(connection, profile);
+                writeProfile(connection, profile);
                 return null;
             });
         } catch (SQLException exception) {
             throw new MMOException(ErrorCode.STORAGE_FAILURE,
                     "failed to save profile " + profile.playerId(), exception);
+        }
+    }
+
+    @Override
+    public void saveLifeSkills(LifeSkillProfile lifeSkills) {
+        Objects.requireNonNull(lifeSkills, "lifeSkills");
+        try {
+            databaseManager.inTransaction(connection -> {
+                writeLifeSkills(connection, lifeSkills);
+                return null;
+            });
+        } catch (SQLException exception) {
+            throw new MMOException(ErrorCode.STORAGE_FAILURE,
+                    "failed to save life skills for " + lifeSkills.playerId(), exception);
+        }
+    }
+
+    @Override
+    public void saveSession(PlayerProfile profile, LifeSkillProfile lifeSkills) {
+        Objects.requireNonNull(profile, "profile");
+        Objects.requireNonNull(lifeSkills, "lifeSkills");
+        if (!profile.playerId().equals(lifeSkills.playerId())) {
+            throw new MMOException(ErrorCode.INVALID_ARGUMENT,
+                    "profile and Life Skill snapshot belong to different players");
+        }
+        try {
+            databaseManager.inTransaction(connection -> {
+                writeProfile(connection, profile);
+                writeLifeSkills(connection, lifeSkills);
+                return null;
+            });
+        } catch (SQLException exception) {
+            throw new MMOException(ErrorCode.STORAGE_FAILURE,
+                    "failed to save session " + profile.playerId(), exception);
+        }
+    }
+
+    private static void writeProfile(Connection connection, PlayerProfile profile) throws SQLException {
+        try (PreparedStatement update = connection.prepareStatement(
+                "UPDATE mmorpg_player_profile SET last_known_name = ?, schema_version = ?, "
+                        + "last_seen_at = ?, selected_loadout_id = ?, respawn_point_id = ? "
+                        + "WHERE player_uuid = ?")) {
+            update.setString(1, profile.lastKnownName());
+            update.setInt(2, profile.schemaVersion());
+            update.setTimestamp(3, Timestamp.from(profile.lastSeenAt()));
+            update.setString(4, profile.selectedLoadoutId().map(ContentId::toString).orElse(null));
+            update.setString(5, profile.respawnPointId().map(ContentId::toString).orElse(null));
+            update.setBytes(6, toBytes(profile.playerId()));
+            if (update.executeUpdate() == 0) {
+                throw new MMOException(ErrorCode.STORAGE_FAILURE,
+                        "no profile row for " + profile.playerId() + "; refusing to create one "
+                                + "during save so a failed load cannot become a blank profile");
+            }
+        }
+        writeSettings(connection, profile);
+    }
+
+    static void writeLifeSkills(Connection connection, LifeSkillProfile lifeSkills)
+            throws SQLException {
+        byte[] playerId = toBytes(lifeSkills.playerId());
+        try (PreparedStatement deleteRanks = connection.prepareStatement(
+                "DELETE FROM mmorpg_life_skill_node_rank WHERE player_uuid = ?");
+             PreparedStatement deleteProgress = connection.prepareStatement(
+                     "DELETE FROM mmorpg_life_skill_progress WHERE player_uuid = ?")) {
+            deleteRanks.setBytes(1, playerId);
+            deleteRanks.executeUpdate();
+            deleteProgress.setBytes(1, playerId);
+            deleteProgress.executeUpdate();
+        }
+
+        if (lifeSkills.skills().isEmpty()) {
+            return;
+        }
+        try (PreparedStatement insertProgress = connection.prepareStatement(
+                "INSERT INTO mmorpg_life_skill_progress "
+                        + "(player_uuid, skill_id, level, total_xp, unspent_points, tree_revision, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?)");
+             PreparedStatement insertRank = connection.prepareStatement(
+                     "INSERT INTO mmorpg_life_skill_node_rank "
+                             + "(player_uuid, skill_id, node_id, rank_value, updated_at) "
+                             + "VALUES (?, ?, ?, ?, ?)")) {
+            for (LifeSkillSnapshot snapshot : lifeSkills.skills().values()) {
+                LifeSkillProgress progress = snapshot.progress();
+                insertProgress.setBytes(1, playerId);
+                insertProgress.setString(2, progress.skillId().toString());
+                insertProgress.setInt(3, progress.level());
+                insertProgress.setLong(4, progress.totalXp());
+                insertProgress.setInt(5, progress.unspentPoints());
+                insertProgress.setLong(6, progress.treeRevision());
+                insertProgress.setTimestamp(7, Timestamp.from(progress.updatedAt()));
+                insertProgress.addBatch();
+
+                for (Map.Entry<ContentId, Integer> rank : snapshot.nodeRanks().entrySet()) {
+                    insertRank.setBytes(1, playerId);
+                    insertRank.setString(2, progress.skillId().toString());
+                    insertRank.setString(3, rank.getKey().toString());
+                    insertRank.setInt(4, rank.getValue());
+                    insertRank.setTimestamp(5, Timestamp.from(progress.updatedAt()));
+                    insertRank.addBatch();
+                }
+            }
+            insertProgress.executeBatch();
+            insertRank.executeBatch();
         }
     }
 
@@ -189,6 +305,43 @@ public final class JdbcPlayerProfileRepository implements PlayerProfileRepositor
         return ranks;
     }
 
+    static LifeSkillProfile readLifeSkills(Connection connection, UUID playerId)
+            throws SQLException {
+        Map<ContentId, Map<ContentId, Integer>> ranks = readNodeRanks(connection, playerId);
+        Map<ContentId, LifeSkillSnapshot> skills = new LinkedHashMap<>();
+        try (PreparedStatement select = connection.prepareStatement(
+                "SELECT skill_id, level, total_xp, unspent_points, tree_revision, updated_at "
+                        + "FROM mmorpg_life_skill_progress WHERE player_uuid = ?")) {
+            select.setBytes(1, toBytes(playerId));
+            try (ResultSet rows = select.executeQuery()) {
+                while (rows.next()) {
+                    ContentId skillId = ContentId.parse(rows.getString("skill_id"));
+                    LifeSkillProgress progress = new LifeSkillProgress(
+                            skillId, rows.getInt("level"), rows.getLong("total_xp"),
+                            rows.getInt("unspent_points"), rows.getLong("tree_revision"),
+                            rows.getTimestamp("updated_at").toInstant());
+                    skills.put(skillId, new LifeSkillSnapshot(
+                            progress, ranks.getOrDefault(skillId, Map.of())));
+                }
+            }
+        }
+        return new LifeSkillProfile(playerId, skills, Instant.now());
+    }
+
+    static void lockPlayer(Connection connection, UUID playerId) throws SQLException {
+        try (PreparedStatement lock = connection.prepareStatement(
+                "SELECT player_uuid FROM mmorpg_player_profile "
+                        + "WHERE player_uuid = ? FOR UPDATE")) {
+            lock.setBytes(1, toBytes(playerId));
+            try (ResultSet row = lock.executeQuery()) {
+                if (!row.next()) {
+                    throw new MMOException(ErrorCode.PROFILE_LOAD_FAILED,
+                            "player profile is not loaded in storage " + playerId);
+                }
+            }
+        }
+    }
+
     private static void writeSettings(Connection connection, PlayerProfile profile) throws SQLException {
         try (PreparedStatement delete = connection.prepareStatement(
                 "DELETE FROM mmorpg_player_setting WHERE player_uuid = ?")) {
@@ -215,7 +368,7 @@ public final class JdbcPlayerProfileRepository implements PlayerProfileRepositor
         return raw == null || raw.isBlank() ? Optional.empty() : Optional.of(ContentId.parse(raw));
     }
 
-    private static byte[] toBytes(UUID uuid) {
+    static byte[] toBytes(UUID uuid) {
         return ByteBuffer.allocate(16)
                 .putLong(uuid.getMostSignificantBits())
                 .putLong(uuid.getLeastSignificantBits())

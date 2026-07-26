@@ -2,8 +2,8 @@ package com.branz.mmorpg.paper;
 
 import com.branz.mmorpg.api.economy.EconomyPaymentPort;
 import com.branz.mmorpg.api.operation.OperationId;
-import dev.branzx.wallet.api.Checkout;
-import dev.branzx.wallet.api.WalletApi;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -20,7 +20,7 @@ public final class PaperWalletEconomyAdapter implements EconomyPaymentPort,
 
     @Override public boolean adjustCredits(
             UUID playerId, long amount, String operationId, String reason) {
-        WalletApi wallet = plugin.getServer().getServicesManager().load(WalletApi.class);
+        Object wallet = wallet();
         if (wallet == null) {
             throw new IllegalStateException("BranzWallet service is unavailable");
         }
@@ -29,15 +29,16 @@ public final class PaperWalletEconomyAdapter implements EconomyPaymentPort,
             throw new IllegalArgumentException(
                     "amount, operation ID, and reason are required");
         }
-        return wallet.adjustCredit(playerId, amount, "MMORPG_ADMIN",
-                operationId, reason);
+        return (boolean) invoke(wallet, "adjustCredit",
+                new Class<?>[]{UUID.class, long.class, String.class, String.class, String.class},
+                playerId, amount, "MMORPG_ADMIN", operationId, reason);
     }
 
     @Override
     public long coins(UUID playerId) {
-        WalletApi wallet = wallet();
+        Object wallet = wallet();
         if (wallet == null) throw new IllegalStateException("BranzWallet is unavailable");
-        return wallet.coins(playerId);
+        return ((Number) invoke(wallet, "coins", new Class<?>[]{UUID.class}, playerId)).longValue();
     }
 
     @Override
@@ -45,19 +46,23 @@ public final class PaperWalletEconomyAdapter implements EconomyPaymentPort,
             UUID playerId, long amount, String purchaseId, OperationId operationId) {
         if (amount < 0) throw new IllegalArgumentException("negative Coin charge");
         if (amount == 0) return new PaymentResult(Status.PAID, "No fee.", 0);
-        WalletApi wallet = wallet();
+        Object wallet = wallet();
         if (wallet == null) {
             return new PaymentResult(Status.UNAVAILABLE,
                     "BranzWallet is unavailable; craft remains pending.", 0);
         }
         try {
-            Checkout checkout = wallet.hybridPay(
-                    playerId, amount, 0, purchaseId, operationId.value());
-            if (checkout.success()) {
+            Object checkout = invoke(wallet, "hybridPay",
+                    new Class<?>[]{UUID.class, long.class, long.class, String.class, String.class},
+                    playerId, amount, 0L, purchaseId, operationId.value());
+            boolean successful = (boolean) invoke(checkout, "success", new Class<?>[0]);
+            String message = (String) invoke(checkout, "message", new Class<?>[0]);
+            if (successful) {
                 return new PaymentResult(
-                        Status.PAID, checkout.message(), checkout.coinsCharged());
+                        Status.PAID, message,
+                        ((Number) invoke(checkout, "coinsCharged", new Class<?>[0])).longValue());
             }
-            String detail = checkout.message() == null ? "" : checkout.message();
+            String detail = message == null ? "" : message;
             String normalized = detail.toLowerCase(Locale.ROOT);
             if (normalized.contains("already processed")) {
                 return new PaymentResult(Status.ALREADY_PAID, detail, amount);
@@ -73,7 +78,28 @@ public final class PaperWalletEconomyAdapter implements EconomyPaymentPort,
         }
     }
 
-    private WalletApi wallet() {
-        return plugin.getServer().getServicesManager().load(WalletApi.class);
+    private Object wallet() {
+        try {
+            Class<?> walletApi = Class.forName(
+                    "dev.branzx.wallet.api.WalletApi", false, plugin.getClass().getClassLoader());
+            return plugin.getServer().getServicesManager().load(walletApi);
+        } catch (ClassNotFoundException unavailable) {
+            return null;
+        }
+    }
+
+    private static Object invoke(Object target, String methodName, Class<?>[] parameterTypes, Object... arguments) {
+        try {
+            Method method = target.getClass().getMethod(methodName, parameterTypes);
+            return method.invoke(target, arguments);
+        } catch (InvocationTargetException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException("BranzWallet call failed: " + methodName, cause);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Incompatible BranzWallet API: " + methodName, exception);
+        }
     }
 }

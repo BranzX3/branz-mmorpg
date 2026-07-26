@@ -19,15 +19,11 @@ Standalone, modular MMORPG framework for Paper 26.2 and Java 25.
 - [Phase 1 Foundation](docs/PHASE_1_FOUNDATION.md)
 - [Development Ownership and Contracts](docs/DEVELOPMENT_OWNERSHIP_AND_CONTRACTS.md)
 - [Core MMO Specification](docs/CORE_MMO_SPECIFICATION.md)
-<<<<<<< HEAD
 - [Combat and Skill Input Specification](docs/COMBAT_SKILL_INPUT_SPECIFICATION.md)
 - [Permanent Character Class Specification](docs/PERMANENT_CHARACTER_CLASS_SPECIFICATION.md)
 - [Class Compass and Skill Tree UI Specification](docs/CLASS_COMPASS_AND_SKILL_TREE_UI_SPECIFICATION.md)
 - [Combat Mastery and Character Build Specification](docs/COMBAT_MASTERY_AND_CHARACTER_BUILD_SPECIFICATION.md)
-- [Survival Skill Mastery Specification](docs/SURVIVAL_SKILL_MASTERY_SPECIFICATION.md)
-=======
-- [Life Skill Mastery Specification](docs/SURVIVAL_SKILL_MASTERY_SPECIFICATION.md)
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
+- [Survival Skill Mastery (Life Skills) Specification](docs/SURVIVAL_SKILL_MASTERY_SPECIFICATION.md)
 - [Quest, Dialogue, and Cutscene Specification](docs/QUEST_DIALOGUE_CUTSCENE_SPECIFICATION.md)
 - [Parallel Implementation Roadmap](docs/IMPLEMENTATION_ROADMAP.md)
 - [External Plugin Integration Contract](docs/EXTERNAL_PLUGIN_INTEGRATION_CONTRACT.md)

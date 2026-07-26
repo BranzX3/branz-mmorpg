@@ -5,15 +5,11 @@ Related specifications:
 
 - DEVELOPMENT_OWNERSHIP_AND_CONTRACTS.md
 - CORE_MMO_SPECIFICATION.md
-<<<<<<< HEAD
 - COMBAT_SKILL_INPUT_SPECIFICATION.md
 - PERMANENT_CHARACTER_CLASS_SPECIFICATION.md
 - CLASS_COMPASS_AND_SKILL_TREE_UI_SPECIFICATION.md
 - COMBAT_MASTERY_AND_CHARACTER_BUILD_SPECIFICATION.md
 - SURVIVAL_SKILL_MASTERY_SPECIFICATION.md
-=======
-- SURVIVAL_SKILL_MASTERY_SPECIFICATION.md (Life Skill Mastery)
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 - QUEST_DIALOGUE_CUTSCENE_SPECIFICATION.md
 - PHASE_1_FOUNDATION.md
 
@@ -24,7 +20,6 @@ Core and Quest proceed in parallel after agreeing on API contracts.
 | Milestone | Core MMO workstream | Quest workstream | Integration gate |
 |---|---|---|---|
 | M0 | C0 Foundation adoption | Q0 Module/contracts | Dependency and ownership checks |
-<<<<<<< HEAD
 | M1 | C1 Player session, permanent-class domain/selection transaction, C2 Attributes; Survival Skill profile contract | Q1 Compiler, Q2 State machine | Player identity, class snapshot/selection contract, lifecycle, and immutable skill snapshot contract |
 | M2 | C3 Status, C4 Combat, B0 input contracts; class restrictions and starter definitions | Q3 Objectives, Q4 Conditions/actions | Combat/domain-event envelopes, class query/condition contracts, and fake adapters |
 | M3 | C5 Combat input/combos and Class Skill Tree domain, C6 Character Build and Combat Mastery; S1 Survival progression engine and tree | Q5 Persistence/migration | Input arbitration, Skill Point transaction, typed class/mastery query/event, class/build/tree snapshot, and operation ID |
@@ -33,22 +28,11 @@ Core and Quest proceed in parallel after agreeing on API contracts.
 | M6 | C9 Mob AI, C10 Encounter/boss | Q9 Tracker/journal, Q10 Cutscene | Mob/boss events and actor/camera adapters |
 | M7 | C11 Party/trade | Q11 Party/private scenes | Stable party snapshot contract |
 | M8 | C12 Operations, C13 Hardening; K4/B5/S3 UI, admin, telemetry, and smoke tests | Q12–Q15 Tools/editor/hardening | Reference scenarios and final release gate |
-=======
-| M1 | C1 Player session, C2 Attributes; Life Skill profile contract | Q1 Compiler, Q2 State machine | Player identity, lifecycle, and immutable skill snapshot contract |
-| M2 | C3 Status, C4 Combat | Q3 Objectives, Q4 Conditions/actions | Domain-event envelopes and fake adapters |
-| M3 | C5 Skills, C6 Combat Mastery; S1 Life Skill progression engine and tree | Q5 Persistence/migration | Mastery query/event, tree snapshot, and operation ID |
-| M4 | C7 Items/loot | Q6 Dialogue engine, Q7 Renderer/history | Item query/reward and player audience |
-| M5 | C8 Gathering/crafting/economy; S2 Mining nodes | Q8 NPC/world integration | Gathering, Life Skill XP, craft, item, region, and interaction events |
-| M6 | C9 Mob AI, C10 Encounter/boss | Q9 Tracker/journal, Q10 Cutscene | Mob/boss events and actor/camera adapters |
-| M7 | C11 Party/trade | Q11 Party/private scenes | Stable party snapshot contract |
-| M8 | C12 Operations, C13 Hardening; S3 Life Skill UI, admin, telemetry, and smoke tests | Q12–Q15 Tools/editor/hardening | Reference scenarios and final release gate |
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 
 Quest development must not wait for a Core implementation when a fake port can
 express the contract. Real integration occurs at each gate after both sides pass
 their own tests.
 
-<<<<<<< HEAD
 ## 1.1 Permanent Class and Compass delivery order
 
 Permanent classes belong to Core; inventory presentation belongs to Paper and
@@ -90,9 +74,6 @@ An input is never a combat result. B2 may create intents only; B1 remains the
 authoritative source of damage, resource payment, contribution, and progression.
 
 ## 1.3 Survival Skill Mastery delivery order
-=======
-## 1.1 Life Skill Mastery delivery order
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 
 Life Skill Mastery belongs to the Core workstream and is delivered in four
 increments:
@@ -101,7 +82,7 @@ increments:
 |---|---|---|---|
 | S0 Profile contract | M1 | Skill ID, immutable progress snapshot, level/XP/point values, persistence model | A player session loads skill progress without Paper types |
 | S1 Progression engine | M3 | XP formula, level curve, points, mastery-tree DAG, node purchase and respec transactions | Pure Java formula, tree-validation, and idempotency tests pass |
-| S2 Mining nodes | M5 | Node definitions, node instances and placement commands, reservation/contest, depletion and respawn, yields, committed events | Ordinary blocks grant zero; a registered node grants its configured XP; contested harvest resolves to exactly one winner |
+| S2 Mining nodes | M5 | Natural-block origin plus node definitions, instances and placement commands, reservation/contest, depletion and respawn, yields, committed events | Eligible natural stone grants 1 XP; a registered node grants its configured XP; contested harvest resolves to exactly one winner |
 | S3 Operations and release | M8 | Player UI, admin inspect/repair/reset, node repair tooling, audit, telemetry, Paper adapter, performance and abuse tests | Life Skill acceptance criteria and Paper smoke tests pass |
 
 Mining is required for the initial release. Woodcutting, Excavation, Foraging,
@@ -185,7 +166,6 @@ between branches.
 | Quest state machine | Required | Contract suite | Not required |
 | Objective reducers | Required | Event contract suite | Not required |
 | Rewards/idempotency | Required | Required | Smoke |
-<<<<<<< HEAD
 | Permanent class selection | Fake starter delivery | Required | Required |
 | Class selection retry/starter grant | Failure-injected fake | Required | Smoke |
 | Class tree purchase/respec/migration | Required | Required | Renderer smoke |
@@ -200,14 +180,9 @@ between branches.
 | Survival XP/level/tree | Fake source/tool | Required | Not required |
 | Mining block eligibility | Fake block origin | Required | Required |
 | Survival anti-farm/idempotency | Synthetic actions | Required | Smoke |
-=======
-| Life Skill profile/query | Useful | Required | Not required |
-| Life Skill XP/level/tree | Fake node/tool | Required | Not required |
 | Node eligibility and yields | Fake node instance | Required | Required |
 | Node reservation and contest | Simulated concurrency | Required | Required |
 | Node depletion/respawn/restart | Fake clock | Required | Smoke |
-| Life Skill anti-farm/idempotency | Synthetic actions | Required | Smoke |
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 | Dialogue graph | Required | Not required | Renderer smoke |
 | NPC/region | Fake location/actor | Event adapter | Required |
 | Cutscene timeline | Virtual ports | Actor integration | Required |
@@ -226,7 +201,6 @@ An integration gate passes when:
 - No implementation dependency crosses ownership boundary.
 - Database migrations have unique ordered versions and were tested together.
 - Content schemas resolve cross-system IDs against one catalog snapshot.
-<<<<<<< HEAD
 - Permanent class selection and starter delivery are idempotent and audited.
 - Every launch class has a complete valid starter weapon and skill kit.
 - Slot-9 reconciliation proves that no normal item is deleted or duplicated.
@@ -235,10 +209,7 @@ An integration gate passes when:
 - Class, weapon, resource, skill, and mastery compatibility validates together.
 - Survival XP and tree mutations use idempotent operation IDs.
 - Gathering sources prove their origin before valuable XP or bonus yield.
-=======
-- Life Skill XP and tree mutations use idempotent operation IDs.
-- XP and yields come only from registered node instances.
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
+- Registered node XP and yields require an authoritative node instance.
 - gradlew clean test shadowJar passes.
 
 ## 6. Reference quest used for final integration
@@ -270,7 +241,7 @@ Life Skill progression uses a separate scenario so Mining does not depend on
 quest completion:
 
 1. Join with an ACTIVE player session and a valid pickaxe.
-2. Break ordinary stone in the world and receive no XP at all.
+2. Break eligible natural stone in the world and receive exactly 1 Mining XP.
 3. Harvest a placed `branz:stone_deposit` node and receive its configured XP
    and yields.
 4. Harvest a placed `branz:iron_vein` node and receive its larger XP value.
@@ -405,12 +376,12 @@ As of the roadmap review on 2026-07-26:
 | Area | Current repository state | Roadmap consequence |
 |---|---|---|
 | Gradle wrapper | Gradle 9.1 wrapper restored; `clean test shadowJar` passes | I0 complete; retain the clean-build gate |
-| mmorpg-api | Foundation content/lifecycle/health/IDs plus immutable Player Profile/Session, dirty-component, save, and recovery contracts | Remaining C0 scheduler/transaction/error and K0/B0 contracts remain |
-| mmorpg-content | YAML material loading, validation, immutable atomic snapshots | Class, skill, tree, combo, item, mob, quest type registration remains |
-| mmorpg-storage | Hikari/Flyway, V2 player-profile migration, async optimistic-lock repository, atomic file recovery journal, and passing MySQL 8.4 integration suite | Class/mastery/tree/item/outbox storage remains |
-| mmorpg-core | Lifecycle container, managed foundation services, typed IDs, and tokenized Player Session manager with dirty snapshots, bounded save retry, and recovery replay | I1/C0 remains in progress; I2/C1 is complete |
-| mmorpg-paper | Core bootstrap plus database-enabled async join/quit, configurable autosave/retry, durable recovery, and health/status reporting | Compass UI, input, combat, inventory, and scheduler adapters remain |
-| Tests | Foundation, lifecycle, Player Session concurrency/failure/recovery tests, and MySQL 8.4 migration/repository/outage/restart integration tests | Class/Combat/Survival/Quest and Paper behavior suites remain |
+| mmorpg-api | Foundation plus typed contracts for Player Session, combat, skills, status, mastery, items, gathering, crafting, mobs, encounters, social, telemetry, and Survival/Life Skills | K0 permanent-class contracts remain the next blocking API gap |
+| mmorpg-content | Atomic YAML catalog loads and validates materials, skills, masteries, weapons, loot, Life Skills, nodes, recipes, mobs, and encounters | Permanent class and Class Tree content types remain |
+| mmorpg-storage | Hikari/Flyway V1-V17 with V2.1 collision bridge, legacy history upgrade, optimistic Player Profile, recovery import, and repositories for merged gameplay/Quest domains | Permanent class selection/tree migrations remain |
+| mmorpg-core | Service container plus tokenized Player Session, combat/status/skill, mastery, item, gathering/crafting, mob/encounter, social, and telemetry services | Merged services require class-domain integration and final acceptance audit |
+| mmorpg-paper | One Player Session lifecycle drives the merged combat, skill, status, item, gathering, crafting, mob, encounter, social, HUD, telemetry, and Quest runtimes | Permanent class compass/tree flow remains |
+| Tests | Unit suites plus MySQL 8.4 fresh-schema, legacy-schema upgrade, Player Session recovery, and full Core/Quest migration tests | Permanent class and end-to-end Paper acceptance suites remain |
 | Local Paper | Paper 26.2 starts on localhost:25565 with Core READY and database disabled | Foundation smoke gate passes; persistent gameplay is intentionally offline |
 
 Documentation completion does not mark an implementation milestone complete.
@@ -422,15 +393,18 @@ measured acceptance gate exist.
 Work proceeds in this order unless a fake port allows explicitly parallel pure
 Java development:
 
-Current execution status: **I0 and I2 complete; I1 in progress; I3–I10 pending.**
+Current execution status: **I0-I2 complete; I3 is next. I4-I10 contain merged
+implementations but remain pending until their gates are audited against the
+permanent-class integration.**
 
 I2 implementation increment 2 is complete: active profiles can be
 mutated through component-scoped dirty tracking, periodic saves keep sessions
 active, logout coalesces with an in-flight save, failed writes use bounded retry,
 and exhausted writes are atomically journaled outside MySQL and replayed before a
 later session becomes ACTIVE. The integration gate passed against MySQL 8.4.10:
-Flyway V1/V2, binary UUID and JSON columns, profile round trips, concurrent
-insert-if-absent, optimistic conflict, database outage, and restart replay were
+Flyway V1/V2/V2.1-V17, legacy history upgrade, binary UUID and JSON columns,
+class/revision profile round trips, concurrent insert-if-absent, optimistic
+conflict, database outage, legacy JSON recovery import, and restart replay were
 all exercised with the real Connector/J and HikariCP stack.
 
 | Order | Implementation package | Required output | Gate before next dependent package |

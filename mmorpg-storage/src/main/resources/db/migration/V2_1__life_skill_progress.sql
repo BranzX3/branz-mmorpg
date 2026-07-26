@@ -1,4 +1,5 @@
 -- Life Skill Mastery persistence model (S0).
+-- Version 2.1 follows the legacy V2 player-profile migration after both workstreams merge.
 --
 -- Progress is keyed by player UUID and skill ID; mastery ranks by player, skill,
 -- and node. Both are written only by the progression engine, inside the same

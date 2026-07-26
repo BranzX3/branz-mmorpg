@@ -155,6 +155,13 @@ public final class RuntimePlayerSession implements PlayerSession {
         lifeSkills.updateAndGet(current -> current.with(snapshot));
     }
 
+    /** Advances the optimistic profile revision without overwriting changes made during the save. */
+    void acceptPersistedProfileRevision(long expectedRevision) {
+        profile.updateAndGet(current -> current.revision() == expectedRevision
+                ? current.withRevision(expectedRevision + 1)
+                : current);
+    }
+
     public void markDirty(DirtyComponent component) {
         synchronized (dirtyVersions) {
             dirtyVersions.merge(component, 1L, Long::sum);

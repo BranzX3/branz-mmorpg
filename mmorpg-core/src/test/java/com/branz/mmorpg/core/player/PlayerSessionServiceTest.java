@@ -236,6 +236,7 @@ class PlayerSessionServiceTest {
 
         assertEquals(1, service.flushAll(), "login marks the profile dirty");
         assertEquals(SessionState.ACTIVE, session.state(), "a periodic save resumes play");
+        assertEquals(1, session.profile().revision(), "the live snapshot tracks the committed revision");
         assertFalse(session.hasUnsavedChanges());
 
         assertEquals(0, service.flushAll(), "a clean session is not written again");

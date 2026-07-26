@@ -5,20 +5,6 @@ import com.branz.mmorpg.api.combat.CombatPolicy;
 import com.branz.mmorpg.api.content.ContentId;
 import com.branz.mmorpg.api.operation.OperationId;
 import com.branz.mmorpg.api.content.ContentService;
-<<<<<<< HEAD
-import com.branz.mmorpg.api.lifecycle.HealthService;
-import com.branz.mmorpg.api.player.PlayerSessionService;
-import com.branz.mmorpg.api.player.PlayerSessionState;
-import com.branz.mmorpg.content.AtomicContentService;
-import com.branz.mmorpg.core.lifecycle.CoreRuntime;
-import com.branz.mmorpg.core.player.PlayerSessionManager;
-import com.branz.mmorpg.core.player.PlayerSessionSavePolicy;
-import com.branz.mmorpg.core.service.ContentManagedService;
-import com.branz.mmorpg.core.service.DatabaseManagedService;
-import com.branz.mmorpg.storage.DatabaseConfig;
-import com.branz.mmorpg.storage.player.FilePlayerProfileRecoveryStore;
-import com.branz.mmorpg.storage.player.MySqlPlayerProfileStore;
-=======
 import com.branz.mmorpg.api.lifeskill.LifeSkillQuery;
 import com.branz.mmorpg.api.lifeskill.LifeSkillMutationService;
 import com.branz.mmorpg.api.player.PlayerProfileRepository;
@@ -87,40 +73,20 @@ import com.branz.mmorpg.storage.JdbcTradeRepository;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.UUID;
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
 
-public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
+public class BranzMMORPGPlugin extends JavaPlugin {
     private AtomicContentService contentService;
-<<<<<<< HEAD
-    private ContentManagedService contentManagedService;
-    private DatabaseManagedService databaseManagedService;
-    private CoreRuntime coreRuntime;
-    private ExecutorService playerStorageExecutor;
-    private PlayerSessionManager playerSessionManager;
-    private BukkitTask playerAutosaveTask;
-=======
     private DatabaseManager databaseManager;
     private ServiceContainer serviceContainer;
     private Scheduler scheduler;
@@ -160,7 +126,6 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
     private InMemoryTelemetryService telemetryService;
     private PaperTelemetryRuntime telemetryRuntime;
     private PaperQuestRuntime questRuntime;
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
     private Path contentDirectory;
 
     @Override
@@ -173,16 +138,6 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
                     .resolve(getConfig().getString("content.directory", "content"))
                     .normalize();
             contentService = new AtomicContentService();
-<<<<<<< HEAD
-            contentManagedService = new ContentManagedService(contentService, contentDirectory);
-            boolean databaseEnabled = getConfig().getBoolean("database.enabled", false);
-            databaseManagedService = new DatabaseManagedService(databaseEnabled, readDatabaseConfig());
-            coreRuntime = new CoreRuntime(List.of(contentManagedService, databaseManagedService));
-            coreRuntime.start();
-
-            ContentReloadResult initialLoad = contentManagedService.lastResult();
-            if (databaseManagedService.connected()) {
-=======
             telemetryService = new InMemoryTelemetryService();
             ContentReloadResult initialLoad = contentService.reload(contentDirectory);
             if (!initialLoad.successful()) {
@@ -194,9 +149,7 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
             if (getConfig().getBoolean("database.enabled", false)) {
                 databaseManager = DatabaseManager.connect(readDatabaseConfig());
                 transactionRunner = new JdbcTransactionRunner(databaseManager);
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
                 getLogger().info("Database connected and migrations applied.");
-                startPlayerSessions();
             } else {
                 getLogger().warning("Database is disabled; persistent gameplay services must remain offline.");
             }
@@ -219,7 +172,10 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
                         () -> contentService.snapshot().revision(),
                         duplicateLoginPolicy(),
                         new FilePendingSessionSaveStore(
-                                getDataFolder().toPath().resolve("pending-saves"))));
+                                getDataFolder().toPath().resolve(getConfig().getString(
+                                        "player-session.recovery-directory",
+                                        "recovery/player-profiles"))),
+                        Math.max(1, getConfig().getInt("player-session.save-max-attempts", 3))));
                 lifeSkillProgression = new LifeSkillProgressionService(
                         profileRepository, sessionService, new SystemGameClock(),
                         contentService::snapshot);
@@ -394,19 +350,8 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
             }
             getServer().getServicesManager().register(
                     ContentService.class, contentService, this, ServicePriority.Normal);
-            getServer().getServicesManager().register(
-                    HealthService.class, coreRuntime, this, ServicePriority.Normal);
-            if (playerSessionManager != null) {
-                getServer().getServicesManager().register(
-                        PlayerSessionService.class,
-                        playerSessionManager,
-                        this,
-                        ServicePriority.Normal);
-            }
-            getServer().getPluginManager().registerEvents(this, this);
             Objects.requireNonNull(getCommand("branz"), "branz command").setExecutor(new AdminCommand());
-            getLogger().info("Branz MMORPG Core " + coreRuntime.health().state()
-                    + " with " + initialLoad.definitionCount()
+            getLogger().info("Branz MMORPG enabled with " + initialLoad.definitionCount()
                     + " content definitions (revision " + initialLoad.revision() + ").");
         } catch (Exception exception) {
             getLogger().severe("Branz MMORPG startup failed: " + exception.getMessage());
@@ -421,21 +366,12 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
             questRuntime.shutdown();
         }
         getServer().getServicesManager().unregisterAll(this);
-<<<<<<< HEAD
-        stopPlayerAutosave();
-        closeOnlinePlayerSessions();
-        stopPlayerStorageExecutor();
-        if (coreRuntime != null) {
-            try {
-                coreRuntime.close();
-            } catch (RuntimeException exception) {
-                getLogger().severe("Core shutdown failed: " + exception.getMessage());
-            }
-            coreRuntime = null;
-=======
         getServer().getScheduler().cancelTasks(this);
-        if (scheduler != null && !scheduler.drainAndShutdown(Duration.ofSeconds(10))) {
-            getLogger().warning("Scheduler did not drain within 10s; remaining work was abandoned.");
+        Duration shutdownBudget = Duration.ofMillis(Math.max(
+                1L, getConfig().getLong("player-session.shutdown-timeout-millis", 10_000L)));
+        if (scheduler != null && !scheduler.drainAndShutdown(shutdownBudget)) {
+            getLogger().warning("Scheduler did not drain within " + shutdownBudget.toMillis()
+                    + "ms; remaining work was abandoned.");
         }
         if (serviceContainer != null) {
             // Storage closes last: draining work above may still need it.
@@ -482,58 +418,10 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
         if (databaseManager != null) {
             databaseManager.close();
             databaseManager = null;
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
         }
         getLogger().info("Branz MMORPG disabled.");
     }
 
-<<<<<<< HEAD
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        if (playerSessionManager == null) {
-            return;
-        }
-        UUID playerId = event.getPlayer().getUniqueId();
-        String playerName = event.getPlayer().getName();
-        long contentRevision = contentService.snapshot().revision();
-        playerSessionManager.open(playerId, playerName, contentRevision).whenComplete((snapshot, failure) -> {
-            if (!isEnabled()) {
-                return;
-            }
-            getServer().getScheduler().runTask(this, () -> {
-                Player player = getServer().getPlayer(playerId);
-                if (player == null || !player.isOnline()) {
-                    return;
-                }
-                if (failure != null) {
-                    getLogger().log(Level.SEVERE, "Player session callback failed for " + playerId, failure);
-                    player.sendMessage("MMO profile unavailable; gameplay mutations are disabled.");
-                    return;
-                }
-                if (snapshot.state() == PlayerSessionState.LOAD_FAILED
-                        || snapshot.state() == PlayerSessionState.CONFLICTED) {
-                    getLogger().warning("Player session rejected for " + playerId + ": " + snapshot.detail());
-                    player.sendMessage("MMO profile unavailable: " + snapshot.detail());
-                }
-            });
-        });
-    }
-
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        if (playerSessionManager == null) {
-            return;
-        }
-        UUID playerId = event.getPlayer().getUniqueId();
-        playerSessionManager.snapshot(playerId).ifPresent(snapshot ->
-                playerSessionManager.close(playerId, snapshot.token()).whenComplete((closed, failure) -> {
-                    if (failure != null) {
-                        getLogger().log(Level.SEVERE, "Player session close failed for " + playerId, failure);
-                    } else if (closed.state() == PlayerSessionState.SAVE_RETRY_PENDING) {
-                        getLogger().severe("Player profile save requires retry for " + playerId + ": " + closed.detail());
-                    }
-                }));
-=======
     private DuplicateLoginPolicy duplicateLoginPolicy() {
         String configured = getConfig()
                 .getString("player.duplicate-login", DuplicateLoginPolicy.CLOSE_PREVIOUS.name())
@@ -568,7 +456,6 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
                 getLogger().warning("Autosave pass failed: " + failure.getMessage());
             }
         }, intervalTicks, intervalTicks);
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
     }
 
     private void saveBundledContent() {
@@ -622,97 +509,6 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
                 getConfig().getLong("database.connection-timeout-millis", 5000));
     }
 
-<<<<<<< HEAD
-    private void startPlayerSessions() {
-        int workerThreads = Math.max(1, getConfig().getInt("player-session.worker-threads", 2));
-        playerStorageExecutor = Executors.newFixedThreadPool(
-                workerThreads,
-                Thread.ofPlatform().name("branz-player-storage-", 0).daemon(true).factory());
-        Path recoveryDirectory = getDataFolder().toPath()
-                .resolve(getConfig().getString(
-                        "player-session.recovery-directory", "recovery/player-profiles"))
-                .normalize();
-        playerSessionManager = new PlayerSessionManager(
-                new MySqlPlayerProfileStore(
-                        databaseManagedService.manager().orElseThrow(), playerStorageExecutor),
-                new PlayerSessionSavePolicy(Math.max(
-                        1, getConfig().getInt("player-session.save-max-attempts", 3))),
-                new FilePlayerProfileRecoveryStore(recoveryDirectory, playerStorageExecutor));
-        long autosaveInterval = Math.max(
-                20L, getConfig().getLong("player-session.autosave-interval-ticks", 6000L));
-        playerAutosaveTask = getServer().getScheduler().runTaskTimer(
-                this, this::saveDirtyPlayerSessions, autosaveInterval, autosaveInterval);
-    }
-
-    private void saveDirtyPlayerSessions() {
-        if (playerSessionManager == null) {
-            return;
-        }
-        for (Player player : getServer().getOnlinePlayers()) {
-            UUID playerId = player.getUniqueId();
-            playerSessionManager.snapshot(playerId)
-                    .filter(snapshot -> snapshot.state() == PlayerSessionState.ACTIVE)
-                    .filter(snapshot -> !snapshot.dirtyComponents().isEmpty())
-                    .ifPresent(snapshot -> playerSessionManager.save(playerId, snapshot.token())
-                            .whenComplete((saved, failure) -> {
-                                if (failure != null) {
-                                    getLogger().log(Level.SEVERE, "Player autosave failed for " + playerId, failure);
-                                } else if (saved.state() == PlayerSessionState.SAVE_RETRY_PENDING) {
-                                    getLogger().severe("Player autosave requires retry for "
-                                            + playerId + ": " + saved.detail());
-                                }
-                            }));
-        }
-    }
-
-    private void stopPlayerAutosave() {
-        if (playerAutosaveTask != null) {
-            playerAutosaveTask.cancel();
-            playerAutosaveTask = null;
-        }
-    }
-
-    private void closeOnlinePlayerSessions() {
-        if (playerSessionManager == null) {
-            return;
-        }
-        List<CompletableFuture<?>> pending = new ArrayList<>();
-        for (Player player : getServer().getOnlinePlayers()) {
-            playerSessionManager.snapshot(player.getUniqueId()).ifPresent(snapshot -> pending.add(
-                    playerSessionManager.close(player.getUniqueId(), snapshot.token()).toCompletableFuture()));
-        }
-        if (pending.isEmpty()) {
-            return;
-        }
-        long timeoutMillis = Math.max(
-                1, getConfig().getLong("player-session.shutdown-timeout-millis", 5000));
-        try {
-            CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new))
-                    .get(timeoutMillis, TimeUnit.MILLISECONDS);
-        } catch (Exception exception) {
-            getLogger().log(Level.SEVERE, "Timed out while flushing player sessions", exception);
-        }
-    }
-
-    private void stopPlayerStorageExecutor() {
-        if (playerStorageExecutor == null) {
-            return;
-        }
-        playerStorageExecutor.shutdown();
-        long timeoutMillis = Math.max(
-                1, getConfig().getLong("player-session.shutdown-timeout-millis", 5000));
-        try {
-            if (!playerStorageExecutor.awaitTermination(timeoutMillis, TimeUnit.MILLISECONDS)) {
-                getLogger().severe("Player storage executor did not stop within the shutdown budget.");
-            }
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            getLogger().warning("Interrupted while stopping player storage executor.");
-        } finally {
-            playerStorageExecutor = null;
-            playerSessionManager = null;
-        }
-=======
     private byte[] readItemTokenSecret() {
         String configured = getConfig().getString("items.token-secret", "");
         if (configured != null && !configured.isBlank()) {
@@ -730,7 +526,6 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
         saveConfig();
         getLogger().warning("Generated a new signed-item token secret in config.yml.");
         return generated;
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
     }
 
     private void logDiagnostics(String heading, ContentReloadResult result) {
@@ -2149,14 +1944,6 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
                 var snapshot = contentService.snapshot();
                 sender.sendMessage("Branz MMORPG: content revision " + snapshot.revision()
                         + ", definitions " + snapshot.definitions().size()
-<<<<<<< HEAD
-                        + ", core " + coreRuntime.health().state()
-                        + ", database " + databaseManagedService.detail()
-                        + ", active sessions "
-                        + (playerSessionManager == null ? "offline" : playerSessionManager.activeSessionCount())
-                        + ", dirty sessions "
-                        + (playerSessionManager == null ? "offline" : playerSessionManager.dirtySessionCount()));
-=======
                         + ", database " + (databaseManager == null ? "disabled" : "connected"));
                 var health = serviceContainer == null ? null : serviceContainer.health();
                 sender.sendMessage("Core: " + (health == null
@@ -2168,7 +1955,6 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
                                 + (status.detail() == null ? "" : " (" + status.detail() + ")"));
                     }
                 }
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
                 return true;
             }
             if (args[0].equalsIgnoreCase("reload")) {

@@ -9,6 +9,9 @@ import com.branz.mmorpg.api.lifeskill.LifeSkillProgress;
 import com.branz.mmorpg.api.lifeskill.LifeSkillSnapshot;
 import com.branz.mmorpg.api.player.PendingSessionSave;
 import com.branz.mmorpg.api.player.PlayerProfile;
+import com.branz.mmorpg.api.player.PlayerProfileRecoveryRecord;
+import com.branz.mmorpg.storage.player.FilePlayerProfileRecoveryStore;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
@@ -29,8 +32,9 @@ class FilePendingSessionSaveStoreTest {
         ContentId mining = ContentId.parse("branz:mining");
         ContentId node = ContentId.parse("branz:mining_stoneworker");
         PlayerProfile profile = new PlayerProfile(playerId, "Branz", 1, now.minusSeconds(60), now,
+                Optional.of(ContentId.parse("branz:warrior")),
                 Optional.of(ContentId.parse("branz:starter")), Optional.empty(),
-                Map.of("hud", "compact"));
+                Map.of("hud", "compact"), 7);
         LifeSkillProgress progress = new LifeSkillProgress(mining, 5, 1_234L, 2, 9L, now);
         PendingSessionSave pending = new PendingSessionSave(profile,
                 new LifeSkillProfile(playerId,
@@ -45,5 +49,34 @@ class FilePendingSessionSaveStoreTest {
         assertTrue(loaded.lifeSkills().hasNode(mining, node, 2));
         store.remove(playerId);
         assertTrue(store.loadAll().isEmpty());
+    }
+
+    @Test
+    void importsAndRemovesLegacyPlayerSessionJsonJournal() {
+        UUID playerId = UUID.fromString("79dcc7c1-9c4e-42ba-985c-0955680a4cb4");
+        Instant now = Instant.parse("2026-07-26T13:00:00Z");
+        PlayerProfile profile = new PlayerProfile(
+                playerId,
+                "Legacy",
+                1,
+                now.minusSeconds(60),
+                now,
+                Optional.of(ContentId.parse("branz:rogue")),
+                Optional.empty(),
+                Optional.empty(),
+                Map.of("language", "th_TH"),
+                11);
+        FilePlayerProfileRecoveryStore legacy =
+                new FilePlayerProfileRecoveryStore(temporary, Runnable::run);
+        legacy.write(new PlayerProfileRecoveryRecord(profile, now, "database offline"))
+                .toCompletableFuture().join();
+
+        FilePendingSessionSaveStore merged = new FilePendingSessionSaveStore(temporary);
+        PendingSessionSave imported = merged.loadAll().get(playerId);
+
+        assertEquals(profile, imported.profile());
+        assertTrue(imported.lifeSkills().skills().isEmpty());
+        merged.remove(playerId);
+        assertTrue(Files.notExists(temporary.resolve(playerId + ".json")));
     }
 }

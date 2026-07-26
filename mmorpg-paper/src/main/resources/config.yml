@@ -11,14 +11,13 @@ database:
 content:
   directory: content
 
-<<<<<<< HEAD
 player-session:
   worker-threads: 2
   autosave-interval-ticks: 6000
   save-max-attempts: 3
   recovery-directory: recovery/player-profiles
   shutdown-timeout-millis: 5000
-=======
+
 quest:
   directory: quest-content
 
@@ -48,4 +47,3 @@ items:
   # Generated and persisted on first start. Changing it quarantines old tokens;
   # authoritative ownership remains safe and tokens are re-issued on reconcile.
   token-secret: ""
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351

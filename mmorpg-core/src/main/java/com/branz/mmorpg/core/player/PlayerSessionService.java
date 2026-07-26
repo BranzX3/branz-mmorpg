@@ -53,6 +53,7 @@ public final class PlayerSessionService extends AbstractService implements LifeS
     private final LongSupplier contentRevision;
     private final DuplicateLoginPolicy duplicateLoginPolicy;
     private final PendingSessionSaveStore pendingSaveStore;
+    private final int saveAttempts;
 
     private final Map<UUID, RuntimePlayerSession> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastSequence = new ConcurrentHashMap<>();
@@ -64,7 +65,7 @@ public final class PlayerSessionService extends AbstractService implements LifeS
                                 LongSupplier contentRevision,
                                 DuplicateLoginPolicy duplicateLoginPolicy) {
         this(repository, scheduler, clock, contentRevision, duplicateLoginPolicy,
-                new InMemoryPendingSessionSaveStore());
+                new InMemoryPendingSessionSaveStore(), SAVE_ATTEMPTS);
     }
 
     public PlayerSessionService(PlayerProfileRepository repository,
@@ -73,6 +74,17 @@ public final class PlayerSessionService extends AbstractService implements LifeS
                                 LongSupplier contentRevision,
                                 DuplicateLoginPolicy duplicateLoginPolicy,
                                 PendingSessionSaveStore pendingSaveStore) {
+        this(repository, scheduler, clock, contentRevision, duplicateLoginPolicy,
+                pendingSaveStore, SAVE_ATTEMPTS);
+    }
+
+    public PlayerSessionService(PlayerProfileRepository repository,
+                                Scheduler scheduler,
+                                GameClock clock,
+                                LongSupplier contentRevision,
+                                DuplicateLoginPolicy duplicateLoginPolicy,
+                                PendingSessionSaveStore pendingSaveStore,
+                                int saveAttempts) {
         super("player-session");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -80,6 +92,10 @@ public final class PlayerSessionService extends AbstractService implements LifeS
         this.contentRevision = Objects.requireNonNull(contentRevision, "contentRevision");
         this.duplicateLoginPolicy = Objects.requireNonNull(duplicateLoginPolicy, "duplicateLoginPolicy");
         this.pendingSaveStore = Objects.requireNonNull(pendingSaveStore, "pendingSaveStore");
+        if (saveAttempts < 1) {
+            throw new IllegalArgumentException("saveAttempts must be at least 1");
+        }
+        this.saveAttempts = saveAttempts;
     }
 
     @Override
@@ -157,7 +173,7 @@ public final class PlayerSessionService extends AbstractService implements LifeS
             return CompletableFuture.completedFuture(null);
         }
         return scheduler.async(() -> {
-            save(session, SAVE_ATTEMPTS);
+            save(session, saveAttempts);
             return null;
         }).thenApply(ignored -> null);
     }
@@ -261,6 +277,7 @@ public final class PlayerSessionService extends AbstractService implements LifeS
         for (int attempt = 1; attempt <= Math.max(1, attempts); attempt++) {
             try {
                 repository.saveSession(profile, lifeSkills);
+                session.acceptPersistedProfileRevision(profile.revision());
                 session.clearDirty(captured);
                 if (!resuming) {
                     session.closed();

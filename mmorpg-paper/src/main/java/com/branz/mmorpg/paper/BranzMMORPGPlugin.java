@@ -44,6 +44,7 @@ import com.branz.mmorpg.content.AtomicContentService;
 import com.branz.mmorpg.core.player.PlayerSessionService;
 import com.branz.mmorpg.core.character.PermanentCharacterClassService;
 import com.branz.mmorpg.core.event.SimpleEventBus;
+import com.branz.mmorpg.core.stat.PlayerAttributeService;
 import com.branz.mmorpg.core.lifeskill.LifeSkillProgressionService;
 import com.branz.mmorpg.core.mastery.DefaultCombatMasteryService;
 import com.branz.mmorpg.core.item.DefaultLoadoutService;
@@ -98,6 +99,7 @@ public class BranzMMORPGPlugin extends JavaPlugin {
     private PlayerProfileRepository profileRepository;
     private PermanentCharacterClassService characterClassService;
     private SimpleEventBus characterClassEvents;
+    private PlayerAttributeService attributeService;
     private LifeSkillProgressionService lifeSkillProgression;
     private DefaultCombatMasteryService combatMasteryService;
     private DefaultLoadoutService loadoutService;
@@ -187,6 +189,11 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                         sessionService, contentService,
                         new JdbcCharacterClassSelectionRepository(databaseManager),
                         characterClassEvents, new SystemGameClock());
+                attributeService = new PlayerAttributeService(
+                        sessionService, contentService, characterClassEvents, new SystemGameClock());
+                characterClassEvents.subscribe(
+                        com.branz.mmorpg.api.character.CharacterClassSelected.class,
+                        selected -> attributeService.activate(selected.playerId()));
                 lifeSkillProgression = new LifeSkillProgressionService(
                         profileRepository, sessionService, new SystemGameClock(),
                         contentService::snapshot);
@@ -225,7 +232,8 @@ public class BranzMMORPGPlugin extends JavaPlugin {
 
             if (sessionService != null) {
                 getServer().getPluginManager()
-                        .registerEvents(new PlayerSessionListener(this, sessionService), this);
+                        .registerEvents(new PlayerSessionListener(
+                                this, sessionService, attributeService), this);
                 combatRuntime = new PaperCombatRuntime(this, sessionService, combatPolicy());
                 loadoutService = new DefaultLoadoutService(sessionService,
                         contentService::snapshot,
@@ -259,7 +267,7 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 getServer().getScheduler().runTaskTimer(this, statusRuntime::tick, 1L, 1L);
                 skillRuntime = new PaperSkillRuntime(
                         this, sessionService, contentService, combatRuntime, statusRuntime,
-                        loadoutService, itemRuntime, telemetryService);
+                        loadoutService, itemRuntime, telemetryService, attributeService);
                 combatRuntime.basicAttackHandler(skillRuntime::basicAttack);
                 getServer().getPluginManager().registerEvents(skillRuntime, this);
                 getServer().getScheduler().runTaskTimer(this, skillRuntime::tick, 1L, 1L);

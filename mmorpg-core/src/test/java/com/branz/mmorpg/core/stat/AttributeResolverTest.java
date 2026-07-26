@@ -129,13 +129,14 @@ class AttributeResolverTest {
     }
 
     @Test
-    void overflowFallsBackToTheCapInsteadOfInfinity() {
-        double resolved = AttributeResolver.resolve(AttributeType.PHYSICAL_POWER, Double.MAX_VALUE, List.of(
-                new AttributeModifier("huge", AttributeType.PHYSICAL_POWER, ModifierOperation.MULTIPLY,
-                        Double.MAX_VALUE, SWORD, "", 0, Optional.empty())));
+    void rejectsOverflowInsteadOfLeakingInfinityOrSilentlyClamping() {
+        MMOException failure = assertThrows(MMOException.class,
+                () -> AttributeResolver.resolve(AttributeType.PHYSICAL_POWER, Double.MAX_VALUE, List.of(
+                        new AttributeModifier("huge", AttributeType.PHYSICAL_POWER,
+                                ModifierOperation.MULTIPLY, Double.MAX_VALUE,
+                                SWORD, "", 0, Optional.empty()))));
 
-        assertTrue(Double.isFinite(resolved));
-        assertEquals(AttributeType.PHYSICAL_POWER.maximum(), resolved, 1e-9);
+        assertEquals(com.branz.mmorpg.api.error.ErrorCode.INVALID_ARGUMENT, failure.code());
     }
 
     @Test
@@ -145,6 +146,35 @@ class AttributeResolverTest {
             assertTrue(attribute.maximum() >= attribute.minimum(), attribute + " range is inverted");
             assertEquals(attribute.defaultValue(), attribute.clamp(attribute.defaultValue()), 1e-9,
                     attribute + " default must sit inside its own range");
+        }
+    }
+
+    @Test
+    void randomizedFiniteInputsStayDeterministicAndInsideDeclaredBounds() {
+        java.util.Random random = new java.util.Random(0xC2A77L);
+        for (int sample = 0; sample < 500; sample++) {
+            AttributeType attribute = AttributeType.values()[
+                    random.nextInt(AttributeType.values().length)];
+            double base = random.nextDouble(1_000.0);
+            List<AttributeModifier> modifiers = new ArrayList<>();
+            for (int index = 0; index < 8; index++) {
+                ModifierOperation operation = ModifierOperation.values()[random.nextInt(3)];
+                double value = switch (operation) {
+                    case ADD_FLAT -> random.nextDouble(-50.0, 50.0);
+                    case ADD_PERCENT -> random.nextDouble(-0.25, 0.50);
+                    case MULTIPLY -> random.nextDouble(0.50, 1.50);
+                };
+                modifiers.add(new AttributeModifier("m" + index, attribute, operation,
+                        value, SWORD, "", 0, Optional.empty()));
+            }
+            double expected = AttributeResolver.resolve(attribute, base, modifiers);
+            Collections.shuffle(modifiers, random);
+            double shuffled = AttributeResolver.resolve(attribute, base, modifiers);
+
+            assertEquals(expected, shuffled, 1e-9);
+            assertTrue(shuffled >= attribute.minimum());
+            assertTrue(shuffled <= attribute.maximum());
+            assertTrue(Double.isFinite(shuffled));
         }
     }
 }

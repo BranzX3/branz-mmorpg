@@ -1,6 +1,7 @@
 package com.branz.mmorpg.content;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.branz.mmorpg.api.content.ContentId;
 import java.nio.file.Files;
@@ -35,6 +36,11 @@ class BundledContentTest {
                 .containsKey(ContentId.parse("branz:mage")));
         assertTrue(service.snapshot().characterClasses()
                 .containsKey(ContentId.parse("branz:rogue")));
+        var warrior = service.snapshot().characterClasses()
+                .get(ContentId.parse("branz:warrior"));
+        assertTrue(warrior.secondaryResources()
+                .contains(com.branz.mmorpg.api.skill.ResourceType.RAGE));
+        assertEquals(140.0, warrior.baseAttributes().get("max_health"), 1e-9);
     }
 
     private static Path locateBundle() {

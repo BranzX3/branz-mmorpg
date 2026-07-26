@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Live modifier set for one entity, with a cached resolved snapshot.
@@ -38,6 +39,9 @@ public final class AttributeContainer {
         Objects.requireNonNull(attribute, "attribute");
         if (!Double.isFinite(value)) {
             throw new IllegalArgumentException("base for " + attribute + " must be finite: " + value);
+        }
+        if (attribute.resourceMaximum() && value < 0) {
+            throw new IllegalArgumentException("resource maximum must not be negative: " + attribute);
         }
         bases.put(attribute, value);
         invalidate();
@@ -103,6 +107,10 @@ public final class AttributeContainer {
 
     public boolean contains(String modifierId) {
         return modifiers.containsKey(modifierId);
+    }
+
+    public Optional<AttributeModifier> modifier(String modifierId) {
+        return Optional.ofNullable(modifiers.get(Objects.requireNonNull(modifierId, "modifierId")));
     }
 
     public int size() {

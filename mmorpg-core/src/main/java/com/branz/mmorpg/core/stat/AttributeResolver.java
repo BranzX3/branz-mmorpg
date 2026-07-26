@@ -3,6 +3,8 @@ package com.branz.mmorpg.core.stat;
 import com.branz.mmorpg.api.stat.AttributeModifier;
 import com.branz.mmorpg.api.stat.AttributeType;
 import com.branz.mmorpg.api.stat.ModifierOperation;
+import com.branz.mmorpg.api.error.ErrorCode;
+import com.branz.mmorpg.api.error.MMOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -66,9 +68,8 @@ public final class AttributeResolver {
 
         double resolved = flat * (1.0 + percentSum) * product;
         if (!Double.isFinite(resolved)) {
-            // Overflow to infinity is a broken stat sheet, not a very strong
-            // player. Fall back to the documented cap rather than propagating it.
-            return attribute.maximum();
+            throw new MMOException(ErrorCode.INVALID_ARGUMENT,
+                    "attribute calculation overflowed for " + attribute);
         }
         return attribute.clamp(resolved);
     }

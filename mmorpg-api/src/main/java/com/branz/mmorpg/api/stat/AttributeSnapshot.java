@@ -16,7 +16,13 @@ public record AttributeSnapshot(Map<AttributeType, Double> values) {
     public AttributeSnapshot {
         Objects.requireNonNull(values, "values");
         EnumMap<AttributeType, Double> copy = new EnumMap<>(AttributeType.class);
-        copy.putAll(values);
+        values.forEach((attribute, value) -> {
+            Objects.requireNonNull(attribute, "attribute");
+            if (value == null || !Double.isFinite(value)) {
+                throw new IllegalArgumentException("attribute snapshot value must be finite: " + attribute);
+            }
+            copy.put(attribute, value);
+        });
         values = Map.copyOf(copy);
     }
 

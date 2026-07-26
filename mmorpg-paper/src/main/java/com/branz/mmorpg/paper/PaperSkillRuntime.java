@@ -17,7 +17,7 @@ import com.branz.mmorpg.api.telemetry.TelemetryService;
 import com.branz.mmorpg.core.player.PlayerSessionService;
 import com.branz.mmorpg.core.runtime.SystemGameClock;
 import com.branz.mmorpg.core.skill.SkillExecutionEngine;
-import com.branz.mmorpg.core.stat.ResourcePool;
+import com.branz.mmorpg.core.stat.PlayerAttributeService;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -55,7 +55,7 @@ public final class PaperSkillRuntime implements Listener {
     private final LoadoutService loadouts;
     private final PaperItemRuntime items;
     private final TelemetryService telemetry;
-    private final Map<UUID, PlayerResources> resources = new ConcurrentHashMap<>();
+    private final PlayerAttributeService attributes;
     private final Map<UUID, ProjectileCast> projectiles = new ConcurrentHashMap<>();
     private final SkillExecutionEngine engine;
     private volatile BiConsumer<UUID, ContentId> skillListener =
@@ -68,7 +68,8 @@ public final class PaperSkillRuntime implements Listener {
     public PaperSkillRuntime(JavaPlugin plugin, PlayerSessionService sessions,
                              ContentService content, PaperCombatRuntime combat,
                              PaperStatusRuntime statuses, LoadoutService loadouts,
-                             PaperItemRuntime items, TelemetryService telemetry) {
+                             PaperItemRuntime items, TelemetryService telemetry,
+                             PlayerAttributeService attributes) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.content = Objects.requireNonNull(content, "content");
@@ -77,6 +78,7 @@ public final class PaperSkillRuntime implements Listener {
         this.loadouts = Objects.requireNonNull(loadouts, "loadouts");
         this.items = Objects.requireNonNull(items, "items");
         this.telemetry = Objects.requireNonNull(telemetry, "telemetry");
+        this.attributes = Objects.requireNonNull(attributes, "attributes");
         this.engine = new SkillExecutionEngine(new SystemGameClock(), this::execute);
     }
 
@@ -130,7 +132,8 @@ public final class PaperSkillRuntime implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        resources.put(event.getPlayer().getUniqueId(), new PlayerResources());
+        // PlayerSessionListener activates the class-derived stat block after the
+        // asynchronous profile load has completed.
     }
 
     @EventHandler
@@ -141,7 +144,6 @@ public final class PaperSkillRuntime implements Listener {
             combat.engine().endCast(cast.castId());
             engine.forget(cast.castId());
         });
-        resources.remove(playerId);
     }
 
     /** Called once per Paper tick. */
@@ -158,15 +160,14 @@ public final class PaperSkillRuntime implements Listener {
                 engine.forget(cast.castId());
             }
         }
-        for (Map.Entry<UUID, PlayerResources> entry : resources.entrySet()) {
-            Player player = plugin.getServer().getPlayer(entry.getKey());
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
             if (player == null || !player.isOnline()) {
                 continue;
             }
             boolean inCombat = combat.engine().combatState()
                     .inCombat(player.getUniqueId(), java.time.Instant.now());
-            entry.getValue().mana.regenerate(5.0, 1L, inCombat, 0.25);
-            entry.getValue().stamina.regenerate(10.0, 1L, inCombat, 0.50);
+            attributes.find(player.getUniqueId()).ifPresent(ignored ->
+                    attributes.tick(player.getUniqueId(), 1L, inCombat));
         }
     }
 
@@ -175,10 +176,17 @@ public final class PaperSkillRuntime implements Listener {
     }
 
     public ResourceView resources(UUID playerId) {
-        PlayerResources value = resources.computeIfAbsent(
-                playerId, ignored -> new PlayerResources());
-        return new ResourceView(value.mana.current(), value.mana.maximum(),
-                value.stamina.current(), value.stamina.maximum());
+        return attributes.find(playerId).map(block -> {
+            var pools = block.resources();
+            var mana = pools.get(ResourceType.MANA);
+            var stamina = pools.get(ResourceType.STAMINA);
+            var primary = pools.get(block.primaryResource());
+            return new ResourceView(
+                    mana == null ? 0 : mana.current(), mana == null ? 0 : mana.maximum(),
+                    stamina == null ? 0 : stamina.current(), stamina == null ? 0 : stamina.maximum(),
+                    block.primaryResource(), primary.current(), primary.maximum());
+        }).orElseGet(() -> new ResourceView(0, 0, 0, 0,
+                ResourceType.HEALTH, 0, 0));
     }
 
     /** Routes vanilla melee intent through the same authoritative skill state machine. */
@@ -246,12 +254,12 @@ public final class PaperSkillRuntime implements Listener {
     }
 
     public record ResourceView(double mana, double maximumMana,
-                               double stamina, double maximumStamina) {
+                               double stamina, double maximumStamina,
+                               ResourceType primaryResource, double primary,
+                               double maximumPrimary) {
     }
 
     private SkillCaster caster(Player player) {
-        PlayerResources pools = resources.computeIfAbsent(player.getUniqueId(),
-                ignored -> new PlayerResources());
         return new SkillCaster() {
             @Override public UUID id() { return player.getUniqueId(); }
             @Override public boolean alive() { return !player.isDead() && player.getHealth() > 0; }
@@ -263,23 +271,24 @@ public final class PaperSkillRuntime implements Listener {
                 return statuses.has(player.getUniqueId(),
                         com.branz.mmorpg.core.status.BuiltInStatuses.STUN);
             }
-            @Override public double cooldownRecovery() { return 0.0; }
+            @Override public double cooldownRecovery() {
+                return attributes.attributes(player.getUniqueId())
+                        .get(AttributeType.COOLDOWN_RECOVERY);
+            }
             @Override public boolean spend(Map<ResourceType, Double> costs) {
                 double mana = costs.getOrDefault(ResourceType.MANA, 0.0);
                 double stamina = costs.getOrDefault(ResourceType.STAMINA, 0.0);
                 double health = costs.getOrDefault(ResourceType.HEALTH, 0.0);
-                if (pools.mana.current() < mana || pools.stamina.current() < stamina
-                        || player.getHealth() <= health) {
+                if (player.getHealth() <= health) {
                     return false;
                 }
-                pools.mana.spend(mana);
-                pools.stamina.spend(stamina);
-                player.setHealth(player.getHealth() - health);
-                return true;
+                boolean spent = attributes.spend(player.getUniqueId(), costs, "skill_cost");
+                if (spent && health > 0) player.setHealth(player.getHealth() - health);
+                return spent;
             }
             @Override public void refund(Map<ResourceType, Double> costs, double fraction) {
-                pools.mana.add(costs.getOrDefault(ResourceType.MANA, 0.0) * fraction);
-                pools.stamina.add(costs.getOrDefault(ResourceType.STAMINA, 0.0) * fraction);
+                costs.forEach((resource, amount) -> attributes.add(player.getUniqueId(), resource,
+                        amount * fraction, "skill_refund"));
                 player.setHealth(Math.min(player.getMaxHealth(), player.getHealth()
                         + costs.getOrDefault(ResourceType.HEALTH, 0.0) * fraction));
             }
@@ -362,12 +371,16 @@ public final class PaperSkillRuntime implements Listener {
     }
 
     private boolean playable(Player player) {
-        return sessions.session(player.getUniqueId()).map(PlayerSession::playable).orElse(false);
-    }
-
-    private static final class PlayerResources {
-        private final ResourcePool mana = new ResourcePool(AttributeType.MAX_MANA, 50.0);
-        private final ResourcePool stamina = new ResourcePool(AttributeType.MAX_STAMINA, 100.0);
+        if (sessions.session(player.getUniqueId()).map(PlayerSession::playable).orElse(false)
+                && sessions.requirePlayable(player.getUniqueId()).profile().classId().isPresent()) {
+            try {
+                attributes.require(player.getUniqueId());
+                return true;
+            } catch (RuntimeException unavailable) {
+                return false;
+            }
+        }
+        return false;
     }
 
     private record ProjectileCast(

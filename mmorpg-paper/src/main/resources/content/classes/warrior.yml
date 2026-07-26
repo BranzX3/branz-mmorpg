@@ -3,8 +3,23 @@ id: branz:warrior
 display-name: Warrior
 schema-version: 1
 roles: [damage, tank]
-base-attributes: {strength: 12, vitality: 11, agility: 7, intelligence: 4}
+base-attributes:
+  max_health: 140
+  max_stamina: 100
+  max_rage: 100
+  physical_power: 18
+  magic_power: 2
+  defense: 12
+  magic_resistance: 5
+  critical_chance: 0.05
+  critical_damage: 1.5
+  cooldown_recovery: 0
+  movement_speed: 1.0
+  attack_speed: 1.0
+  healing_power: 0
+  crowd_control_resistance: 0.10
 primary-resource: stamina
+secondary-resources: [rage]
 allowed-weapon-tags: [sword, melee]
 allowed-armor-tags: [heavy, medium]
 class-skills: [branz:heavy_slash]

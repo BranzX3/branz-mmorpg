@@ -3,6 +3,7 @@ package com.branz.mmorpg.core.stat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.branz.mmorpg.api.stat.AttributeModifier;
 import com.branz.mmorpg.api.stat.AttributeType;
@@ -107,5 +108,13 @@ class AttributeContainerTest {
         assertEquals(AttributeType.MAX_MANA.defaultValue(), container.base(AttributeType.MAX_MANA), 1e-9);
         assertEquals(AttributeType.CRITICAL_DAMAGE.defaultValue(),
                 container.value(AttributeType.CRITICAL_DAMAGE), 1e-9);
+    }
+
+    @Test
+    void rejectsNegativeResourceMaximumBases() {
+        AttributeContainer container = new AttributeContainer();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> container.base(AttributeType.MAX_ENERGY, -1.0));
     }
 }

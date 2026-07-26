@@ -135,7 +135,8 @@ class PermanentCharacterClassServiceTest {
                 List.of(ContentId.parse("branz:basic_strike")), Map.of());
         return new CharacterClassDefinition(CharacterClassId.WARRIOR.value(), "Warrior", 1,
                 Set.of(CharacterClassRole.DAMAGE, CharacterClassRole.TANK),
-                Map.of("strength", 12.0), ResourceType.STAMINA, Set.of("sword"),
+                Map.of("max_health", 140.0, "max_stamina", 100.0, "max_rage", 100.0),
+                ResourceType.STAMINA, Set.of(ResourceType.RAGE), Set.of("sword"),
                 Set.of("heavy"), List.of(ContentId.parse("branz:heavy_slash")),
                 ContentId.parse("branz:heavy_slash"), ContentId.parse("branz:warrior_root"),
                 starter, Set.of("physical"));

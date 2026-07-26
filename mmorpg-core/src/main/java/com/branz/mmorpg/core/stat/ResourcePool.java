@@ -1,6 +1,8 @@
 package com.branz.mmorpg.core.stat;
 
 import com.branz.mmorpg.api.stat.AttributeType;
+import com.branz.mmorpg.api.stat.ResourceSnapshot;
+import com.branz.mmorpg.api.skill.ResourceType;
 import java.util.Objects;
 
 /**
@@ -19,12 +21,20 @@ public final class ResourcePool {
     private double current;
 
     public ResourcePool(AttributeType maximumAttribute, double maximum) {
+        this(maximumAttribute, maximum, maximum);
+    }
+
+    public ResourcePool(ResourceType resource, double maximum, double initial) {
+        this(AttributeType.maximumFor(resource), maximum, initial);
+    }
+
+    public ResourcePool(AttributeType maximumAttribute, double maximum, double initial) {
         this.maximumAttribute = Objects.requireNonNull(maximumAttribute, "maximumAttribute");
         if (!maximumAttribute.resourceMaximum()) {
             throw new IllegalArgumentException(maximumAttribute + " is not a resource maximum");
         }
         this.maximum = requireValid(maximum, "maximum");
-        this.current = this.maximum;
+        this.current = Math.min(this.maximum, requireValid(initial, "initial"));
     }
 
     public AttributeType maximumAttribute() {
@@ -45,6 +55,10 @@ public final class ResourcePool {
 
     public double ratio() {
         return maximum <= 0.0 ? 0.0 : current / maximum;
+    }
+
+    public ResourceSnapshot snapshot() {
+        return new ResourceSnapshot(maximumAttribute.resourceType(), current, maximum);
     }
 
     /**

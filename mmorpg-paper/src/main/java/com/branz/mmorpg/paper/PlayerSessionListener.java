@@ -1,6 +1,7 @@
 package com.branz.mmorpg.paper;
 
 import com.branz.mmorpg.core.player.PlayerSessionService;
+import com.branz.mmorpg.core.stat.PlayerAttributeService;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -27,10 +28,13 @@ public final class PlayerSessionListener implements Listener {
 
     private final JavaPlugin plugin;
     private final PlayerSessionService sessions;
+    private final PlayerAttributeService attributes;
 
-    public PlayerSessionListener(JavaPlugin plugin, PlayerSessionService sessions) {
+    public PlayerSessionListener(JavaPlugin plugin, PlayerSessionService sessions,
+                                 PlayerAttributeService attributes) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.attributes = Objects.requireNonNull(attributes, "attributes");
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -42,6 +46,8 @@ public final class PlayerSessionListener implements Listener {
                 plugin.getLogger().log(Level.SEVERE,
                         "MMO session load failed for " + name + " (" + playerId
                                 + "); MMO features stay disabled for this player", failure);
+            } else if (session.profile().classId().isPresent()) {
+                attributes.activate(playerId);
             }
         });
     }
@@ -49,6 +55,7 @@ public final class PlayerSessionListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
+        attributes.forget(playerId);
         sessions.logout(playerId).whenComplete((ignored, failure) -> {
             if (failure != null) {
                 plugin.getLogger().log(Level.SEVERE,

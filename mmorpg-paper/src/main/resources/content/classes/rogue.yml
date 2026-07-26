@@ -3,8 +3,22 @@ id: branz:rogue
 display-name: Rogue
 schema-version: 1
 roles: [damage, mobility]
-base-attributes: {strength: 7, vitality: 7, agility: 13, intelligence: 5}
+base-attributes:
+  max_health: 100
+  max_energy: 100
+  physical_power: 17
+  magic_power: 3
+  defense: 6
+  magic_resistance: 6
+  critical_chance: 0.12
+  critical_damage: 1.65
+  cooldown_recovery: 0
+  movement_speed: 1.08
+  attack_speed: 1.10
+  healing_power: 0
+  crowd_control_resistance: 0.05
 primary-resource: energy
+secondary-resources: []
 allowed-weapon-tags: [bow, ranged]
 allowed-armor-tags: [light, medium]
 class-skills: [branz:precise_shot]

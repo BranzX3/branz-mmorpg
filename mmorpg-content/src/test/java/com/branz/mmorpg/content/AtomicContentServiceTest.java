@@ -112,8 +112,9 @@ class AtomicContentServiceTest {
                 display-name: Warrior
                 schema-version: 1
                 roles: [damage]
-                base-attributes: {strength: 12}
+                base-attributes: {max_health: 140, max_stamina: 100}
                 primary-resource: stamina
+                secondary-resources: []
                 allowed-weapon-tags: [sword]
                 allowed-armor-tags: [heavy]
                 class-skills: [branz:missing_skill]

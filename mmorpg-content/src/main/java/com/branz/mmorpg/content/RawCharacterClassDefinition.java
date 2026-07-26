@@ -13,6 +13,7 @@ record RawCharacterClassDefinition(
         Set<String> roles,
         @JsonProperty("base-attributes") Map<String, Double> baseAttributes,
         @JsonProperty("primary-resource") String primaryResource,
+        @JsonProperty("secondary-resources") Set<String> secondaryResources,
         @JsonProperty("allowed-weapon-tags") Set<String> allowedWeaponTags,
         @JsonProperty("allowed-armor-tags") Set<String> allowedArmorTags,
         @JsonProperty("class-skills") List<String> classSkills,

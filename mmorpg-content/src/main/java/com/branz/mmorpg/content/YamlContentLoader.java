@@ -24,6 +24,7 @@ import com.branz.mmorpg.api.character.CharacterClassDefinition;
 import com.branz.mmorpg.api.character.CharacterClassId;
 import com.branz.mmorpg.api.character.CharacterClassRole;
 import com.branz.mmorpg.api.character.StarterGrantPlan;
+import com.branz.mmorpg.api.stat.AttributeType;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -139,6 +140,30 @@ final class YamlContentLoader {
             diagnostics.add("character classes must be exactly " + required + "; found " + actual);
         }
         for (CharacterClassDefinition characterClass : classes) {
+            characterClass.baseAttributes().keySet().forEach(key -> {
+                try {
+                    AttributeType.fromContentKey(key);
+                } catch (IllegalArgumentException invalid) {
+                    diagnostics.add(characterClass.id() + ": unknown base attribute " + key);
+                }
+            });
+            Set<ResourceType> resources = new java.util.HashSet<>(characterClass.secondaryResources());
+            resources.add(characterClass.primaryResource());
+            resources.add(ResourceType.HEALTH);
+            resources.forEach(resource -> {
+                AttributeType maximum = AttributeType.maximumFor(resource);
+                boolean declared = characterClass.baseAttributes().keySet().stream().anyMatch(key -> {
+                    try {
+                        return maximum == AttributeType.fromContentKey(key);
+                    } catch (IllegalArgumentException ignored) {
+                        return false;
+                    }
+                });
+                if (!declared) {
+                    diagnostics.add(characterClass.id() + ": missing base attribute "
+                            + maximum.name().toLowerCase(Locale.ROOT));
+                }
+            });
             for (ContentId skill : characterClass.classSkillIds()) {
                 if (!(definitions.get(skill) instanceof SkillDefinition)) {
                     diagnostics.add(characterClass.id() + ": unknown class skill " + skill);
@@ -399,6 +424,9 @@ final class YamlContentLoader {
                         .collect(java.util.stream.Collectors.toSet()),
                 raw.baseAttributes() == null ? Map.of() : raw.baseAttributes(),
                 ResourceType.valueOf(raw.primaryResource().toUpperCase(Locale.ROOT)),
+                raw.secondaryResources() == null ? Set.of() : raw.secondaryResources().stream()
+                        .map(resource -> ResourceType.valueOf(resource.toUpperCase(Locale.ROOT)))
+                        .collect(java.util.stream.Collectors.toSet()),
                 raw.allowedWeaponTags() == null ? Set.of() : raw.allowedWeaponTags(),
                 raw.allowedArmorTags() == null ? Set.of() : raw.allowedArmorTags(),
                 raw.classSkills() == null ? List.of()

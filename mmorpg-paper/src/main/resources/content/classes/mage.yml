@@ -3,8 +3,22 @@ id: branz:mage
 display-name: Mage
 schema-version: 1
 roles: [damage, control]
-base-attributes: {strength: 4, vitality: 7, agility: 7, intelligence: 13}
+base-attributes:
+  max_health: 90
+  max_mana: 140
+  physical_power: 4
+  magic_power: 20
+  defense: 4
+  magic_resistance: 12
+  critical_chance: 0.08
+  critical_damage: 1.5
+  cooldown_recovery: 0.05
+  movement_speed: 1.0
+  attack_speed: 1.0
+  healing_power: 6
+  crowd_control_resistance: 0.05
 primary-resource: mana
+secondary-resources: []
 allowed-weapon-tags: [staff, magic]
 allowed-armor-tags: [cloth, light]
 class-skills: [branz:fire_burst]

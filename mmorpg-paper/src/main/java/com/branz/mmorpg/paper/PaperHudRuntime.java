@@ -15,6 +15,7 @@ import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import com.branz.mmorpg.api.skill.ResourceType;
 
 /** Coalesced, dirty-driven action-bar HUD with text-only accessibility. */
 public final class PaperHudRuntime implements Listener {
@@ -64,12 +65,10 @@ public final class PaperHudRuntime implements Listener {
             Component line = Component.text("HP ", NamedTextColor.RED)
                     .append(Component.text(round(player.getHealth()) + "/"
                             + round(player.getMaxHealth()), NamedTextColor.WHITE))
-                    .append(Component.text("  MP ", NamedTextColor.AQUA))
-                    .append(Component.text(round(resource.mana()) + "/"
-                            + round(resource.maximumMana()), NamedTextColor.WHITE))
-                    .append(Component.text("  ST ", NamedTextColor.YELLOW))
-                    .append(Component.text(round(resource.stamina()) + "/"
-                            + round(resource.maximumStamina()), NamedTextColor.WHITE));
+                    .append(Component.text("  " + resourceLabel(resource.primaryResource()) + " ",
+                            resourceColor(resource.primaryResource())))
+                    .append(Component.text(round(resource.primary()) + "/"
+                            + round(resource.maximumPrimary()), NamedTextColor.WHITE));
             if (!active.isEmpty()) {
                 line = line.append(Component.text("  [" + active + "]",
                         NamedTextColor.LIGHT_PURPLE));
@@ -80,5 +79,25 @@ public final class PaperHudRuntime implements Listener {
 
     private static int round(double value) {
         return (int) Math.round(value);
+    }
+
+    private static String resourceLabel(ResourceType resource) {
+        return switch (resource) {
+            case MANA -> "MP";
+            case STAMINA -> "ST";
+            case RAGE -> "RG";
+            case ENERGY -> "EN";
+            case HEALTH -> "HP";
+        };
+    }
+
+    private static NamedTextColor resourceColor(ResourceType resource) {
+        return switch (resource) {
+            case MANA -> NamedTextColor.AQUA;
+            case STAMINA -> NamedTextColor.YELLOW;
+            case RAGE -> NamedTextColor.RED;
+            case ENERGY -> NamedTextColor.GREEN;
+            case HEALTH -> NamedTextColor.DARK_RED;
+        };
     }
 }

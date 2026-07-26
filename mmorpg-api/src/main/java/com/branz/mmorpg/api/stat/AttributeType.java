@@ -1,5 +1,8 @@
 package com.branz.mmorpg.api.stat;
 
+import com.branz.mmorpg.api.skill.ResourceType;
+import java.util.Locale;
+
 /**
  * The attributes the combat engine resolves.
  *
@@ -17,6 +20,8 @@ public enum AttributeType {
     MAX_HEALTH("Maximum Health", "HP", 100.0, 1.0, 1_000_000.0),
     MAX_MANA("Maximum Mana", "MP", 50.0, 0.0, 1_000_000.0),
     MAX_STAMINA("Maximum Stamina", "SP", 100.0, 0.0, 1_000_000.0),
+    MAX_RAGE("Maximum Rage", "RAGE", 0.0, 0.0, 1_000_000.0),
+    MAX_ENERGY("Maximum Energy", "EN", 0.0, 0.0, 1_000_000.0),
 
     PHYSICAL_POWER("Physical Power", "ATK", 10.0, 0.0, 1_000_000.0),
     MAGIC_POWER("Magic Power", "MATK", 0.0, 0.0, 1_000_000.0),
@@ -76,7 +81,34 @@ public enum AttributeType {
 
     /** Whether this attribute is a resource pool maximum. */
     public boolean resourceMaximum() {
-        return this == MAX_HEALTH || this == MAX_MANA || this == MAX_STAMINA;
+        return this == MAX_HEALTH || this == MAX_MANA || this == MAX_STAMINA
+                || this == MAX_RAGE || this == MAX_ENERGY;
+    }
+
+    public static AttributeType fromContentKey(String key) {
+        if (key == null || key.isBlank()) throw new IllegalArgumentException("attribute key is blank");
+        return valueOf(key.trim().toUpperCase(Locale.ROOT).replace('-', '_'));
+    }
+
+    public static AttributeType maximumFor(ResourceType resource) {
+        return switch (resource) {
+            case HEALTH -> MAX_HEALTH;
+            case MANA -> MAX_MANA;
+            case STAMINA -> MAX_STAMINA;
+            case RAGE -> MAX_RAGE;
+            case ENERGY -> MAX_ENERGY;
+        };
+    }
+
+    public ResourceType resourceType() {
+        return switch (this) {
+            case MAX_HEALTH -> ResourceType.HEALTH;
+            case MAX_MANA -> ResourceType.MANA;
+            case MAX_STAMINA -> ResourceType.STAMINA;
+            case MAX_RAGE -> ResourceType.RAGE;
+            case MAX_ENERGY -> ResourceType.ENERGY;
+            default -> throw new IllegalStateException(this + " is not a resource maximum");
+        };
     }
 
     /** Clamps {@code value} into this attribute's documented range. */

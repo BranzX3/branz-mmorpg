@@ -393,7 +393,7 @@ measured acceptance gate exist.
 Work proceeds in this order unless a fake port allows explicitly parallel pure
 Java development:
 
-Current execution status: **I0-I3 complete; I4 is next. I4-I10 contain merged
+Current execution status: **I0-I4 complete; I5 is next. I5-I10 contain merged
 implementations but remain pending until their gates are audited against the
 permanent-class integration.**
 
@@ -415,6 +415,17 @@ metadata and the starter plan with an audit record, and returns the original
 result for an operation retry without publishing or granting twice. Legacy
 `class_id` rows are backfilled and remain permanent. Compass rendering and
 physical starter-item delivery remain owned by I7.
+
+I4 is complete: the deterministic flat/additive-percent/multiplicative modifier
+pipeline now rejects non-finite values and overflow, enforces documented caps,
+deduplicates stable modifier IDs, safely expires modifiers, and reconciles
+resource maxima without ratio healing. Permanent class content provides validated
+base attributes plus primary/secondary resource declarations. Session-scoped stat
+blocks implement bounded HP, Mana, Stamina, Rage, and Energy policies; Warrior
+Rage starts empty and is generated, while Rogue Energy regenerates quickly.
+Attribute/resource/modifier events, atomic multi-resource costs, class-selection
+activation, logout cleanup, Skill runtime costs, cooldown recovery, and the
+class-aware HUD are connected without retaining Bukkit Player objects.
 
 | Order | Implementation package | Required output | Gate before next dependent package |
 |---:|---|---|---|

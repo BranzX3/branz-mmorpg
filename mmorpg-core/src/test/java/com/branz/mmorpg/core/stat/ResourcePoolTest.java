@@ -110,4 +110,21 @@ class ResourcePoolTest {
         assertThrows(IllegalArgumentException.class,
                 () -> health.maximum(Double.POSITIVE_INFINITY));
     }
+
+    @Test
+    void supportsEmptyRageAndFullFastEnergyPolicies() {
+        ResourcePool rage = new ResourcePool(
+                com.branz.mmorpg.api.skill.ResourceType.RAGE, 100.0, 0.0);
+        ResourcePool energy = new ResourcePool(
+                com.branz.mmorpg.api.skill.ResourceType.ENERGY, 100.0, 100.0);
+
+        assertEquals(0.0, rage.current(), 1e-9);
+        assertEquals(100.0, energy.current(), 1e-9);
+        energy.spend(24.0);
+        var policy = com.branz.mmorpg.api.stat.ResourcePolicy.standard(
+                com.branz.mmorpg.api.skill.ResourceType.ENERGY);
+        energy.regenerate(policy.regenerationPerSecond(), 20, true,
+                policy.combatRegenerationFactor());
+        assertEquals(88.0, energy.current(), 1e-9);
+    }
 }

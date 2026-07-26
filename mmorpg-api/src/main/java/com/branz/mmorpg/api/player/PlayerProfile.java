@@ -2,6 +2,7 @@ package com.branz.mmorpg.api.player;
 
 import com.branz.mmorpg.api.content.ContentId;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -81,5 +82,68 @@ public record PlayerProfile(
                 respawnPointId,
                 settings,
                 nextRevision);
+    }
+
+    public PlayerProfile withSelectedLoadout(Optional<ContentId> nextLoadoutId) {
+        return new PlayerProfile(
+                playerId,
+                lastKnownName,
+                schemaVersion,
+                createdAt,
+                lastSeenAt,
+                classId,
+                Objects.requireNonNull(nextLoadoutId, "nextLoadoutId"),
+                respawnPointId,
+                settings,
+                revision);
+    }
+
+    public PlayerProfile withRespawnPoint(Optional<ContentId> nextRespawnPointId) {
+        return new PlayerProfile(
+                playerId,
+                lastKnownName,
+                schemaVersion,
+                createdAt,
+                lastSeenAt,
+                classId,
+                selectedLoadoutId,
+                Objects.requireNonNull(nextRespawnPointId, "nextRespawnPointId"),
+                settings,
+                revision);
+    }
+
+    public PlayerProfile withSetting(String key, String value) {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(value, "value");
+        if (key.isBlank()) {
+            throw new IllegalArgumentException("Setting key must not be blank");
+        }
+        Map<String, String> updated = new HashMap<>(settings);
+        updated.put(key, value);
+        return withSettings(updated);
+    }
+
+    public PlayerProfile withoutSetting(String key) {
+        Objects.requireNonNull(key, "key");
+        if (!settings.containsKey(key)) {
+            return this;
+        }
+        Map<String, String> updated = new HashMap<>(settings);
+        updated.remove(key);
+        return withSettings(updated);
+    }
+
+    private PlayerProfile withSettings(Map<String, String> nextSettings) {
+        return new PlayerProfile(
+                playerId,
+                lastKnownName,
+                schemaVersion,
+                createdAt,
+                lastSeenAt,
+                classId,
+                selectedLoadoutId,
+                respawnPointId,
+                nextSettings,
+                revision);
     }
 }

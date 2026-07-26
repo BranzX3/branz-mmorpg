@@ -46,8 +46,7 @@ public final class MySqlPlayerProfileStore implements PlayerProfileStore {
         Objects.requireNonNull(now, "now");
         return supplyAsync(() -> database.inTransaction(connection -> {
             insertIfAbsent(connection, playerId, lastKnownName, now);
-            touch(connection, playerId, lastKnownName, now);
-            return select(connection, playerId);
+            return select(connection, playerId).seenAs(lastKnownName, now);
         }));
     }
 
@@ -79,22 +78,6 @@ public final class MySqlPlayerProfileStore implements PlayerProfileStore {
             statement.setTimestamp(5, Timestamp.from(now));
             statement.setString(6, "{}");
             statement.executeUpdate();
-        }
-    }
-
-    private void touch(Connection connection, UUID playerId, String name, Instant now) throws SQLException {
-        String sql = """
-                UPDATE mmorpg_player_profiles
-                SET last_known_name = ?, last_seen_at = ?, revision = revision + 1
-                WHERE player_uuid = UUID_TO_BIN(?)
-                """;
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, name);
-            statement.setTimestamp(2, Timestamp.from(now));
-            statement.setString(3, playerId.toString());
-            if (statement.executeUpdate() != 1) {
-                throw new SQLException("Player profile disappeared during load: " + playerId);
-            }
         }
     }
 

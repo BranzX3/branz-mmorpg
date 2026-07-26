@@ -43,3 +43,20 @@ Then connect Minecraft to:
 The local configuration starts with MySQL disabled, so foundation services and
 content reload are available while persistent gameplay remains offline. Use
 `/branz status` as an operator to inspect Core, content, and database health.
+
+## MySQL integration tests
+
+The real-MySQL suites are opt-in and are skipped during a normal build. Start a
+disposable MySQL 8.4 instance with an empty test database, then run in PowerShell:
+
+    $env:BRANZ_MYSQL_INTEGRATION = "true"
+    $env:BRANZ_MYSQL_HOST = "127.0.0.1"
+    $env:BRANZ_MYSQL_PORT = "3407"
+    $env:BRANZ_MYSQL_DATABASE = "branz_mmorpg_test"
+    $env:BRANZ_MYSQL_USERNAME = "root"
+    $env:BRANZ_MYSQL_PASSWORD = ""
+    .\gradlew.bat :mmorpg-storage:test :mmorpg-core:test --rerun-tasks
+
+The suites apply Flyway migrations and cover the profile schema, JSON/content-ID
+round trips, concurrent insert-if-absent, optimistic conflicts, database outage,
+durable recovery journaling, and replay after reconnect.

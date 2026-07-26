@@ -13,4 +13,7 @@ content:
 
 player-session:
   worker-threads: 2
+  autosave-interval-ticks: 6000
+  save-max-attempts: 3
+  recovery-directory: recovery/player-profiles
   shutdown-timeout-millis: 5000

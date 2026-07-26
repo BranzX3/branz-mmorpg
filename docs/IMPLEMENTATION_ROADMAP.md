@@ -352,12 +352,12 @@ As of the roadmap review on 2026-07-26:
 | Area | Current repository state | Roadmap consequence |
 |---|---|---|
 | Gradle wrapper | Gradle 9.1 wrapper restored; `clean test shadowJar` passes | I0 complete; retain the clean-build gate |
-| mmorpg-api | Foundation content/lifecycle/health/IDs plus immutable Player Profile/Session contracts | Remaining C0 scheduler/transaction/error and K0/B0 contracts remain |
+| mmorpg-api | Foundation content/lifecycle/health/IDs plus immutable Player Profile/Session, dirty-component, save, and recovery contracts | Remaining C0 scheduler/transaction/error and K0/B0 contracts remain |
 | mmorpg-content | YAML material loading, validation, immutable atomic snapshots | Class, skill, tree, combo, item, mob, quest type registration remains |
-| mmorpg-storage | Hikari/Flyway plus V2 player-profile migration and async optimistic-lock repository | MySQL integration/fault tests and class/mastery/tree/item/outbox storage remain |
-| mmorpg-core | Lifecycle container, managed foundation services, typed IDs, and tokenized Player Session manager | I1/C0 and I2/C1 are in progress; durable save recovery and remaining foundation ports remain |
-| mmorpg-paper | Core bootstrap plus database-enabled async join/quit session adapter and health/status reporting | Compass UI, input, combat, inventory, and scheduler adapters remain |
-| Tests | Foundation plus lifecycle and Player Session duplicate/failure/late-callback/retry-state tests | MySQL integration, Class/Combat/Survival/Quest, and Paper behavior suites remain |
+| mmorpg-storage | Hikari/Flyway, V2 player-profile migration, async optimistic-lock repository, atomic file recovery journal, and passing MySQL 8.4 integration suite | Class/mastery/tree/item/outbox storage remains |
+| mmorpg-core | Lifecycle container, managed foundation services, typed IDs, and tokenized Player Session manager with dirty snapshots, bounded save retry, and recovery replay | I1/C0 remains in progress; I2/C1 is complete |
+| mmorpg-paper | Core bootstrap plus database-enabled async join/quit, configurable autosave/retry, durable recovery, and health/status reporting | Compass UI, input, combat, inventory, and scheduler adapters remain |
+| Tests | Foundation, lifecycle, Player Session concurrency/failure/recovery tests, and MySQL 8.4 migration/repository/outage/restart integration tests | Class/Combat/Survival/Quest and Paper behavior suites remain |
 | Local Paper | Paper 26.2 starts on localhost:25565 with Core READY and database disabled | Foundation smoke gate passes; persistent gameplay is intentionally offline |
 
 Documentation completion does not mark an implementation milestone complete.
@@ -369,7 +369,16 @@ measured acceptance gate exist.
 Work proceeds in this order unless a fake port allows explicitly parallel pure
 Java development:
 
-Current execution status: **I0 complete; I1 and I2 in progress; I3–I10 pending.**
+Current execution status: **I0 and I2 complete; I1 in progress; I3–I10 pending.**
+
+I2 implementation increment 2 is complete: active profiles can be
+mutated through component-scoped dirty tracking, periodic saves keep sessions
+active, logout coalesces with an in-flight save, failed writes use bounded retry,
+and exhausted writes are atomically journaled outside MySQL and replayed before a
+later session becomes ACTIVE. The integration gate passed against MySQL 8.4.10:
+Flyway V1/V2, binary UUID and JSON columns, profile round trips, concurrent
+insert-if-absent, optimistic conflict, database outage, and restart replay were
+all exercised with the real Connector/J and HikariCP stack.
 
 | Order | Implementation package | Required output | Gate before next dependent package |
 |---:|---|---|---|

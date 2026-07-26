@@ -8,9 +8,11 @@ import com.branz.mmorpg.api.player.PlayerSessionState;
 import com.branz.mmorpg.content.AtomicContentService;
 import com.branz.mmorpg.core.lifecycle.CoreRuntime;
 import com.branz.mmorpg.core.player.PlayerSessionManager;
+import com.branz.mmorpg.core.player.PlayerSessionSavePolicy;
 import com.branz.mmorpg.core.service.ContentManagedService;
 import com.branz.mmorpg.core.service.DatabaseManagedService;
 import com.branz.mmorpg.storage.DatabaseConfig;
+import com.branz.mmorpg.storage.player.FilePlayerProfileRecoveryStore;
 import com.branz.mmorpg.storage.player.MySqlPlayerProfileStore;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -32,6 +34,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
     private AtomicContentService contentService;
@@ -40,6 +43,7 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
     private CoreRuntime coreRuntime;
     private ExecutorService playerStorageExecutor;
     private PlayerSessionManager playerSessionManager;
+    private BukkitTask playerAutosaveTask;
     private Path contentDirectory;
 
     @Override
@@ -92,6 +96,7 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
     @Override
     public void onDisable() {
         getServer().getServicesManager().unregisterAll(this);
+        stopPlayerAutosave();
         closeOnlinePlayerSessions();
         stopPlayerStorageExecutor();
         if (coreRuntime != null) {
@@ -174,8 +179,48 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
         playerStorageExecutor = Executors.newFixedThreadPool(
                 workerThreads,
                 Thread.ofPlatform().name("branz-player-storage-", 0).daemon(true).factory());
-        playerSessionManager = new PlayerSessionManager(new MySqlPlayerProfileStore(
-                databaseManagedService.manager().orElseThrow(), playerStorageExecutor));
+        Path recoveryDirectory = getDataFolder().toPath()
+                .resolve(getConfig().getString(
+                        "player-session.recovery-directory", "recovery/player-profiles"))
+                .normalize();
+        playerSessionManager = new PlayerSessionManager(
+                new MySqlPlayerProfileStore(
+                        databaseManagedService.manager().orElseThrow(), playerStorageExecutor),
+                new PlayerSessionSavePolicy(Math.max(
+                        1, getConfig().getInt("player-session.save-max-attempts", 3))),
+                new FilePlayerProfileRecoveryStore(recoveryDirectory, playerStorageExecutor));
+        long autosaveInterval = Math.max(
+                20L, getConfig().getLong("player-session.autosave-interval-ticks", 6000L));
+        playerAutosaveTask = getServer().getScheduler().runTaskTimer(
+                this, this::saveDirtyPlayerSessions, autosaveInterval, autosaveInterval);
+    }
+
+    private void saveDirtyPlayerSessions() {
+        if (playerSessionManager == null) {
+            return;
+        }
+        for (Player player : getServer().getOnlinePlayers()) {
+            UUID playerId = player.getUniqueId();
+            playerSessionManager.snapshot(playerId)
+                    .filter(snapshot -> snapshot.state() == PlayerSessionState.ACTIVE)
+                    .filter(snapshot -> !snapshot.dirtyComponents().isEmpty())
+                    .ifPresent(snapshot -> playerSessionManager.save(playerId, snapshot.token())
+                            .whenComplete((saved, failure) -> {
+                                if (failure != null) {
+                                    getLogger().log(Level.SEVERE, "Player autosave failed for " + playerId, failure);
+                                } else if (saved.state() == PlayerSessionState.SAVE_RETRY_PENDING) {
+                                    getLogger().severe("Player autosave requires retry for "
+                                            + playerId + ": " + saved.detail());
+                                }
+                            }));
+        }
+    }
+
+    private void stopPlayerAutosave() {
+        if (playerAutosaveTask != null) {
+            playerAutosaveTask.cancel();
+            playerAutosaveTask = null;
+        }
     }
 
     private void closeOnlinePlayerSessions() {
@@ -239,7 +284,9 @@ public class BranzMMORPGPlugin extends JavaPlugin implements Listener {
                         + ", core " + coreRuntime.health().state()
                         + ", database " + databaseManagedService.detail()
                         + ", active sessions "
-                        + (playerSessionManager == null ? "offline" : playerSessionManager.activeSessionCount()));
+                        + (playerSessionManager == null ? "offline" : playerSessionManager.activeSessionCount())
+                        + ", dirty sessions "
+                        + (playerSessionManager == null ? "offline" : playerSessionManager.dirtySessionCount()));
                 return true;
             }
             if (args[0].equalsIgnoreCase("reload")) {

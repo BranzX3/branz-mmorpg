@@ -99,6 +99,21 @@ class StatusContainerTest {
     }
 
     @Test
+    void independentStacksStopAtTheirDeclaredCap() {
+        StatusContainer container = new StatusContainer();
+        StatusDefinition bleed = catalog.get(BuiltInStatuses.BLEED);
+
+        for (int i = 0; i < bleed.maxStacks(); i++) {
+            assertTrue(container.apply(bleed, CASTER_A, null, 0.0, NOW).applied());
+        }
+        StatusApplication rejected =
+                container.apply(bleed, CASTER_A, null, 0.0, NOW);
+
+        assertEquals(StatusApplication.Outcome.REJECTED_AT_CAP, rejected.outcome());
+        assertEquals(bleed.maxStacks(), container.size());
+    }
+
+    @Test
     void replaceWeakerKeepsTheStrongerRemainingDuration() {
         StatusContainer container = new StatusContainer();
         StatusDefinition stun = catalog.get(BuiltInStatuses.STUN);

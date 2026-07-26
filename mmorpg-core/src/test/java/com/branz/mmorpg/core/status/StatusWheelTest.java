@@ -116,6 +116,32 @@ class StatusWheelTest {
         assertEquals(0, wheel.activeEffects());
     }
 
+    @Test
+    void disconnectHonorsPauseTickDownAndClearPolicies() {
+        FixedGameClock clock = FixedGameClock.at("2026-07-25T12:00:00Z");
+        Map<ContentId, StatusDefinition> definitions = new java.util.HashMap<>(catalog);
+        StatusDefinition clear = new StatusDefinition(ContentId.parse("branz:logout_clear"), "Clear",
+                com.branz.mmorpg.api.status.StatusCategory.NEUTRAL,
+                com.branz.mmorpg.api.status.StackPolicy.UNIQUE, 1, Duration.ofSeconds(30),
+                Duration.ZERO, 0.0, List.of(), java.util.Set.of(),
+                com.branz.mmorpg.api.status.CrowdControlCategory.NONE,
+                com.branz.mmorpg.api.status.OfflinePolicy.CLEAR);
+        definitions.put(clear.id(), clear);
+        StatusWheel wheel = new StatusWheel(definitions::get);
+        UUID target = UUID.randomUUID();
+        wheel.container(target).apply(catalog.get(BuiltInStatuses.SHIELD), CASTER, null, 0.0, clock.now());
+        wheel.container(target).apply(catalog.get(BuiltInStatuses.BURN), CASTER, null, 0.0, clock.now());
+        wheel.container(target).apply(clear, CASTER, null, 0.0, clock.now());
+
+        wheel.disconnect(target, clock.now());
+        clock.advance(Duration.ofSeconds(7));
+        assertEquals(1, wheel.reconnect(target, clock.now()),
+                "shield pauses, burn expires while offline, CLEAR is discarded");
+        assertTrue(wheel.container(target).has(BuiltInStatuses.SHIELD));
+        assertEquals(10_000L,
+                wheel.container(target).active().get(0).remainingMillis(clock.now()));
+    }
+
     private static final class RecordingHandler implements StatusWheel.TickHandler {
 
         private final AtomicInteger ticks = new AtomicInteger();

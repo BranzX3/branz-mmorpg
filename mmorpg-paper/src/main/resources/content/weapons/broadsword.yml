@@ -1,0 +1,9 @@
+type: weapon
+id: branz:broadsword
+display-name: Broadsword
+family-mastery: branz:sword_mastery
+type-mastery: branz:broadsword_mastery
+basic-attack-skill: branz:basic_strike
+active-skills: [branz:heavy_slash]
+tags: [sword, melee]
+two-handed: false

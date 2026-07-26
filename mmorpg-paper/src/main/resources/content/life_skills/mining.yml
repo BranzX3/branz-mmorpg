@@ -1,0 +1,7 @@
+type: life_skill
+id: branz:mining
+display-name: Mining
+maximum-level: 100
+curve-base: 75
+curve-exponent: 1.55
+point-milestones: [2, 5, 10, 15, 20, 30, 40, 50, 60, 75, 100]

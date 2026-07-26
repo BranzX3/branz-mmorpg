@@ -1,0 +1,18 @@
+type: recipe
+id: branz:aether_ingot_recipe
+display_name: Refine Aether Ingot
+inputs:
+  "branz:aether_ore": 3
+optional_catalysts: {}
+coin_fee: 5
+station_tag: branz:forge
+profession: branz:blacksmithing
+required_profession_level: 1
+duration_ms: 2000
+output:
+  item: branz:aether_ingot
+  quantity: 1
+  binding: unbound
+  quality_policy: fixed
+profession_xp: 10
+trivial_after_level: 10

@@ -1,0 +1,23 @@
+type: skill
+id: branz:heavy_slash
+display-name: Heavy Slash
+input-slot: weapon-1
+tags: [weapon, sword]
+cast-ms: 250
+active-ms: 50
+recovery-ms: 300
+cooldown-ms: 2500
+cooldown-group: sword-primary
+costs:
+  STAMINA: 15
+interrupt-refund: 0.5
+range: 4.5
+requires-line-of-sight: true
+root-effect: hit
+effects:
+  - id: hit
+    type: damage
+    numbers:
+      power: 40
+    values:
+      type: physical

@@ -39,4 +39,6 @@ public interface Scheduler {
      * {@code timeout}. Returns false if work remained.
      */
     boolean drainAndShutdown(Duration timeout);
+
+    default int queueDepth() { return -1; }
 }

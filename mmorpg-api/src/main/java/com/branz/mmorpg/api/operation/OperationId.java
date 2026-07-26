@@ -1,6 +1,5 @@
 package com.branz.mmorpg.api.operation;
 
-<<<<<<< HEAD
 import com.branz.mmorpg.api.error.ErrorCode;
 import com.branz.mmorpg.api.error.MMOException;
 import java.util.Locale;
@@ -97,26 +96,10 @@ public record OperationId(String value) implements Comparable<OperationId> {
     @Override
     public int compareTo(OperationId other) {
         return value.compareTo(other.value);
-=======
-import java.util.Objects;
-import java.util.UUID;
-
-public record OperationId(UUID value) {
-    public OperationId {
-        Objects.requireNonNull(value, "value");
-    }
-
-    public static OperationId parse(String value) {
-        return new OperationId(UUID.fromString(value));
->>>>>>> parent of 3846639 (74)
     }
 
     @Override
     public String toString() {
-<<<<<<< HEAD
         return value;
-=======
-        return value.toString();
->>>>>>> parent of 3846639 (74)
     }
 }

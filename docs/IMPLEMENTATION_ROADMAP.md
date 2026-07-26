@@ -75,35 +75,34 @@ authoritative source of damage, resource payment, contribution, and progression.
 
 ## 1.3 Survival Skill Mastery delivery order
 
-Survival Skill Mastery belongs to the Core workstream and is delivered in four
+Life Skill Mastery belongs to the Core workstream and is delivered in four
 increments:
 
 | Increment | Milestone | Deliverables | Exit criteria |
 |---|---|---|---|
 | S0 Profile contract | M1 | Skill ID, immutable progress snapshot, level/XP/point values, persistence model | A player session loads skill progress without Paper types |
 | S1 Progression engine | M3 | XP formula, level curve, points, mastery-tree DAG, node purchase and respec transactions | Pure Java formula, tree-validation, and idempotency tests pass |
-<<<<<<< HEAD
 | S2 Mining nodes | M5 | Natural-block origin plus node definitions, instances and placement commands, reservation/contest, depletion and respawn, yields, committed events | Eligible natural stone grants 1 XP; a registered node grants its configured XP; contested harvest resolves to exactly one winner |
 | S3 Operations and release | M8 | Player UI, admin inspect/repair/reset, node repair tooling, audit, telemetry, Paper adapter, performance and abuse tests | Life Skill acceptance criteria and Paper smoke tests pass |
-=======
-| S2 Mining integration | M5 | Pickaxe tags, block-source definitions, rarity XP, origin tracking, anti-farm decay, committed events | Natural stone grants configured 1 XP; rare ore grants more; placed or cancelled blocks grant none |
-| S3 Operations and release | M8 | Player UI, admin inspect/repair/reset, audit, telemetry, Paper adapter, performance and abuse tests | Survival Skill acceptance criteria and Paper smoke tests pass |
->>>>>>> parent of 3846639 (74)
 
 Mining is required for the initial release. Woodcutting, Excavation, Foraging,
-and Fishing may reuse the engine only after their source definitions,
+and Fishing may reuse the engine only after their node definitions,
 anti-exploit policies, and tests pass the same gate.
 
 Dependencies:
 
     S0 Profile contract
       -> S1 Progression engine
-      -> S2 Mining integration
+      -> S2 Mining nodes
       -> S3 Operations and release
 
-S1 may use immutable fake tools and sources before C7 Items is complete. S2
-cannot pass integration until authoritative item identity, gathering-source
-origin, and transactional reward services are available.
+S1 may use immutable fake tools and nodes before C7 Items is complete. S2 cannot
+pass integration until authoritative item identity and transactional reward
+services are available, because node yields are real items.
+
+S2 no longer depends on per-block origin tracking. Under the node model a
+player-placed block is simply not a registered node instance, so it grants
+nothing by construction rather than by detection.
 
 ## 2. Shared-file policy
 
@@ -125,13 +124,17 @@ Preferred procedure:
 
 Large feature implementations do not belong in shared bootstrap files.
 
-Survival Skill ownership follows the module boundaries:
+Life Skill ownership follows the module boundaries:
 
     mmorpg-api        immutable progress/tree snapshots, queries, and events
-    mmorpg-content    gathering-source and mastery-tree definitions
-    mmorpg-storage    progress, node rank, operation, audit, and outbox records
-    mmorpg-core       formulas, progression, validation, and anti-farm policy
-    mmorpg-paper      block/tool adapters, player UI, and commands
+    mmorpg-content    gathering-node and mastery-tree definitions
+    mmorpg-storage    progress, node rank, node instances, operation, audit, and outbox records
+    mmorpg-core       formulas, progression, reservation rules, validation, and anti-farm policy
+    mmorpg-paper      interaction/tool adapters, node presentation, player UI, and commands
+
+Node definitions are content; node instances are world state owned by storage
+and mutated only through admin commands. A content reload never moves, deletes,
+or respawns a placed node.
 
 Permanent Class, Combat, and Compass ownership follows the same dependency rule:
 
@@ -177,12 +180,9 @@ between branches.
 | Survival XP/level/tree | Fake source/tool | Required | Not required |
 | Mining block eligibility | Fake block origin | Required | Required |
 | Survival anti-farm/idempotency | Synthetic actions | Required | Smoke |
-<<<<<<< HEAD
 | Node eligibility and yields | Fake node instance | Required | Required |
 | Node reservation and contest | Simulated concurrency | Required | Required |
 | Node depletion/respawn/restart | Fake clock | Required | Smoke |
-=======
->>>>>>> parent of 3846639 (74)
 | Dialogue graph | Required | Not required | Renderer smoke |
 | NPC/region | Fake location/actor | Event adapter | Required |
 | Cutscene timeline | Virtual ports | Actor integration | Required |
@@ -209,10 +209,7 @@ An integration gate passes when:
 - Class, weapon, resource, skill, and mastery compatibility validates together.
 - Survival XP and tree mutations use idempotent operation IDs.
 - Gathering sources prove their origin before valuable XP or bonus yield.
-<<<<<<< HEAD
 - Registered node XP and yields require an authoritative node instance.
-=======
->>>>>>> parent of 3846639 (74)
 - gradlew clean test shadowJar passes.
 
 ## 6. Reference quest used for final integration
@@ -238,13 +235,12 @@ Flow:
 This quest validates dialogue, choices, regions, interactions, cutscene, mob/boss
 events, items, rewards, history, persistence, restart recovery, and administration.
 
-## 6.1 Survival Skill reference scenario
+## 6.1 Life Skill reference scenario
 
-Survival progression uses a separate scenario so ordinary Mining does not depend
-on quest completion:
+Life Skill progression uses a separate scenario so Mining does not depend on
+quest completion:
 
 1. Join with an ACTIVE player session and a valid pickaxe.
-<<<<<<< HEAD
 2. Break eligible natural stone in the world and receive exactly 1 Mining XP.
 3. Harvest a placed `branz:stone_deposit` node and receive its configured XP
    and yields.
@@ -259,15 +255,6 @@ on quest completion:
 10. Retry the same operation IDs and verify no XP, yield, point, or rank
     duplication.
 11. Restart the server and verify respawn timers survived and progress is intact.
-=======
-2. Break natural stone and receive exactly 1 configured Mining XP.
-3. Break a configured rare ore and receive its larger XP value.
-4. Place and re-break the same ore type and receive no rare-tier XP.
-5. Reach a configured milestone and receive its skill point exactly once.
-6. Unlock `branz:mining_stoneworker` and observe its bounded effect.
-7. Retry the same operation IDs and verify no XP, point, or rank duplication.
-8. Reconnect and verify level, XP, points, and node ranks are preserved.
->>>>>>> parent of 3846639 (74)
 
 ## 6.2 Permanent Class onboarding reference scenario
 
@@ -310,14 +297,19 @@ A system is final when:
 - Documentation matches implementation.
 - It can be consumed by the other workstream without importing implementation.
 
-For Survival Skill Mastery, final additionally means:
+For Life Skill Mastery, final additionally means:
 
-- Natural and registered source origin is authoritative and tested.
-- XP, levels, points, node purchases, and respecs are idempotent and audited.
+- Only registered node instances can grant XP; every other world interaction
+  grants nothing.
+- Node reservation, depletion, and respawn are authoritative, contested safely,
+  and survive restart.
+- XP, levels, points, yields, node purchases, and respecs are idempotent and
+  audited.
 - Mastery trees reject cycles, broken prerequisites, and unbounded effects.
-- Placed, restored, cancelled, duplicated, and rate-limited actions cannot
-  produce unintended progression.
-- Mining runs through Paper while formulas and tree rules remain pure Java.
+- Interrupted, duplicated, orphaned, and rate-limited actions cannot produce
+  unintended progression.
+- Mining runs through Paper while formulas, reservation rules, and tree rules
+  remain pure Java.
 
 For Permanent Class, Combat, and Compass systems, final additionally means:
 

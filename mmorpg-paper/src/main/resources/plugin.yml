@@ -4,15 +4,11 @@ main: com.branz.mmorpg.paper.BranzMMORPGPlugin
 api-version: '1.21.11'
 author: Branz
 description: High-performance MMORPG System Plugin for Paper Minecraft
+softdepend: [BranzWallet]
 commands:
   branz:
     description: Branz MMORPG administration command
-<<<<<<< HEAD
-    usage: /branz <reload|status|player>
-=======
-    usage: /branz <reload|status>
->>>>>>> parent of 3846639 (74)
-    permission: branz.admin
+    usage: /branz <reload|status|player|life|mastery|loadout|inventory|loot|equipment|node|craft|mob|encounter|party|trade|telemetry|currency|quest|dialogue|cutscene|npc|location>
 permissions:
   branz.admin:
     description: Allows administration of Branz MMORPG

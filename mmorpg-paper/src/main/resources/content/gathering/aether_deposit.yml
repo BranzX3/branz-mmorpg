@@ -1,0 +1,20 @@
+type: gathering_node
+id: branz:aether_deposit
+display_name: Aether Deposit
+skill: branz:mining
+tier: uncommon
+base_xp: 3
+required_tool_tag: branz:pickaxe
+required_level: 1
+harvest_time_ms: 2500
+respawn_seconds: 60
+respawn_jitter_seconds: 10
+tags: [branz:common_mining]
+presentation:
+  available_block: minecraft:amethyst_block
+  depleted_block: minecraft:stone
+  hologram: "<light_purple>Aether Deposit"
+yields:
+  - item: branz:aether_ore
+    amount: [1, 3]
+    chance: 1.0

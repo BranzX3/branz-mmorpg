@@ -9,6 +9,9 @@ Standalone, modular MMORPG framework for Paper 26.2 and Java 25.
 - mmorpg-storage: MySQL/HikariCP lifecycle and Flyway migrations.
 - mmorpg-core: Platform-independent game rules.
 - mmorpg-paper: Paper bootstrap, commands, listeners, and UI.
+- mmorpg-quest-api/core/storage/paper: Quest, dialogue, cutscene, migration,
+  persistence, and Paper presentation.
+- tools/quest-editor: Local-only visual YAML graph/timeline editor.
 
 ## Documentation
 
@@ -20,16 +23,14 @@ Standalone, modular MMORPG framework for Paper 26.2 and Java 25.
 - [Permanent Character Class Specification](docs/PERMANENT_CHARACTER_CLASS_SPECIFICATION.md)
 - [Class Compass and Skill Tree UI Specification](docs/CLASS_COMPASS_AND_SKILL_TREE_UI_SPECIFICATION.md)
 - [Combat Mastery and Character Build Specification](docs/COMBAT_MASTERY_AND_CHARACTER_BUILD_SPECIFICATION.md)
-<<<<<<< HEAD
 - [Survival Skill Mastery (Life Skills) Specification](docs/SURVIVAL_SKILL_MASTERY_SPECIFICATION.md)
 - [Quest, Dialogue, and Cutscene Specification](docs/QUEST_DIALOGUE_CUTSCENE_SPECIFICATION.md)
 - [Parallel Implementation Roadmap](docs/IMPLEMENTATION_ROADMAP.md)
 - [External Plugin Integration Contract](docs/EXTERNAL_PLUGIN_INTEGRATION_CONTRACT.md)
-=======
-- [Survival Skill Mastery Specification](docs/SURVIVAL_SKILL_MASTERY_SPECIFICATION.md)
-- [Quest, Dialogue, and Cutscene Specification](docs/QUEST_DIALOGUE_CUTSCENE_SPECIFICATION.md)
-- [Parallel Implementation Roadmap](docs/IMPLEMENTATION_ROADMAP.md)
->>>>>>> parent of 3846639 (74)
+- [Operations Runbook](docs/OPERATIONS_RUNBOOK.md)
+- [Public API Guide](docs/PUBLIC_API.md)
+- [Reference Quest QA Path](docs/QUEST_QA_PATH.md)
+- [Release Verification](docs/RELEASE_VERIFICATION.md)
 
 ## Build
 

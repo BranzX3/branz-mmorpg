@@ -1,11 +1,8 @@
 package com.branz.mmorpg.api.player;
 
 import com.branz.mmorpg.api.content.ContentId;
-<<<<<<< HEAD
 import com.branz.mmorpg.api.error.ErrorCode;
 import com.branz.mmorpg.api.error.MMOException;
-=======
->>>>>>> parent of 3846639 (74)
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,13 +10,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-<<<<<<< HEAD
 /**
  * Immutable persistent player profile shared by the session and gameplay systems.
  * UUID is the identity; the last known name is presentation metadata only.
  */
-=======
->>>>>>> parent of 3846639 (74)
 public record PlayerProfile(
         UUID playerId,
         String lastKnownName,
@@ -36,16 +30,11 @@ public record PlayerProfile(
 
     public PlayerProfile {
         Objects.requireNonNull(playerId, "playerId");
-<<<<<<< HEAD
-=======
-        Objects.requireNonNull(lastKnownName, "lastKnownName");
->>>>>>> parent of 3846639 (74)
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(lastSeenAt, "lastSeenAt");
         classId = Objects.requireNonNull(classId, "classId");
         selectedLoadoutId = Objects.requireNonNull(selectedLoadoutId, "selectedLoadoutId");
         respawnPointId = Objects.requireNonNull(respawnPointId, "respawnPointId");
-<<<<<<< HEAD
         Objects.requireNonNull(settings, "settings");
         if (schemaVersion < 1) {
             throw new MMOException(ErrorCode.INVALID_ARGUMENT,
@@ -129,96 +118,10 @@ public record PlayerProfile(
 
     public PlayerProfile withRespawnPoint(ContentId respawnPointId) {
         return withRespawnPoint(Optional.ofNullable(respawnPointId));
-=======
-        settings = Map.copyOf(settings);
-        if (lastKnownName.isBlank()) {
-            throw new IllegalArgumentException("Player name must not be blank");
-        }
-        if (schemaVersion < 1) {
-            throw new IllegalArgumentException("Schema version must be positive");
-        }
-        if (revision < 0) {
-            throw new IllegalArgumentException("Revision must not be negative");
-        }
-    }
-
-    public static PlayerProfile create(UUID playerId, String name, Instant now) {
-        return new PlayerProfile(
-                playerId,
-                name,
-                CURRENT_SCHEMA_VERSION,
-                now,
-                now,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Map.of(),
-                0);
-    }
-
-    public PlayerProfile seenAs(String name, Instant now) {
-        return new PlayerProfile(
-                playerId,
-                name,
-                schemaVersion,
-                createdAt,
-                now,
-                classId,
-                selectedLoadoutId,
-                respawnPointId,
-                settings,
-                revision);
-    }
-
-    public PlayerProfile withRevision(long nextRevision) {
-        return new PlayerProfile(
-                playerId,
-                lastKnownName,
-                schemaVersion,
-                createdAt,
-                lastSeenAt,
-                classId,
-                selectedLoadoutId,
-                respawnPointId,
-                settings,
-                nextRevision);
-    }
-
-    public PlayerProfile withSelectedLoadout(Optional<ContentId> nextLoadoutId) {
-        return new PlayerProfile(
-                playerId,
-                lastKnownName,
-                schemaVersion,
-                createdAt,
-                lastSeenAt,
-                classId,
-                Objects.requireNonNull(nextLoadoutId, "nextLoadoutId"),
-                respawnPointId,
-                settings,
-                revision);
-    }
-
-    public PlayerProfile withRespawnPoint(Optional<ContentId> nextRespawnPointId) {
-        return new PlayerProfile(
-                playerId,
-                lastKnownName,
-                schemaVersion,
-                createdAt,
-                lastSeenAt,
-                classId,
-                selectedLoadoutId,
-                Objects.requireNonNull(nextRespawnPointId, "nextRespawnPointId"),
-                settings,
-                revision);
->>>>>>> parent of 3846639 (74)
     }
 
     public PlayerProfile withSetting(String key, String value) {
         Objects.requireNonNull(key, "key");
-<<<<<<< HEAD
-=======
-        Objects.requireNonNull(value, "value");
->>>>>>> parent of 3846639 (74)
         if (key.isBlank()) {
             throw new MMOException(ErrorCode.INVALID_ARGUMENT, "setting key must not be blank");
         }
@@ -241,7 +144,6 @@ public record PlayerProfile(
         return withSettings(updated);
     }
 
-<<<<<<< HEAD
     public String setting(String key, String fallback) {
         return settings.getOrDefault(Objects.requireNonNull(key, "key"), fallback);
     }
@@ -249,19 +151,5 @@ public record PlayerProfile(
     private PlayerProfile withSettings(Map<String, String> nextSettings) {
         return new PlayerProfile(playerId, lastKnownName, schemaVersion, createdAt, lastSeenAt, classId,
                 selectedLoadoutId, respawnPointId, nextSettings, revision);
-=======
-    private PlayerProfile withSettings(Map<String, String> nextSettings) {
-        return new PlayerProfile(
-                playerId,
-                lastKnownName,
-                schemaVersion,
-                createdAt,
-                lastSeenAt,
-                classId,
-                selectedLoadoutId,
-                respawnPointId,
-                nextSettings,
-                revision);
->>>>>>> parent of 3846639 (74)
     }
 }

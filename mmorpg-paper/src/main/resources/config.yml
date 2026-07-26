@@ -10,3 +10,7 @@ database:
 
 content:
   directory: content
+
+player-session:
+  worker-threads: 2
+  shutdown-timeout-millis: 5000

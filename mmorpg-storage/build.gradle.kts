@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     api(project(":mmorpg-api"))
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.19.2")
     implementation("com.zaxxer:HikariCP:6.3.1")
     implementation("com.mysql:mysql-connector-j:9.4.0")
     implementation("org.flywaydb:flyway-core:11.11.2")

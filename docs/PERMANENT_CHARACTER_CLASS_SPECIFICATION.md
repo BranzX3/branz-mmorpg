@@ -4,6 +4,9 @@ Status: Proposed workstream contract
 Owner: Core MMO developer  
 Depends on: Player Session, Attributes, Skills, Combat Mastery, Items, and Content
 
+Class selection and the reserved hotbar compass UI follow
+`CLASS_COMPASS_AND_SKILL_TREE_UI_SPECIFICATION.md`.
+
 ## 1. Product Rule
 
 Every playable character permanently selects exactly one class:

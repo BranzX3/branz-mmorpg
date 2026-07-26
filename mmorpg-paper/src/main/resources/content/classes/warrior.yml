@@ -1,0 +1,19 @@
+type: character_class
+id: branz:warrior
+display-name: Warrior
+schema-version: 1
+roles: [damage, tank]
+base-attributes: {strength: 12, vitality: 11, agility: 7, intelligence: 4}
+primary-resource: stamina
+allowed-weapon-tags: [sword, melee]
+allowed-armor-tags: [heavy, medium]
+class-skills: [branz:heavy_slash]
+ultimate-skill: branz:heavy_slash
+passive-root-node: branz:warrior_root
+starter-grant:
+  id: branz:warrior_starter
+  revision: 1
+  weapon: branz:broadsword
+  unlocked-skills: [branz:basic_strike, branz:heavy_slash]
+  additional-items: {}
+tags: [physical, frontline]

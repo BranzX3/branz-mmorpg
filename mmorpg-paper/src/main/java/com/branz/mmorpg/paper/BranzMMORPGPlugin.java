@@ -42,6 +42,8 @@ import com.branz.mmorpg.api.runtime.TransactionRunner;
 import com.branz.mmorpg.api.service.ServiceStatus;
 import com.branz.mmorpg.content.AtomicContentService;
 import com.branz.mmorpg.core.player.PlayerSessionService;
+import com.branz.mmorpg.core.character.PermanentCharacterClassService;
+import com.branz.mmorpg.core.event.SimpleEventBus;
 import com.branz.mmorpg.core.lifeskill.LifeSkillProgressionService;
 import com.branz.mmorpg.core.mastery.DefaultCombatMasteryService;
 import com.branz.mmorpg.core.item.DefaultLoadoutService;
@@ -60,6 +62,7 @@ import com.branz.mmorpg.core.service.ServiceContainer;
 import com.branz.mmorpg.storage.DatabaseConfig;
 import com.branz.mmorpg.storage.DatabaseManager;
 import com.branz.mmorpg.storage.JdbcPlayerProfileRepository;
+import com.branz.mmorpg.storage.JdbcCharacterClassSelectionRepository;
 import com.branz.mmorpg.storage.JdbcTransactionRunner;
 import com.branz.mmorpg.storage.FilePendingSessionSaveStore;
 import com.branz.mmorpg.storage.JdbcCombatMasteryRepository;
@@ -93,6 +96,8 @@ public class BranzMMORPGPlugin extends JavaPlugin {
     private TransactionRunner transactionRunner;
     private PlayerSessionService sessionService;
     private PlayerProfileRepository profileRepository;
+    private PermanentCharacterClassService characterClassService;
+    private SimpleEventBus characterClassEvents;
     private LifeSkillProgressionService lifeSkillProgression;
     private DefaultCombatMasteryService combatMasteryService;
     private DefaultLoadoutService loadoutService;
@@ -176,6 +181,12 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                                         "player-session.recovery-directory",
                                         "recovery/player-profiles"))),
                         Math.max(1, getConfig().getInt("player-session.save-max-attempts", 3))));
+                characterClassEvents = new SimpleEventBus(failure -> getLogger().log(
+                        Level.WARNING, "Permanent class event subscriber failed", failure));
+                characterClassService = new PermanentCharacterClassService(
+                        sessionService, contentService,
+                        new JdbcCharacterClassSelectionRepository(databaseManager),
+                        characterClassEvents, new SystemGameClock());
                 lifeSkillProgression = new LifeSkillProgressionService(
                         profileRepository, sessionService, new SystemGameClock(),
                         contentService::snapshot);

@@ -20,6 +20,10 @@ import com.branz.mmorpg.api.crafting.RecipeDefinition;
 import com.branz.mmorpg.api.mob.MobDefinition;
 import com.branz.mmorpg.api.mob.MobAbilityDefinition;
 import com.branz.mmorpg.api.encounter.EncounterDefinition;
+import com.branz.mmorpg.api.character.CharacterClassDefinition;
+import com.branz.mmorpg.api.character.CharacterClassId;
+import com.branz.mmorpg.api.character.CharacterClassRole;
+import com.branz.mmorpg.api.character.StarterGrantPlan;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -118,6 +122,51 @@ final class YamlContentLoader {
         validateRecipes(definitions, diagnostics);
         validateMobs(definitions, diagnostics);
         validateEncounters(definitions, diagnostics);
+        validateCharacterClasses(definitions, diagnostics);
+    }
+
+    private void validateCharacterClasses(Map<ContentId, ContentDefinition> definitions,
+                                          List<String> diagnostics) {
+        List<CharacterClassDefinition> classes = definitions.values().stream()
+                .filter(CharacterClassDefinition.class::isInstance)
+                .map(CharacterClassDefinition.class::cast).toList();
+        if (classes.isEmpty()) return;
+        Set<ContentId> required = Set.of(CharacterClassId.WARRIOR.value(),
+                CharacterClassId.MAGE.value(), CharacterClassId.ROGUE.value());
+        Set<ContentId> actual = classes.stream().map(CharacterClassDefinition::id)
+                .collect(java.util.stream.Collectors.toSet());
+        if (!actual.equals(required)) {
+            diagnostics.add("character classes must be exactly " + required + "; found " + actual);
+        }
+        for (CharacterClassDefinition characterClass : classes) {
+            for (ContentId skill : characterClass.classSkillIds()) {
+                if (!(definitions.get(skill) instanceof SkillDefinition)) {
+                    diagnostics.add(characterClass.id() + ": unknown class skill " + skill);
+                }
+            }
+            if (!(definitions.get(characterClass.ultimateSkillId()) instanceof SkillDefinition)) {
+                diagnostics.add(characterClass.id() + ": unknown ultimate skill "
+                        + characterClass.ultimateSkillId());
+            }
+            StarterGrantPlan starter = characterClass.starterGrantPlan();
+            ContentDefinition weapon = definitions.get(starter.weaponId());
+            if (!(weapon instanceof WeaponDefinition starterWeapon)) {
+                diagnostics.add(characterClass.id() + ": unknown starter weapon " + starter.weaponId());
+            } else if (starterWeapon.tags().stream().noneMatch(characterClass.allowedWeaponTags()::contains)) {
+                diagnostics.add(characterClass.id() + ": starter weapon is incompatible " + starter.weaponId());
+            }
+            starter.unlockedSkillIds().forEach(skill -> {
+                if (!(definitions.get(skill) instanceof SkillDefinition)) {
+                    diagnostics.add(characterClass.id() + ": unknown starter skill " + skill);
+                }
+            });
+            starter.additionalItems().keySet().forEach(item -> {
+                ContentDefinition found = definitions.get(item);
+                if (!(found instanceof MaterialDefinition) && !(found instanceof WeaponDefinition)) {
+                    diagnostics.add(characterClass.id() + ": unknown starter item " + item);
+                }
+            });
+        }
     }
 
     private void validateWeapons(Map<ContentId, ContentDefinition> definitions,
@@ -322,8 +371,40 @@ final class YamlContentLoader {
             case "mob" -> parseMob(mapper.treeToValue(root, RawMobDefinition.class));
             case "encounter" -> parseEncounter(
                     mapper.treeToValue(root, RawEncounterDefinition.class));
+            case "character_class" -> parseCharacterClass(
+                    mapper.treeToValue(root, RawCharacterClassDefinition.class));
             default -> throw new IllegalArgumentException("unsupported content type '" + type + "'");
         };
+    }
+
+    private CharacterClassDefinition parseCharacterClass(RawCharacterClassDefinition raw) {
+        if (raw.starterGrant() == null) {
+            throw new IllegalArgumentException("character_class requires starter-grant");
+        }
+        Map<ContentId, Integer> additionalItems = new LinkedHashMap<>();
+        if (raw.starterGrant().additionalItems() != null) {
+            raw.starterGrant().additionalItems().forEach((id, quantity) ->
+                    additionalItems.put(ContentId.parse(id), quantity));
+        }
+        StarterGrantPlan starter = new StarterGrantPlan(
+                ContentId.parse(raw.starterGrant().id()), raw.starterGrant().revision(),
+                ContentId.parse(raw.starterGrant().weapon()),
+                raw.starterGrant().unlockedSkills() == null ? List.of()
+                        : raw.starterGrant().unlockedSkills().stream().map(ContentId::parse).toList(),
+                additionalItems);
+        return new CharacterClassDefinition(
+                ContentId.parse(raw.id()), raw.displayName(), raw.schemaVersion(),
+                raw.roles() == null ? Set.of() : raw.roles().stream()
+                        .map(role -> CharacterClassRole.valueOf(role.toUpperCase(Locale.ROOT)))
+                        .collect(java.util.stream.Collectors.toSet()),
+                raw.baseAttributes() == null ? Map.of() : raw.baseAttributes(),
+                ResourceType.valueOf(raw.primaryResource().toUpperCase(Locale.ROOT)),
+                raw.allowedWeaponTags() == null ? Set.of() : raw.allowedWeaponTags(),
+                raw.allowedArmorTags() == null ? Set.of() : raw.allowedArmorTags(),
+                raw.classSkills() == null ? List.of()
+                        : raw.classSkills().stream().map(ContentId::parse).toList(),
+                ContentId.parse(raw.ultimateSkill()), ContentId.parse(raw.passiveRootNode()),
+                starter, raw.tags() == null ? Set.of() : raw.tags());
     }
 
     private MobDefinition parseMob(RawMobDefinition raw) {

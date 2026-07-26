@@ -15,6 +15,7 @@ import com.branz.mmorpg.api.crafting.ProfessionDefinition;
 import com.branz.mmorpg.api.crafting.RecipeDefinition;
 import com.branz.mmorpg.api.mob.MobDefinition;
 import com.branz.mmorpg.api.encounter.EncounterDefinition;
+import com.branz.mmorpg.api.character.CharacterClassDefinition;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -37,6 +38,7 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
     private final Map<ContentId, RecipeDefinition> recipes;
     private final Map<ContentId, MobDefinition> mobs;
     private final Map<ContentId, EncounterDefinition> encounters;
+    private final Map<ContentId, CharacterClassDefinition> characterClasses;
 
     ImmutableContentSnapshot(long revision, Instant loadedAt, Map<ContentId, ContentDefinition> definitions) {
         this.revision = revision;
@@ -75,6 +77,7 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
         Map<ContentId, RecipeDefinition> recipeIndex = new LinkedHashMap<>();
         Map<ContentId, MobDefinition> mobIndex = new LinkedHashMap<>();
         Map<ContentId, EncounterDefinition> encounterIndex = new LinkedHashMap<>();
+        Map<ContentId, CharacterClassDefinition> classIndex = new LinkedHashMap<>();
         definitions.forEach((id, definition) -> {
             if (definition instanceof MasteryDefinition mastery) {
                 masteryIndex.put(id, mastery);
@@ -92,6 +95,8 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
                 mobIndex.put(id, mob);
             } else if (definition instanceof EncounterDefinition encounter) {
                 encounterIndex.put(id, encounter);
+            } else if (definition instanceof CharacterClassDefinition characterClass) {
+                classIndex.put(id, characterClass);
             }
         });
         this.masteries = Map.copyOf(masteryIndex);
@@ -102,6 +107,7 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
         this.recipes = Map.copyOf(recipeIndex);
         this.mobs = Map.copyOf(mobIndex);
         this.encounters = Map.copyOf(encounterIndex);
+        this.characterClasses = Map.copyOf(classIndex);
     }
 
     static ImmutableContentSnapshot empty() {
@@ -187,5 +193,9 @@ final class ImmutableContentSnapshot implements ContentSnapshot {
 
     @Override public Map<ContentId, EncounterDefinition> encounters() {
         return encounters;
+    }
+
+    @Override public Map<ContentId, CharacterClassDefinition> characterClasses() {
+        return characterClasses;
     }
 }

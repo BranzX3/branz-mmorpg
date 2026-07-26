@@ -29,6 +29,12 @@ class BundledContentTest {
                 .containsKey(ContentId.parse("branz:seal_guardian")));
         assertTrue(service.snapshot().encounters()
                 .containsKey(ContentId.parse("branz:seal_guardian_encounter")));
+        assertTrue(service.snapshot().characterClasses()
+                .containsKey(ContentId.parse("branz:warrior")));
+        assertTrue(service.snapshot().characterClasses()
+                .containsKey(ContentId.parse("branz:mage")));
+        assertTrue(service.snapshot().characterClasses()
+                .containsKey(ContentId.parse("branz:rogue")));
     }
 
     private static Path locateBundle() {

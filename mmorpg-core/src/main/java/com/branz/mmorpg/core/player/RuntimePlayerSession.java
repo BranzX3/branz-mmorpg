@@ -155,6 +155,27 @@ public final class RuntimePlayerSession implements PlayerSession {
         lifeSkills.updateAndGet(current -> current.with(snapshot));
     }
 
+    /** Reconciles a permanent class transaction already committed by storage. */
+    public void acceptPersistedClass(
+            com.branz.mmorpg.api.content.ContentId classId, long committedProfileRevision) {
+        Objects.requireNonNull(classId, "classId");
+        requirePlayable();
+        profile.updateAndGet(current -> {
+            if (current.classId().isPresent() && !current.classId().get().equals(classId)) {
+                throw new MMOException(ErrorCode.STORAGE_FAILURE,
+                        "session class conflicts with committed permanent class");
+            }
+            if (current.revision() > committedProfileRevision) return current;
+            if (current.revision() < committedProfileRevision - 1) {
+                throw new MMOException(ErrorCode.STORAGE_FAILURE,
+                        "session profile is too stale to reconcile class selection");
+            }
+            PlayerProfile selected = current.classId().isPresent()
+                    ? current : current.withPermanentClass(classId);
+            return selected.withRevision(committedProfileRevision);
+        });
+    }
+
     /** Advances the optimistic profile revision without overwriting changes made during the save. */
     void acceptPersistedProfileRevision(long expectedRevision) {
         profile.updateAndGet(current -> current.revision() == expectedRevision

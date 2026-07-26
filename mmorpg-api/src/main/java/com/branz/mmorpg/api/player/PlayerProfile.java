@@ -95,9 +95,21 @@ public record PlayerProfile(
                 selectedLoadoutId, respawnPointId, settings, nextRevision);
     }
 
-    public PlayerProfile withClass(Optional<ContentId> nextClassId) {
+    /**
+     * Returns a profile with its permanent class selected for the first time.
+     * Clearing or changing an existing class is deliberately unsupported.
+     */
+    public PlayerProfile withPermanentClass(ContentId nextClassId) {
+        Objects.requireNonNull(nextClassId, "nextClassId");
+        if (classId.isPresent()) {
+            if (classId.get().equals(nextClassId)) {
+                return this;
+            }
+            throw new MMOException(ErrorCode.INVALID_ARGUMENT,
+                    "character class is permanent and already selected: " + classId.get());
+        }
         return new PlayerProfile(playerId, lastKnownName, schemaVersion, createdAt, lastSeenAt,
-                Objects.requireNonNull(nextClassId, "nextClassId"), selectedLoadoutId, respawnPointId,
+                Optional.of(nextClassId), selectedLoadoutId, respawnPointId,
                 settings, revision);
     }
 

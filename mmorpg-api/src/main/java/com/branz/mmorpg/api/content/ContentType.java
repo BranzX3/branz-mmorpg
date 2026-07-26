@@ -12,5 +12,6 @@ public enum ContentType {
     MOB,
     ENCOUNTER,
     LIFE_SKILL,
-    LIFE_SKILL_NODE
+    LIFE_SKILL_NODE,
+    CHARACTER_CLASS
 }

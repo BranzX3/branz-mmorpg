@@ -104,6 +104,39 @@ class AtomicContentServiceTest {
                 .anyMatch(line -> line.contains("no active MMO acquisition path")));
     }
 
+    @Test
+    void rejectsClassContentWithMissingStarterReferences() throws IOException {
+        write("warrior.yml", """
+                type: character_class
+                id: branz:warrior
+                display-name: Warrior
+                schema-version: 1
+                roles: [damage]
+                base-attributes: {strength: 12}
+                primary-resource: stamina
+                allowed-weapon-tags: [sword]
+                allowed-armor-tags: [heavy]
+                class-skills: [branz:missing_skill]
+                ultimate-skill: branz:missing_ultimate
+                passive-root-node: branz:warrior_root
+                starter-grant:
+                  id: branz:warrior_starter
+                  revision: 1
+                  weapon: branz:missing_weapon
+                  unlocked-skills: [branz:missing_skill]
+                  additional-items: {}
+                tags: [physical]
+                """);
+
+        var result = new AtomicContentService().reload(directory);
+
+        assertFalse(result.successful());
+        assertTrue(result.diagnostics().stream()
+                .anyMatch(line -> line.contains("unknown starter weapon branz:missing_weapon")));
+        assertTrue(result.diagnostics().stream()
+                .anyMatch(line -> line.contains("unknown class skill branz:missing_skill")));
+    }
+
     private Path write(String name, String content) throws IOException {
         Path file = directory.resolve(name);
         Files.writeString(file, content);

@@ -393,7 +393,7 @@ measured acceptance gate exist.
 Work proceeds in this order unless a fake port allows explicitly parallel pure
 Java development:
 
-Current execution status: **I0-I2 complete; I3 is next. I4-I10 contain merged
+Current execution status: **I0-I3 complete; I4 is next. I4-I10 contain merged
 implementations but remain pending until their gates are audited against the
 permanent-class integration.**
 
@@ -406,6 +406,15 @@ Flyway V1/V2/V2.1-V17, legacy history upgrade, binary UUID and JSON columns,
 class/revision profile round trips, concurrent insert-if-absent, optimistic
 conflict, database outage, legacy JSON recovery import, and restart replay were
 all exercised with the real Connector/J and HikariCP stack.
+
+I3 is complete: `branz:warrior`, `branz:mage`, and `branz:rogue` are typed,
+validated content definitions with revisioned starter grant plans. Selection
+requires an ACTIVE token, explicit permanent-choice confirmation, and matching
+profile/content revisions. The MySQL transaction locks the profile, stores class
+metadata and the starter plan with an audit record, and returns the original
+result for an operation retry without publishing or granting twice. Legacy
+`class_id` rows are backfilled and remain permanent. Compass rendering and
+physical starter-item delivery remain owned by I7.
 
 | Order | Implementation package | Required output | Gate before next dependent package |
 |---:|---|---|---|

@@ -15,6 +15,7 @@ import com.branz.mmorpg.api.crafting.ProfessionDefinition;
 import com.branz.mmorpg.api.crafting.RecipeDefinition;
 import com.branz.mmorpg.api.mob.MobDefinition;
 import com.branz.mmorpg.api.encounter.EncounterDefinition;
+import com.branz.mmorpg.api.character.CharacterClassDefinition;
 
 public interface ContentSnapshot {
     long revision();
@@ -60,6 +61,10 @@ public interface ContentSnapshot {
     }
 
     default Map<ContentId, EncounterDefinition> encounters() {
+        return Map.of();
+    }
+
+    default Map<ContentId, CharacterClassDefinition> characterClasses() {
         return Map.of();
     }
 }

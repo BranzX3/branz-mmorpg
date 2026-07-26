@@ -1,0 +1,19 @@
+type: character_class
+id: branz:mage
+display-name: Mage
+schema-version: 1
+roles: [damage, control]
+base-attributes: {strength: 4, vitality: 7, agility: 7, intelligence: 13}
+primary-resource: mana
+allowed-weapon-tags: [staff, magic]
+allowed-armor-tags: [cloth, light]
+class-skills: [branz:fire_burst]
+ultimate-skill: branz:fire_burst
+passive-root-node: branz:mage_root
+starter-grant:
+  id: branz:mage_starter
+  revision: 1
+  weapon: branz:fire_staff
+  unlocked-skills: [branz:basic_strike, branz:fire_burst]
+  additional-items: {}
+tags: [magic, ranged]

@@ -1,0 +1,19 @@
+type: character_class
+id: branz:rogue
+display-name: Rogue
+schema-version: 1
+roles: [damage, mobility]
+base-attributes: {strength: 7, vitality: 7, agility: 13, intelligence: 5}
+primary-resource: energy
+allowed-weapon-tags: [bow, ranged]
+allowed-armor-tags: [light, medium]
+class-skills: [branz:precise_shot]
+ultimate-skill: branz:precise_shot
+passive-root-node: branz:rogue_root
+starter-grant:
+  id: branz:rogue_starter
+  revision: 1
+  weapon: branz:longbow
+  unlocked-skills: [branz:basic_strike, branz:precise_shot]
+  additional-items: {}
+tags: [physical, ranged, mobile]

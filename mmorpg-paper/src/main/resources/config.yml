@@ -18,10 +18,12 @@ player-session:
   save-max-attempts: 3
   recovery-directory: recovery/player-profiles
   shutdown-timeout-millis: 5000
-=======
+
 quest:
   directory: quest-content
 
+=======
+>>>>>>> parent of 14f4881 (complete mmo task)
 core:
   # Threads for off-tick work (profile loads, saves).
   async-pool-size: 4
@@ -34,18 +36,3 @@ player:
   duplicate-login: CLOSE_PREVIOUS
   # Periodic save of dirty sessions. Minimum 30s.
   autosave-seconds: 300
-
-combat:
-  pvp-enabled: false
-  friendly-fire: false
-  pvp-coefficient: 0.5
-  mitigation-constant: 100.0
-  maximum-reduction: 0.85
-  minimum-damage-fraction: 0.10
-  timeout-millis: 6000
-
-items:
-  # Generated and persisted on first start. Changing it quarantines old tokens;
-  # authoritative ownership remains safe and tokens are re-issued on reconcile.
-  token-secret: ""
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351

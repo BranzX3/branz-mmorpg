@@ -8,9 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.branz.mmorpg.api.error.ErrorCode;
 import com.branz.mmorpg.api.error.MMOException;
-import com.branz.mmorpg.api.content.ContentId;
-import com.branz.mmorpg.api.lifeskill.LifeSkillProgress;
-import com.branz.mmorpg.api.lifeskill.LifeSkillSnapshot;
 import com.branz.mmorpg.api.player.DuplicateLoginPolicy;
 import com.branz.mmorpg.api.player.PlayerProfile;
 import com.branz.mmorpg.api.player.PlayerSession;
@@ -20,7 +17,6 @@ import com.branz.mmorpg.core.fixture.DirectScheduler;
 import com.branz.mmorpg.core.fixture.FakePlayerProfileRepository;
 import com.branz.mmorpg.core.fixture.FixedGameClock;
 import java.util.UUID;
-import java.util.Map;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
@@ -159,24 +155,6 @@ class PlayerSessionServiceTest {
     }
 
     @Test
-    void logoutPersistsLifeSkillProgressAndRanks() throws Exception {
-        RuntimePlayerSession session = (RuntimePlayerSession) service.login(PLAYER, "Branz").get();
-        ContentId mining = ContentId.parse("branz:mining");
-        ContentId stoneworker = ContentId.parse("branz:mining_stoneworker");
-        LifeSkillProgress progress =
-                new LifeSkillProgress(mining, 4, 900L, 2, 7L, clock.now());
-        session.updateLifeSkills(profile -> profile.with(
-                new LifeSkillSnapshot(progress, Map.of(stoneworker, 2))));
-
-        service.logout(PLAYER).get();
-        PlayerSession reloaded = service.login(PLAYER, "Branz").get();
-
-        assertEquals(4, reloaded.lifeSkills().level(mining));
-        assertEquals(900L, reloaded.lifeSkills().skill(mining).totalXp());
-        assertTrue(reloaded.lifeSkills().hasNode(mining, stoneworker, 2));
-    }
-
-    @Test
     void logoutSaveRetriesAndThenKeepsADurableRecord() throws Exception {
         RuntimePlayerSession session = (RuntimePlayerSession) service.login(PLAYER, "Branz").get();
         session.updateProfile(profile -> profile.withSetting("hud", "compact"));
@@ -208,34 +186,13 @@ class PlayerSessionServiceTest {
     }
 
     @Test
-    void pendingSaveSurvivesServiceRestartThroughTheJournal() throws Exception {
-        InMemoryPendingSessionSaveStore journal = new InMemoryPendingSessionSaveStore();
-        service.stop();
-        service = new PlayerSessionService(repository, new DirectScheduler(), clock, () -> 7L,
-                DuplicateLoginPolicy.CLOSE_PREVIOUS, journal);
-        service.start();
-        RuntimePlayerSession session = (RuntimePlayerSession) service.login(PLAYER, "Branz").get();
-        session.updateProfile(profile -> profile.withSetting("hud", "durable"));
-        repository.failNextSaves(PlayerSessionService.SAVE_ATTEMPTS);
-        assertThrows(CompletionException.class, () -> service.logout(PLAYER).join());
-
-        service.stop();
-        service = new PlayerSessionService(repository, new DirectScheduler(), clock, () -> 7L,
-                DuplicateLoginPolicy.CLOSE_PREVIOUS, journal);
-        service.start();
-
-        assertTrue(service.pendingSaves().containsKey(PLAYER));
-        assertEquals(java.util.List.of(PLAYER), service.retryPendingSaves());
-        assertEquals("durable", repository.stored(PLAYER).setting("hud", "?"));
-    }
-
-    @Test
     void periodicFlushSavesOnlyDirtySessionsAndKeepsThemPlayable() throws Exception {
         RuntimePlayerSession session = (RuntimePlayerSession) service.login(PLAYER, "Branz").get();
         int afterLogin = repository.saveCount();
 
         assertEquals(1, service.flushAll(), "login marks the profile dirty");
         assertEquals(SessionState.ACTIVE, session.state(), "a periodic save resumes play");
+        assertEquals(1, session.profile().revision(), "the live snapshot tracks the committed revision");
         assertFalse(session.hasUnsavedChanges());
 
         assertEquals(0, service.flushAll(), "a clean session is not written again");

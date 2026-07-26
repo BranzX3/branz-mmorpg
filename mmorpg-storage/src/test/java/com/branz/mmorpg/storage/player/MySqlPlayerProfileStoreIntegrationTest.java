@@ -72,8 +72,13 @@ class MySqlPlayerProfileStoreIntegrationTest {
         try (Connection connection = database.dataSource().getConnection()) {
             assertEquals(1, count(connection, """
                     SELECT COUNT(*)
-                    FROM flyway_schema_history
+                    FROM mmorpg_schema_history
                     WHERE version = '2' AND success = TRUE
+                    """));
+            assertEquals(1, count(connection, """
+                    SELECT COUNT(*)
+                    FROM mmorpg_schema_history
+                    WHERE version = '2.1' AND success = TRUE
                     """));
             assertEquals("binary", columnType(connection, "player_uuid"));
             assertEquals("json", columnType(connection, "settings_json"));

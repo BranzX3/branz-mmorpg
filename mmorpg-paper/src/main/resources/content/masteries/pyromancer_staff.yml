@@ -1,9 +1,0 @@
-type: combat_mastery
-id: branz:pyromancer_staff_mastery
-display-name: Pyromancer Staff Mastery
-kind: weapon_type
-parent: branz:fire_staff_mastery
-maximum-level: 100
-curve-base: 100
-curve-exponent: 1.65
-maximum-power-bonus: 0.20

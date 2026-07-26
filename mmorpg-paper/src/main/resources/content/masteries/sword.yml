@@ -1,8 +1,0 @@
-type: combat_mastery
-id: branz:sword_mastery
-display-name: Sword Mastery
-kind: family
-maximum-level: 100
-curve-base: 100
-curve-exponent: 1.65
-maximum-power-bonus: 0.20

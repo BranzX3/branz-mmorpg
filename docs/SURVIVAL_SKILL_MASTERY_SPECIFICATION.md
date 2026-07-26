@@ -154,7 +154,6 @@ A wrong tool produces a clear refusal message. It never silently grants zero.
 Every multiplier is finite, bounded, and recorded in audit data. The result is
 never negative.
 
-<<<<<<< HEAD
 ### 5.1 Authoritative block origin
 
 Core consumes block provenance through a platform port:
@@ -197,10 +196,7 @@ Origin records for non-natural blocks and registered nodes survive chunk unload
 and restart. Cleanup is keyed by world identity, chunk, block coordinates, and
 world-generation epoch so stale records cannot affect a recreated world.
 
-## 6. Levels and Skill Points
-=======
-Suggested initial Mining tiers:
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
+### 5.2 Suggested initial Mining tiers
 
 | Tier | Example node | Base XP | Respawn |
 |---|---|---:|---|
@@ -233,7 +229,6 @@ Rejections record a reason: `NODE_TAKEN`, `NODE_DEPLETED`, `INVALID_TOOL`,
 Each Life Skill stores independent total XP, level, unspent points, unlocked
 nodes, and content revision.
 
-<<<<<<< HEAD
 The level curve is a **cumulative total-XP threshold**. A player reaches level
 `L` when `total_xp >= total_xp_required(L)`.
 
@@ -266,12 +261,6 @@ enabled. Overflow, negative grants through the normal gameplay API, NaN
 multipliers, and non-finite formula inputs are rejected. Administrative revoke
 or repair is a separate audited operation and cannot reduce a level or invalidate
 an unlocked node unless an explicit reset policy permits it.
-=======
-    xp_required(level) = round(75 * level ^ 1.55)
-
-Cap and thresholds are content-driven. Milestone levels grant Life Skill Points.
-Levels and unlocked mastery nodes never decrease on death.
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 
 A respec, if enabled, is transactional, audited, has an explicit cost, and never
 leaves a partially reset tree.
@@ -310,7 +299,6 @@ Tree effects cannot bypass region protection, mint currency, execute console
 commands, reduce harvest time to zero, or create unbounded yield, XP, speed, or
 damage multipliers.
 
-<<<<<<< HEAD
 ### 7.1 Tree revision and migration
 
 Published tree definitions have an immutable revision. Existing player progress
@@ -332,10 +320,7 @@ target revision. A failed player migration leaves that player on the previous
 revision and disables new tree mutations until repair; it does not partially
 apply ranks, effects, or refunds.
 
-## 8. Content Definitions
-=======
 ## 8. Content definitions
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 
 Node definition:
 
@@ -390,25 +375,14 @@ is told exactly which instances are now orphaned.
 
 ## 9. Persistence and transactions
 
-<<<<<<< HEAD
-    player_uuid
-    skill_id
-    level
-    total_xp
-    unspent_points
-    schema_version
-    tree_revision
-    updated_at
-=======
 Skill progress keyed by player UUID and skill ID:
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 
-    player_uuid, skill_id, level, total_xp, unspent_points, tree_revision, updated_at
+    player_uuid, skill_id, level, total_xp, unspent_points,
+    schema_version, tree_revision, updated_at
 
 Node ranks keyed by player UUID, skill ID, and node ID. Node instances as in
 §3.1.
 
-<<<<<<< HEAD
 Operation-result and outbox retention must be longer than the maximum supported
 retry/recovery window. Purging requires a recorded high-water mark and cannot
 remove an operation that may still be retried by an active recovery job.
@@ -416,13 +390,6 @@ remove an operation that may still be retried by an active recovery job.
 Database failure follows the normal fail-closed player-session policy. The
 system must not substitute a blank profile or grant speculative XP.
 
-## 10. Events and API
-
-Core publishes immutable events after the authoritative transaction commits.
-All events use the common envelope from
-`DEVELOPMENT_OWNERSHIP_AND_CONTRACTS.md`, including event ID, operation ID,
-event version, timestamp, aggregate sequence, and content revision.
-=======
 - Harvest commits node depletion, yields, XP, audit, and events in one
   transaction. There is no state in which the node is depleted but the player
   was not paid.
@@ -438,22 +405,18 @@ event version, timestamp, aggregate sequence, and content revision.
 
 ## 10. Events and API
 
-Published after the authoritative transaction commits:
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
+Core publishes immutable events after the authoritative transaction commits.
+All events use the common envelope from
+`DEVELOPMENT_OWNERSHIP_AND_CONTRACTS.md`, including event ID, operation ID,
+event version, timestamp, aggregate sequence, and content revision.
 
 | Event | Payload data |
 |---|---|
-<<<<<<< HEAD
 | SurvivalXpGranted | Player, skill, source, base XP, multipliers, awarded XP, resulting total XP |
 | SurvivalSkillLevelChanged | Player, skill, old/new level, total XP, points granted |
 | SurvivalSkillNodeUnlocked | Player, skill, node, old/new rank, points spent, points remaining |
-=======
-| LifeSkillXpGranted | Event ID, operation ID, player, skill, node instance, node definition, XP, timestamp |
-| LifeSkillLevelChanged | Player, skill, old/new level, total XP |
-| LifeSkillNodeUnlocked | Player, skill, mastery node, rank, remaining points |
 | GatheringNodeHarvested | Node instance, definition, harvester, yields, respawn_at |
 | GatheringNodeRespawned | Node instance, definition, timestamp |
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 
 Quest and Paper consume `mmorpg-api` contracts only.
 
@@ -476,7 +439,14 @@ content-creation tool and deserve to be good:
 
 Progression commands:
 
-<<<<<<< HEAD
+    /branz life inspect <player> [skill]
+    /branz life grant-xp <player> <skill> <amount> <reason>
+    /branz life tree <player> <skill>
+    /branz life reset <player> <skill> <reason>
+
+Mutating commands require permission, a reason, and an audit record. Reset
+requires explicit confirmation.
+
 ## 12. Performance Budget
 
 - Survival processing attributable to one accepted block break targets under
@@ -511,18 +481,6 @@ Progression commands:
 - Tree revision migration is idempotent and cannot partially refund or apply ranks.
 - Piston movement preserves placed-block origin across source and destination.
 - Unknown rare-source origin grants no rare-tier XP.
-=======
-    /branz life inspect <player> [skill]
-    /branz life grant-xp <player> <skill> <amount> <reason>
-    /branz life tree <player> <skill>
-    /branz life reset <player> <skill> <reason>
-
-Mutating commands require permission, a reason, and an audit record. Reset
-requires explicit confirmation.
-
-## 12. Acceptance criteria
-
-- Breaking an ordinary world block grants zero XP, in every skill, always.
 - Harvesting a registered node grants exactly its configured XP.
 - A rare node grants more than a common node.
 - A depleted node grants nothing until `respawn_at` has passed.
@@ -539,7 +497,6 @@ requires explicit confirmation.
   instead of granting XP against a missing block.
 - Server restart preserves respawn timers; nodes neither all respawn at once nor
   stay depleted forever.
->>>>>>> 14f48819ebb179329fe30a79707d68429f4dc351
 - Logout, reconnect, reload, failed save, and shutdown preserve progress.
 - Pure Java tests cover XP formulas, levels, trees, reservation state machine,
   and idempotency.

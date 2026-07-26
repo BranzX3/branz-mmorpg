@@ -3,7 +3,6 @@ package com.branz.mmorpg.api.status;
 import com.branz.mmorpg.api.content.ContentId;
 import com.branz.mmorpg.api.stat.ModifierSource;
 import java.time.Instant;
-import java.time.Duration;
 import java.util.Objects;
 
 /**
@@ -77,16 +76,5 @@ public record StatusInstance(
     public StatusInstance withNextTick(Instant next) {
         return new StatusInstance(instanceId, definitionId, source, stacks,
                 appliedAt, expiresAt, next);
-    }
-
-    /** Moves expiry and periodic schedule forward while an offline PAUSE was active. */
-    public StatusInstance shiftedBy(Duration duration) {
-        Objects.requireNonNull(duration, "duration");
-        if (duration.isNegative()) {
-            throw new IllegalArgumentException("duration must not be negative");
-        }
-        return new StatusInstance(instanceId, definitionId, source, stacks, appliedAt,
-                expiresAt == null ? null : expiresAt.plus(duration),
-                nextTickAt == null ? null : nextTickAt.plus(duration));
     }
 }

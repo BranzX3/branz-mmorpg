@@ -26,7 +26,3 @@ plugins/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 *.log
-
-# Local quest editor
-node_modules/
-dist/

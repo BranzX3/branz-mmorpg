@@ -141,17 +141,6 @@ public final class CombatEngine {
         combatState.clear(combatantId);
     }
 
-    /** Expires inactive combat state and publishes the matching leave events. */
-    public java.util.List<UUID> sweepCombatState() {
-        Instant now = clock.now();
-        java.util.List<UUID> left = combatState.sweep(now);
-        for (UUID combatantId : left) {
-            events.publish(new CombatEvents.CombatStateChanged(
-                    UUID.randomUUID(), now, combatantId, false));
-        }
-        return left;
-    }
-
     private RejectionReason validate(DamageRequest request, Combatant attacker, Combatant target) {
         if (!target.alive()) {
             return RejectionReason.TARGET_DEAD;

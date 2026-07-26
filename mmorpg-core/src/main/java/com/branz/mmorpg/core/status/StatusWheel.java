@@ -10,8 +10,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.time.Instant;
-import java.time.Duration;
 
 /**
  * The single ticker for every status on the server.
@@ -28,7 +26,6 @@ import java.time.Duration;
 public final class StatusWheel {
 
     private final Map<UUID, StatusContainer> containers = new ConcurrentHashMap<>();
-    private final Map<UUID, Suspended> suspended = new ConcurrentHashMap<>();
     private final Function<ContentId, StatusDefinition> definitions;
 
     public StatusWheel(Function<ContentId, StatusDefinition> definitions) {
@@ -47,67 +44,8 @@ public final class StatusWheel {
 
     /** Drops a target entirely. Called on death cleanup and on logout. */
     public List<StatusInstance> unregister(UUID targetId) {
-        suspended.remove(targetId);
         StatusContainer container = containers.remove(targetId);
         return container == null ? List.of() : container.clear();
-    }
-
-    /**
-     * Detaches a player on logout while honoring each definition's offline policy.
-     * CLEAR statuses are discarded, TICK_DOWN retains absolute timestamps, and
-     * PAUSE statuses have their clocks shifted when the player reconnects.
-     */
-    public List<StatusInstance> disconnect(UUID targetId, Instant now) {
-        Objects.requireNonNull(targetId, "targetId");
-        Objects.requireNonNull(now, "now");
-        StatusContainer container = containers.remove(targetId);
-        if (container == null) {
-            return List.of();
-        }
-        List<StatusInstance> kept = container.active().stream()
-                .filter(instance -> {
-                    StatusDefinition definition = definitions.apply(instance.definitionId());
-                    return definition != null
-                            && definition.offlinePolicy()
-                            != com.branz.mmorpg.api.status.OfflinePolicy.CLEAR;
-                })
-                .toList();
-        container.clear();
-        if (!kept.isEmpty()) {
-            suspended.put(targetId, new Suspended(now, kept));
-        }
-        return List.copyOf(kept);
-    }
-
-    /** Restores statuses retained by {@link #disconnect(UUID, Instant)}. */
-    public int reconnect(UUID targetId, Instant now) {
-        Objects.requireNonNull(targetId, "targetId");
-        Objects.requireNonNull(now, "now");
-        Suspended offline = suspended.remove(targetId);
-        if (offline == null) {
-            return 0;
-        }
-        Duration elapsed = Duration.between(offline.at(), now);
-        if (elapsed.isNegative()) {
-            elapsed = Duration.ZERO;
-        }
-        StatusContainer container = container(targetId);
-        int restored = 0;
-        for (StatusInstance stored : offline.instances()) {
-            StatusDefinition definition = definitions.apply(stored.definitionId());
-            if (definition == null) {
-                continue;
-            }
-            StatusInstance candidate = definition.offlinePolicy()
-                    == com.branz.mmorpg.api.status.OfflinePolicy.PAUSE
-                    ? stored.shiftedBy(elapsed)
-                    : stored;
-            if (!candidate.expiredAt(now)) {
-                container.restore(candidate);
-                restored++;
-            }
-        }
-        return restored;
     }
 
     public int trackedTargets() {
@@ -167,8 +105,5 @@ public final class StatusWheel {
 
         /** {@code definition} may be null if it left the content snapshot. */
         void onExpire(UUID targetId, StatusInstance instance, StatusDefinition definition);
-    }
-
-    private record Suspended(Instant at, List<StatusInstance> instances) {
     }
 }

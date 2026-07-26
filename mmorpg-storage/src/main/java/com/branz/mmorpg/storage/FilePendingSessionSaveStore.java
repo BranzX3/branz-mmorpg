@@ -9,6 +9,7 @@ import com.branz.mmorpg.api.lifeskill.LifeSkillSnapshot;
 import com.branz.mmorpg.api.player.PendingSessionSave;
 import com.branz.mmorpg.api.player.PendingSessionSaveStore;
 import com.branz.mmorpg.api.player.PlayerProfile;
+import com.branz.mmorpg.storage.player.FilePlayerProfileRecoveryStore;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -32,7 +33,7 @@ import java.util.UUID;
 public final class FilePendingSessionSaveStore implements PendingSessionSaveStore {
 
     private static final int MAGIC = 0x42524E5A;
-    private static final int FORMAT = 1;
+    private static final int FORMAT = 2;
     private final Path directory;
 
     public FilePendingSessionSaveStore(Path directory) {
@@ -49,10 +50,11 @@ public final class FilePendingSessionSaveStore implements PendingSessionSaveStor
                 PendingSessionSave pending = read(file);
                 loaded.put(pending.playerId(), pending);
             }
-            return Map.copyOf(loaded);
         } catch (IOException exception) {
             throw failure("failed to read pending-save journal " + directory, exception);
         }
+        loadLegacyJsonRecords(loaded);
+        return Map.copyOf(loaded);
     }
 
     @Override
@@ -82,6 +84,7 @@ public final class FilePendingSessionSaveStore implements PendingSessionSaveStor
     public void remove(UUID playerId) {
         try {
             Files.deleteIfExists(file(playerId));
+            Files.deleteIfExists(legacyFile(playerId));
         } catch (IOException exception) {
             throw failure("failed to remove recovered snapshot for " + playerId, exception);
         }
@@ -90,19 +93,25 @@ public final class FilePendingSessionSaveStore implements PendingSessionSaveStor
     private PendingSessionSave read(Path file) {
         try (DataInputStream input = new DataInputStream(
                 new BufferedInputStream(Files.newInputStream(file)))) {
-            if (input.readInt() != MAGIC || input.readInt() != FORMAT) {
+            if (input.readInt() != MAGIC) {
                 throw new IOException("unsupported recovery file header");
+            }
+            int format = input.readInt();
+            if (format < 1 || format > FORMAT) {
+                throw new IOException("unsupported recovery file format " + format);
             }
             UUID playerId = new UUID(input.readLong(), input.readLong());
             String name = input.readUTF();
             int schema = input.readInt();
             Instant createdAt = Instant.ofEpochMilli(input.readLong());
             Instant lastSeenAt = Instant.ofEpochMilli(input.readLong());
+            Optional<ContentId> classId = format >= 2 ? readContentId(input) : Optional.empty();
             Optional<ContentId> loadout = readContentId(input);
             Optional<ContentId> respawn = readContentId(input);
             Map<String, String> settings = readStrings(input);
+            long revision = format >= 2 ? input.readLong() : 0;
             PlayerProfile profile = new PlayerProfile(playerId, name, schema, createdAt, lastSeenAt,
-                    loadout, respawn, settings);
+                    classId, loadout, respawn, settings, revision);
 
             int skillCount = checkedCount(input.readInt(), "skills");
             Map<ContentId, LifeSkillSnapshot> skills = new LinkedHashMap<>();
@@ -135,6 +144,7 @@ public final class FilePendingSessionSaveStore implements PendingSessionSaveStor
         output.writeInt(profile.schemaVersion());
         output.writeLong(profile.createdAt().toEpochMilli());
         output.writeLong(profile.lastSeenAt().toEpochMilli());
+        writeContentId(output, profile.classId());
         writeContentId(output, profile.selectedLoadoutId());
         writeContentId(output, profile.respawnPointId());
         output.writeInt(profile.settings().size());
@@ -142,6 +152,7 @@ public final class FilePendingSessionSaveStore implements PendingSessionSaveStor
             output.writeUTF(setting.getKey());
             output.writeUTF(setting.getValue());
         }
+        output.writeLong(profile.revision());
 
         output.writeInt(pending.lifeSkills().skills().size());
         for (LifeSkillSnapshot snapshot : pending.lifeSkills().skills().values()) {
@@ -171,6 +182,32 @@ public final class FilePendingSessionSaveStore implements PendingSessionSaveStor
 
     private Path file(UUID playerId) {
         return directory.resolve(playerId + ".pending");
+    }
+
+    /** Imports recovery journals written by the pre-merge PlayerSessionManager. */
+    private void loadLegacyJsonRecords(Map<UUID, PendingSessionSave> loaded) {
+        FilePlayerProfileRecoveryStore legacy =
+                new FilePlayerProfileRecoveryStore(directory, Runnable::run);
+        try (var files = Files.list(directory)) {
+            for (Path file : files.filter(path -> path.getFileName().toString().endsWith(".json"))
+                    .sorted().toList()) {
+                String filename = file.getFileName().toString();
+                UUID playerId = UUID.fromString(filename.substring(0, filename.length() - ".json".length()));
+                if (loaded.containsKey(playerId)) {
+                    continue;
+                }
+                legacy.load(playerId).toCompletableFuture().join().ifPresent(record ->
+                        loaded.put(playerId, new PendingSessionSave(
+                                record.profile(),
+                                new LifeSkillProfile(playerId, Map.of(), record.recordedAt()))));
+            }
+        } catch (IOException | IllegalArgumentException exception) {
+            throw failure("failed to import legacy recovery journal " + directory, exception);
+        }
+    }
+
+    private Path legacyFile(UUID playerId) {
+        return directory.resolve(playerId + ".json");
     }
 
     private static Optional<ContentId> readContentId(DataInputStream input) throws IOException {

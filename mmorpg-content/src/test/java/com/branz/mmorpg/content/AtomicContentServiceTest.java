@@ -53,57 +53,6 @@ class AtomicContentServiceTest {
         assertTrue(result.diagnostics().stream().anyMatch(line -> line.contains("duplicate content ID")));
     }
 
-    @Test
-    void loadsAndValidatesADeclarativeSkillGraph() throws IOException {
-        write("slash.yml", """
-                type: skill
-                id: branz:heavy_slash
-                display-name: Heavy Slash
-                input-slot: weapon-1
-                tags: [weapon, sword]
-                cast-ms: 250
-                active-ms: 50
-                recovery-ms: 300
-                cooldown-ms: 2500
-                cooldown-group: sword-primary
-                costs: {STAMINA: 15}
-                interrupt-refund: 0.5
-                range: 4.5
-                requires-line-of-sight: true
-                root-effect: combo
-                effects:
-                  - id: combo
-                    type: sequence
-                    children: [hit]
-                  - id: hit
-                    type: damage
-                    numbers: {power: 40}
-                    values: {type: physical}
-                """);
-
-        AtomicContentService service = new AtomicContentService();
-        var result = service.reload(directory);
-
-        assertTrue(result.successful(), () -> String.join(", ", result.diagnostics()));
-        assertEquals(1, service.snapshot().skills().size());
-        assertEquals(2_500L,
-                service.snapshot().skills().get(ContentId.parse("branz:heavy_slash")).cooldownMillis());
-    }
-
-    @Test
-    void rejectsRecipesWhoseInputsAreOnlyProducedByACycle() throws IOException {
-        write("a.yml", validMaterial("branz:a"));
-        write("b.yml", validMaterial("branz:b"));
-        write("recipe-a.yml", recipe("branz:recipe_a", "branz:b", "branz:a"));
-        write("recipe-b.yml", recipe("branz:recipe_b", "branz:a", "branz:b"));
-
-        var result = new AtomicContentService().reload(directory);
-
-        assertFalse(result.successful());
-        assertTrue(result.diagnostics().stream()
-                .anyMatch(line -> line.contains("no active MMO acquisition path")));
-    }
-
     private Path write(String name, String content) throws IOException {
         Path file = directory.resolve(name);
         Files.writeString(file, content);
@@ -120,26 +69,5 @@ class AtomicContentServiceTest {
                 tradable: true
                 max-stack-size: 64
                 """.formatted(id);
-    }
-
-    private static String recipe(String id, String input, String output) {
-        return """
-                type: recipe
-                id: %s
-                display_name: Cycle
-                inputs: {"%s": 1}
-                optional_catalysts: {}
-                coin_fee: 0
-                station_tag: branz:forge
-                required_profession_level: 1
-                duration_ms: 0
-                output:
-                  item: %s
-                  quantity: 1
-                  binding: unbound
-                  quality_policy: fixed
-                profession_xp: 0
-                trivial_after_level: 1
-                """.formatted(id, input, output);
     }
 }

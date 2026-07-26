@@ -20,7 +20,8 @@ public final class UuidIdGenerator implements IdGenerator {
 
     @Override
     public OperationId newOperationId() {
-        return new OperationId(source.get());
+        UUID value = source.get();
+        return OperationId.of("core", "generated", value, "generated");
     }
 
     @Override

@@ -8,8 +8,6 @@ import com.branz.mmorpg.api.player.DuplicateLoginPolicy;
 import com.branz.mmorpg.api.player.PlayerProfile;
 import com.branz.mmorpg.api.player.PlayerProfileRepository;
 import com.branz.mmorpg.api.player.PlayerSession;
-import com.branz.mmorpg.api.player.PendingSessionSave;
-import com.branz.mmorpg.api.player.PendingSessionSaveStore;
 import com.branz.mmorpg.api.player.SessionState;
 import com.branz.mmorpg.api.player.SessionToken;
 import com.branz.mmorpg.api.runtime.GameClock;
@@ -52,19 +50,24 @@ public final class PlayerSessionService extends AbstractService implements LifeS
     private final GameClock clock;
     private final LongSupplier contentRevision;
     private final DuplicateLoginPolicy duplicateLoginPolicy;
+<<<<<<< HEAD
     private final PendingSessionSaveStore pendingSaveStore;
+    private final int saveAttempts;
+=======
+>>>>>>> parent of 14f4881 (complete mmo task)
 
     private final Map<UUID, RuntimePlayerSession> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastSequence = new ConcurrentHashMap<>();
-    private final Map<UUID, PendingSave> pendingSaves = new ConcurrentHashMap<>();
+    private final Map<UUID, PlayerProfile> pendingSaves = new ConcurrentHashMap<>();
 
     public PlayerSessionService(PlayerProfileRepository repository,
                                 Scheduler scheduler,
                                 GameClock clock,
                                 LongSupplier contentRevision,
                                 DuplicateLoginPolicy duplicateLoginPolicy) {
+<<<<<<< HEAD
         this(repository, scheduler, clock, contentRevision, duplicateLoginPolicy,
-                new InMemoryPendingSessionSaveStore());
+                new InMemoryPendingSessionSaveStore(), SAVE_ATTEMPTS);
     }
 
     public PlayerSessionService(PlayerProfileRepository repository,
@@ -73,22 +76,39 @@ public final class PlayerSessionService extends AbstractService implements LifeS
                                 LongSupplier contentRevision,
                                 DuplicateLoginPolicy duplicateLoginPolicy,
                                 PendingSessionSaveStore pendingSaveStore) {
+        this(repository, scheduler, clock, contentRevision, duplicateLoginPolicy,
+                pendingSaveStore, SAVE_ATTEMPTS);
+    }
+
+    public PlayerSessionService(PlayerProfileRepository repository,
+                                Scheduler scheduler,
+                                GameClock clock,
+                                LongSupplier contentRevision,
+                                DuplicateLoginPolicy duplicateLoginPolicy,
+                                PendingSessionSaveStore pendingSaveStore,
+                                int saveAttempts) {
+=======
+>>>>>>> parent of 14f4881 (complete mmo task)
         super("player-session");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.contentRevision = Objects.requireNonNull(contentRevision, "contentRevision");
         this.duplicateLoginPolicy = Objects.requireNonNull(duplicateLoginPolicy, "duplicateLoginPolicy");
+<<<<<<< HEAD
         this.pendingSaveStore = Objects.requireNonNull(pendingSaveStore, "pendingSaveStore");
+        if (saveAttempts < 1) {
+            throw new IllegalArgumentException("saveAttempts must be at least 1");
+        }
+        this.saveAttempts = saveAttempts;
+=======
+>>>>>>> parent of 14f4881 (complete mmo task)
     }
 
     @Override
     protected void onStart() {
         sessions.clear();
         pendingSaves.clear();
-        pendingSaveStore.loadAll().forEach((playerId, pending) ->
-                pendingSaves.put(playerId,
-                        new PendingSave(pending.profile(), pending.lifeSkills())));
     }
 
     @Override
@@ -157,7 +177,7 @@ public final class PlayerSessionService extends AbstractService implements LifeS
             return CompletableFuture.completedFuture(null);
         }
         return scheduler.async(() -> {
-            save(session, SAVE_ATTEMPTS);
+            save(session, saveAttempts);
             return null;
         }).thenApply(ignored -> null);
     }
@@ -205,18 +225,15 @@ public final class PlayerSessionService extends AbstractService implements LifeS
 
     /** Profiles whose logout save exhausted its retries and await recovery. */
     public Map<UUID, PlayerProfile> pendingSaves() {
-        Map<UUID, PlayerProfile> profiles = new java.util.LinkedHashMap<>();
-        pendingSaves.forEach((playerId, pending) -> profiles.put(playerId, pending.profile()));
-        return Map.copyOf(profiles);
+        return Map.copyOf(pendingSaves);
     }
 
     /** Retries pending saves. Returns the players that were recovered. */
     public List<UUID> retryPendingSaves() {
         List<UUID> recovered = new ArrayList<>();
-        for (Map.Entry<UUID, PendingSave> entry : Map.copyOf(pendingSaves).entrySet()) {
+        for (Map.Entry<UUID, PlayerProfile> entry : Map.copyOf(pendingSaves).entrySet()) {
             try {
-                repository.saveSession(entry.getValue().profile(), entry.getValue().lifeSkills());
-                pendingSaveStore.remove(entry.getKey());
+                repository.saveProfile(entry.getValue());
                 pendingSaves.remove(entry.getKey());
                 recovered.add(entry.getKey());
             } catch (RuntimeException stillFailing) {
@@ -243,26 +260,29 @@ public final class PlayerSessionService extends AbstractService implements LifeS
     }
 
     private void save(RuntimePlayerSession session, int attempts) {
-        Map<DirtyComponent, Long> captured = session.dirtySnapshot();
+        Set<DirtyComponent> captured = session.dirtyComponents();
         boolean resuming = session.state() == SessionState.ACTIVE && sessions.containsKey(session.playerId());
         PlayerProfile profile;
-        LifeSkillProfile lifeSkills;
         try {
             profile = session.profile().withLastSeenAt(clock.now());
-            lifeSkills = session.lifeSkills();
         } catch (MMOException notLoaded) {
             session.closed();
             return;
         }
-        if (!resuming) {
-            session.beginSaving();
-        }
+        session.beginSaving();
         RuntimeException lastFailure = null;
         for (int attempt = 1; attempt <= Math.max(1, attempts); attempt++) {
             try {
+<<<<<<< HEAD
                 repository.saveSession(profile, lifeSkills);
+                session.acceptPersistedProfileRevision(profile.revision());
+=======
+                repository.saveProfile(profile);
+>>>>>>> parent of 14f4881 (complete mmo task)
                 session.clearDirty(captured);
-                if (!resuming) {
+                if (resuming) {
+                    session.savedAndResumed();
+                } else {
                     session.closed();
                 }
                 return;
@@ -271,11 +291,9 @@ public final class PlayerSessionService extends AbstractService implements LifeS
             }
         }
         // Retries exhausted: keep a durable record instead of losing the write.
-        PendingSave pending = new PendingSave(profile, lifeSkills);
-        pendingSaves.put(session.playerId(), pending);
-        pendingSaveStore.put(new PendingSessionSave(profile, lifeSkills));
+        pendingSaves.put(session.playerId(), profile);
+        session.saveRetryPending();
         if (!resuming) {
-            session.saveRetryPending();
             session.closed();
         }
         throw new MMOException(ErrorCode.STORAGE_FAILURE,
@@ -292,8 +310,5 @@ public final class PlayerSessionService extends AbstractService implements LifeS
     }
 
     private record Loaded(PlayerProfile profile, LifeSkillProfile lifeSkills) {
-    }
-
-    private record PendingSave(PlayerProfile profile, LifeSkillProfile lifeSkills) {
     }
 }

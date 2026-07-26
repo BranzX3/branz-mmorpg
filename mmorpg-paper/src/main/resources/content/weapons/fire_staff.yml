@@ -1,9 +1,0 @@
-type: weapon
-id: branz:fire_staff
-display-name: Fire Staff
-family-mastery: branz:fire_staff_mastery
-type-mastery: branz:pyromancer_staff_mastery
-basic-attack-skill: branz:basic_strike
-active-skills: [branz:fire_burst]
-tags: [staff, magic, fire]
-two-handed: true

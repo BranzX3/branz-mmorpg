@@ -11,7 +11,8 @@ class UuidIdGeneratorTest {
         UUID value = UUID.fromString("61bc8f4a-019c-40d3-b5f3-ae57d94d0ee4");
         UuidIdGenerator generator = new UuidIdGenerator(() -> value);
 
-        assertEquals(value, generator.newOperationId().value());
+        assertEquals(value, generator.newOperationId().playerUuid());
+        assertEquals("core", generator.newOperationId().subsystem());
         assertEquals(value, generator.newEventId().value());
     }
 }

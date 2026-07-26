@@ -3,7 +3,10 @@ package com.branz.mmorpg.storage;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Objects;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
@@ -29,6 +32,7 @@ public final class DatabaseManager implements AutoCloseable {
         hikari.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
         HikariDataSource dataSource = new HikariDataSource(hikari);
         try {
+            migrateLegacyHistoryTable(dataSource);
             Flyway.configure()
                     .dataSource(dataSource)
                     .locations("classpath:db/migration")
@@ -43,6 +47,52 @@ public final class DatabaseManager implements AutoCloseable {
         } catch (RuntimeException exception) {
             dataSource.close();
             throw exception;
+        }
+    }
+
+    /**
+     * Moves the pre-merge Flyway history to the project-specific name.
+     *
+     * <p>The legacy table is claimed only when it contains the exact Player
+     * Session V2 migration. A shared history owned by another plugin is left
+     * untouched and Flyway will fail closed instead of adopting foreign state.
+     */
+    private static void migrateLegacyHistoryTable(DataSource dataSource) {
+        try (Connection connection = dataSource.getConnection()) {
+            if (tableExists(connection, "mmorpg_schema_history")
+                    || !tableExists(connection, "flyway_schema_history")
+                    || !isLegacyBranzHistory(connection)) {
+                connection.rollback();
+                return;
+            }
+            try (Statement statement = connection.createStatement()) {
+                statement.executeUpdate(
+                        "RENAME TABLE flyway_schema_history TO mmorpg_schema_history");
+            }
+            connection.commit();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to migrate legacy Branz MMORPG Flyway history", exception);
+        }
+    }
+
+    private static boolean tableExists(Connection connection, String tableName) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT COUNT(*) FROM information_schema.tables "
+                        + "WHERE table_schema = DATABASE() AND table_name = ?")) {
+            statement.setString(1, tableName);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() && result.getInt(1) == 1;
+            }
+        }
+    }
+
+    private static boolean isLegacyBranzHistory(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT COUNT(*) FROM flyway_schema_history "
+                        + "WHERE version = '2' AND script = 'V2__player_profiles.sql' AND success = TRUE")) {
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() && result.getInt(1) == 1;
+            }
         }
     }
 
@@ -65,9 +115,6 @@ public final class DatabaseManager implements AutoCloseable {
                 }
                 if (exception instanceof SQLException sqlException) {
                     throw sqlException;
-                }
-                if (exception instanceof RuntimeException runtimeException) {
-                    throw runtimeException;
                 }
                 throw new SQLException("Database transaction failed", exception);
             }

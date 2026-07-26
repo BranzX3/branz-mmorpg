@@ -8,8 +8,6 @@ import com.branz.mmorpg.api.player.PlayerSession;
 import com.branz.mmorpg.api.player.SessionState;
 import com.branz.mmorpg.api.player.SessionToken;
 import java.util.EnumSet;
-import java.util.EnumMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -40,7 +38,7 @@ public final class RuntimePlayerSession implements PlayerSession {
     private final AtomicReference<SessionState> state = new AtomicReference<>(SessionState.ABSENT);
     private final AtomicReference<PlayerProfile> profile = new AtomicReference<>();
     private final AtomicReference<LifeSkillProfile> lifeSkills = new AtomicReference<>();
-    private final Map<DirtyComponent, Long> dirtyVersions = new EnumMap<>(DirtyComponent.class);
+    private final Set<DirtyComponent> dirty = EnumSet.noneOf(DirtyComponent.class);
     private volatile String loadFailure;
 
     public RuntimePlayerSession(SessionToken token, long contentRevision) {
@@ -148,6 +146,7 @@ public final class RuntimePlayerSession implements PlayerSession {
         markDirty(DirtyComponent.LIFE_SKILL);
     }
 
+<<<<<<< HEAD
     /** Reconciles a snapshot that storage has already committed; it is not dirty. */
     public void acceptPersistedLifeSkill(com.branz.mmorpg.api.lifeskill.LifeSkillSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
@@ -155,30 +154,30 @@ public final class RuntimePlayerSession implements PlayerSession {
         lifeSkills.updateAndGet(current -> current.with(snapshot));
     }
 
+    /** Advances the optimistic profile revision without overwriting changes made during the save. */
+    void acceptPersistedProfileRevision(long expectedRevision) {
+        profile.updateAndGet(current -> current.revision() == expectedRevision
+                ? current.withRevision(expectedRevision + 1)
+                : current);
+    }
+
+=======
+>>>>>>> parent of 14f4881 (complete mmo task)
     public void markDirty(DirtyComponent component) {
-        synchronized (dirtyVersions) {
-            dirtyVersions.merge(component, 1L, Long::sum);
+        synchronized (dirty) {
+            dirty.add(component);
         }
     }
 
     public Set<DirtyComponent> dirtyComponents() {
-        synchronized (dirtyVersions) {
-            return EnumSet.copyOf(dirtyVersions.isEmpty()
-                    ? EnumSet.noneOf(DirtyComponent.class)
-                    : dirtyVersions.keySet());
+        synchronized (dirty) {
+            return EnumSet.copyOf(dirty.isEmpty() ? EnumSet.noneOf(DirtyComponent.class) : dirty);
         }
     }
 
     public boolean hasUnsavedChanges() {
-        synchronized (dirtyVersions) {
-            return !dirtyVersions.isEmpty();
-        }
-    }
-
-    /** Component generations captured with an immutable save snapshot. */
-    Map<DirtyComponent, Long> dirtySnapshot() {
-        synchronized (dirtyVersions) {
-            return Map.copyOf(dirtyVersions);
+        synchronized (dirty) {
+            return !dirty.isEmpty();
         }
     }
 
@@ -187,11 +186,9 @@ public final class RuntimePlayerSession implements PlayerSession {
      * <em>during</em> the save survive, so a change made mid-flush is written by
      * the next save rather than lost.
      */
-    void clearDirty(Map<DirtyComponent, Long> saved) {
-        synchronized (dirtyVersions) {
-            saved.forEach((component, version) ->
-                    dirtyVersions.computeIfPresent(component,
-                            (key, current) -> current.equals(version) ? null : current));
+    void clearDirty(Set<DirtyComponent> saved) {
+        synchronized (dirty) {
+            dirty.removeAll(saved);
         }
     }
 

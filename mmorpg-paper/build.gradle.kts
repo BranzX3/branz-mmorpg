@@ -8,11 +8,8 @@ dependencies {
     implementation(project(":mmorpg-api"))
     implementation(project(":mmorpg-content"))
     implementation(project(":mmorpg-storage"))
-    implementation(project(":mmorpg-quest-paper"))
     implementation(project(":mmorpg-core"))
     compileOnly("io.papermc.paper:paper-api:26.2.build.+")
-    compileOnly(files("../../branz-wallet/build/libs/BranzWallet-1.0.0.jar"))
-    testImplementation(files("../../branz-wallet/build/libs/BranzWallet-1.0.0.jar"))
 }
 
 tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {

@@ -1,7 +1,0 @@
-type: material
-id: branz:aether_ingot
-display-name: Aether Ingot
-category: ingot
-rarity: uncommon
-tradable: true
-max-stack-size: 99

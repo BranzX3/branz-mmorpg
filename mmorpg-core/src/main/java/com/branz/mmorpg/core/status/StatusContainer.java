@@ -68,17 +68,7 @@ public final class StatusContainer {
         Instant expiry = expiryFor(definition, requestedDuration, ccResistance, now);
         StatusInstance existing = findByDefinition(definition.id());
 
-        if (definition.stackPolicy() == StackPolicy.INDEPENDENT_STACKS) {
-            if (countByDefinition(definition.id()) >= definition.maxStacks()) {
-                return StatusApplication.rejected(StatusApplication.Outcome.REJECTED_AT_CAP,
-                        definition.id() + " already has " + definition.maxStacks()
-                                + " independent stack(s)");
-            }
-            return StatusApplication.of(StatusApplication.Outcome.APPLIED,
-                    store(newInstance(definition, source, expiry, now)));
-        }
-
-        if (existing == null) {
+        if (existing == null || definition.stackPolicy() == StackPolicy.INDEPENDENT_STACKS) {
             return StatusApplication.of(StatusApplication.Outcome.APPLIED,
                     store(newInstance(definition, source, expiry, now)));
         }
@@ -229,12 +219,6 @@ public final class StatusContainer {
         return List.copyOf(instances.values());
     }
 
-    /** Restores a previously suspended runtime instance without reapplying it. */
-    void restore(StatusInstance instance) {
-        Objects.requireNonNull(instance, "instance");
-        instances.put(instance.instanceId(), instance);
-    }
-
     private StatusInstance store(StatusInstance instance) {
         instances.put(instance.instanceId(), instance);
         return instance;
@@ -254,12 +238,6 @@ public final class StatusContainer {
             }
         }
         return null;
-    }
-
-    private long countByDefinition(ContentId definitionId) {
-        return instances.values().stream()
-                .filter(instance -> instance.definitionId().equals(definitionId))
-                .count();
     }
 
     private static Instant expiryFor(StatusDefinition definition, Duration requestedDuration,

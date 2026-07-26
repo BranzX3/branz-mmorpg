@@ -1,9 +1,0 @@
-type: weapon
-id: branz:longbow
-display-name: Longbow
-family-mastery: branz:bow_mastery
-type-mastery: branz:longbow_mastery
-basic-attack-skill: branz:basic_strike
-active-skills: [branz:precise_shot]
-tags: [bow, ranged]
-two-handed: true

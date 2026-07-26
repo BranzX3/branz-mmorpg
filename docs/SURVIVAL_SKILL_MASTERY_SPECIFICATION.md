@@ -1,158 +1,96 @@
-# Branz MMORPG — Life Skill Mastery Specification
+# Branz MMORPG — Survival Skill Mastery Specification
 
-Status: Proposed
-Owner: Core MMO developer
-Depends on: Player Session, Content, Storage, Item, and Region systems
-Supersedes: the block-break model of the previous revision
+Status: Proposed  
+Owner: Core MMO developer  
+Depends on: Player Session, Content, Storage, Item, and Gathering systems
 
 ## 1. Purpose
 
-Life Skill Mastery is MMO progression earned from **MMO life-skill content**, not
-from ordinary Minecraft survival play. The world contains hand-placed
-**gathering nodes** — an ore vein, a herb patch, a fishing spot — and harvesting
-one is the only action that grants Life Skill XP. The model is BDO-style: nodes
-occupy fixed positions, are shared by everyone on the server, deplete when
-harvested, and respawn on a timer.
+Survival Skill Mastery turns normal Minecraft survival activities into MMO-style
+progression. Players gain experience from valid actions performed with Minecraft
+equipment, level individual Survival Skills, and spend points in a Mastery Tree.
 
-Breaking a stone block in the world is ordinary Minecraft. It grants nothing.
+The first implementation target is **Mining**:
 
-The first implementation target is **Mining**.
+- Breaking stone with a valid pickaxe grants 1 base Mining XP.
+- Rarer ores grant more Mining XP.
+- Player-placed or repeatedly exploited blocks do not provide normal XP.
+- Skill progression and rewards are controlled by the server.
 
-### 1.1 Why this model
+Survival Skill Mastery is separate from combat weapon mastery.
 
-The previous revision derived XP from block breaks anywhere in the world, which
-forced the engine to answer a question it cannot answer reliably: *was this block
-naturally generated, or did the player place it a moment ago?* Getting that wrong
-means place-break-place-break yields unlimited XP, and getting it right requires
-per-block origin tracking across restarts, world edits, and rollbacks.
+## 2. Initial Survival Skills
 
-Node-based gathering removes the question. A placed block is not a registered
-node, so it grants zero **by construction** rather than by heuristic. Throughput
-is bounded by respawn timers, which are content data, instead of by anti-exploit
-detection. This is both safer and considerably less work.
-
-## 2. Initial Life Skills
-
-| Skill | Tool | Node kinds |
+| Skill | Equipment | Eligible activities |
 |---|---|---|
-| Mining | Pickaxe | Ore veins, mineral deposits |
-| Woodcutting | Axe | Registered trees, sap taps |
-| Excavation | Shovel | Dig sites, ruins |
-| Foraging | Hoe or hand | Herb patches, wild crops |
-| Fishing | Fishing rod | Fishing spots |
+| Mining | Pickaxe | Stone, ores, mineral nodes |
+| Woodcutting | Axe | Logs, stems, registered trees |
+| Excavation | Shovel | Dirt, sand, gravel, clay |
+| Foraging | Hoe or hand | Crops, herbs, plants |
+| Fishing | Fishing rod | Fish, treasure, salvage |
 
-Mining is required for the first release. The others reuse the same engine and
-stay disabled until their node definitions and content exist.
+Mining is required for the first release. Other skills reuse the same engine and
+must remain disabled until their definitions and anti-exploit rules are ready.
 
-## 3. Gathering nodes
+## 3. Mining XP
 
-A node has two halves, and keeping them separate is the central design rule:
+Core evaluates a block break only after Paper confirms that the event was not
+cancelled. The client, item lore, NBT, and packets are never authoritative.
 
-| Half | What it is | Where it lives | Changes via |
-|---|---|---|---|
-| **Node definition** | Kind of node: skill, tier, XP, yields, tool, harvest time, respawn window | YAML content | `/branz reload` |
-| **Node instance** | One physical node at one coordinate | Database (world state) | admin commands |
+Suggested initial values:
 
-A definition is content and may be reloaded atomically. An instance is world
-state, survives reload untouched, and is never expressed in YAML — a content
-reload must never move, delete, or respawn a node that exists in the world.
+| Tier | Examples | Base XP |
+|---|---|---:|
+| Common | Stone, cobblestone, deepslate | 1 |
+| Uncommon | Coal ore, copper ore | 3 |
+| Rare | Iron ore, redstone ore, lapis ore | 6 |
+| Epic | Gold ore, diamond ore, emerald ore | 15 |
+| Legendary | Custom MMO ore or event mineral | 40+ |
 
-### 3.1 Instance record
+All values are data-driven. Silk Touch, Fortune, and additional item drops do
+not multiply mastery XP unless a content definition explicitly permits it.
 
-    node_instance_id
-    definition_id
-    world_uid, x, y, z
-    state
-    respawn_at
-    reserved_by, reserved_until
-    last_harvested_by, last_harvested_at
-    created_by, created_at
-
-### 3.2 Node lifecycle
-
-    AVAILABLE
-      -> RESERVED   (a player began harvesting)
-      -> DEPLETED   (harvest committed)
-      -> AVAILABLE  (respawn_at reached)
-
-    RESERVED -> AVAILABLE   (harvest interrupted or reservation expired)
-    any      -> BROKEN      (world no longer matches the definition)
-
-`BROKEN` is not a failure of the player's action; it is an operator alert. A node
-whose world block was removed by terrain editing must refuse to be harvested and
-appear in admin listings, never grant XP against a block that is not there.
-
-### 3.3 Contest and reservation
-
-Nodes are shared world objects. Competition for a rich vein is intended.
-
-Harvesting takes time (`harvest_time_ms`), and the node is **reserved at the
-start of the channel, not at the end**. Two players interacting in the same tick
-resolve through one atomic compare-and-set on node state: exactly one wins and
-begins channelling, the other is told the node is taken and loses nothing. The
-alternative — both channel, one is robbed at the finish — punishes a player for
-work already done and is rejected.
-
-Reservation rules:
-
-- A reservation carries `reserved_until = now + harvest_time_ms + grace`.
-- An expired reservation returns the node to AVAILABLE. A crashed or
-  disconnected player never locks a node permanently.
-- Interruption (moving beyond leash range, taking damage, swapping tools,
-  logging out) releases the reservation and grants nothing.
-- One player holds at most one reservation at a time.
-
-### 3.4 Harvest interaction
-
-Harvesting is an **interaction with the node's block, never a block break**. The
-block is not destroyed; on depletion its presentation swaps to the definition's
-depleted appearance and swaps back on respawn.
-
-This is deliberate: no block is broken, so there is nothing to restore, no
-interaction with world protection or rollback tooling, and no way for a
-half-completed harvest to leave a hole in the world. It also means node blocks
-can be protected against ordinary breaking wholesale — breaking a node block is
-simply denied.
-
-Harvest sequence:
-
-1. Player interacts with a node block.
-2. Server validates eligibility (§4) and atomically reserves the node.
-3. Channel runs for `harvest_time_ms`, reduced by mastery effects within caps.
-4. On completion, one transaction commits: node depleted with `respawn_at`,
-   yields granted, XP granted, audit written, events published.
-5. Any failure rolls back and releases the reservation. Partial credit does not
-   exist.
-
-## 4. Eligibility
-
-XP and yields are granted only when:
-
-1. The player has an ACTIVE MMO session.
-2. The target is a node instance in state AVAILABLE.
-3. The node's definition is enabled in the active content snapshot.
-4. The held tool matches the definition's required tool tag.
-5. The player meets the definition's required skill level and any region or
-   unlock requirement.
-6. Region, permission, and protection rules allow the interaction.
-7. The reservation was won by this player and has not expired.
-8. The harvest channel completed without interruption.
-9. The operation ID has not been processed before.
-
-A wrong tool produces a clear refusal message. It never silently grants zero.
-
-## 5. XP and throughput
+XP is calculated as:
 
     awarded_xp = floor(
         base_xp
-        * node_quality_multiplier
         * region_multiplier
-        * diminishing_multiplier
+        * node_quality_multiplier
+        * anti_farm_multiplier
         * event_multiplier
     )
 
-Every multiplier is finite, bounded, and recorded in audit data. The result is
-never negative.
+The result cannot be negative. Every multiplier must be finite, bounded, and
+included in audit data.
+
+## 4. Eligibility
+
+XP is granted only when:
+
+1. The player has an ACTIVE MMO session.
+2. The block has an enabled Survival Skill source definition.
+3. The held tool matches the configured tool or tool tag.
+4. The source is naturally generated or is a registered gathering node.
+5. World, region, permission, cooldown, and protection rules allow the action.
+6. The block break and its authoritative reward complete successfully.
+7. The operation ID has not been processed previously.
+
+Wrong tools may produce normal Minecraft behavior while granting zero mastery
+XP, unless the source definition requires the break to be rejected entirely.
+
+## 5. Anti-farm Rules
+
+- Player-placed blocks grant zero XP by default.
+- Plugin-restored or regenerated blocks must retain a trusted origin marker.
+- If valuable-block origin cannot be verified, rare-tier XP must not be granted.
+- Repeated actions in the same location and time window may receive decay.
+- Trivial sources may grant reduced or zero XP at high skill levels.
+- Admin preview, rollback, and test actions grant no normal XP.
+- One block break can produce at most one committed XP operation.
+- Implausible action rates generate staff telemetry.
+
+Anti-farm rejection stores an internal reason such as `PLACED_BLOCK`,
+`DUPLICATE_OPERATION`, `INVALID_TOOL`, `SOURCE_COOLDOWN`, or `RATE_LIMITED`.
 
 ### 5.1 Authoritative block origin
 
@@ -196,37 +134,13 @@ Origin records for non-natural blocks and registered nodes survive chunk unload
 and restart. Cleanup is keyed by world identity, chunk, block coordinates, and
 world-generation epoch so stale records cannot affect a recreated world.
 
+<<<<<<< HEAD
 ### 5.2 Suggested initial Mining tiers
+=======
+## 6. Levels and Skill Points
+>>>>>>> parent of 3846639 (74)
 
-| Tier | Example node | Base XP | Respawn |
-|---|---|---:|---|
-| Common | Stone deposit | 1 | 30s |
-| Uncommon | Coal vein | 3 | 60s |
-| Rare | Iron vein | 6 | 3m |
-| Epic | Diamond vein | 15 | 10m |
-| Legendary | Event mineral | 40+ | 30m+ |
-
-**Respawn timers are the throughput cap.** A region's XP per hour is the sum of
-its nodes divided by their respawn windows, which is a number content designers
-can compute in advance rather than discover after launch.
-
-Because throughput is already bounded, anti-farm rules stay minimal:
-
-- Optional per-player diminishing returns for repeatedly harvesting the same
-  node instance within a window, so camping one respawn is worse than rotating.
-- Trivial-tier nodes may grant reduced XP at high skill level.
-- Admin preview, test, and rollback actions grant nothing.
-- One harvest commits at most one XP operation.
-- Implausible harvest rates raise staff telemetry rather than silently
-  cancelling, so automation is investigated instead of guessed at.
-
-Rejections record a reason: `NODE_TAKEN`, `NODE_DEPLETED`, `INVALID_TOOL`,
-`LEVEL_TOO_LOW`, `INTERRUPTED`, `DUPLICATE_OPERATION`, `RATE_LIMITED`,
-`NODE_BROKEN`.
-
-## 6. Levels and skill points
-
-Each Life Skill stores independent total XP, level, unspent points, unlocked
+Each Survival Skill stores independent total XP, level, unspent points, unlocked
 nodes, and content revision.
 
 The level curve is a **cumulative total-XP threshold**. A player reaches level
@@ -261,13 +175,16 @@ enabled. Overflow, negative grants through the normal gameplay API, NaN
 multipliers, and non-finite formula inputs are rejected. Administrative revoke
 or repair is a separate audited operation and cannot reduce a level or invalidate
 an unlocked node unless an explicit reset policy permits it.
+<<<<<<< HEAD
+=======
 
-A respec, if enabled, is transactional, audited, has an explicit cost, and never
-leaves a partially reset tree.
+A respec, if enabled, must be transactional, audited, have an explicit cost,
+and never leave the player with a partially reset tree.
+>>>>>>> parent of 3846639 (74)
 
-## 7. Mastery tree
+## 7. Mastery Tree
 
-Each skill owns a directed acyclic graph of mastery nodes containing:
+Each skill owns a directed acyclic graph of mastery nodes. A node contains:
 
 - Stable content ID and display metadata
 - Maximum rank and point cost
@@ -286,18 +203,19 @@ Initial Mining example:
     └─ Deep Delver (1 rank)
        └─ Geologist (3 ranks)
 
+Suggested effects:
+
 | Node | Effect |
 |---|---|
-| Stoneworker | Reduces harvest time on common nodes, capped |
+| Stoneworker | +2% mining speed per rank for common blocks |
 | Efficient Swing | Reduces configured tool or stamina cost |
-| Ore Sense | Bounded hint toward nearby AVAILABLE rare nodes |
-| Prospector | Small capped chance of bonus yield |
+| Ore Sense | Shows a bounded hint for nearby eligible rare nodes |
+| Prospector | Small capped chance for configured bonus material |
 | Deep Delver | Unlocks configured deep-region nodes |
-| Geologist | Chance of configured by-products |
+| Geologist | Chance to obtain configured geology by-products |
 
-Tree effects cannot bypass region protection, mint currency, execute console
-commands, reduce harvest time to zero, or create unbounded yield, XP, speed, or
-damage multipliers.
+Tree effects cannot bypass region protection, mint arbitrary currency, execute
+console commands, or create unbounded item, speed, XP, or damage multipliers.
 
 ### 7.1 Tree revision and migration
 
@@ -320,68 +238,71 @@ target revision. A failed player migration leaves that player on the previous
 revision and disables new tree mutations until repair; it does not partially
 apply ranks, effects, or refunds.
 
+<<<<<<< HEAD
 ## 8. Content definitions
+=======
+## 8. Content Definitions
+>>>>>>> parent of 3846639 (74)
 
-Node definition:
+Example gathering source:
 
 ```yaml
-id: branz:iron_vein
-type: gathering_node
+id: branz:diamond_ore_mining
+type: survival_gathering
 skill: branz:mining
-tier: rare
-base_xp: 6
+block: minecraft:diamond_ore
 required_tool_tag: branz:pickaxe
-required_level: 10
-harvest_time_ms: 3200
-respawn_seconds: 180
-respawn_jitter_seconds: 30
-presentation:
-  available_block: minecraft:iron_ore
-  depleted_block: minecraft:stone
-  hologram: "<gray>Iron Vein"
-yields:
-  - item: branz:raw_iron_chunk
-    amount: [1, 3]
-  - item: branz:geode_fragment
-    amount: [1, 1]
-    chance: 0.05
+tier: epic
+base_xp: 15
+eligible_origins: [NATURAL, REGISTERED_NODE]
 ```
 
-Mastery tree node:
+Example tree node:
 
 ```yaml
 id: branz:mining_stoneworker
-type: life_skill_node
+type: survival_skill_node
 skill: branz:mining
 max_rank: 3
 point_cost_per_rank: 1
 requires_level: 2
 effect:
-  type: harvest_time_reduction
+  type: gathering_speed_bonus
   target_tags: [branz:common_mining]
   percent_per_rank: 2
   cap_percent: 6
 ```
 
-Reload validation rejects duplicate IDs, unknown skills, unknown tools, tags, or
-items, negative XP, non-positive harvest or respawn times, cyclic trees,
-unreachable nodes, invalid prerequisites, and unbounded effects. A failed reload
-retains the previous snapshot.
+Reload validation rejects duplicate IDs, unknown skills, unknown tools or tags,
+negative XP, cyclic trees, unreachable nodes, invalid prerequisites, and
+unbounded effects. Failed reload retains the previous content snapshot.
 
-**Reload against live instances**: if a reload removes a definition that placed
-instances still reference, those instances become BROKEN and are reported. The
-reload is not rejected for this — world state is not content — but the operator
-is told exactly which instances are now orphaned.
+## 9. Persistence and Transactions
 
-## 9. Persistence and transactions
+Skill progress is keyed by player UUID and skill ID:
 
+<<<<<<< HEAD
 Skill progress keyed by player UUID and skill ID:
 
     player_uuid, skill_id, level, total_xp, unspent_points,
     schema_version, tree_revision, updated_at
+=======
+    player_uuid
+    skill_id
+    level
+    total_xp
+    unspent_points
+    schema_version
+    tree_revision
+    updated_at
 
-Node ranks keyed by player UUID, skill ID, and node ID. Node instances as in
-§3.1.
+Node ranks are keyed by player UUID, skill ID, and node ID.
+>>>>>>> parent of 3846639 (74)
+
+XP grants, level-ups, point grants, node purchases, and respecs require unique
+operation IDs. Progress, audit data, and domain events are committed atomically.
+Retrying an operation returns its original result without granting anything
+twice.
 
 Operation-result and outbox retention must be longer than the maximum supported
 retry/recovery window. Purging requires a recorded high-water mark and cannot
@@ -390,6 +311,7 @@ remove an operation that may still be retried by an active recovery job.
 Database failure follows the normal fail-closed player-session policy. The
 system must not substitute a blank profile or grant speculative XP.
 
+<<<<<<< HEAD
 - Harvest commits node depletion, yields, XP, audit, and events in one
   transaction. There is no state in which the node is depleted but the player
   was not paid.
@@ -403,6 +325,8 @@ system must not substitute a blank profile or grant speculative XP.
 - Storage failure follows the fail-closed session policy: no blank profile, no
   speculative XP.
 
+=======
+>>>>>>> parent of 3846639 (74)
 ## 10. Events and API
 
 Core publishes immutable events after the authoritative transaction commits.
@@ -415,30 +339,32 @@ event version, timestamp, aggregate sequence, and content revision.
 | SurvivalXpGranted | Player, skill, source, base XP, multipliers, awarded XP, resulting total XP |
 | SurvivalSkillLevelChanged | Player, skill, old/new level, total XP, points granted |
 | SurvivalSkillNodeUnlocked | Player, skill, node, old/new rank, points spent, points remaining |
+<<<<<<< HEAD
 | GatheringNodeHarvested | Node instance, definition, harvester, yields, respawn_at |
 | GatheringNodeRespawned | Node instance, definition, timestamp |
+=======
+>>>>>>> parent of 3846639 (74)
 
-Quest and Paper consume `mmorpg-api` contracts only.
+Quest and Paper consume public contracts from `mmorpg-api` and must not import
+Core implementation classes.
 
-## 11. UI and administration
+## 11. UI and Administration
 
-Player UI shows skill level, XP progress, available points, mastery ranks,
-requirements, and recent gains. Updates are event-driven and coalesced. A
-reserved node shows its channel progress; a depleted node shows its respawn.
+The player UI shows skill level, XP progress, available points, node ranks,
+requirements, and recent XP gains. Updates are event-driven and coalesced.
 
-Node authoring commands — nodes are placed by hand, so these are the primary
-content-creation tool and deserve to be good:
+Required admin commands:
 
-    /branz node place <definitionId>          place at the targeted block
-    /branz node remove                        remove the targeted node
-    /branz node move                          move the targeted node to your target block
-    /branz node inspect                       definition, state, respawn, last harvester
-    /branz node list <definitionId|region>    listing with coordinates
-    /branz node respawn <all|targeted>        force respawn, audited
-    /branz node broken                        every BROKEN instance, for repair
+    /branz survival inspect <player> [skill]
+    /branz survival grant-xp <player> <skill> <amount> <reason>
+    /branz survival tree <player> <skill>
+    /branz survival reset <player> <skill> <reason>
+    /branz survival source inspect <player>
 
-Progression commands:
+Mutation commands require permission, reason, and audit records. Reset requires
+explicit confirmation.
 
+<<<<<<< HEAD
     /branz life inspect <player> [skill]
     /branz life grant-xp <player> <skill> <amount> <reason>
     /branz life tree <player> <skill>
@@ -447,6 +373,8 @@ Progression commands:
 Mutating commands require permission, a reason, and an audit record. Reset
 requires explicit confirmation.
 
+=======
+>>>>>>> parent of 3846639 (74)
 ## 12. Performance Budget
 
 - Survival processing attributable to one accepted block break targets under
@@ -481,6 +409,7 @@ requires explicit confirmation.
 - Tree revision migration is idempotent and cannot partially refund or apply ranks.
 - Piston movement preserves placed-block origin across source and destination.
 - Unknown rare-source origin grants no rare-tier XP.
+<<<<<<< HEAD
 - Harvesting a registered node grants exactly its configured XP.
 - A rare node grants more than a common node.
 - A depleted node grants nothing until `respawn_at` has passed.
@@ -497,9 +426,9 @@ requires explicit confirmation.
   instead of granting XP against a missing block.
 - Server restart preserves respawn timers; nodes neither all respawn at once nor
   stay depleted forever.
+=======
+>>>>>>> parent of 3846639 (74)
 - Logout, reconnect, reload, failed save, and shutdown preserve progress.
-- Pure Java tests cover XP formulas, levels, trees, reservation state machine,
-  and idempotency.
-- Paper smoke tests cover harvest, contest, interruption, depletion, respawn,
-  wrong tool, and a broken node.
+- Pure Java tests cover formulas, levels, trees, and idempotency.
+- Paper smoke tests cover valid, invalid, placed, and cancelled block breaks.
 - No SQL, filesystem access, or content parsing occurs on a Paper tick thread.

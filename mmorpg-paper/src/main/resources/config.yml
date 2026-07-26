@@ -11,13 +11,13 @@ database:
 content:
   directory: content
 
-<<<<<<< HEAD
 player-session:
   worker-threads: 2
   autosave-interval-ticks: 6000
   save-max-attempts: 3
   recovery-directory: recovery/player-profiles
   shutdown-timeout-millis: 5000
+<<<<<<< HEAD
 
 quest:
   directory: quest-content
@@ -36,3 +36,5 @@ player:
   duplicate-login: CLOSE_PREVIOUS
   # Periodic save of dirty sessions. Minimum 30s.
   autosave-seconds: 300
+=======
+>>>>>>> parent of 3846639 (74)

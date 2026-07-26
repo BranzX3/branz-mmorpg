@@ -97,7 +97,7 @@ class MySqlPlayerProfileStoreIntegrationTest {
                 created.schemaVersion(),
                 created.createdAt(),
                 LATER,
-                Optional.of(ContentId.parse("branz:warrior")),
+                Optional.empty(),
                 Optional.of(ContentId.parse("branz:warrior/starter")),
                 Optional.of(ContentId.parse("branz:spawn/tutorial")),
                 Map.of("hud", "compact", "language", "th_TH"),
@@ -110,7 +110,7 @@ class MySqlPlayerProfileStoreIntegrationTest {
         assertEquals(0, created.revision());
         assertEquals(1, saved.revision());
         assertEquals("Renamed", reloaded.lastKnownName());
-        assertEquals(ContentId.parse("branz:warrior"), reloaded.classId().orElseThrow());
+        assertTrue(reloaded.classId().isEmpty());
         assertEquals(ContentId.parse("branz:warrior/starter"), reloaded.selectedLoadoutId().orElseThrow());
         assertEquals(ContentId.parse("branz:spawn/tutorial"), reloaded.respawnPointId().orElseThrow());
         assertEquals(changed.settings(), reloaded.settings());

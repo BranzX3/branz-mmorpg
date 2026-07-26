@@ -19,18 +19,18 @@ base-attributes:
   crowd_control_resistance: 0.05
 primary-resource: energy
 secondary-resources: []
-allowed-weapon-tags: [bow, ranged]
+allowed-weapon-tags: [dagger, melee]
 allowed-armor-tags: [light, medium]
-class-skills: [branz:precise_shot, branz:smoke_veil]
+class-skills: [branz:eviscerate, branz:smoke_veil]
 ultimate-skill: branz:shadow_step
 passive-root-node: branz:rogue_root
 starter-grant:
   id: branz:rogue_starter
   revision: 1
-  weapon: branz:longbow
-  unlocked-skills: [branz:basic_strike, branz:precise_shot]
+  weapon: branz:daggers
+  unlocked-skills: [branz:dagger_strike, branz:dagger_flurry, branz:throwing_knife, branz:eviscerate]
   additional-items: {}
-tags: [physical, ranged, mobile]
+tags: [physical, melee, mobile]
 maximum-level: 100
 xp-curve-base: 100
 xp-curve-exponent: 1.65

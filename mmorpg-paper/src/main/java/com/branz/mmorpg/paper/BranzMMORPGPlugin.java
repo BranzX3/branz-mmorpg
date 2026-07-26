@@ -53,6 +53,7 @@ import com.branz.mmorpg.core.item.DefaultLoadoutService;
 import com.branz.mmorpg.core.item.DefaultInventoryService;
 import com.branz.mmorpg.core.item.DefaultLootService;
 import com.branz.mmorpg.core.item.DefaultEquipmentService;
+import com.branz.mmorpg.core.item.StarterKitDeliveryService;
 import com.branz.mmorpg.core.gathering.DefaultGatheringService;
 import com.branz.mmorpg.core.crafting.DefaultCraftingService;
 import com.branz.mmorpg.core.encounter.DefaultEncounterService;
@@ -77,6 +78,8 @@ import com.branz.mmorpg.storage.JdbcMobRepository;
 import com.branz.mmorpg.storage.JdbcEncounterRepository;
 import com.branz.mmorpg.storage.JdbcPartyRepository;
 import com.branz.mmorpg.storage.JdbcTradeRepository;
+import com.branz.mmorpg.storage.JdbcPendingSlotItemRepository;
+import com.branz.mmorpg.storage.JdbcStarterKitDeliveryRepository;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
@@ -129,6 +132,7 @@ public class BranzMMORPGPlugin extends JavaPlugin {
     private PaperSkillRuntime skillRuntime;
     private PaperStatusRuntime statusRuntime;
     private PaperItemRuntime itemRuntime;
+    private PaperClassCompassRuntime classCompassRuntime;
     private PaperGatheringRuntime gatheringRuntime;
     private PaperCraftingRuntime craftingRuntime;
     private PaperMobRuntime mobRuntime;
@@ -240,13 +244,6 @@ public class BranzMMORPGPlugin extends JavaPlugin {
             serviceContainer.startAll();
 
             if (sessionService != null) {
-                getServer().getPluginManager()
-                        .registerEvents(new PlayerSessionListener(
-                                this, sessionService, attributeService,
-                                this::activateCombatProfile, playerId -> {
-                                    characterClassProgression.forget(playerId);
-                                    combatMasteryService.forget(playerId);
-                                }), this);
                 combatRuntime = new PaperCombatRuntime(
                         this, sessionService, attributeService, combatPolicy());
                 loadoutService = new DefaultLoadoutService(sessionService,
@@ -267,6 +264,23 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                         this, sessionService, inventoryService, contentService,
                         readItemTokenSecret());
                 getServer().getPluginManager().registerEvents(itemRuntime, this);
+                StarterKitDeliveryService starterKitDelivery = new StarterKitDeliveryService(
+                        new JdbcStarterKitDeliveryRepository(databaseManager), inventoryService,
+                        equipmentService, loadoutService, sessionService, contentService,
+                        new SystemGameClock());
+                classCompassRuntime = new PaperClassCompassRuntime(
+                        this, sessionService, contentService, characterClassService,
+                        characterClassProgression, starterKitDelivery,
+                        new JdbcPendingSlotItemRepository(databaseManager), itemRuntime,
+                        scheduler, readItemTokenSecret());
+                getServer().getPluginManager().registerEvents(classCompassRuntime, this);
+                getServer().getPluginManager().registerEvents(new PlayerSessionListener(
+                        this, sessionService, attributeService,
+                        this::activateCombatProfile, classCompassRuntime::sessionReady,
+                        playerId -> {
+                            characterClassProgression.forget(playerId);
+                            combatMasteryService.forget(playerId);
+                        }), this);
                 gatheringRuntime = new PaperGatheringRuntime(
                         this, gatheringService, contentService, scheduler, itemRuntime);
                 getServer().getPluginManager().registerEvents(gatheringRuntime, this);
@@ -288,6 +302,7 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                         this, sessionService, contentService, combatRuntime, statusRuntime,
                         loadoutService, itemRuntime, telemetryService, attributeService,
                         characterClassProgression);
+                skillRuntime.inputReserved(classCompassRuntime::isHeldCompass);
                 combatRuntime.basicAttackHandler(skillRuntime::basicAttack);
                 combatRuntime.damageListener(this::rewardCombatDamage);
                 getServer().getPluginManager().registerEvents(skillRuntime, this);
@@ -567,7 +582,14 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 "content/skills/mana_shield.yml",
                 "content/skills/meteor.yml",
                 "content/skills/smoke_veil.yml",
-                "content/skills/shadow_step.yml",
+                        "content/skills/shadow_step.yml",
+                        "content/skills/shield_bash.yml",
+                        "content/skills/fire_bolt.yml",
+                        "content/skills/flame_dash.yml",
+                        "content/skills/dagger_strike.yml",
+                        "content/skills/dagger_flurry.yml",
+                        "content/skills/throwing_knife.yml",
+                        "content/skills/eviscerate.yml",
                 "content/classes/warrior.yml",
                 "content/classes/mage.yml",
                 "content/classes/rogue.yml",
@@ -592,16 +614,21 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 "content/masteries/bow.yml",
                 "content/masteries/longbow.yml",
                 "content/masteries/fire_staff.yml",
-                "content/masteries/pyromancer_staff.yml",
+                        "content/masteries/pyromancer_staff.yml",
+                        "content/masteries/dagger.yml",
+                        "content/masteries/dual_daggers.yml",
                 "content/mastery_trees/sword_edge.yml",
                 "content/mastery_trees/broadsword_guard.yml",
                 "content/mastery_trees/bow_precision.yml",
                 "content/mastery_trees/longbow_draw.yml",
                 "content/mastery_trees/staff_focus.yml",
-                "content/mastery_trees/pyromancer_burn.yml",
+                        "content/mastery_trees/pyromancer_burn.yml",
+                        "content/mastery_trees/dagger_agility.yml",
+                        "content/mastery_trees/dual_daggers_combo.yml",
                 "content/weapons/broadsword.yml",
                 "content/weapons/longbow.yml",
-                "content/weapons/fire_staff.yml",
+                        "content/weapons/fire_staff.yml",
+                        "content/weapons/daggers.yml",
                 "content/loot/aether_cache.yml",
                 "content/gathering/aether_deposit.yml",
                 "content/professions/blacksmithing.yml",

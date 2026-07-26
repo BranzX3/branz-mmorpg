@@ -1,6 +1,7 @@
 package com.branz.mmorpg.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,6 +14,8 @@ import com.branz.mmorpg.api.content.ContentId;
 import com.branz.mmorpg.api.error.ErrorCode;
 import com.branz.mmorpg.api.error.MMOException;
 import com.branz.mmorpg.api.operation.OperationId;
+import com.branz.mmorpg.api.item.PendingSlotItem;
+import com.branz.mmorpg.api.item.StarterKitDelivery;
 import com.branz.mmorpg.api.skill.ResourceType;
 import java.time.Instant;
 import java.util.List;
@@ -29,6 +32,8 @@ class JdbcCharacterClassSelectionRepositoryIntegrationTest {
     private DatabaseManager database;
     private JdbcPlayerProfileRepository profiles;
     private JdbcCharacterClassSelectionRepository selections;
+    private JdbcStarterKitDeliveryRepository starterDeliveries;
+    private JdbcPendingSlotItemRepository pendingSlots;
 
     @BeforeEach void connect() {
         database = DatabaseManager.connect(new DatabaseConfig(
@@ -39,6 +44,8 @@ class JdbcCharacterClassSelectionRepositoryIntegrationTest {
                 environment("BRANZ_MYSQL_PASSWORD", ""), 4, 5000));
         profiles = new JdbcPlayerProfileRepository(database);
         selections = new JdbcCharacterClassSelectionRepository(database);
+        starterDeliveries = new JdbcStarterKitDeliveryRepository(database);
+        pendingSlots = new JdbcPendingSlotItemRepository(database);
     }
 
     @AfterEach void close() { if (database != null) database.close(); }
@@ -60,6 +67,16 @@ class JdbcCharacterClassSelectionRepositoryIntegrationTest {
         assertEquals(first.starterGrantPlan(), retry.starterGrantPlan());
         assertEquals(CharacterClassId.WARRIOR.value(),
                 profiles.loadOrCreate(player, "I3Test").classId().orElseThrow());
+        StarterKitDelivery delivery = starterDeliveries.find(player).orElseThrow();
+        assertEquals(operation, delivery.selectionOperationId());
+        assertEquals(ContentId.parse("branz:broadsword"), delivery.weaponId());
+        assertEquals(StarterKitDelivery.State.PENDING, delivery.state());
+        assertTrue(starterDeliveries.markDelivered(player,
+                Instant.parse("2026-07-26T10:00:02Z")));
+        assertFalse(starterDeliveries.markDelivered(player,
+                Instant.parse("2026-07-26T10:00:03Z")));
+        assertEquals(StarterKitDelivery.State.DELIVERED,
+                starterDeliveries.find(player).orElseThrow().state());
 
         MMOException permanent = assertThrows(MMOException.class, () -> selections.select(
                 player, first.snapshot().profileRevision(),
@@ -68,7 +85,24 @@ class JdbcCharacterClassSelectionRepositoryIntegrationTest {
         assertEquals(ErrorCode.INVALID_ARGUMENT, permanent.code());
     }
 
-    private static CharacterClassDefinition warrior() {
+    @Test
+    void reservedSlotPayloadIsDurableAndIdempotent() {
+        UUID player = UUID.randomUUID();
+        profiles.loadOrCreate(player, "SlotTest");
+        byte[] payload = {1, 3, 3, 7};
+        PendingSlotItem item = new PendingSlotItem(player, UUID.randomUUID(), payload,
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                Instant.parse("2026-07-26T11:00:00Z"));
+
+        pendingSlots.store(item);
+        PendingSlotItem replay = pendingSlots.store(item);
+
+        assertEquals(item.deliveryId(), replay.deliveryId());
+        assertEquals(item.payloadHash(), replay.payloadHash());
+        assertArrayEquals(payload, pendingSlots.find(player).orElseThrow().payload());
+    }
+
+    static CharacterClassDefinition warrior() {
         StarterGrantPlan starter = new StarterGrantPlan(ContentId.parse("branz:warrior_starter"),
                 1, ContentId.parse("branz:broadsword"),
                 List.of(ContentId.parse("branz:basic_strike")), Map.of());

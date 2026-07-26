@@ -28,7 +28,7 @@ starter-grant:
   id: branz:mage_starter
   revision: 1
   weapon: branz:fire_staff
-  unlocked-skills: [branz:basic_strike, branz:fire_burst]
+  unlocked-skills: [branz:fire_bolt, branz:fire_burst, branz:flame_dash]
   additional-items: {}
 tags: [magic, ranged]
 maximum-level: 100

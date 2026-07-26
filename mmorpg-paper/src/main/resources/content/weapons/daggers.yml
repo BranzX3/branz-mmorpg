@@ -1,0 +1,12 @@
+type: weapon
+id: branz:daggers
+display-name: Twin Daggers
+family-mastery: branz:dagger_mastery
+type-mastery: branz:dual_daggers_mastery
+basic-attack-skill: branz:dagger_strike
+active-skills: [branz:dagger_flurry, branz:throwing_knife]
+tags: [dagger, melee, rogue]
+two-handed: true
+family-xp-share: 0.40
+type-xp-share: 0.60
+skill-xp-share: 0.0

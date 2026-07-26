@@ -1,0 +1,9 @@
+type: combat_mastery
+id: branz:dagger_mastery
+display-name: Dagger Mastery
+kind: family
+maximum-level: 100
+curve-base: 100
+curve-exponent: 1.65
+maximum-power-bonus: 0.20
+tree-revision: 1

@@ -9,6 +9,7 @@ import com.branz.mmorpg.api.error.MMOException;
 import com.branz.mmorpg.api.lifeskill.LifeSkillProfile;
 import com.branz.mmorpg.api.lifeskill.LifeSkillProgress;
 import com.branz.mmorpg.api.lifeskill.LifeSkillSnapshot;
+import com.branz.mmorpg.api.operation.OperationId;
 import com.branz.mmorpg.api.player.PlayerProfile;
 import java.time.Instant;
 import java.util.Map;
@@ -53,21 +54,26 @@ class JdbcPlayerProfileRepositoryIntegrationTest {
         Instant now = Instant.parse("2026-07-26T12:00:00Z");
 
         PlayerProfile created = repository.loadOrCreate(playerId, "MergeTest");
+        new JdbcCharacterClassSelectionRepository(database).select(
+                playerId, created.revision(),
+                OperationId.of("class", "selection", playerId, "profile-integration"),
+                JdbcCharacterClassSelectionRepositoryIntegrationTest.warrior(), 9, now);
+        PlayerProfile selected = repository.loadOrCreate(playerId, "MergeTest");
         PlayerProfile changed = new PlayerProfile(
                 playerId,
                 "MergeTest",
-                created.schemaVersion(),
-                created.createdAt(),
+                selected.schemaVersion(),
+                selected.createdAt(),
                 now,
-                Optional.of(warrior),
+                selected.classId(),
                 Optional.of(ContentId.parse("branz:warrior/starter")),
                 Optional.empty(),
                 Map.of("language", "th_TH"),
-                created.revision());
+                selected.revision());
         repository.saveProfile(changed);
 
         PlayerProfile saved = repository.loadOrCreate(playerId, "MergeTest");
-        assertEquals(1, saved.revision());
+        assertEquals(2, saved.revision());
         assertEquals(warrior, saved.classId().orElseThrow());
         assertEquals("th_TH", saved.setting("language", "missing"));
 
@@ -79,7 +85,7 @@ class JdbcPlayerProfileRepositoryIntegrationTest {
         repository.saveSession(saved.withSetting("hud", "compact"), lifeSkills);
 
         PlayerProfile sessionProfile = repository.loadOrCreate(playerId, "MergeTest");
-        assertEquals(2, sessionProfile.revision());
+        assertEquals(3, sessionProfile.revision());
         assertEquals("compact", sessionProfile.setting("hud", "missing"));
         assertEquals(412, repository.loadLifeSkills(playerId).skill(mining).totalXp());
     }

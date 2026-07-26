@@ -31,16 +31,19 @@ public final class PlayerSessionListener implements Listener {
     private final PlayerSessionService sessions;
     private final PlayerAttributeService attributes;
     private final Consumer<UUID> playerActivator;
+    private final Consumer<UUID> sessionReady;
     private final Consumer<UUID> sessionCleanup;
 
     public PlayerSessionListener(JavaPlugin plugin, PlayerSessionService sessions,
                                  PlayerAttributeService attributes,
                                  Consumer<UUID> playerActivator,
+                                 Consumer<UUID> sessionReady,
                                  Consumer<UUID> sessionCleanup) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.attributes = Objects.requireNonNull(attributes, "attributes");
         this.playerActivator = Objects.requireNonNull(playerActivator, "playerActivator");
+        this.sessionReady = Objects.requireNonNull(sessionReady, "sessionReady");
         this.sessionCleanup = Objects.requireNonNull(sessionCleanup, "sessionCleanup");
     }
 
@@ -53,13 +56,16 @@ public final class PlayerSessionListener implements Listener {
                 plugin.getLogger().log(Level.SEVERE,
                         "MMO session load failed for " + name + " (" + playerId
                                 + "); MMO features stay disabled for this player", failure);
-            } else if (session.profile().classId().isPresent()) {
+            } else {
                 try {
-                    playerActivator.accept(playerId);
+                    if (session.profile().classId().isPresent()) {
+                        playerActivator.accept(playerId);
+                    }
+                    sessionReady.accept(playerId);
                 } catch (RuntimeException activationFailure) {
                     plugin.getLogger().log(Level.SEVERE,
-                            "MMO combat profile activation failed for " + name + " ("
-                                    + playerId + "); MMO combat stays disabled",
+                            "MMO post-login activation failed for " + name + " ("
+                                    + playerId + "); dependent MMO features stay disabled",
                             activationFailure);
                 }
             }

@@ -24,9 +24,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -59,19 +60,20 @@ public final class PaperItemRuntime implements Listener {
         signatureKey = new NamespacedKey(plugin, "token_signature");
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onJoin(PlayerJoinEvent event) {
-        UUID playerId = event.getPlayer().getUniqueId();
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            if (sessions.session(playerId).map(session -> session.playable()).orElse(false)) {
-                reconcile(event.getPlayer());
-            }
-        }, 20L);
-    }
-
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         snapshots.remove(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler
+    public void onDeath(PlayerDeathEvent event) {
+        event.getDrops().removeIf(this::hasToken);
+    }
+
+    @EventHandler
+    public void onRespawn(PlayerRespawnEvent event) {
+        plugin.getServer().getScheduler().runTask(plugin,
+                () -> reconcile(event.getPlayer()));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

@@ -1,0 +1,19 @@
+type: skill
+id: branz:eviscerate
+display-name: Eviscerate
+input-slot: class-1
+tags: [class, rogue, dagger]
+cast-ms: 150
+active-ms: 80
+recovery-ms: 300
+cooldown-ms: 7000
+cooldown-group: rogue-eviscerate
+costs: {ENERGY: 35}
+interrupt-refund: 0.5
+range: 3.5
+requires-line-of-sight: true
+root-effect: combo
+effects:
+  - {id: combo, type: sequence, children: [hit, bleed]}
+  - {id: hit, type: damage, numbers: {power: 52}, values: {type: physical}}
+  - {id: bleed, type: apply_status, values: {status: "branz:bleed"}}

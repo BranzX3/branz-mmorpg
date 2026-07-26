@@ -393,7 +393,7 @@ measured acceptance gate exist.
 Work proceeds in this order unless a fake port allows explicitly parallel pure
 Java development:
 
-Current execution status: **I0-I6 complete; I7 is next. I7-I10 contain merged
+Current execution status: **I0-I7 complete; I8 is next. I8-I10 contain merged
 implementations but remain pending until their gates are audited against the
 permanent-class integration.**
 
@@ -413,8 +413,8 @@ requires an ACTIVE token, explicit permanent-choice confirmation, and matching
 profile/content revisions. The MySQL transaction locks the profile, stores class
 metadata and the starter plan with an audit record, and returns the original
 result for an operation retry without publishing or granting twice. Legacy
-`class_id` rows are backfilled and remain permanent. Compass rendering and
-physical starter-item delivery remain owned by I7.
+`class_id` rows are backfilled and remain permanent. I7 now consumes the stored
+starter plan through a durable exact-once delivery record.
 
 I4 is complete: the deterministic flat/additive-percent/multiplicative modifier
 pipeline now rejects non-finite values and overflow, enforces documented caps,
@@ -455,6 +455,22 @@ rejected hits, PvP, and zero effective damage award nothing. Flyway V19/V20 and
 environment-gated MySQL round-trip/idempotency tests cover the new persistence.
 The clean release gate passed 264 tests with zero failures (13 environment-gated
 tests skipped) and produced the shaded Paper plugin JAR.
+
+I7 is complete: class selection creates a durable starter-kit outbox in the same
+MySQL transaction as the permanent choice. Delivery grants one bound authoritative
+weapon, routes C7 overflow through pending inventory, and idempotently equips the
+matching loadout on retry or reconnect. ACTIVE sessions reconcile a signed,
+owner/session-bound compass at Bukkit slot index 8; occupied normal items move to
+free storage or an opaque durable pending-delivery row before the compass is
+placed. Duplicate/tampered tokens, clicks, number swaps, drags, off-hand swaps,
+drops, death, respawn, world changes, stale menus, double clicks, and combat-input
+collisions fail closed. The selection preview/confirmation and authoritative
+Skill Tree inventories are live, while all storage mutations remain off the Paper
+thread. Warrior/Broadsword, Mage/Fire Staff, and Rogue/Daggers now each ship a
+compatible basic attack, two weapon actions, class actions, ultimate, and
+family/type mastery path. Flyway V21 and the full storage suite passed against
+MySQL 8.0.46. The clean release gate passed 270 tests with zero failures (14
+environment-gated tests skipped) and produced the shaded Paper plugin JAR.
 
 | Order | Implementation package | Required output | Gate before next dependent package |
 |---:|---|---|---|

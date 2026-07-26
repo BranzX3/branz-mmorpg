@@ -1,0 +1,17 @@
+type: skill
+id: branz:fire_bolt
+display-name: Fire Bolt
+input-slot: basic
+tags: [weapon, staff, fire, projectile]
+cast-ms: 0
+active-ms: 0
+recovery-ms: 250
+cooldown-ms: 750
+cooldown-group: staff-basic
+costs: {}
+interrupt-refund: 0
+range: 20
+requires-line-of-sight: true
+root-effect: projectile
+effects:
+  - {id: projectile, type: spawn_projectile, numbers: {speed: 1.8, power: 14}, values: {type: magic}}

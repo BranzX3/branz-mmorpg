@@ -1,0 +1,17 @@
+type: skill
+id: branz:flame_dash
+display-name: Flame Dash
+input-slot: weapon-2
+tags: [weapon, staff, fire, mobility]
+cast-ms: 0
+active-ms: 0
+recovery-ms: 150
+cooldown-ms: 6000
+cooldown-group: staff-mobility
+costs: {MANA: 14}
+interrupt-refund: 0
+range: 0
+requires-line-of-sight: false
+root-effect: dash
+effects:
+  - {id: dash, type: dash, numbers: {strength: 1.35}}

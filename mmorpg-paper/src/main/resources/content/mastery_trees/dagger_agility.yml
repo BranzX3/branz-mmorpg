@@ -1,0 +1,11 @@
+type: combat_mastery_node
+id: branz:dagger_agility
+mastery-id: branz:dagger_mastery
+tree-revision: 1
+branch-id: agility
+maximum-rank: 3
+point-cost-per-rank: 1
+required-mastery-level: 2
+prerequisites: {}
+modifiers:
+  - {id: quick_hands, attribute: attack_speed, operation: add_percent, value: 0.02, stacking-group: mastery_attack_speed, priority: 10}

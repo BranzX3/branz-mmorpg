@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.branz.mmorpg.api.content.ContentId;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class BundledContentTest {
@@ -19,6 +20,7 @@ class BundledContentTest {
         assertTrue(result.successful(), () -> String.join("\n", result.diagnostics()));
         assertTrue(service.snapshot().skills().containsKey(ContentId.parse("branz:heavy_slash")));
         assertTrue(service.snapshot().weapons().containsKey(ContentId.parse("branz:broadsword")));
+        assertTrue(service.snapshot().weapons().containsKey(ContentId.parse("branz:daggers")));
         assertTrue(service.snapshot().lootTables().containsKey(ContentId.parse("branz:aether_cache")));
         assertTrue(service.snapshot().gatheringNodes()
                 .containsKey(ContentId.parse("branz:aether_deposit")));
@@ -49,7 +51,26 @@ class BundledContentTest {
                 .containsKey(ContentId.parse("branz:warrior_root")));
         assertEquals(1, service.snapshot().combatInputProfiles().size());
         assertEquals(1, service.snapshot().combatCombos().size());
-        assertEquals(6, service.snapshot().masteryNodes().size());
+        assertEquals(8, service.snapshot().masteryNodes().size());
+
+        Map.of(
+                ContentId.parse("branz:warrior"), ContentId.parse("branz:broadsword"),
+                ContentId.parse("branz:mage"), ContentId.parse("branz:fire_staff"),
+                ContentId.parse("branz:rogue"), ContentId.parse("branz:daggers"))
+                .forEach((classId, weaponId) -> {
+                    var characterClass = service.snapshot().characterClasses().get(classId);
+                    var weapon = service.snapshot().weapons().get(weaponId);
+                    assertEquals(weaponId, characterClass.starterGrantPlan().weaponId());
+                    assertTrue(weapon.tags().stream()
+                            .anyMatch(characterClass.allowedWeaponTags()::contains));
+                    assertTrue(service.snapshot().skills().containsKey(weapon.basicAttackSkillId()));
+                    assertTrue(weapon.activeSkillIds().stream()
+                            .allMatch(service.snapshot().skills()::containsKey));
+                    assertTrue(characterClass.classSkillIds().stream()
+                            .allMatch(service.snapshot().skills()::containsKey));
+                    assertTrue(service.snapshot().skills()
+                            .containsKey(characterClass.ultimateSkillId()));
+                });
     }
 
     private static Path locateBundle() {

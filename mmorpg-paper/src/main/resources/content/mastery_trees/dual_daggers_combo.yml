@@ -1,0 +1,11 @@
+type: combat_mastery_node
+id: branz:dual_daggers_combo
+mastery-id: branz:dual_daggers_mastery
+tree-revision: 1
+branch-id: combo
+maximum-rank: 3
+point-cost-per-rank: 1
+required-mastery-level: 2
+prerequisites: {}
+modifiers:
+  - {id: combo_edge, attribute: critical_chance, operation: add_flat, value: 0.01, stacking-group: "", priority: 0}

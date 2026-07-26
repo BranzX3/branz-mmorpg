@@ -1,0 +1,17 @@
+type: skill
+id: branz:throwing_knife
+display-name: Throwing Knife
+input-slot: weapon-2
+tags: [weapon, dagger, projectile]
+cast-ms: 100
+active-ms: 0
+recovery-ms: 200
+cooldown-ms: 4200
+cooldown-group: dagger-utility
+costs: {ENERGY: 12}
+interrupt-refund: 0.5
+range: 14
+requires-line-of-sight: true
+root-effect: projectile
+effects:
+  - {id: projectile, type: spawn_projectile, numbers: {speed: 2.2, power: 22}, values: {type: physical}}

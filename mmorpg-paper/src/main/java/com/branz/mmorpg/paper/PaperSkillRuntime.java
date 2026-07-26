@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
@@ -78,9 +79,14 @@ public final class PaperSkillRuntime implements Listener {
     private final SkillExecutionEngine engine;
     private volatile BiConsumer<UUID, ContentId> skillListener =
             (player, skill) -> {};
+    private volatile Predicate<Player> inputReserved = player -> false;
 
     public void skillListener(BiConsumer<UUID, ContentId> listener) {
         skillListener = Objects.requireNonNull(listener, "listener");
+    }
+
+    public void inputReserved(Predicate<Player> predicate) {
+        inputReserved = Objects.requireNonNull(predicate, "predicate");
     }
 
     public PaperSkillRuntime(JavaPlugin plugin, PlayerSessionService sessions,
@@ -102,10 +108,10 @@ public final class PaperSkillRuntime implements Listener {
         this.engine = new SkillExecutionEngine(new SystemGameClock(), this::execute);
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onSwapHand(PlayerSwapHandItemsEvent event) {
         Player player = event.getPlayer();
-        if (!playable(player)) {
+        if (inputReserved.test(player) || !playable(player)) {
             return;
         }
         event.setCancelled(true);
@@ -117,6 +123,7 @@ public final class PaperSkillRuntime implements Listener {
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND
                 || event.getAction() != Action.RIGHT_CLICK_AIR
+                || inputReserved.test(event.getPlayer())
                 || !playable(event.getPlayer())) return;
         event.setCancelled(true);
         Player player = event.getPlayer();
@@ -187,7 +194,7 @@ public final class PaperSkillRuntime implements Listener {
 
     /** Routes vanilla melee intent through the same authoritative skill state machine. */
     public void basicAttack(Player player, LivingEntity target) {
-        if (!playable(player)) return;
+        if (inputReserved.test(player) || !playable(player)) return;
         routeInput(player, player.isSneaking()
                 ? CombatInputKey.SHIFT_LMB : CombatInputKey.LMB, target);
     }

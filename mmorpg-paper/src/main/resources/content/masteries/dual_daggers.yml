@@ -1,0 +1,10 @@
+type: combat_mastery
+id: branz:dual_daggers_mastery
+display-name: Dual Daggers Mastery
+kind: weapon_type
+parent: branz:dagger_mastery
+maximum-level: 100
+curve-base: 100
+curve-exponent: 1.65
+maximum-power-bonus: 0.20
+tree-revision: 1

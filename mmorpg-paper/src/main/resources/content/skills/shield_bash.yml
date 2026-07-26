@@ -1,0 +1,19 @@
+type: skill
+id: branz:shield_bash
+display-name: Shield Bash
+input-slot: weapon-2
+tags: [weapon, sword, control]
+cast-ms: 0
+active-ms: 50
+recovery-ms: 250
+cooldown-ms: 5000
+cooldown-group: sword-utility
+costs: {STAMINA: 12}
+interrupt-refund: 0
+range: 4
+requires-line-of-sight: true
+root-effect: combo
+effects:
+  - {id: combo, type: sequence, children: [hit, stun]}
+  - {id: hit, type: damage, numbers: {power: 18}, values: {type: physical}}
+  - {id: stun, type: apply_status, values: {status: "branz:stun"}}

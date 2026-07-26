@@ -133,6 +133,24 @@ public final class JdbcCharacterClassSelectionRepository
                     insert.setString(12, encode(items));
                     insert.executeUpdate();
                 }
+                try (PreparedStatement delivery = connection.prepareStatement(
+                        "INSERT INTO mmorpg_starter_kit_delivery "
+                                + "(player_uuid, selection_operation_id, starter_plan_id, "
+                                + "starter_plan_revision, starter_weapon_id, "
+                                + "starter_additional_items, state, created_at) "
+                                + "VALUES (?, ?, ?, ?, ?, CAST(? AS JSON), 'PENDING', ?)")) {
+                    Map<String, Integer> items = new LinkedHashMap<>();
+                    starter.additionalItems().forEach(
+                            (id, amount) -> items.put(id.toString(), amount));
+                    delivery.setBytes(1, JdbcPlayerProfileRepository.toBytes(playerId));
+                    delivery.setString(2, operationId.value());
+                    delivery.setString(3, starter.id().toString());
+                    delivery.setInt(4, starter.revision());
+                    delivery.setString(5, starter.weaponId().toString());
+                    delivery.setString(6, encode(items));
+                    delivery.setTimestamp(7, Timestamp.from(selectedAt));
+                    delivery.executeUpdate();
+                }
                 try (PreparedStatement audit = connection.prepareStatement(
                         "INSERT INTO mmorpg_audit_log "
                                 + "(actor_uuid, action, subject, detail_json) "

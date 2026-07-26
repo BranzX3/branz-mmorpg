@@ -1,0 +1,20 @@
+type: gathering_node
+id: branz:iron_vein
+display_name: Iron Vein
+skill: branz:mining
+tier: rare
+base_xp: 6
+required_tool_tag: branz:pickaxe
+required_level: 10
+harvest_time_ms: 3200
+respawn_seconds: 180
+respawn_jitter_seconds: 30
+tags: [branz:rare_mining, branz:deep_mining]
+presentation:
+  available_block: minecraft:iron_ore
+  depleted_block: minecraft:deepslate
+  hologram: "<gold>Iron Vein"
+yields:
+  - item: branz:iron_ore
+    amount: [1, 2]
+    chance: 1.0

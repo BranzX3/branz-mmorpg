@@ -1,0 +1,14 @@
+type: life_skill_node
+id: branz:mining_geologist
+skill: branz:mining
+display-name: Geologist
+max-rank: 3
+point-cost-per-rank: 1
+requires-level: 20
+prerequisites:
+  "branz:mining_deep_delver": 1
+effect:
+  type: byproduct_chance
+  target-tags: [branz:deep_mining]
+  percent-per-rank: 2
+  cap-percent: 6

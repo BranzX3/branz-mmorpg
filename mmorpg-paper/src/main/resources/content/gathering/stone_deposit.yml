@@ -1,0 +1,20 @@
+type: gathering_node
+id: branz:stone_deposit
+display_name: Stone Deposit
+skill: branz:mining
+tier: common
+base_xp: 1
+required_tool_tag: branz:pickaxe
+required_level: 1
+harvest_time_ms: 1500
+respawn_seconds: 30
+respawn_jitter_seconds: 5
+tags: [branz:common_mining]
+presentation:
+  available_block: minecraft:stone
+  depleted_block: minecraft:cobblestone
+  hologram: "<gray>Stone Deposit"
+yields:
+  - item: branz:stone_chunk
+    amount: [1, 2]
+    chance: 1.0

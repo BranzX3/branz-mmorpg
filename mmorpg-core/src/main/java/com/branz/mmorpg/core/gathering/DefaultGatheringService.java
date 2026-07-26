@@ -2,21 +2,28 @@ package com.branz.mmorpg.core.gathering;
 
 import com.branz.mmorpg.api.content.ContentId;
 import com.branz.mmorpg.api.content.ContentSnapshot;
+import com.branz.mmorpg.api.event.EventBus;
+import com.branz.mmorpg.api.gathering.GatheringHarvestCommit;
+import com.branz.mmorpg.api.gathering.GatheringNodeHarvested;
 import com.branz.mmorpg.api.gathering.GatheringNodeDefinition;
 import com.branz.mmorpg.api.gathering.GatheringNodeInstance;
 import com.branz.mmorpg.api.gathering.GatheringNodeRepository;
+import com.branz.mmorpg.api.gathering.GatheringNodeRespawned;
 import com.branz.mmorpg.api.gathering.GatheringNodeState;
 import com.branz.mmorpg.api.gathering.GatheringReservation;
 import com.branz.mmorpg.api.gathering.GatheringResult;
 import com.branz.mmorpg.api.gathering.GatheringService;
 import com.branz.mmorpg.api.gathering.WorldBlockPosition;
 import com.branz.mmorpg.api.item.InventorySnapshot;
+import com.branz.mmorpg.api.lifeskill.SurvivalSkillLevelChanged;
+import com.branz.mmorpg.api.lifeskill.SurvivalXpGranted;
 import com.branz.mmorpg.api.operation.OperationId;
 import com.branz.mmorpg.api.runtime.GameClock;
 import com.branz.mmorpg.core.item.InventoryEngine;
 import com.branz.mmorpg.core.lifeskill.LifeSkillProgressionEngine;
 import com.branz.mmorpg.core.player.PlayerSessionService;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -26,6 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -36,15 +44,40 @@ public final class DefaultGatheringService implements GatheringService {
     private final PlayerSessionService sessions;
     private final Supplier<ContentSnapshot> content;
     private final GameClock clock;
+    private final EventBus events;
     private final InventoryEngine inventoryEngine = new InventoryEngine();
+    private volatile Consumer<HarvestCommitted> listener = ignored -> {};
+
+    /** Immutable post-commit fact; duplicate operation replays never publish it. */
+    public record HarvestCommitted(
+            UUID playerId, UUID nodeInstanceId, ContentId definitionId,
+            ContentId skillId, OperationId operationId, long awardedXp,
+            Map<ContentId, Long> yields, Instant respawnAt) {
+        public HarvestCommitted {
+            yields = Map.copyOf(yields);
+        }
+    }
+
+    public void mutationListener(Consumer<HarvestCommitted> listener) {
+        this.listener = java.util.Objects.requireNonNull(listener, "listener");
+    }
 
     public DefaultGatheringService(GatheringNodeRepository repository,
                                    PlayerSessionService sessions,
                                    Supplier<ContentSnapshot> content, GameClock clock) {
+        this(repository, sessions, content, clock,
+                new com.branz.mmorpg.core.event.SimpleEventBus());
+    }
+
+    public DefaultGatheringService(GatheringNodeRepository repository,
+                                   PlayerSessionService sessions,
+                                   Supplier<ContentSnapshot> content, GameClock clock,
+                                   EventBus events) {
         this.repository = java.util.Objects.requireNonNull(repository, "repository");
         this.sessions = java.util.Objects.requireNonNull(sessions, "sessions");
         this.content = java.util.Objects.requireNonNull(content, "content");
         this.clock = java.util.Objects.requireNonNull(clock, "clock");
+        this.events = java.util.Objects.requireNonNull(events, "events");
     }
 
     @Override public Optional<GatheringNodeInstance> findAt(WorldBlockPosition position) {
@@ -116,18 +149,59 @@ public final class DefaultGatheringService implements GatheringService {
                 reservation.reservationSequence());
         Instant respawnAt = now.plusMillis(definition.respawnMillis() + jitter);
         LifeSkillProgressionEngine progression = progression(snapshot, definition.skillId());
-        var commit = repository.commitHarvest(
-                reservation.nodeInstanceId(), reservation.playerId(),
-                reservation.reservationSequence(), definition.skillId(),
-                reservation.operationId(), now, respawnAt,
-                before -> progression.award(
-                        before, xp, snapshot.revision(), now).after(),
-                before -> grantYields(before, yields, snapshot, now));
+        GatheringHarvestCommit commit;
+        try {
+            commit = repository.commitHarvest(
+                    reservation.nodeInstanceId(), reservation.playerId(),
+                    reservation.reservationSequence(), definition.skillId(),
+                    reservation.operationId(), now, respawnAt,
+                    before -> progression.award(
+                            before, xp, snapshot.revision(), now).after(),
+                    before -> grantYields(before, yields, snapshot, now));
+        } catch (RuntimeException failure) {
+            try {
+                repository.release(reservation.nodeInstanceId(), reservation.playerId(),
+                        reservation.reservationSequence(), now);
+            } catch (RuntimeException releaseFailure) {
+                failure.addSuppressed(releaseFailure);
+            }
+            throw failure;
+        }
         sessions.requirePlayable(reservation.playerId())
                 .acceptPersistedLifeSkill(commit.skillAfter());
         Instant committedRespawn = commit.nodeAfter().respawnAt().orElse(respawnAt);
+        long awardedXp = commit.applied()
+                ? commit.skillAfter().totalXp() - commit.skillBefore().totalXp() : 0L;
+        if (commit.applied()) {
+            events.publish(new SurvivalXpGranted(
+                    eventId(reservation.operationId(), "xp"), now, reservation.operationId(),
+                    reservation.playerId(), definition.skillId(), definition.id().toString(),
+                    xp, awardedXp, commit.skillAfter().totalXp(), snapshot.revision()));
+            for (int level = commit.skillBefore().level() + 1;
+                 level <= commit.skillAfter().level(); level++) {
+                int points = snapshot.lifeSkills().get(definition.skillId())
+                        .pointMilestones().contains(level) ? 1 : 0;
+                events.publish(new SurvivalSkillLevelChanged(
+                        eventId(reservation.operationId(), "level-" + level), now,
+                        reservation.operationId(), reservation.playerId(), definition.skillId(),
+                        level - 1, level, commit.skillAfter().totalXp(), points,
+                        snapshot.revision()));
+            }
+            events.publish(new GatheringNodeHarvested(
+                    eventId(reservation.operationId(), "harvest"), now,
+                    reservation.operationId(), reservation.nodeInstanceId(), definition.id(),
+                    reservation.playerId(), yields, committedRespawn, snapshot.revision()));
+            try {
+                listener.accept(new HarvestCommitted(
+                        reservation.playerId(), reservation.nodeInstanceId(), definition.id(),
+                        definition.skillId(), reservation.operationId(), awardedXp,
+                        yields, committedRespawn));
+            } catch (RuntimeException ignored) {
+                // The transaction is already authoritative. Observer failure cannot roll it back.
+            }
+        }
         return new GatheringResult(commit.applied(), commit.nodeAfter(),
-                commit.applied() ? xp : 0, yields, committedRespawn);
+                awardedXp, yields, committedRespawn);
     }
 
     @Override
@@ -139,7 +213,21 @@ public final class DefaultGatheringService implements GatheringService {
     @Override
     public GatheringNodeInstance setState(
             UUID nodeInstanceId, GatheringNodeState state, Instant now) {
-        return repository.setState(nodeInstanceId, state, now);
+        GatheringNodeInstance before = repository.find(nodeInstanceId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "unknown gathering node " + nodeInstanceId));
+        GatheringNodeInstance changed = repository.setState(nodeInstanceId, state, now);
+        if (before.state() == GatheringNodeState.DEPLETED
+                && changed.state() == GatheringNodeState.AVAILABLE) {
+            UUID actor = before.lastHarvestedBy().orElse(before.createdBy());
+            OperationId operation = OperationId.of(
+                    "gathering", before.definitionId().value(), actor,
+                    compactNode(nodeInstanceId) + '-' + before.reservationSequence() + "-respawn");
+            events.publish(new GatheringNodeRespawned(
+                    eventId(operation, "respawn"), now, operation,
+                    nodeInstanceId, before.definitionId(), before.reservationSequence()));
+        }
+        return changed;
     }
 
     private InventorySnapshot grantYields(
@@ -220,5 +308,10 @@ public final class DefaultGatheringService implements GatheringService {
 
     private static String compactNode(UUID nodeId) {
         return nodeId.toString().replace("-", "");
+    }
+
+    private static UUID eventId(OperationId operationId, String kind) {
+        return UUID.nameUUIDFromBytes(
+                (operationId.value() + ':' + kind).getBytes(StandardCharsets.UTF_8));
     }
 }

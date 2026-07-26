@@ -154,47 +154,13 @@ A wrong tool produces a clear refusal message. It never silently grants zero.
 Every multiplier is finite, bounded, and recorded in audit data. The result is
 never negative.
 
-### 5.1 Authoritative block origin
+### 5.1 Authoritative gathering source
 
-Core consumes block provenance through a platform port:
-
-    interface BlockOriginPort {
-        BlockOrigin origin(BlockPosition position);
-        void recordPlacement(BlockPosition position, BlockOrigin origin);
-        void recordRemoval(BlockPosition position, OperationId operationId);
-        void move(BlockPosition from, BlockPosition to, OperationId operationId);
-    }
-
-The platform-independent origin values are:
-
-    NATURAL
-    PLAYER_PLACED
-    REGISTERED_NODE
-    PLUGIN_CREATED
-    RESTORED
-    UNKNOWN
-
-`UNKNOWN` fails closed for rare, epic, and legendary XP. Common sources may use
-the configured conservative fallback, which cannot exceed common-tier XP.
-
-The Paper adapter must define behavior for:
-
-- Player placement, piston movement, falling blocks, and block transformation
-- Silk Touch placement and movement of mined blocks
-- Explosion, TNT, fire, fluid, and entity-caused removal
-- WorldEdit or other plugin-created and restored blocks
-- Chunk unload/reload and server restart
-- World regeneration and deletion
-- Registered node depletion and respawn
-
-Moving a tracked block moves its origin; it never converts a placed block into a
-natural block. Explosion or indirect destruction attributes the action to a
-player only when a trusted server-side cause chain exists. Otherwise it grants
-no Survival XP.
-
-Origin records for non-natural blocks and registered nodes survive chunk unload
-and restart. Cleanup is keyed by world identity, chunk, block coordinates, and
-world-generation epoch so stale records cannot affect a recreated world.
+The durable gathering-node instance is the source proof. Core accepts XP and
+yields only after the repository locks an AVAILABLE registered instance and
+reserves it for the player. Ordinary blocks, including natural, placed,
+restored, piston-moved, Silk Touch, and WorldEdit blocks, have no node instance
+and therefore never enter the reward transaction.
 
 ### 5.2 Suggested initial Mining tiers
 
@@ -229,25 +195,26 @@ Rejections record a reason: `NODE_TAKEN`, `NODE_DEPLETED`, `INVALID_TOOL`,
 Each Life Skill stores independent total XP, level, unspent points, unlocked
 nodes, and content revision.
 
-The level curve is a **cumulative total-XP threshold**. A player reaches level
-`L` when `total_xp >= total_xp_required(L)`.
+The level curve is a **cumulative total-XP threshold**. Level 1 starts at zero.
+For target level `L >= 2`, the player reaches that level when
+`total_xp >= total_xp_required(L)`.
 
-    total_xp_required(level) = round(75 * level ^ 1.55)
+    total_xp_required(L) = round(75 * (L - 1) ^ 1.55)
 
 Initial golden values:
 
-| Level | Required total XP |
+| Target level | Required total XP |
 |---:|---:|
-| 1 | 75 |
-| 2 | 220 |
-| 3 | 412 |
-| 4 | 643 |
-| 5 | 909 |
-| 6 | 1,206 |
-| 7 | 1,531 |
-| 8 | 1,883 |
-| 9 | 2,260 |
-| 10 | 2,661 |
+| 2 | 75 |
+| 3 | 220 |
+| 4 | 412 |
+| 5 | 643 |
+| 6 | 909 |
+| 7 | 1,206 |
+| 8 | 1,531 |
+| 9 | 1,883 |
+| 10 | 2,260 |
+| 11 | 2,661 |
 
 The level cap and thresholds are content-driven. Configured level milestones
 grant Survival Skill Points. Levels and unlocked nodes never decrease on death.
@@ -449,29 +416,24 @@ requires explicit confirmation.
 
 ## 12. Performance Budget
 
-- Survival processing attributable to one accepted block break targets under
-  0.25 ms at p95 on the owning Paper thread, excluding vanilla block handling.
+- Survival processing attributable to one accepted node interaction targets
+  under 0.25 ms at p95 on the owning Paper thread, excluding asynchronous work.
 - No SQL, filesystem access, YAML parsing, or blocking wait occurs on the owning
   Paper thread.
-- One player, block, or anti-farm window does not create an individual scheduler
+- One player, node, or anti-farm window does not create an individual scheduler
   task; expiry uses bounded buckets or periodic batch cleanup.
-- Origin lookup for a loaded chunk is memory-backed and targets under 0.10 ms at
-  p95. Persistence flush is asynchronous and bounded.
+- Node lookup and persistence are asynchronous and bounded; no database lookup
+  blocks the owning Paper thread.
 - With 50 concurrent players and 20 eligible actions per second in aggregate,
   the persistence queue remains bounded and exposes depth, oldest age, failures,
   and retry count.
 - Logout and shutdown drain or durably record pending mutations within the
   configured shutdown budget. No accepted operation is silently discarded.
-- A soak test covers at least 100,000 synthetic actions, chunk unload/reload,
-  origin movement, duplicate operations, and tree effect recalculation.
+- A soak test covers at least 100,000 synthetic harvest attempts, node
+  contention, duplicate operations, respawn, and tree effect recalculation.
 
 ## 13. Acceptance Criteria
 
-- Natural stone broken with a valid pickaxe grants exactly 1 configured XP.
-- Configured rare ores grant more XP than common stone.
-- Placed or restored rare ores cannot grant rare-tier XP by default.
-- Cancelled block-break events grant no XP.
-- Fortune and Silk Touch cannot duplicate XP.
 - Duplicate operation IDs cannot grant XP or skill points twice.
 - A single grant crossing multiple levels awards every milestone exactly once.
 - XP overflow and negative gameplay grants are rejected.
@@ -479,8 +441,7 @@ requires explicit confirmation.
 - Node purchase cannot consume points without granting the node rank.
 - Content validation rejects cycles and broken prerequisites.
 - Tree revision migration is idempotent and cannot partially refund or apply ranks.
-- Piston movement preserves placed-block origin across source and destination.
-- Unknown rare-source origin grants no rare-tier XP.
+- Ordinary block breaks and player-placed ore grant no Life Skill XP.
 - Harvesting a registered node grants exactly its configured XP.
 - A rare node grants more than a common node.
 - A depleted node grants nothing until `respawn_at` has passed.

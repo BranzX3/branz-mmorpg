@@ -1,0 +1,7 @@
+type: material
+id: branz:stone_chunk
+display-name: Stone Chunk
+category: crafting_material
+rarity: common
+tradable: true
+max-stack-size: 99

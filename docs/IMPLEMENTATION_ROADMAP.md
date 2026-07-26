@@ -82,7 +82,7 @@ increments:
 |---|---|---|---|
 | S0 Profile contract | M1 | Skill ID, immutable progress snapshot, level/XP/point values, persistence model | A player session loads skill progress without Paper types |
 | S1 Progression engine | M3 | XP formula, level curve, points, mastery-tree DAG, node purchase and respec transactions | Pure Java formula, tree-validation, and idempotency tests pass |
-| S2 Mining nodes | M5 | Natural-block origin plus node definitions, instances and placement commands, reservation/contest, depletion and respawn, yields, committed events | Eligible natural stone grants 1 XP; a registered node grants its configured XP; contested harvest resolves to exactly one winner |
+| S2 Mining nodes | M5 | Registered node definitions, instances and placement commands, reservation/contest, depletion and respawn, yields, committed events | A common node grants 1 XP; a rare node grants more; contested harvest resolves to exactly one winner |
 | S3 Operations and release | M8 | Player UI, admin inspect/repair/reset, node repair tooling, audit, telemetry, Paper adapter, performance and abuse tests | Life Skill acceptance criteria and Paper smoke tests pass |
 
 Mining is required for the initial release. Woodcutting, Excavation, Foraging,
@@ -178,7 +178,7 @@ between branches.
 | Combat Mastery XP/idempotency | Synthetic contribution | Required | Smoke |
 | Survival profile/query | Useful | Required | Not required |
 | Survival XP/level/tree | Fake source/tool | Required | Not required |
-| Mining block eligibility | Fake block origin | Required | Required |
+| Mining node eligibility | Fake registered node | Required | Required |
 | Survival anti-farm/idempotency | Synthetic actions | Required | Smoke |
 | Node eligibility and yields | Fake node instance | Required | Required |
 | Node reservation and contest | Simulated concurrency | Required | Required |
@@ -208,7 +208,7 @@ An integration gate passes when:
 - Combat inputs cannot apply vanilla and MMO damage to the same target.
 - Class, weapon, resource, skill, and mastery compatibility validates together.
 - Survival XP and tree mutations use idempotent operation IDs.
-- Gathering sources prove their origin before valuable XP or bonus yield.
+- Gathering sources prove their durable registered-node identity before XP or yield.
 - Registered node XP and yields require an authoritative node instance.
 - gradlew clean test shadowJar passes.
 
@@ -241,8 +241,8 @@ Life Skill progression uses a separate scenario so Mining does not depend on
 quest completion:
 
 1. Join with an ACTIVE player session and a valid pickaxe.
-2. Break eligible natural stone in the world and receive exactly 1 Mining XP.
-3. Harvest a placed `branz:stone_deposit` node and receive its configured XP
+2. Break ordinary stone and verify it grants no Mining XP.
+3. Harvest a placed `branz:stone_deposit` node and receive exactly 1 Mining XP
    and yields.
 4. Harvest a placed `branz:iron_vein` node and receive its larger XP value.
 5. Attempt to harvest the same node again before respawn and be refused.
@@ -393,7 +393,7 @@ measured acceptance gate exist.
 Work proceeds in this order unless a fake port allows explicitly parallel pure
 Java development:
 
-Current execution status: **I0-I7 complete; I8 is next. I8-I10 contain merged
+Current execution status: **I0-I8 complete; I9 is next. I9-I10 contain merged
 implementations but remain pending until their gates are audited against the
 permanent-class integration.**
 
@@ -472,6 +472,25 @@ family/type mastery path. Flyway V21 and the full storage suite passed against
 MySQL 8.0.46. The clean release gate passed 270 tests with zero failures (14
 environment-gated tests skipped) and produced the shaded Paper plugin JAR.
 
+I8 is complete: Mining progression now uses the specified cumulative XP
+thresholds, clamps safely at the configured level cap, awards every crossed
+point milestone once, and publishes immutable XP, ordered level, tree unlock,
+harvest, and respawn events only after an applied operation. The bundled Mining
+content includes common Stone Deposit
+(1 XP), uncommon Aether Deposit (3 XP), rare Iron Vein (6 XP), their
+authoritative materials, and the six-node Mining mastery DAG. Ordinary block
+breaks remain outside the gathering service and grant nothing. Registered nodes
+are atomically reserved, interrupted, depleted, rewarded into authoritative
+inventory/pending storage, and respawned from durable timestamps. Crafting
+escrows materials before the BranzWallet Coin charge, refunds insufficient
+payments, retains unavailable payments for retry, and finalizes output plus
+profession XP exactly once; reconnect recovery now starts from the ACTIVE
+Player Session token rather than a fixed join delay. The MySQL 8.0 integration
+gate covered same-tick contention, interruption, harvest replay, restart and
+respawn, craft sequence/escrow/recovery/finalization replay. The clean release
+gate passed 274 tests with zero failures (16 environment-gated tests skipped)
+and produced the shaded Paper plugin JAR.
+
 | Order | Implementation package | Required output | Gate before next dependent package |
 |---:|---|---|---|
 | I0 | Restore build gate | Valid Gradle wrapper; `clean test shadowJar` starts from a clean checkout | Foundation build succeeds |
@@ -482,7 +501,7 @@ environment-gated tests skipped) and produced the shaded Paper plugin JAR.
 | I5 | C3/C4 combat foundation | Status scheduler, target validation, hit/damage/resource/contribution pipeline | Pure Java combat golden tests pass |
 | I6 | B0–B3 and K2 | Input/skill/combo engine, three Class Trees, Skill Points, Combat Mastery, builds/loadouts | Class restriction, tree, cast, combo, and mastery tests pass |
 | I7 | C7, K3, B4 | Authoritative items/inventory, pending delivery, slot-9 compass UI, three playable starter kits | Lossless compass and per-class combat scenarios pass |
-| I8 | C8 and S0–S2 | Mining origin/XP/tree, gathering, basic crafting and Coins | Survival reference scenario and fault tests pass |
+| I8 | C8 and S0–S2 | Mining node XP/tree, gathering, basic crafting and Coins | Survival reference scenario and fault tests pass |
 | I9 | C9/C10 and Quest integration | Mob family, boss, Q0–Q9 runtime/UI, reference quest | Full reference quest passes with real Core |
 | I10 | C12/C13, K4/B5/S3 and Q15 | Admin/repair, telemetry, migrations, soak, backup/restore, release tests | Launch release criteria pass |
 
@@ -508,7 +527,7 @@ shared-file procedure in section 2.
   pipeline owns validation and mutation.
 - Class selection must not deliver starter items outside the authoritative item
   transaction.
-- Survival rare-ore XP must not ship before block-origin persistence fails
-  closed for unknown origin.
+- Survival rare-ore XP must not ship before registered-node identity,
+  reservation, and exact-once persistence fail closed.
 - Quest economic rewards must not use real Core before operation/outbox contracts
   pass their fake and real adapter suites.

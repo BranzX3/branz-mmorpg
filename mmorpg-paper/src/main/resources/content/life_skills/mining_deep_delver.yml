@@ -1,0 +1,13 @@
+type: life_skill_node
+id: branz:mining_deep_delver
+skill: branz:mining
+display-name: Deep Delver
+max-rank: 1
+point-cost-per-rank: 1
+requires-level: 15
+prerequisites: {}
+effect:
+  type: region_unlock
+  target-tags: [branz:deep_mining]
+  percent-per-rank: 100
+  cap-percent: 100

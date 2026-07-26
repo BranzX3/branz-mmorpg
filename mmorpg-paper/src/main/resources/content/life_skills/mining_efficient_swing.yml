@@ -1,0 +1,14 @@
+type: life_skill_node
+id: branz:mining_efficient_swing
+skill: branz:mining
+display-name: Efficient Swing
+max-rank: 2
+point-cost-per-rank: 1
+requires-level: 5
+prerequisites:
+  "branz:mining_stoneworker": 1
+effect:
+  type: tool_cost_reduction
+  target-tags: [branz:mining]
+  percent-per-rank: 5
+  cap-percent: 10

@@ -1,0 +1,7 @@
+type: material
+id: branz:iron_ore
+display-name: Iron Ore
+category: crafting_material
+rarity: rare
+tradable: true
+max-stack-size: 64

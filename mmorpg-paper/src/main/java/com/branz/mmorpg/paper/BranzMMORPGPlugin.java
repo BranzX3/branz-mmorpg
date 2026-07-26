@@ -209,7 +209,7 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                         selected -> activateCombatProfile(selected.playerId()));
                 lifeSkillProgression = new LifeSkillProgressionService(
                         profileRepository, sessionService, new SystemGameClock(),
-                        contentService::snapshot);
+                        contentService::snapshot, characterClassEvents);
                 combatMasteryService = new DefaultCombatMasteryService(
                         new JdbcCombatMasteryRepository(databaseManager),
                         contentService::snapshot, new SystemGameClock(), characterClassEvents);
@@ -222,7 +222,8 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 gatheringRepository = new JdbcGatheringNodeRepository(databaseManager);
                 gatheringService = new DefaultGatheringService(
                         gatheringRepository, sessionService,
-                        contentService::snapshot, new SystemGameClock());
+                        contentService::snapshot, new SystemGameClock(),
+                        characterClassEvents);
                 craftingRepository = new JdbcCraftingRepository(databaseManager);
                 economyPayment = new PaperWalletEconomyAdapter(this);
                 adminCurrency = (AdminCurrencyPort) economyPayment;
@@ -274,13 +275,6 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                         new JdbcPendingSlotItemRepository(databaseManager), itemRuntime,
                         scheduler, readItemTokenSecret());
                 getServer().getPluginManager().registerEvents(classCompassRuntime, this);
-                getServer().getPluginManager().registerEvents(new PlayerSessionListener(
-                        this, sessionService, attributeService,
-                        this::activateCombatProfile, classCompassRuntime::sessionReady,
-                        playerId -> {
-                            characterClassProgression.forget(playerId);
-                            combatMasteryService.forget(playerId);
-                        }), this);
                 gatheringRuntime = new PaperGatheringRuntime(
                         this, gatheringService, contentService, scheduler, itemRuntime);
                 getServer().getPluginManager().registerEvents(gatheringRuntime, this);
@@ -289,8 +283,18 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 getServer().getScheduler().runTaskTimer(
                         this, gatheringRuntime::refresh, 20L, 20L);
                 craftingRuntime = new PaperCraftingRuntime(
-                        this, craftingService, contentService, scheduler, itemRuntime);
+                        this, craftingService, sessionService,
+                        contentService, scheduler, itemRuntime);
                 getServer().getPluginManager().registerEvents(craftingRuntime, this);
+                getServer().getPluginManager().registerEvents(new PlayerSessionListener(
+                        this, sessionService, attributeService,
+                        this::activateCombatProfile, playerId -> {
+                            classCompassRuntime.sessionReady(playerId);
+                            craftingRuntime.sessionReady(playerId);
+                        }, playerId -> {
+                            characterClassProgression.forget(playerId);
+                            combatMasteryService.forget(playerId);
+                        }), this);
                 getServer().getPluginManager().registerEvents(combatRuntime, this);
                 getServer().getScheduler().runTaskTimer(this,
                         combatRuntime::sweepCombatState, 20L, 20L);
@@ -573,6 +577,8 @@ public class BranzMMORPGPlugin extends JavaPlugin {
         for (String resource : java.util.List.of(
                 "content/materials/aether_ore.yml",
                 "content/materials/aether_ingot.yml",
+                "content/materials/stone_chunk.yml",
+                "content/materials/iron_ore.yml",
                 "content/skills/basic_strike.yml",
                 "content/skills/heavy_slash.yml",
                 "content/skills/precise_shot.yml",
@@ -609,6 +615,11 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                 "content/combos/broadsword_heavy_strike.yml",
                 "content/life_skills/mining.yml",
                 "content/life_skills/mining_stoneworker.yml",
+                "content/life_skills/mining_efficient_swing.yml",
+                "content/life_skills/mining_ore_sense.yml",
+                "content/life_skills/mining_prospector.yml",
+                "content/life_skills/mining_deep_delver.yml",
+                "content/life_skills/mining_geologist.yml",
                 "content/masteries/sword.yml",
                 "content/masteries/broadsword.yml",
                 "content/masteries/bow.yml",
@@ -631,6 +642,8 @@ public class BranzMMORPGPlugin extends JavaPlugin {
                         "content/weapons/daggers.yml",
                 "content/loot/aether_cache.yml",
                 "content/gathering/aether_deposit.yml",
+                "content/gathering/stone_deposit.yml",
+                "content/gathering/iron_vein.yml",
                 "content/professions/blacksmithing.yml",
                 "content/recipes/aether_ingot.yml",
                 "content/mobs/seal_guardian.yml",

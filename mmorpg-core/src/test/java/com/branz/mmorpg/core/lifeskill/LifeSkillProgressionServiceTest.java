@@ -10,6 +10,8 @@ import com.branz.mmorpg.api.content.ContentSnapshot;
 import com.branz.mmorpg.api.content.MaterialDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillNodeDefinition;
+import com.branz.mmorpg.api.lifeskill.SurvivalSkillLevelChanged;
+import com.branz.mmorpg.api.lifeskill.SurvivalXpGranted;
 import com.branz.mmorpg.api.operation.OperationId;
 import com.branz.mmorpg.api.player.DuplicateLoginPolicy;
 import com.branz.mmorpg.api.skill.SkillDefinition;
@@ -18,6 +20,7 @@ import com.branz.mmorpg.api.item.WeaponDefinition;
 import com.branz.mmorpg.core.fixture.DirectScheduler;
 import com.branz.mmorpg.core.fixture.FakePlayerProfileRepository;
 import com.branz.mmorpg.core.fixture.FixedGameClock;
+import com.branz.mmorpg.core.event.SimpleEventBus;
 import com.branz.mmorpg.core.player.PlayerSessionService;
 import java.time.Instant;
 import java.util.Collection;
@@ -39,8 +42,13 @@ class LifeSkillProgressionServiceTest {
                 clock, () -> 5L, DuplicateLoginPolicy.CLOSE_PREVIOUS);
         sessions.start();
         sessions.login(player, "Branz").get();
+        SimpleEventBus events = new SimpleEventBus();
+        java.util.List<SurvivalXpGranted> xpEvents = new java.util.ArrayList<>();
+        java.util.List<SurvivalSkillLevelChanged> levelEvents = new java.util.ArrayList<>();
+        events.subscribe(SurvivalXpGranted.class, xpEvents::add);
+        events.subscribe(SurvivalSkillLevelChanged.class, levelEvents::add);
         LifeSkillProgressionService progression = new LifeSkillProgressionService(
-                repository, sessions, clock, () -> snapshot(mining));
+                repository, sessions, clock, () -> snapshot(mining), events);
         OperationId operation = OperationId.of("mastery", mining.toString(), player, "harvest_1");
 
         var first = progression.grantXp(player, mining, 100L, operation);
@@ -50,6 +58,10 @@ class LifeSkillProgressionServiceTest {
         assertFalse(repeated.applied());
         assertEquals(100L, sessions.profile(player).skill(mining).totalXp());
         assertEquals(100L, repository.storedLifeSkills(player).skill(mining).totalXp());
+        assertEquals(1, xpEvents.size());
+        assertEquals(1, levelEvents.size());
+        assertEquals(operation, xpEvents.getFirst().operationId());
+        assertEquals(1, levelEvents.getFirst().pointsGranted());
         sessions.stop();
     }
 

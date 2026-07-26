@@ -11,6 +11,8 @@ import com.branz.mmorpg.api.content.ContentSnapshot;
 import com.branz.mmorpg.api.content.MaterialDefinition;
 import com.branz.mmorpg.api.gathering.GatheringHarvestCommit;
 import com.branz.mmorpg.api.gathering.GatheringNodeDefinition;
+import com.branz.mmorpg.api.gathering.GatheringNodeHarvested;
+import com.branz.mmorpg.api.gathering.GatheringNodeRespawned;
 import com.branz.mmorpg.api.gathering.GatheringNodeInstance;
 import com.branz.mmorpg.api.gathering.GatheringNodeRepository;
 import com.branz.mmorpg.api.gathering.GatheringNodeState;
@@ -22,6 +24,7 @@ import com.branz.mmorpg.api.item.WeaponDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillNodeDefinition;
 import com.branz.mmorpg.api.lifeskill.LifeSkillSnapshot;
+import com.branz.mmorpg.api.lifeskill.SurvivalXpGranted;
 import com.branz.mmorpg.api.mastery.MasteryDefinition;
 import com.branz.mmorpg.api.operation.OperationId;
 import com.branz.mmorpg.api.player.DuplicateLoginPolicy;
@@ -29,6 +32,7 @@ import com.branz.mmorpg.api.skill.SkillDefinition;
 import com.branz.mmorpg.core.fixture.DirectScheduler;
 import com.branz.mmorpg.core.fixture.FakePlayerProfileRepository;
 import com.branz.mmorpg.core.fixture.FixedGameClock;
+import com.branz.mmorpg.core.event.SimpleEventBus;
 import com.branz.mmorpg.core.player.PlayerSessionService;
 import java.time.Duration;
 import java.time.Instant;
@@ -41,6 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class DefaultGatheringServiceTest {
@@ -61,8 +66,19 @@ class DefaultGatheringServiceTest {
         try {
             sessions.login(PLAYER, "Branz").get();
             FakeNodes nodes = new FakeNodes();
+            SimpleEventBus events = new SimpleEventBus();
+            AtomicInteger xpEvents = new AtomicInteger();
+            AtomicInteger harvestEvents = new AtomicInteger();
+            AtomicInteger respawnEvents = new AtomicInteger();
+            events.subscribe(SurvivalXpGranted.class, event -> xpEvents.incrementAndGet());
+            events.subscribe(GatheringNodeHarvested.class,
+                    event -> harvestEvents.incrementAndGet());
+            events.subscribe(GatheringNodeRespawned.class,
+                    event -> respawnEvents.incrementAndGet());
             DefaultGatheringService service = new DefaultGatheringService(
-                    nodes, sessions, DefaultGatheringServiceTest::snapshot, clock);
+                    nodes, sessions, DefaultGatheringServiceTest::snapshot, clock, events);
+            AtomicInteger committedEvents = new AtomicInteger();
+            service.mutationListener(event -> committedEvents.incrementAndGet());
             WorldBlockPosition position = new WorldBlockPosition(WORLD, 1, 64, 2);
             service.place(DEPOSIT, position, PLAYER);
 
@@ -78,6 +94,12 @@ class DefaultGatheringServiceTest {
             assertTrue(nodes.inventory.materials().get(ORE) >= 1);
             long quantity = nodes.inventory.materials().get(ORE);
             assertFalse(replay.applied());
+            assertEquals(1, committedEvents.get());
+            assertEquals(1, xpEvents.get());
+            assertEquals(1, harvestEvents.get());
+            service.setState(first.node().instanceId(), GatheringNodeState.AVAILABLE,
+                    first.respawnAt());
+            assertEquals(1, respawnEvents.get());
             assertEquals(quantity, nodes.inventory.materials().get(ORE));
             assertEquals(GatheringNodeState.DEPLETED, first.node().state());
         } finally {
@@ -101,6 +123,33 @@ class DefaultGatheringServiceTest {
             assertThrows(IllegalStateException.class, () -> service.begin(
                     PLAYER, position, Set.of("branz:axe"), true, true));
             assertEquals(0, sessions.profile(PLAYER).skill(MINING).totalXp());
+        } finally {
+            sessions.stop();
+        }
+    }
+
+    @Test
+    void failedCommitReleasesReservationAndGrantsNothing() throws Exception {
+        FixedGameClock clock = new FixedGameClock(NOW);
+        PlayerSessionService sessions = sessions(clock);
+        sessions.start();
+        try {
+            sessions.login(PLAYER, "Branz").get();
+            FakeNodes nodes = new FakeNodes();
+            nodes.failCommitOnce = true;
+            DefaultGatheringService service = new DefaultGatheringService(
+                    nodes, sessions, DefaultGatheringServiceTest::snapshot, clock);
+            WorldBlockPosition position = new WorldBlockPosition(WORLD, 9, 64, 9);
+            service.place(DEPOSIT, position, PLAYER);
+            var reservation = service.begin(
+                    PLAYER, position, Set.of("branz:pickaxe"), true, true);
+            clock.advance(Duration.ofMillis(2500));
+
+            assertThrows(RuntimeException.class, () -> service.complete(reservation));
+            assertEquals(GatheringNodeState.AVAILABLE,
+                    nodes.find(reservation.nodeInstanceId()).orElseThrow().state());
+            assertEquals(0, sessions.profile(PLAYER).skill(MINING).totalXp());
+            assertTrue(nodes.inventory.materials().isEmpty());
         } finally {
             sessions.stop();
         }
@@ -163,6 +212,7 @@ class DefaultGatheringServiceTest {
         private final GatheringNodeEngine engine = new GatheringNodeEngine();
         private LifeSkillSnapshot skill = LifeSkillSnapshot.untrained(MINING, NOW);
         private InventorySnapshot inventory = InventorySnapshot.empty(PLAYER, 36, NOW);
+        private boolean failCommitOnce;
 
         @Override public GatheringNodeInstance place(GatheringNodeInstance node) {
             nodes.put(node.instanceId(), node);
@@ -198,6 +248,10 @@ class DefaultGatheringServiceTest {
                 OperationId operation, Instant now, Instant respawnAt,
                 UnaryOperator<LifeSkillSnapshot> skillMutation,
                 UnaryOperator<InventorySnapshot> inventoryMutation) {
+            if (failCommitOnce) {
+                failCommitOnce = false;
+                throw new RuntimeException("injected harvest commit failure");
+            }
             GatheringNodeInstance beforeNode = nodes.get(id);
             if (!operations.add(operation)) {
                 return new GatheringHarvestCommit(false, beforeNode, beforeNode,

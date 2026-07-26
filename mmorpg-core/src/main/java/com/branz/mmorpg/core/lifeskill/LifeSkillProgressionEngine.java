@@ -25,23 +25,25 @@ public final class LifeSkillProgressionEngine {
         validateTree();
     }
 
+    /** Cumulative XP threshold at curve index {@code level}. */
     public long requiredXp(int level) {
-        if (level < 1 || level > skill.maximumLevel()) {
+        if (level < 1 || level >= skill.maximumLevel()) {
             throw new IllegalArgumentException("level outside skill curve: " + level);
         }
-        return Math.max(1L, Math.round(skill.curveBase() * Math.pow(level, skill.curveExponent())));
+        double required = skill.curveBase() * Math.pow(level, skill.curveExponent());
+        if (!Double.isFinite(required) || required > Long.MAX_VALUE) {
+            throw new ArithmeticException("Life Skill XP curve overflow at " + level);
+        }
+        return Math.max(1L, Math.round(required));
     }
 
     /** Total XP at the start of {@code level}. */
     public long threshold(int level) {
-        if (level <= 1) {
-            return 0L;
+        if (level < 1 || level > skill.maximumLevel()) {
+            throw new IllegalArgumentException("level outside skill curve: " + level);
         }
-        long total = 0L;
-        for (int current = 1; current < level; current++) {
-            total = Math.addExact(total, requiredXp(current));
-        }
-        return total;
+        if (level == 1) return 0L;
+        return requiredXp(level - 1);
     }
 
     public int levelFor(long totalXp) {
@@ -49,15 +51,7 @@ public final class LifeSkillProgressionEngine {
             throw new IllegalArgumentException("totalXp must not be negative");
         }
         int level = 1;
-        long remaining = totalXp;
-        while (level < skill.maximumLevel()) {
-            long next = requiredXp(level);
-            if (remaining < next) {
-                break;
-            }
-            remaining -= next;
-            level++;
-        }
+        while (level < skill.maximumLevel() && totalXp >= threshold(level + 1)) level++;
         return level;
     }
 
@@ -66,7 +60,10 @@ public final class LifeSkillProgressionEngine {
         if (xp < 0) {
             throw new IllegalArgumentException("XP must not be negative");
         }
-        long total = Math.addExact(current.totalXp(), xp);
+        long cap = threshold(skill.maximumLevel());
+        long awardable = Math.max(0L, cap - current.totalXp());
+        long awarded = Math.min(xp, awardable);
+        long total = Math.addExact(current.totalXp(), awarded);
         int level = levelFor(total);
         int points = current.unspentPoints();
         for (int crossed = current.level() + 1; crossed <= level; crossed++) {
@@ -77,7 +74,7 @@ public final class LifeSkillProgressionEngine {
         LifeSkillProgress progress = new LifeSkillProgress(skill.id(), level, total, points,
                 treeRevision, now);
         return new Mutation(current, new LifeSkillSnapshot(progress, current.nodeRanks()),
-                xp, level - current.level(), points - current.unspentPoints());
+                awarded, level - current.level(), points - current.unspentPoints());
     }
 
     public Mutation purchase(LifeSkillSnapshot current, ContentId nodeId, Instant now) {

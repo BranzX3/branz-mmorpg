@@ -1,0 +1,14 @@
+type: life_skill_node
+id: branz:mining_prospector
+skill: branz:mining
+display-name: Prospector
+max-rank: 3
+point-cost-per-rank: 1
+requires-level: 10
+prerequisites:
+  "branz:mining_ore_sense": 1
+effect:
+  type: bonus_yield_chance
+  target-tags: [branz:rare_mining]
+  percent-per-rank: 2
+  cap-percent: 6

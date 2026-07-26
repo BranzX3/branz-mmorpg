@@ -1,0 +1,13 @@
+type: life_skill_node
+id: branz:mining_ore_sense
+skill: branz:mining
+display-name: Ore Sense
+max-rank: 1
+point-cost-per-rank: 1
+requires-level: 5
+prerequisites: {}
+effect:
+  type: node_hint_range
+  target-tags: [branz:rare_mining]
+  percent-per-rank: 25
+  cap-percent: 25

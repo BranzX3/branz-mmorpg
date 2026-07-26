@@ -24,6 +24,11 @@ class BundledContentTest {
         assertTrue(service.snapshot().lootTables().containsKey(ContentId.parse("branz:aether_cache")));
         assertTrue(service.snapshot().gatheringNodes()
                 .containsKey(ContentId.parse("branz:aether_deposit")));
+        assertEquals(1, service.snapshot().gatheringNodes()
+                .get(ContentId.parse("branz:stone_deposit")).baseXp());
+        assertEquals(6, service.snapshot().gatheringNodes()
+                .get(ContentId.parse("branz:iron_vein")).baseXp());
+        assertEquals(6, service.snapshot().lifeSkillNodes().size());
         assertTrue(service.snapshot().professions()
                 .containsKey(ContentId.parse("branz:blacksmithing")));
         assertTrue(service.snapshot().recipes()

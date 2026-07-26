@@ -31,6 +31,26 @@ class LifeSkillProgressionEngineTest {
         assertEquals(2, mutation.after().unspentPoints(), "milestones at levels 2 and 5");
         assertEquals(4, mutation.levelsGained());
         assertEquals(Math.round(75 * Math.pow(3, 1.55)), engine.requiredXp(3));
+        assertEquals(75, engine.threshold(2));
+        assertEquals(220, engine.threshold(3));
+        assertEquals(412, engine.threshold(4));
+        assertEquals(643, engine.threshold(5));
+        assertEquals(909, engine.threshold(6));
+    }
+
+    @Test
+    void xpAtLevelCapIsClampedAndCannotOverflow() {
+        LifeSkillProgressionEngine engine = engine();
+        LifeSkillSnapshot initial = LifeSkillSnapshot.untrained(MINING, NOW);
+
+        var capped = engine.award(initial, Long.MAX_VALUE, 12L, NOW);
+        var replayAtCap = engine.award(capped.after(), 10, 12L, NOW);
+
+        assertEquals(100, capped.after().level());
+        assertEquals(engine.threshold(100), capped.after().totalXp());
+        assertEquals(engine.threshold(100), capped.awardedXp());
+        assertEquals(0, replayAtCap.awardedXp());
+        assertEquals(capped.after(), replayAtCap.after());
     }
 
     @Test

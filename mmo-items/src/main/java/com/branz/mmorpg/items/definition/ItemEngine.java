@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -126,6 +127,14 @@ public final class ItemEngine {
             return Result.failure(
                     ItemEngineErrorCode.ITEM_QUIVER_PROFILE_INVALID, exception.getMessage());
         }
+        Optional<CatalystProfile> catalystProfile;
+        try {
+            catalystProfile =
+                    compileCatalystProfile(itemClass, durability, body.get("catalyst_profile"));
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    ItemEngineErrorCode.ITEM_CATALYST_PROFILE_INVALID, exception.getMessage());
+        }
         try {
             return Result.success(
                     new ItemDefinition(
@@ -136,7 +145,8 @@ public final class ItemEngine {
                             cosmetic,
                             weaponProfile,
                             ammoProfile,
-                            quiverProfile));
+                            quiverProfile,
+                            catalystProfile));
         } catch (IllegalArgumentException exception) {
             return Result.failure(ItemEngineErrorCode.ITEM_CLASS_INVALID, exception.getMessage());
         }
@@ -192,6 +202,36 @@ public final class ItemEngine {
                         families,
                         requiredInteger(quiverNode, "prepared_ammo_category_count"),
                         requiredInteger(quiverNode, "ammo_switch_handling_ticks")));
+    }
+
+    private static Optional<CatalystProfile> compileCatalystProfile(
+            ItemClass itemClass, OptionalInt durability, JsonNode catalystNode) {
+        if (catalystNode == null || catalystNode.isNull()) {
+            return Optional.empty();
+        }
+        if (itemClass != ItemClass.UNIQUE_DURABLE
+                || durability.isEmpty()
+                || !catalystNode.isObject()) {
+            throw new IllegalArgumentException(
+                    "catalyst_profile requires a durable UNIQUE_DURABLE item");
+        }
+        JsonNode tagsNode = catalystNode.get("tags");
+        if (tagsNode == null || !tagsNode.isArray() || tagsNode.isEmpty()) {
+            throw new IllegalArgumentException("catalyst_profile.tags must contain entries");
+        }
+        LinkedHashSet<String> tags = new LinkedHashSet<>();
+        for (JsonNode tag : tagsNode) {
+            if (!tag.isTextual() || tag.textValue().isBlank()) {
+                throw new IllegalArgumentException(
+                        "catalyst_profile.tags entries must be non-blank text");
+            }
+            tags.add(tag.textValue());
+        }
+        return Optional.of(
+                new CatalystProfile(
+                        tags,
+                        requiredNumber(catalystNode, "channel_stability"),
+                        requiredInteger(catalystNode, "durability_cost_per_commit")));
     }
 
     private static Optional<BowWeaponProfile> compileBowProfile(String family, JsonNode bowNode) {

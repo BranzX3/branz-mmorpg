@@ -260,6 +260,25 @@ with an operator/test account:
 73. Remove or empty the equipped Bolt Quiver and attempt to reload. Verify `CROSSBOW NO QUIVER` or
     `CROSSBOW NO PREPARED BOLT`, no checkpoint mutation and no projectile. Inventory Bolt lots must
     never satisfy reload.
+74. Open `/mmo dev` -> `Persisted Test Item`, grant `weapon.training_staff`, equip it as main hand
+    through the Scene and wait for `STAFF READY`. Verify `/mmo health` reports `spell=IDLE` and
+    `mana=100 (reserved=0)`.
+75. LMB with the Staff and verify `move.training_staff.primary_1` opens its authored ARC, spends ten
+    stamina at commit and resolves BLUNT damage/posture through the existing melee authority.
+76. RMB once and verify `FIRE LANCE WINDUP` reserves 18 mana without reducing the current total.
+    RMB again before eight charge ticks and verify `FIRE LANCE NOT READY`; `/mmo health` must still
+    show `mana=100 (reserved=18)`.
+77. RMB after the minimum charge (or wait for the 30-tick maximum). Verify `FIRE LANCE COMMITTING`
+    appears before the projectile, then Fire particles launch only after PostgreSQL commits. Status
+    must show mana 82, zero reserved mana and authored recovery.
+78. Hit a training mob and verify vanilla armor is not used for Fire damage while server collision,
+    HP, posture, projectile cap and conditional posture-break advantage still apply.
+79. Swap weapons or trigger hard CC before release. Verify the spell cancels, mana returns to 100
+    and catalyst durability does not change. Repeat during the in-flight commit and verify the
+    terminal result never leaves a mana reservation or creates a projectile for an invalid session.
+80. Cast once, disconnect/reconnect and restart Paper. Re-equip the same Staff UUID and cast again;
+    the action bar must show catalyst durability continuing from 99/100 to 98/100 rather than
+    resetting. Exhausted durability must report `CATALYST BROKEN` without mana reservation.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
@@ -275,7 +294,10 @@ split compatible lots from inventory into the equipped Quiver UUID under the aut
 Prepared state is item-owned and selected with stationary sneak+scroll; Bow release commits one unit
 from only the selected stored category before projectile creation. Crossbow reload binds one selected
 stored Bolt at `BOLT_PLACED`, persists `LOADED` on the item UUID and clears it before projectile
-creation. Encounter recovery and lot merging remain later slices.
+creation. Staff casting reserves mana before release, commits one item-owned catalyst durability
+through PostgreSQL before Fire Lance creation and uses the same authoritative projectile/HP/posture
+engines with a separate arcane damage channel. Persistent attunement/build selection, the rest of
+the Ember art, Runic Imbuement, encounter recovery and lot merging remain later slices.
 
 Live engagement check:
 

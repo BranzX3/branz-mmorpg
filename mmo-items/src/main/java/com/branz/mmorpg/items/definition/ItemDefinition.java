@@ -13,7 +13,8 @@ public record ItemDefinition(
         boolean cosmetic,
         Optional<WeaponCombatProfile> weaponProfile,
         Optional<AmmoProfile> ammoProfile,
-        Optional<QuiverProfile> quiverProfile) {
+        Optional<QuiverProfile> quiverProfile,
+        Optional<CatalystProfile> catalystProfile) {
     public ItemDefinition {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(assetId, "assetId");
@@ -22,6 +23,7 @@ public record ItemDefinition(
         Objects.requireNonNull(weaponProfile, "weaponProfile");
         Objects.requireNonNull(ammoProfile, "ammoProfile");
         Objects.requireNonNull(quiverProfile, "quiverProfile");
+        Objects.requireNonNull(catalystProfile, "catalystProfile");
         if (baseMaxDurability.isPresent() && baseMaxDurability.getAsInt() < 1) {
             throw new IllegalArgumentException("baseMaxDurability must be positive");
         }
@@ -31,7 +33,8 @@ public record ItemDefinition(
         if (cosmetic
                 && (weaponProfile.isPresent()
                         || ammoProfile.isPresent()
-                        || quiverProfile.isPresent())) {
+                        || quiverProfile.isPresent()
+                        || catalystProfile.isPresent())) {
             throw new IllegalArgumentException(
                     "cosmetic definitions cannot have gameplay profiles");
         }
@@ -49,6 +52,36 @@ public record ItemDefinition(
             throw new IllegalArgumentException(
                     "Quiver profiles require a non-durability UNIQUE_DURABLE item");
         }
+        if (catalystProfile.isPresent()
+                && (itemClass != ItemClass.UNIQUE_DURABLE || baseMaxDurability.isEmpty())) {
+            throw new IllegalArgumentException(
+                    "Catalyst profiles require a durable UNIQUE_DURABLE item");
+        }
+        if (catalystProfile.isPresent() && (ammoProfile.isPresent() || quiverProfile.isPresent())) {
+            throw new IllegalArgumentException(
+                    "Catalyst profiles cannot share ammo or Quiver runtime profiles");
+        }
+    }
+
+    public ItemDefinition(
+            DefinitionId id,
+            DefinitionId assetId,
+            ItemClass itemClass,
+            OptionalInt baseMaxDurability,
+            boolean cosmetic,
+            Optional<WeaponCombatProfile> weaponProfile,
+            Optional<AmmoProfile> ammoProfile,
+            Optional<QuiverProfile> quiverProfile) {
+        this(
+                id,
+                assetId,
+                itemClass,
+                baseMaxDurability,
+                cosmetic,
+                weaponProfile,
+                ammoProfile,
+                quiverProfile,
+                Optional.empty());
     }
 
     public ItemDefinition(
@@ -66,6 +99,7 @@ public record ItemDefinition(
                 cosmetic,
                 weaponProfile,
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -81,6 +115,7 @@ public record ItemDefinition(
                 itemClass,
                 baseMaxDurability,
                 cosmetic,
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());

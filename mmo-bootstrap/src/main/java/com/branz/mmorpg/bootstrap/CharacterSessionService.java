@@ -406,6 +406,71 @@ final class CharacterSessionService {
                 contentVersion);
     }
 
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> commitCatalystUse(
+            LoadedCharacterSession session,
+            ItemId catalystItemId,
+            DefinitionId expectedDefinitionId,
+            int baseMaximumDurability,
+            int durabilityCost,
+            DefinitionId spellId,
+            UUID operationId,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(catalystItemId, "catalystItemId");
+        Objects.requireNonNull(expectedDefinitionId, "expectedDefinitionId");
+        Objects.requireNonNull(spellId, "spellId");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        ItemLocationRecord catalyst = equippedMainHand(session, catalystItemId);
+        if (catalyst == null || !catalyst.definitionId().equals(expectedDefinitionId)) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Spell commit requires the same authoritative main-hand catalyst.");
+        }
+        String replacement;
+        CatalystDurability next;
+        try {
+            CatalystDurability current =
+                    CatalystPayloadCodec.decode(catalyst.payloadJson(), baseMaximumDurability);
+            next = current.spend(durabilityCost);
+            replacement = CatalystPayloadCodec.encode(catalyst.payloadJson(), next);
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID, exception.getMessage());
+        }
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "spell-catalyst:" + operationId,
+                        session.characterId(),
+                        session.sessionId(),
+                        JdbcValueTransactionService.ITEM_PAYLOAD_UPDATE,
+                        "{\"itemId\":\""
+                                + catalyst.itemId().value()
+                                + "\",\"itemVersion\":"
+                                + catalyst.version()
+                                + ",\"spellId\":\""
+                                + spellId.value()
+                                + "\"}",
+                        "{\"currentDurability\":" + next.current() + "}",
+                        contentVersion);
+        Result<TransactionExecution, TransactionErrorCode> updated =
+                database.values()
+                        .updateItemPayload(
+                                request,
+                                new ItemPayloadUpdate(
+                                        catalyst.itemId(),
+                                        catalyst.version(),
+                                        catalyst.ownerCharacterId(),
+                                        catalyst.location(),
+                                        catalyst.payloadJson(),
+                                        replacement));
+        if (updated instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+            return transactionFailure(failure);
+        }
+        return reload(session);
+    }
+
     Result<LoadedCharacterSession, CharacterSessionErrorCode> transferQuiverAmmo(
             LoadedCharacterSession session,
             LotId sourceLotId,

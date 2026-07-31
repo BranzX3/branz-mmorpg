@@ -10,6 +10,7 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
 import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.AmmoProfile;
+import com.branz.mmorpg.items.definition.CatalystProfile;
 import com.branz.mmorpg.items.definition.CrossbowWeaponProfile;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
@@ -26,6 +27,108 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CharacterSessionServiceIntegrationTest {
+    @Test
+    void catalystWearCommitsExactlyOnceAndSurvivesReconnectAndRestart(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(10));
+        UUID playerId = UUID.randomUUID();
+        ItemId staffId;
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database);
+            LoadedCharacterSession session = success(service.open(playerId));
+            DefinitionId staffDefinitionId = DefinitionId.of("weapon.test.staff");
+            ItemDefinition staff =
+                    new ItemDefinition(
+                            staffDefinitionId,
+                            staffDefinitionId,
+                            ItemClass.UNIQUE_DURABLE,
+                            OptionalInt.of(100),
+                            false,
+                            Optional.of(new WeaponCombatProfile("STAFF", 95)),
+                            Optional.empty(),
+                            Optional.empty(),
+                            Optional.of(new CatalystProfile(Set.of("STAFF", "EMBER"), 0.85, 1)));
+            session = success(service.grantTestValue(session, staff, 0, "content.test.1"));
+            staffId =
+                    new ItemId(
+                            session.snapshot().inventory().stream()
+                                    .filter(value -> value.definitionId().equals(staffDefinitionId))
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .valueId());
+            session =
+                    success(
+                            service.commitEquipment(
+                                    session,
+                                    session.snapshot()
+                                            .equipment()
+                                            .with(EquipmentSlot.MAIN_HAND, Optional.of(staffId)),
+                                    "content.test.1"));
+            LoadedCharacterSession beforeCommit = session;
+            UUID operationId = UUID.randomUUID();
+            LoadedCharacterSession committed =
+                    success(
+                            service.commitCatalystUse(
+                                    beforeCommit,
+                                    staffId,
+                                    staffDefinitionId,
+                                    100,
+                                    1,
+                                    DefinitionId.of("spell.ember.fire_lance"),
+                                    operationId,
+                                    "content.test.1"));
+            assertEquals(new CatalystDurability(99, 100), catalystState(committed, staffId, 100));
+
+            LoadedCharacterSession replayed =
+                    success(
+                            service.commitCatalystUse(
+                                    beforeCommit,
+                                    staffId,
+                                    staffDefinitionId,
+                                    100,
+                                    1,
+                                    DefinitionId.of("spell.ember.fire_lance"),
+                                    operationId,
+                                    "content.test.1"));
+            assertEquals(new CatalystDurability(99, 100), catalystState(replayed, staffId, 100));
+
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> stale =
+                    service.commitCatalystUse(
+                            beforeCommit,
+                            staffId,
+                            staffDefinitionId,
+                            100,
+                            1,
+                            DefinitionId.of("spell.ember.fire_lance"),
+                            UUID.randomUUID(),
+                            "content.test.1");
+            assertTrue(stale instanceof Result.Failure<?, ?>);
+
+            service.close(replayed);
+            session = success(service.open(playerId));
+            assertEquals(new CatalystDurability(99, 100), catalystState(session, staffId, 100));
+            service.close(session);
+        }
+        try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(restarted);
+            LoadedCharacterSession session = success(service.open(playerId));
+            assertEquals(new CatalystDurability(99, 100), catalystState(session, staffId, 100));
+            service.close(session);
+        }
+    }
+
     @Test
     void crossbowCheckpointsAndBoundBoltSurviveReconnectAndRestart(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
@@ -474,5 +577,16 @@ class CharacterSessionServiceIntegrationTest {
                         .findFirst()
                         .orElseThrow()
                         .payloadJson());
+    }
+
+    private static CatalystDurability catalystState(
+            LoadedCharacterSession session, ItemId staffId, int baseMaximum) {
+        return CatalystPayloadCodec.decode(
+                session.snapshot().itemRecords().stream()
+                        .filter(item -> item.itemId().equals(staffId))
+                        .findFirst()
+                        .orElseThrow()
+                        .payloadJson(),
+                baseMaximum);
     }
 }

@@ -1395,3 +1395,64 @@ Non-goals:
 Schema/config impact: item schema adds `weapon_profile.crossbow.bolt_placement_ticks` and
 `locking_ticks`; the manifest adds three items and one move. Migration impact: no SQL migration;
 existing item JSONB, Quiver lots and value journal are reused, documented by ADR 0010.
+
+## Milestone 5 - Staff and Ember Fire Lance slice
+
+Implemented:
+
+- `mmo-magic` now compiles immutable `spell.*` definitions with cast/target/delivery dimensions,
+  catalyst and attunement requirements, mana cost, phase timings, interruption policy, projectile
+  physics, arcane output and PvE/PvP profiles;
+- deterministic CHARGE casting reserves mana at start, gates release by authored minimum/maximum
+  charge, commits mana at release, refunds pre-commit cancellation and completes authored recovery;
+- arcane damage resolves separately from physical armor with bounded elemental resistance,
+  deterministic conditional advantage and no random hit/critical roll;
+- Item Engine catalyst profiles declare tags, channel stability and durability cost; a Staff may own
+  both weapon and catalyst profiles while ammo/Quiver combinations remain invalid;
+- catalyst durability is item-UUID-owned JSON state. Legacy payloads start full, committed spells
+  advance display revision and a PostgreSQL item-payload CAS verifies version, owner, main-hand
+  location and exact old payload before projectile creation;
+- the training Staff LMB uses `move.training_staff.primary_1`; RMB starts Ember Fire Lance windup,
+  enters charge, and a second RMB after the minimum releases it (maximum charge auto-releases);
+- the Paper adapter reuses authoritative projectile collision, HP and posture engines, emits Fire
+  presentation, exposes spell phase plus mana reservation in `/mmo health`, and regenerates mana at
+  8/s in exploration or 2/s after a 60-tick engaged commit delay;
+- example content contains `weapon.training_staff`, `move.training_staff.primary_1` and
+  `spell.ember.fire_lance`; startup rejects missing or incompatible Staff/move/spell contracts.
+
+Tests:
+
+- Spell Engine tests compile the complete Ember projectile contract and reject missing projectile
+  fields;
+- Spell Cast tests cover mana reservation, early-release rejection, exact commit, recovery,
+  pre-commit refund, incompatible catalyst, insufficient attunement and insufficient mana;
+- arcane damage tests cover resistance bounds and deterministic advantage;
+- Item Engine and generated-schema tests cover combined Staff/catalyst profiles and public spell
+  fields;
+- payload codec tests cover legacy full durability, unrelated-field preservation, display-revision
+  advance, broken catalysts, malformed state and definition mismatch;
+- embedded PostgreSQL integration proves exactly-once catalyst wear, stale CAS rejection,
+  reconnect restoration and database-restart restoration.
+
+Failure/recovery behavior:
+
+- no projectile exists before the catalyst transaction succeeds;
+- transaction failure refunds reserved mana and leaves item durability unchanged;
+- an interruption while the transaction is in flight waits for its terminal result, then either
+  refunds on failure or commits mana/wear without fabricating a projectile for an invalid live
+  session;
+- broken/missing/swapped catalysts, insufficient mana/attunement, projectile-cap exhaustion and
+  active combat locks reject visibly.
+
+Non-goals:
+
+- the remaining Ember instant/zone/channel spells and the Runic Imbuement family;
+- persistent learned-art, moveset, form and attunement loadouts; this test slice exposes an explicit
+  two-point training attunement fixture;
+- Staff signature/utility branches, catalyst repair and authored enemy elemental resistances;
+- packet-native RMB held/release edges; the local signed-item adapter uses first RMB to start and a
+  second RMB to release.
+
+Schema/config impact: item schema adds optional `catalyst_profile`; spell schema gains a complete
+charge-projectile contract and the manifest adds one item, one move and one spell. Migration impact:
+no SQL migration; existing item JSONB and value journal are reused, documented by ADR 0011.

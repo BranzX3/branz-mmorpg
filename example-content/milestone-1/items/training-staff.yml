@@ -1,0 +1,14 @@
+definition_id: weapon.training_staff
+schema_version: 1
+asset_id: weapon.training_staff
+item_class: UNIQUE_DURABLE
+base_max_durability: 100
+weapon_profile:
+  family: STAFF
+  power: 95
+catalyst_profile:
+  tags: [STAFF, EMBER]
+  channel_stability: 0.85
+  durability_cost_per_commit: 1
+status: approved
+owning_team: combat

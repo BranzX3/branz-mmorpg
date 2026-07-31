@@ -149,6 +149,29 @@
           "maximum" : 40.0
         }
       }
+    },
+    "catalyst_profile" : {
+      "type" : "object",
+      "properties" : {
+        "tags" : {
+          "type" : "array",
+          "description" : "Catalyst compatibility tags.",
+          "minItems" : 1
+        },
+        "channel_stability" : {
+          "type" : "number",
+          "description" : "Bounded catalyst channel stability.",
+          "x-unit" : "ratio",
+          "minimum" : 0.0,
+          "maximum" : 1.0
+        },
+        "durability_cost_per_commit" : {
+          "type" : "integer",
+          "description" : "Durability consumed at spell commit.",
+          "x-unit" : "durability",
+          "minimum" : 1.0
+        }
+      }
     }
   },
   "required" : [ "definition_id", "schema_version", "asset_id", "item_class" ]

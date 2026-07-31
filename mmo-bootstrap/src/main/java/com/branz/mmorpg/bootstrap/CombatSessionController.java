@@ -110,12 +110,24 @@ import com.branz.mmorpg.combat.weapon.WeaponTransitionMachine;
 import com.branz.mmorpg.combat.weapon.WeaponTransitionSnapshot;
 import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.BowWeaponProfile;
+import com.branz.mmorpg.items.definition.CatalystProfile;
 import com.branz.mmorpg.items.definition.CrossbowWeaponProfile;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.QuiverProfile;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
+import com.branz.mmorpg.magic.cast.SpellCastEngine;
+import com.branz.mmorpg.magic.cast.SpellCastErrorCode;
+import com.branz.mmorpg.magic.cast.SpellCastPhase;
+import com.branz.mmorpg.magic.cast.SpellCastRuntime;
+import com.branz.mmorpg.magic.damage.ArcaneDamageBreakdown;
+import com.branz.mmorpg.magic.damage.ArcaneDamageRequest;
+import com.branz.mmorpg.magic.damage.ArcaneDamageResolver;
+import com.branz.mmorpg.magic.definition.ArcaneSchool;
+import com.branz.mmorpg.magic.definition.SpellDefinition;
+import com.branz.mmorpg.magic.definition.SpellDeliveryType;
+import com.branz.mmorpg.magic.definition.SpellEngine;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -166,15 +178,26 @@ final class CombatSessionController implements Listener {
             DefinitionId.of("move.training_crossbow.shot");
     private static final DefinitionId TRAINING_CROSSBOW_ITEM =
             DefinitionId.of("weapon.training_crossbow");
+    private static final DefinitionId TRAINING_STAFF_MOVE =
+            DefinitionId.of("move.training_staff.primary_1");
+    private static final DefinitionId TRAINING_STAFF_ITEM =
+            DefinitionId.of("weapon.training_staff");
+    private static final DefinitionId EMBER_FIRE_LANCE = DefinitionId.of("spell.ember.fire_lance");
+    private static final int TRAINING_ATTUNEMENT_CAPACITY = 2;
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
     private final MoveEngine moves;
+    private final SpellEngine spells;
     private final ItemEngine items;
     private final String contentVersion;
     private final MoveDefinition trainingMove;
     private final MoveDefinition trainingBowMove;
     private final MoveDefinition trainingCrossbowMove;
+    private final MoveDefinition trainingStaffMove;
+    private final SpellDefinition emberFireLance;
+    private final CatalystProfile trainingStaffCatalyst;
+    private final int trainingStaffMaximumDurability;
     private final DefinitionId trainingBowAmmo;
     private final AmmoFamily trainingBowAmmoFamily;
     private final DefinitionId trainingCrossbowAmmo;
@@ -182,8 +205,11 @@ final class CombatSessionController implements Listener {
     private final double trainingWeaponPower;
     private final double trainingBowPower;
     private final double trainingCrossbowPower;
+    private final double trainingStaffPower;
     private final BowDrawEngine bowDraws;
     private final CrossbowEngine crossbows;
+    private final SpellCastEngine spellCasts = new SpellCastEngine();
+    private final ArcaneDamageResolver arcaneDamage = new ArcaneDamageResolver();
     private final int maximumActiveProjectilesPerCaster;
     private final WeaponTransitionMachine weapons;
     private final CombatInputPolicy inputPolicy = new CombatInputPolicy();
@@ -223,6 +249,7 @@ final class CombatSessionController implements Listener {
             CharacterSessionController characters,
             ItemEngine items,
             MoveEngine moves,
+            SpellEngine spells,
             String contentVersion,
             double trainingWeaponPower,
             int maximumActiveProjectilesPerCaster,
@@ -242,6 +269,7 @@ final class CombatSessionController implements Listener {
         this.characters = Objects.requireNonNull(characters, "characters");
         this.items = Objects.requireNonNull(items, "items");
         this.moves = Objects.requireNonNull(moves, "moves");
+        this.spells = Objects.requireNonNull(spells, "spells");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
         if (contentVersion.isBlank()) {
             throw new IllegalArgumentException("contentVersion must not be blank");
@@ -352,6 +380,62 @@ final class CombatSessionController implements Listener {
                 new CrossbowEngine(
                         new CrossbowReloadProfile(
                                 crossbow.boltPlacementTicks(), crossbow.lockingTicks()));
+        trainingStaffMove =
+                moves.find(TRAINING_STAFF_MOVE)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "active content is missing "
+                                                        + TRAINING_STAFF_MOVE));
+        if (!trainingStaffMove.family().equals("STAFF")
+                || trainingStaffMove.input().action() != SemanticInput.PRIMARY) {
+            throw new IllegalArgumentException("training Staff move requires PRIMARY input");
+        }
+        ItemDefinition trainingStaffDefinition =
+                items.find(TRAINING_STAFF_ITEM)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "active content is missing "
+                                                        + TRAINING_STAFF_ITEM));
+        WeaponCombatProfile staffWeapon =
+                trainingStaffDefinition
+                        .weaponProfile()
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "training Staff requires weapon profile"));
+        if (!staffWeapon.family().equals("STAFF")) {
+            throw new IllegalArgumentException("training Staff requires STAFF family");
+        }
+        trainingStaffPower = staffWeapon.power();
+        trainingStaffCatalyst =
+                trainingStaffDefinition
+                        .catalystProfile()
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "training Staff requires catalyst profile"));
+        trainingStaffMaximumDurability =
+                trainingStaffDefinition
+                        .baseMaxDurability()
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "training Staff requires base durability"));
+        emberFireLance =
+                spells.find(EMBER_FIRE_LANCE)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "active content is missing " + EMBER_FIRE_LANCE));
+        if (emberFireLance.deliveryType() != SpellDeliveryType.PROJECTILE
+                || !trainingStaffCatalyst
+                        .tags()
+                        .containsAll(emberFireLance.requirements().catalystTags())) {
+            throw new IllegalArgumentException(
+                    "Ember Fire Lance requires a compatible Staff projectile catalyst");
+        }
         if (maximumActiveProjectilesPerCaster < 1 || maximumActiveProjectilesPerCaster > 128) {
             throw new IllegalArgumentException(
                     "maximumActiveProjectilesPerCaster must be between 1 and 128");
@@ -454,6 +538,8 @@ final class CombatSessionController implements Listener {
                                         session.crossbowRecoveryUntilTick
                                                 - plugin.getServer().getCurrentTick()),
                         session.pendingCrossbowCommit != null,
+                        Optional.ofNullable(session.spellCast).map(SpellCastRuntime::phase),
+                        session.pendingSpellCommit != null,
                         activeProjectilesFor(player.getUniqueId()),
                         session.pendingBowLaunch != null,
                         selectedAmmo,
@@ -496,6 +582,8 @@ final class CombatSessionController implements Listener {
                         session.health.dead(),
                         resources.stamina(),
                         resources.reservedStamina(),
+                        resources.mana(),
+                        resources.reservedMana(),
                         Optional.ofNullable(session.lastResolution)));
     }
 
@@ -566,6 +654,7 @@ final class CombatSessionController implements Listener {
         cancelAction(session, "WEAPON_SWAP");
         cancelBow(session, "WEAPON_SWAP");
         cancelCrossbow(session, "WEAPON_SWAP");
+        cancelSpell(session, "WEAPON_SWAP");
         releaseGuard(session);
         session.input.clearBuffer(InputBufferClearReason.WEAPON_SWAP);
         select(session, selectedSlot(event.getPlayer(), event.getNewSlot()));
@@ -585,6 +674,7 @@ final class CombatSessionController implements Listener {
                 || session.bowDraw != null
                 || session.pendingBowLaunch != null
                 || session.pendingCrossbowCommit != null
+                || session.spellCast != null
                 || session.pendingAmmoCycleId != null) {
             player.sendActionBar(Component.text("AMMO SWITCH ACTION LOCKED", NamedTextColor.RED));
             return;
@@ -646,6 +736,10 @@ final class CombatSessionController implements Listener {
         if (session == null || !characters.ready(event.getPlayer())) {
             return;
         }
+        MoveDefinition primary = primaryMove(event.getPlayer()).orElse(null);
+        if (primary == null) {
+            return;
+        }
         SemanticInput intent =
                 resolvedIntent(event.getPlayer(), session, ClientAction.ATTACK).orElse(null);
         if (intent != SemanticInput.PRIMARY) {
@@ -658,7 +752,7 @@ final class CombatSessionController implements Listener {
                                 plugin.getServer().getCurrentTick(),
                                 intent,
                                 DirectionSnapshot.NEUTRAL,
-                                trainingMove.input().branch(),
+                                primary.input().branch(),
                                 new InputDeduplicationKey("MAIN_HAND", "ATTACK")));
         if (observed instanceof Result.Failure<CombatInputRequest, InputRejectionCode>) {
             return;
@@ -843,6 +937,11 @@ final class CombatSessionController implements Listener {
             }
             return;
         }
+        if (family.equals("STAFF")) {
+            event.setCancelled(true);
+            handleStaffUse(event.getPlayer(), session);
+            return;
+        }
         if (!family.equals("SWORD") || session.engagement.state() != EngagementState.ENGAGED) {
             return;
         }
@@ -955,6 +1054,7 @@ final class CombatSessionController implements Listener {
         cancelAction(session, "DEATH");
         cancelBow(session, "DEATH");
         cancelCrossbow(session, "DEATH");
+        cancelSpell(session, "DEATH");
         removeOwnerProjectiles(player.getUniqueId());
         session.input.clearBuffer(InputBufferClearReason.DEATH);
         releaseGuard(session);
@@ -1024,6 +1124,7 @@ final class CombatSessionController implements Listener {
         cancelAction(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         cancelBow(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         cancelCrossbow(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
+        cancelSpell(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         removeOwnerProjectiles(event.getPlayer().getUniqueId());
         session.input.clearBuffer(InputBufferClearReason.WORLD_CHANGE);
         releaseGuard(session);
@@ -1061,6 +1162,7 @@ final class CombatSessionController implements Listener {
             tickSneakPress(player, session);
             tickBow(player, session);
             tickCrossbow(player, session);
+            tickSpell(player, session);
             tickDodge(player, session);
             session.guard = guards.tick(session.guard, plugin.getServer().getCurrentTick());
             session.poise = poise.tick(session.poise, plugin.getServer().getCurrentTick());
@@ -1073,6 +1175,7 @@ final class CombatSessionController implements Listener {
                             session.engagement.state() == EngagementState.EXPLORATION);
             updateHealthPresentation(player, session);
             regenerateStamina(session);
+            regenerateMana(session);
         }
     }
 
@@ -1090,6 +1193,7 @@ final class CombatSessionController implements Listener {
         }
         session.timeline =
                 ((Result.Success<ActionTimeline, ActionTimelineErrorCode>) advanced).value();
+        MoveDefinition activeMove = session.timeline.move();
         if (priorResourceState == ResourceCommitState.RESERVED
                 && session.timeline.resourceState() == ResourceCommitState.COMMITTED) {
             session.lastStaminaSpendTick = plugin.getServer().getCurrentTick();
@@ -1099,7 +1203,7 @@ final class CombatSessionController implements Listener {
         if (session.timeline.phase() != prior) {
             player.sendActionBar(
                     Component.text(
-                            trainingMove.id().value()
+                            activeMove.id().value()
                                     + " "
                                     + session.timeline.phase()
                                     + " tick="
@@ -1128,7 +1232,8 @@ final class CombatSessionController implements Listener {
 
     private void resolveTrainingHitbox(
             Player player, LiveSession session, CombatTransform currentTransform) {
-        MoveDefinition.Hitbox hitbox = trainingMove.hitboxes().getFirst();
+        MoveDefinition activeMove = session.timeline.move();
+        MoveDefinition.Hitbox hitbox = activeMove.hitboxes().getFirst();
         if (hitbox.shape() != MoveDefinition.HitboxShape.ARC) {
             session.lastResolution = "unsupported " + hitbox.shape();
             return;
@@ -1234,8 +1339,10 @@ final class CombatSessionController implements Listener {
             PhysicalDamageBreakdown breakdown =
                     damage.resolve(
                             new PhysicalDamageRequest(
-                                    trainingWeaponPower,
-                                    trainingMove.outputs().moveCoefficient(),
+                                    activeMove.family().equals("STAFF")
+                                            ? trainingStaffPower
+                                            : trainingWeaponPower,
+                                    activeMove.outputs().moveCoefficient(),
                                     0,
                                     armor,
                                     0,
@@ -1244,7 +1351,7 @@ final class CombatSessionController implements Listener {
                                     postureBroken
                                             ? java.util.Set.of(ConditionalAdvantage.POSTURE_BREAK)
                                             : java.util.Set.of(),
-                                    trainingMove.profiles().pveMultiplier()));
+                                    activeMove.profiles().pveMultiplier()));
             CombatHealthRuntime targetHealth =
                     trainingTargetHealth.computeIfAbsent(
                             target.entityId(),
@@ -1255,7 +1362,7 @@ final class CombatSessionController implements Listener {
             trainingTargetHealth.put(target.entityId(), healthResolution.runtime());
             totalDamage += healthResolution.appliedAmount();
             PostureResolution postureResolution =
-                    postures.damage(posture, currentTick, trainingMove.outputs().posture());
+                    postures.damage(posture, currentTick, activeMove.outputs().posture());
             trainingTargetPosture.put(target.entityId(), postureResolution.runtime());
             if (postureResolution.justBroke()) {
                 postureBreaks++;
@@ -1350,7 +1457,7 @@ final class CombatSessionController implements Listener {
             ProjectileTickResolution resolution =
                     projectiles.advance(new ProjectileTickQuery(runtime, candidates, blockContact));
             world.spawnParticle(
-                    Particle.CRIT,
+                    live.context().arcaneSchool().isPresent() ? Particle.FLAME : Particle.CRIT,
                     new Location(
                             world,
                             resolution.pathEnd().x(),
@@ -1441,30 +1548,41 @@ final class CombatSessionController implements Listener {
                             ? 0
                             : Objects.requireNonNull(entity.getAttribute(Attribute.ARMOR))
                                     .getValue();
-            PhysicalDamageBreakdown breakdown =
-                    damage.resolve(
-                            new PhysicalDamageRequest(
-                                    live.context().weaponPower(),
-                                    live.context().move().outputs().moveCoefficient(),
-                                    0,
-                                    armor,
-                                    live.context().penetrationPercentage(),
-                                    0,
-                                    0,
-                                    advantages,
-                                    live.context().move().profiles().pveMultiplier()));
+            double finalDamage;
+            if (live.context().arcaneSchool().isPresent()) {
+                ArcaneDamageBreakdown breakdown =
+                        arcaneDamage.resolve(
+                                new ArcaneDamageRequest(
+                                        live.context().arcaneSchool().orElseThrow(),
+                                        live.context().sourcePower(),
+                                        live.context().powerCoefficient(),
+                                        0,
+                                        advantages,
+                                        live.context().pveMultiplier()));
+                finalDamage = breakdown.finalDamage();
+            } else {
+                PhysicalDamageBreakdown breakdown =
+                        damage.resolve(
+                                new PhysicalDamageRequest(
+                                        live.context().sourcePower(),
+                                        live.context().powerCoefficient(),
+                                        0,
+                                        armor,
+                                        live.context().penetrationPercentage(),
+                                        0,
+                                        0,
+                                        advantages,
+                                        live.context().pveMultiplier()));
+                finalDamage = breakdown.finalDamage();
+            }
             CombatHealthRuntime targetHealth =
                     trainingTargetHealth.computeIfAbsent(
                             hit.entityId(),
                             ignored -> CombatHealthRuntime.full(enemyHealth.profile(), tick));
-            CombatHealthResolution health =
-                    enemyHealth.damage(targetHealth, tick, breakdown.finalDamage());
+            CombatHealthResolution health = enemyHealth.damage(targetHealth, tick, finalDamage);
             trainingTargetHealth.put(hit.entityId(), health.runtime());
             int postureDamage =
-                    (int)
-                            Math.round(
-                                    live.context().move().outputs().posture()
-                                            * live.context().postureMultiplier());
+                    (int) Math.round(live.context().posture() * live.context().postureMultiplier());
             PostureResolution postureResolution = postures.damage(posture, tick, postureDamage);
             trainingTargetPosture.put(hit.entityId(), postureResolution.runtime());
             if (ownerSession != null) {
@@ -1685,6 +1803,7 @@ final class CombatSessionController implements Listener {
         cancelAction(session, "CC_" + severity);
         cancelBow(session, "CC_" + severity);
         cancelCrossbow(session, "CC_" + severity);
+        cancelSpell(session, "CC_" + severity);
         session.input.clearBuffer(InputBufferClearReason.HARD_CC);
         releaseGuard(session);
         session.dodge = null;
@@ -1826,6 +1945,7 @@ final class CombatSessionController implements Listener {
         releaseGuard(session);
         cancelBow(session, "DODGE");
         cancelCrossbow(session, "DODGE");
+        cancelSpell(session, "DODGE");
         session.timeline = null;
         session.previousActionTransform = null;
         session.action = ActionState.IDLE;
@@ -1931,6 +2051,7 @@ final class CombatSessionController implements Listener {
         long tick = plugin.getServer().getCurrentTick();
         if (session.action != ActionState.IDLE
                 || session.timeline != null
+                || session.spellCast != null
                 || session.dodge != null
                 || session.guard.active()
                 || session.pendingAmmoCycleId != null
@@ -2140,7 +2261,7 @@ final class CombatSessionController implements Listener {
                 new LiveProjectile(
                         pending.worldId(),
                         runtime,
-                        new ProjectileCombatContext(
+                        ProjectileCombatContext.physical(
                                 trainingBowPower,
                                 trainingBowMove,
                                 pending.charge().postureMultiplier(),
@@ -2305,7 +2426,7 @@ final class CombatSessionController implements Listener {
             return false;
         }
         return session.timeline == null
-                || session.timeline.tick() >= trainingMove.cancels().dodgeFromTick();
+                || session.timeline.tick() >= session.timeline.move().cancels().dodgeFromTick();
     }
 
     private static DirectionSnapshot direction(Input input) {
@@ -2381,15 +2502,18 @@ final class CombatSessionController implements Listener {
     }
 
     private void startMove(Player player, LiveSession session) {
-        if (!equippedWeaponFamily(player).filter("SWORD"::equals).isPresent()) {
+        MoveDefinition activeMove = primaryMove(player).orElse(null);
+        if (activeMove == null) {
             player.sendActionBar(
                     Component.text(
-                            "Training slash requires the training blade.", NamedTextColor.RED));
+                            "Primary strike requires the training blade or Staff.",
+                            NamedTextColor.RED));
             return;
         }
         if (session.action != ActionState.IDLE
                 || session.timeline != null
                 || session.bowDraw != null
+                || session.spellCast != null
                 || session.dodge != null
                 || session.guard.active()) {
             if (session.dodge != null) {
@@ -2403,7 +2527,7 @@ final class CombatSessionController implements Listener {
             return;
         }
         Result<ActionTimeline, ActionTimelineErrorCode> started =
-                ActionTimeline.start(trainingMove, session.resources);
+                ActionTimeline.start(activeMove, session.resources);
         if (started instanceof Result.Failure<ActionTimeline, ActionTimelineErrorCode> failure) {
             player.sendActionBar(
                     Component.text("Move rejected: " + failure.error().code(), NamedTextColor.RED));
@@ -2417,9 +2541,9 @@ final class CombatSessionController implements Listener {
         session.action = actionState(session.timeline.phase());
         player.sendActionBar(
                 Component.text(
-                        trainingMove.id().value()
+                        activeMove.id().value()
                                 + " started; stamina reserved="
-                                + trainingMove.costs().stamina(),
+                                + activeMove.costs().stamina(),
                         NamedTextColor.AQUA));
     }
 
@@ -2448,7 +2572,7 @@ final class CombatSessionController implements Listener {
         session.lastTrace =
                 new CombatTrace(
                         contentVersion,
-                        trainingMove.id(),
+                        terminalTimeline.move().id(),
                         session.activeTraceInitialResources,
                         session.activeTraceCommands,
                         terminalTimeline.trace(),
@@ -2540,6 +2664,36 @@ final class CombatSessionController implements Listener {
                 .map(WeaponCombatProfile::family);
     }
 
+    private void regenerateMana(LiveSession session) {
+        if (session.health.dead()
+                || session.spellCast != null
+                || session.resources.mana() >= session.resources.maximumMana()) {
+            return;
+        }
+        long currentTick = plugin.getServer().getCurrentTick();
+        boolean engaged = session.engagement.state() == EngagementState.ENGAGED;
+        if (engaged && currentTick - session.lastManaCommitTick < 60) {
+            return;
+        }
+        session.manaRegenRemainder += (engaged ? 2.0 : 8.0) / 20.0;
+        int whole = (int) session.manaRegenRemainder;
+        if (whole > 0) {
+            session.resources = session.resources.restoreMana(whole);
+            session.manaRegenRemainder -= whole;
+        }
+    }
+
+    private Optional<MoveDefinition> primaryMove(Player player) {
+        return equippedWeaponFamily(player)
+                .flatMap(
+                        family ->
+                                switch (family) {
+                                    case "SWORD" -> Optional.of(trainingMove);
+                                    case "STAFF" -> Optional.of(trainingStaffMove);
+                                    default -> Optional.empty();
+                                });
+    }
+
     private void select(LiveSession session, SelectedHotbarSlot selected) {
         Result<WeaponTransitionSnapshot, WeaponTransitionErrorCode> result =
                 weapons.select(session.weapon, selected);
@@ -2576,6 +2730,255 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    private void handleStaffUse(Player player, LiveSession session) {
+        long tick = plugin.getServer().getCurrentTick();
+        if (session.pendingSpellCommit != null) {
+            player.sendActionBar(Component.text("SPELL COMMITTING", NamedTextColor.YELLOW));
+            return;
+        }
+        if (session.spellCast == null) {
+            startStaffCast(player, session, tick);
+            return;
+        }
+        beginStaffSpellCommit(player, session, tick);
+    }
+
+    private void startStaffCast(Player player, LiveSession session, long tick) {
+        if (session.action != ActionState.IDLE
+                || session.timeline != null
+                || session.bowDraw != null
+                || session.crossbow != null
+                        && (session.crossbow.phase() == CrossbowPhase.COCKING
+                                || session.crossbow.phase() == CrossbowPhase.LOCKING)
+                || session.dodge != null
+                || session.guard.active()
+                || session.ammoSwitchHandlingUntilTick > tick) {
+            player.sendActionBar(Component.text("STAFF CAST LOCKED", NamedTextColor.RED));
+            return;
+        }
+        CatalystDurability durability;
+        try {
+            durability =
+                    characters
+                            .equippedCatalystDurability(player, trainingStaffMaximumDurability)
+                            .orElse(null);
+        } catch (IllegalArgumentException exception) {
+            player.sendActionBar(Component.text("CATALYST STATE INVALID", NamedTextColor.RED));
+            return;
+        }
+        if (durability == null
+                || durability.current() < trainingStaffCatalyst.durabilityCostPerCommit()) {
+            player.sendActionBar(Component.text("CATALYST BROKEN", NamedTextColor.RED));
+            return;
+        }
+        Result<SpellCastRuntime, SpellCastErrorCode> started =
+                spellCasts.start(
+                        emberFireLance,
+                        session.resources,
+                        trainingStaffCatalyst.tags(),
+                        TRAINING_ATTUNEMENT_CAPACITY,
+                        tick);
+        if (!(started instanceof Result.Success<SpellCastRuntime, SpellCastErrorCode> success)) {
+            SpellCastErrorCode error =
+                    ((Result.Failure<SpellCastRuntime, SpellCastErrorCode>) started).error();
+            player.sendActionBar(
+                    Component.text("SPELL REJECTED " + error.code(), NamedTextColor.RED));
+            return;
+        }
+        session.spellCast = success.value();
+        session.resources = session.spellCast.resources();
+        session.action = ActionState.WINDUP;
+        session.lastResolution = "FIRE LANCE WINDUP mana-reserved=" + emberFireLance.manaCost();
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GOLD));
+    }
+
+    private void tickSpell(Player player, LiveSession session) {
+        if (session.spellCast == null || session.pendingSpellCommit != null) {
+            return;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        SpellCastPhase prior = session.spellCast.phase();
+        session.spellCast = spellCasts.advance(session.spellCast, tick);
+        session.resources = session.spellCast.resources();
+        if (session.spellCast.phase() == SpellCastPhase.CHARGING) {
+            session.action = ActionState.CHANNELING;
+            if (prior != SpellCastPhase.CHARGING) {
+                session.lastResolution = "FIRE LANCE CHARGING";
+                player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GOLD));
+            }
+            if (spellCasts.maximumChargeReached(session.spellCast, tick)) {
+                beginStaffSpellCommit(player, session, tick);
+            }
+            return;
+        }
+        if (session.spellCast.phase() == SpellCastPhase.RECOVERY) {
+            session.action = ActionState.RECOVERY;
+        } else if (session.spellCast.phase() == SpellCastPhase.COMPLETE) {
+            session.resources = session.spellCast.resources();
+            session.spellCast = null;
+            session.action = ActionState.IDLE;
+        }
+    }
+
+    private void beginStaffSpellCommit(Player player, LiveSession session, long tick) {
+        if (session.spellCast == null || !spellCasts.canRelease(session.spellCast, tick)) {
+            player.sendActionBar(Component.text("FIRE LANCE NOT READY", NamedTextColor.RED));
+            return;
+        }
+        if (activeProjectilesFor(player.getUniqueId()) >= maximumActiveProjectilesPerCaster) {
+            player.sendActionBar(
+                    Component.text(
+                            "Projectile limit reached for this caster.", NamedTextColor.RED));
+            return;
+        }
+        ItemId catalystItemId = characters.equippedMainHandItemId(player).orElse(null);
+        if (catalystItemId == null) {
+            cancelSpell(session, "CATALYST_MISSING");
+            return;
+        }
+        UUID projectileId = UUID.randomUUID();
+        PendingSpellCommit pending =
+                new PendingSpellCommit(
+                        projectileId, catalystItemId, pendingSpellLaunch(player, projectileId));
+        session.pendingSpellCommit = pending;
+        session.spellCommitInterrupted = false;
+        session.action = ActionState.ACTIVE;
+        session.lastResolution = "FIRE LANCE COMMITTING";
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        characters.commitCatalystUse(
+                player,
+                catalystItemId,
+                TRAINING_STAFF_ITEM,
+                trainingStaffMaximumDurability,
+                trainingStaffCatalyst.durabilityCostPerCommit(),
+                emberFireLance.id(),
+                projectileId,
+                contentVersion,
+                result -> completeStaffSpellCommit(player.getUniqueId(), session, pending, result));
+    }
+
+    private void completeStaffSpellCommit(
+            UUID playerId,
+            LiveSession expectedSession,
+            PendingSpellCommit pending,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> result) {
+        LiveSession session = sessions.get(playerId);
+        if (session != expectedSession || session.pendingSpellCommit != pending) {
+            return;
+        }
+        session.pendingSpellCommit = null;
+        Player player = plugin.getServer().getPlayer(playerId);
+        if (result
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            cancelSpell(session, "COMMIT_FAILED_" + failure.error().code());
+            if (player != null && player.isOnline()) {
+                player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            }
+            return;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        Result<SpellCastRuntime, SpellCastErrorCode> released =
+                spellCasts.release(session.spellCast, tick);
+        if (!(released instanceof Result.Success<SpellCastRuntime, SpellCastErrorCode> success)) {
+            session.spellCast = null;
+            session.action = ActionState.IDLE;
+            session.lastResolution = "FIRE LANCE RELEASE FAILED AFTER COMMIT";
+            return;
+        }
+        session.spellCast = success.value();
+        session.resources = session.spellCast.resources();
+        session.lastManaCommitTick = tick;
+        session.manaRegenRemainder = 0;
+        if (session.spellCommitInterrupted
+                || player == null
+                || !player.isOnline()
+                || player.isDead()
+                || !player.getWorld().getUID().equals(pending.launch().worldId())) {
+            session.spellCast = null;
+            if (!session.action.hardControl()) {
+                session.action = ActionState.IDLE;
+            }
+            session.lastResolution = "FIRE LANCE COMMITTED WITHOUT LIVE PROJECTILE";
+            return;
+        }
+        launchStaffSpellProjectile(player, session, pending.launch());
+        session.action = ActionState.RECOVERY;
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GOLD));
+    }
+
+    private PendingSpellLaunch pendingSpellLaunch(Player player, UUID projectileId) {
+        Location eye = player.getEyeLocation();
+        org.bukkit.util.Vector look = eye.getDirection().normalize();
+        CombatVector direction = new CombatVector(look.getX(), look.getY(), look.getZ());
+        CombatVector origin =
+                new CombatVector(eye.getX(), eye.getY(), eye.getZ()).add(direction.multiply(0.35));
+        return new PendingSpellLaunch(projectileId, player.getWorld().getUID(), origin, direction);
+    }
+
+    private void launchStaffSpellProjectile(
+            Player player, LiveSession session, PendingSpellLaunch pending) {
+        SpellDefinition.Projectile authored = emberFireLance.projectile().orElseThrow();
+        ProjectileProfile profile =
+                new ProjectileProfile(
+                        authored.speed(),
+                        authored.gravityPerTick(),
+                        authored.dragPerTick(),
+                        authored.collisionRadius(),
+                        authored.lifetimeTicks(),
+                        authored.pierceCount());
+        ProjectileIdentity identity =
+                new ProjectileIdentity(
+                        pending.projectileId(),
+                        player.getUniqueId(),
+                        emberFireLance.id(),
+                        contentVersion,
+                        Optional.empty(),
+                        authored.hitGroup());
+        ProjectileRuntime runtime =
+                ProjectileRuntime.launch(
+                        identity, profile, pending.origin(), pending.direction(), 1.0);
+        activeProjectiles.put(
+                pending.projectileId(),
+                new LiveProjectile(
+                        pending.worldId(),
+                        runtime,
+                        ProjectileCombatContext.arcane(trainingStaffPower, emberFireLance)));
+        markHostile(player, session);
+        CatalystDurability durability =
+                characters
+                        .equippedCatalystDurability(player, trainingStaffMaximumDurability)
+                        .orElseThrow();
+        session.lastResolution =
+                "FIRE LANCE RELEASED mana="
+                        + session.resources.mana()
+                        + " catalyst="
+                        + durability.current()
+                        + "/"
+                        + durability.maximum();
+    }
+
+    private void cancelSpell(LiveSession session, String reason) {
+        if (session.spellCast == null) {
+            return;
+        }
+        if (session.pendingSpellCommit != null) {
+            session.spellCommitInterrupted = true;
+            session.lastResolution = "SPELL INTERRUPTED DURING COMMIT " + reason;
+            return;
+        }
+        Result<SpellCastRuntime, SpellCastErrorCode> cancelled =
+                spellCasts.cancel(session.spellCast);
+        if (cancelled instanceof Result.Success<SpellCastRuntime, SpellCastErrorCode> success) {
+            session.resources = success.value().resources();
+        }
+        session.spellCast = null;
+        session.lastResolution = "SPELL CANCELLED " + reason;
+        if (!session.action.hardControl()) {
+            session.action = ActionState.IDLE;
+        }
+    }
+
     private void handleCrossbowUse(Player player, LiveSession session) {
         long tick = plugin.getServer().getCurrentTick();
         restoreEquippedCrossbow(player, session, tick);
@@ -2585,6 +2988,7 @@ final class CombatSessionController implements Listener {
         }
         if (session.pendingCrossbowCommit != null
                 || session.timeline != null
+                || session.spellCast != null
                 || session.dodge != null
                 || session.guard.active()
                 || session.pendingAmmoCycleId != null
@@ -2872,7 +3276,7 @@ final class CombatSessionController implements Listener {
                 new LiveProjectile(
                         pending.worldId(),
                         runtime,
-                        new ProjectileCombatContext(
+                        ProjectileCombatContext.physical(
                                 trainingCrossbowPower, trainingCrossbowMove, 1.0, 0.0)));
         markHostile(player, session);
         session.lastResolution =
@@ -2966,20 +3370,60 @@ final class CombatSessionController implements Listener {
     }
 
     private record ProjectileCombatContext(
-            double weaponPower,
-            MoveDefinition move,
+            double sourcePower,
+            double powerCoefficient,
+            int posture,
+            double pveMultiplier,
             double postureMultiplier,
-            double penetrationPercentage) {
+            double penetrationPercentage,
+            Optional<ArcaneSchool> arcaneSchool) {
         private ProjectileCombatContext {
-            if (!Double.isFinite(weaponPower)
-                    || weaponPower <= 0
+            if (!Double.isFinite(sourcePower)
+                    || sourcePower <= 0
+                    || !Double.isFinite(powerCoefficient)
+                    || powerCoefficient <= 0
+                    || posture < 0
+                    || !Double.isFinite(pveMultiplier)
+                    || pveMultiplier <= 0
                     || !Double.isFinite(postureMultiplier)
                     || postureMultiplier <= 0
                     || !Double.isFinite(penetrationPercentage)
                     || penetrationPercentage < 0) {
                 throw new IllegalArgumentException("invalid projectile combat context");
             }
+            Objects.requireNonNull(arcaneSchool, "arcaneSchool");
+            if (arcaneSchool.isPresent() && penetrationPercentage != 0) {
+                throw new IllegalArgumentException(
+                        "arcane projectiles cannot carry physical penetration");
+            }
+        }
+
+        private static ProjectileCombatContext physical(
+                double power,
+                MoveDefinition move,
+                double postureMultiplier,
+                double penetrationPercentage) {
             Objects.requireNonNull(move, "move");
+            return new ProjectileCombatContext(
+                    power,
+                    move.outputs().moveCoefficient(),
+                    move.outputs().posture(),
+                    move.profiles().pveMultiplier(),
+                    postureMultiplier,
+                    penetrationPercentage,
+                    Optional.empty());
+        }
+
+        private static ProjectileCombatContext arcane(double power, SpellDefinition spell) {
+            Objects.requireNonNull(spell, "spell");
+            return new ProjectileCombatContext(
+                    power,
+                    spell.output().powerCoefficient(),
+                    spell.output().posture(),
+                    spell.profiles().pveMultiplier(),
+                    1.0,
+                    0,
+                    Optional.of(spell.output().arcaneSchool()));
         }
     }
 
@@ -3039,6 +3483,29 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    private record PendingSpellLaunch(
+            UUID projectileId, UUID worldId, CombatVector origin, CombatVector direction) {
+        private PendingSpellLaunch {
+            Objects.requireNonNull(projectileId, "projectileId");
+            Objects.requireNonNull(worldId, "worldId");
+            Objects.requireNonNull(origin, "origin");
+            Objects.requireNonNull(direction, "direction");
+        }
+    }
+
+    private record PendingSpellCommit(
+            UUID operationId, ItemId catalystItemId, PendingSpellLaunch launch) {
+        private PendingSpellCommit {
+            Objects.requireNonNull(operationId, "operationId");
+            Objects.requireNonNull(catalystItemId, "catalystItemId");
+            Objects.requireNonNull(launch, "launch");
+            if (!operationId.equals(launch.projectileId())) {
+                throw new IllegalArgumentException(
+                        "spell operation and projectile identity must match");
+            }
+        }
+    }
+
     private static final class LiveSession {
         private EngagementRuntime engagement;
         private WeaponTransitionSnapshot weapon = WeaponTransitionSnapshot.initial();
@@ -3051,6 +3518,9 @@ final class CombatSessionController implements Listener {
         private ItemId crossbowItemId;
         private CrossbowRuntime crossbow;
         private PendingCrossbowCommit pendingCrossbowCommit;
+        private SpellCastRuntime spellCast;
+        private PendingSpellCommit pendingSpellCommit;
+        private boolean spellCommitInterrupted;
         private long crossbowRecoveryUntilTick = -1;
         private UUID pendingAmmoCycleId;
         private long ammoSwitchHandlingUntilTick = -1;
@@ -3071,6 +3541,8 @@ final class CombatSessionController implements Listener {
         private SneakPressWindow sneakPress;
         private long lastStaminaSpendTick = Long.MIN_VALUE / 2;
         private double staminaRegenRemainder;
+        private long lastManaCommitTick = Long.MIN_VALUE / 2;
+        private double manaRegenRemainder;
         private String lastResolution;
         private final java.util.Set<UUID> threatOwners = new java.util.HashSet<>();
 

@@ -1,0 +1,43 @@
+definition_id: move.training_staff.primary_1
+schema_version: 1
+family: STAFF
+input:
+  action: PRIMARY
+  direction: NEUTRAL
+  branch: PRIMARY_1
+phases:
+  windup_ticks: 5
+  active_ticks: 3
+  recovery_ticks: 7
+commit_tick: 4
+costs:
+  stamina: 10
+  mana: 0
+  health: 0
+  setup_stamina: 0
+movement:
+  curve: STEP
+  facing_turn_degrees: 12
+hitboxes:
+  - tick: 5
+    shape: ARC
+    range: 2.6
+    angle_degrees: 80
+    height: 2.0
+    max_targets: 3
+    hit_group: STAFF_PRIMARY
+outputs:
+  health:
+    physical_type: BLUNT
+    move_coefficient: 0.62
+  posture: 14
+  guard_pressure: 10
+cancels:
+  dodge_from_tick: 10
+  chain_windows: []
+interrupt_resistance: NONE
+presentation:
+  archetype: STAFF_SWEEP
+profiles:
+  pve_multiplier: 1.0
+  pvp_multiplier: 0.65

@@ -32,6 +32,16 @@ class JsonSchemaGeneratorTest {
                 schemas.get("mount.schema.json")
                         .at("/properties/permanent_death/enum/0")
                         .isBoolean());
+        ObjectNode spell = schemas.get("spell.schema.json");
+        assertEquals(
+                8.0, spell.at("/properties/projectile/properties/speed/maximum").doubleValue());
+        assertTrue(
+                spell.at("/properties/requirements/required").toString().contains("catalyst_tags"));
+        assertEquals(
+                1.0,
+                schemas.get("item.schema.json")
+                        .at("/properties/catalyst_profile/properties/channel_stability/maximum")
+                        .doubleValue());
         assertEquals(
                 DefinitionType.values().length,
                 schemas.get("content-definition.schema.json").path("oneOf").size());

@@ -1,0 +1,41 @@
+definition_id: spell.ember.fire_lance
+schema_version: 1
+art: magic.ember
+cast_type: CHARGE
+target_type: CROSSHAIR_POINT
+delivery: PROJECTILE
+requirements:
+  catalyst_tags: [STAFF, EMBER]
+  attunement: 2
+cost:
+  mana: 18
+phases:
+  windup_ticks: 8
+  minimum_charge_ticks: 8
+  maximum_charge_ticks: 30
+  recovery_ticks: 12
+interruption:
+  movement: false
+  damage: false
+  flinch: true
+  stagger: true
+  silence: true
+  weapon_swap: true
+projectile:
+  speed: 2.2
+  gravity_per_tick: 0.01
+  drag_per_tick: 0.995
+  collision_radius: 0.22
+  lifetime_ticks: 70
+  pierce_count: 0
+  hit_group: EMBER_FIRE_LANCE
+output:
+  arcane_school: FIRE
+  power_coefficient: 0.9
+  posture: 16
+  guard_pressure: 14
+presentation:
+  archetype: EMBER_FIRE_LANCE
+profiles:
+  pve_multiplier: 1.0
+  pvp_multiplier: 0.65

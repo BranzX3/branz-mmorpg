@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class ItemEngineTest {
@@ -233,6 +234,45 @@ class ItemEngineTest {
         assertEquals(8, crossbow.lockingTicks());
         assertEquals(
                 ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID,
+                ((Result.Failure<ItemEngine, ItemEngineErrorCode>) rejected).error());
+    }
+
+    @Test
+    void compilesStaffWeaponAndCatalystProfilesTogether() throws Exception {
+        String valid =
+                """
+                {
+                  "asset_id": "weapon.test.staff",
+                  "item_class": "UNIQUE_DURABLE",
+                  "base_max_durability": 100,
+                  "weapon_profile": {"family": "STAFF", "power": 95},
+                  "catalyst_profile": {
+                    "tags": ["STAFF", "EMBER"],
+                    "channel_stability": 0.85,
+                    "durability_cost_per_commit": 1
+                  }
+                }
+                """;
+
+        Result<ItemEngine, ItemEngineErrorCode> compiled =
+                ItemEngine.compile(snapshot(definition("weapon.test.staff", valid)));
+        Result<ItemEngine, ItemEngineErrorCode> rejected =
+                ItemEngine.compile(
+                        snapshot(
+                                definition(
+                                        "weapon.test.staff",
+                                        valid.replace("\"base_max_durability\": 100,", ""))));
+
+        ItemDefinition staff =
+                ((Result.Success<ItemEngine, ItemEngineErrorCode>) compiled)
+                        .value()
+                        .find(DefinitionId.of("weapon.test.staff"))
+                        .orElseThrow();
+        assertEquals("STAFF", staff.weaponProfile().orElseThrow().family());
+        assertEquals(Set.of("STAFF", "EMBER"), staff.catalystProfile().orElseThrow().tags());
+        assertEquals(0.85, staff.catalystProfile().orElseThrow().channelStability());
+        assertEquals(
+                ItemEngineErrorCode.ITEM_CATALYST_PROFILE_INVALID,
                 ((Result.Failure<ItemEngine, ItemEngineErrorCode>) rejected).error());
     }
 

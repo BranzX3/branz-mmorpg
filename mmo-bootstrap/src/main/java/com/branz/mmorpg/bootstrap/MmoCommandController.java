@@ -290,7 +290,13 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                     + " | items="
                                     + (items == null ? 0 : items.all().size())
                                     + " | moves="
-                                    + (moves == null ? 0 : moves.all().size()),
+                                    + (moves == null ? 0 : moves.all().size())
+                                    + " | spells="
+                                    + snapshot.definitions()
+                                            .byType(
+                                                    com.branz.mmorpg.content.schema.DefinitionType
+                                                            .SPELL)
+                                            .size(),
                             NamedTextColor.GRAY));
         }
         if (sender instanceof Player player) {
@@ -364,6 +370,13 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                                             .crossbowCheckpointCommitPending()
                                                                     ? "(COMMITTING)"
                                                                     : "")
+                                                            + " | spell="
+                                                            + status.spellCastPhase()
+                                                                    .map(Enum::name)
+                                                                    .orElse("IDLE")
+                                                            + (status.spellCommitPending()
+                                                                    ? "(COMMITTING)"
+                                                                    : "")
                                                             + " | projectiles="
                                                             + status.activeProjectiles()
                                                             + " | ammo="
@@ -423,6 +436,11 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                             + status.stamina()
                                                             + " (reserved="
                                                             + status.reservedStamina()
+                                                            + ")"
+                                                            + " | mana="
+                                                            + status.mana()
+                                                            + " (reserved="
+                                                            + status.reservedMana()
                                                             + ")"
                                                             + status.lastResolution()
                                                                     .map(

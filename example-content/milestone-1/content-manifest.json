@@ -14,8 +14,9 @@
     "wallet": "3.4.5"
   },
   "definitions": {
-    "items": 9,
-    "moves": 3,
+    "items": 10,
+    "moves": 4,
+    "spells": 1,
     "nodes": 1
   }
 }

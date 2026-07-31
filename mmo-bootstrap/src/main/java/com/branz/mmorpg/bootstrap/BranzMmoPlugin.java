@@ -10,6 +10,8 @@ import com.branz.mmorpg.integrations.PluginCapabilityProbe;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.ItemEngineErrorCode;
 import com.branz.mmorpg.items.projection.ProjectionTokenSigner;
+import com.branz.mmorpg.magic.definition.SpellEngine;
+import com.branz.mmorpg.magic.definition.SpellEngineErrorCode;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
@@ -27,6 +29,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private final AtomicReference<ContentSnapshot> activeSnapshot = new AtomicReference<>();
     private final AtomicReference<ItemEngine> activeItemEngine = new AtomicReference<>();
     private final AtomicReference<MoveEngine> activeMoveEngine = new AtomicReference<>();
+    private final AtomicReference<SpellEngine> activeSpellEngine = new AtomicReference<>();
     private ResourcePackGate resourcePackGate;
     private SceneHubController sceneHubController;
     private MmoCommandController commandController;
@@ -132,6 +135,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         }
         activeItemEngine.set(null);
         activeMoveEngine.set(null);
+        activeSpellEngine.set(null);
         activeSnapshot.set(null);
         lifecycle.disable();
         getLogger().info("Branz MMO platform disabled cleanly.");
@@ -218,6 +222,17 @@ public final class BranzMmoPlugin extends JavaPlugin {
         }
         activeMoveEngine.set(
                 ((Result.Success<MoveEngine, MoveEngineErrorCode>) compiledMoves).value());
+        Result<SpellEngine, SpellEngineErrorCode> compiledSpells = SpellEngine.compile(snapshot);
+        if (compiledSpells instanceof Result.Failure<SpellEngine, SpellEngineErrorCode> failure) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            return "Spell Engine rejected active content: "
+                    + failure.error().code()
+                    + " "
+                    + failure.detail();
+        }
+        activeSpellEngine.set(
+                ((Result.Success<SpellEngine, SpellEngineErrorCode>) compiledSpells).value());
         ChronicleService chronicle = new ChronicleService(this);
         resourcePackGate = new ResourcePackGate(this, snapshot);
         if (!resourcePackGate.configurationValid()) {
@@ -357,6 +372,52 @@ public final class BranzMmoPlugin extends JavaPlugin {
             resourcePackGate = null;
             return "Training Crossbow requires checkpoint timing plus compatible Bolt and Quiver profiles.";
         }
+        com.branz.mmorpg.combat.move.MoveDefinition trainingStaffMove =
+                activeMoveEngine
+                        .get()
+                        .find(
+                                com.branz.mmorpg.api.identity.DefinitionId.of(
+                                        "move.training_staff.primary_1"))
+                        .orElse(null);
+        com.branz.mmorpg.items.definition.ItemDefinition trainingStaffDefinition =
+                activeItemEngine
+                        .get()
+                        .find(
+                                com.branz.mmorpg.api.identity.DefinitionId.of(
+                                        "weapon.training_staff"))
+                        .orElse(null);
+        com.branz.mmorpg.items.definition.WeaponCombatProfile trainingStaff =
+                trainingStaffDefinition == null
+                        ? null
+                        : trainingStaffDefinition.weaponProfile().orElse(null);
+        com.branz.mmorpg.items.definition.CatalystProfile trainingCatalyst =
+                trainingStaffDefinition == null
+                        ? null
+                        : trainingStaffDefinition.catalystProfile().orElse(null);
+        com.branz.mmorpg.magic.definition.SpellDefinition fireLance =
+                activeSpellEngine
+                        .get()
+                        .find(
+                                com.branz.mmorpg.api.identity.DefinitionId.of(
+                                        "spell.ember.fire_lance"))
+                        .orElse(null);
+        if (trainingStaffMove == null
+                || !trainingStaffMove.family().equals("STAFF")
+                || trainingStaffMove.input().action()
+                        != com.branz.mmorpg.combat.input.SemanticInput.PRIMARY
+                || trainingStaff == null
+                || !trainingStaff.family().equals("STAFF")
+                || trainingCatalyst == null
+                || fireLance == null
+                || fireLance.deliveryType()
+                        != com.branz.mmorpg.magic.definition.SpellDeliveryType.PROJECTILE
+                || !trainingCatalyst.tags().containsAll(fireLance.requirements().catalystTags())) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            activeSpellEngine.set(null);
+            resourcePackGate = null;
+            return "Training Staff requires a compatible primary move, catalyst and Ember Fire Lance.";
+        }
         BukkitItemProjectionCodec projectionCodec =
                 new BukkitItemProjectionCodec(this, ProjectionTokenSigner.random());
         testItemProjections = new TestItemProjectionService(projectionCodec);
@@ -443,6 +504,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         characterSessionController,
                         activeItemEngine.get(),
                         activeMoveEngine.get(),
+                        activeSpellEngine.get(),
                         snapshot.manifest().contentVersion(),
                         trainingWeapon.power(),
                         maximumActiveProjectilesPerCaster,
@@ -504,6 +566,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                                 + activeItemEngine.get().all().size()
                                 + ", move definitions="
                                 + activeMoveEngine.get().all().size()
+                                + ", spell definitions="
+                                + activeSpellEngine.get().all().size()
                                 + ", Scene preview=COMPACT_2D");
     }
 

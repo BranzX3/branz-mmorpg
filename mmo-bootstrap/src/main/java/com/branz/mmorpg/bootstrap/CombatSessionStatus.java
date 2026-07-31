@@ -10,6 +10,7 @@ import com.branz.mmorpg.combat.dodge.DodgePhase;
 import com.branz.mmorpg.combat.guard.GuardPhase;
 import com.branz.mmorpg.combat.state.EngagementState;
 import com.branz.mmorpg.combat.state.WeaponState;
+import com.branz.mmorpg.magic.cast.SpellCastPhase;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -23,6 +24,8 @@ record CombatSessionStatus(
         Optional<CrossbowPhase> crossbowPhase,
         int crossbowRecoveryTicksRemaining,
         boolean crossbowCheckpointCommitPending,
+        Optional<SpellCastPhase> spellCastPhase,
+        boolean spellCommitPending,
         int activeProjectiles,
         boolean bowAmmoCommitPending,
         Optional<DefinitionId> selectedAmmo,
@@ -41,6 +44,8 @@ record CombatSessionStatus(
         boolean dead,
         int stamina,
         int reservedStamina,
+        int mana,
+        int reservedMana,
         Optional<String> lastResolution) {
     CombatSessionStatus {
         Objects.requireNonNull(engagementState, "engagementState");
@@ -48,6 +53,7 @@ record CombatSessionStatus(
         Objects.requireNonNull(actionPhase, "actionPhase");
         Objects.requireNonNull(bowDrawPhase, "bowDrawPhase");
         Objects.requireNonNull(crossbowPhase, "crossbowPhase");
+        Objects.requireNonNull(spellCastPhase, "spellCastPhase");
         Objects.requireNonNull(selectedAmmo, "selectedAmmo");
         Objects.requireNonNull(dodgeLoad, "dodgeLoad");
         Objects.requireNonNull(dodgePhase, "dodgePhase");
@@ -72,7 +78,9 @@ record CombatSessionStatus(
                 || health > maximumHealth
                 || dead != (health == 0)
                 || stamina < 0
-                || reservedStamina < 0) {
+                || reservedStamina < 0
+                || mana < 0
+                || reservedMana < 0) {
             throw new IllegalArgumentException("combat resources must not be negative");
         }
     }

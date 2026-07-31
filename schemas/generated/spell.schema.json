@@ -29,7 +29,212 @@
       "type" : "string",
       "description" : "Spell delivery mode.",
       "enum" : [ "BEAM", "DIRECT", "IMBUE", "PROJECTILE", "SUMMON", "ZONE" ]
+    },
+    "art" : {
+      "type" : "string",
+      "description" : "Owning magic art identity."
+    },
+    "requirements" : {
+      "type" : "object",
+      "properties" : {
+        "catalyst_tags" : {
+          "type" : "array",
+          "description" : "Required catalyst compatibility tags.",
+          "minItems" : 1
+        },
+        "attunement" : {
+          "type" : "integer",
+          "description" : "Required active attunement capacity.",
+          "x-unit" : "capacity",
+          "minimum" : 0.0
+        }
+      },
+      "required" : [ "catalyst_tags", "attunement" ]
+    },
+    "cost" : {
+      "type" : "object",
+      "properties" : {
+        "mana" : {
+          "type" : "integer",
+          "description" : "Mana reserved at start and spent at release.",
+          "x-unit" : "mana",
+          "minimum" : 0.0
+        }
+      },
+      "required" : [ "mana" ]
+    },
+    "phases" : {
+      "type" : "object",
+      "properties" : {
+        "windup_ticks" : {
+          "type" : "integer",
+          "description" : "Pre-charge windup duration.",
+          "x-unit" : "ticks",
+          "minimum" : 0.0,
+          "maximum" : 200.0
+        },
+        "minimum_charge_ticks" : {
+          "type" : "integer",
+          "description" : "Earliest release after charge begins.",
+          "x-unit" : "ticks",
+          "minimum" : 0.0,
+          "maximum" : 200.0
+        },
+        "maximum_charge_ticks" : {
+          "type" : "integer",
+          "description" : "Forced release boundary after charge begins.",
+          "x-unit" : "ticks",
+          "minimum" : 0.0,
+          "maximum" : 200.0
+        },
+        "recovery_ticks" : {
+          "type" : "integer",
+          "description" : "Post-commit recovery duration.",
+          "x-unit" : "ticks",
+          "minimum" : 0.0,
+          "maximum" : 200.0
+        }
+      },
+      "required" : [ "windup_ticks", "minimum_charge_ticks", "maximum_charge_ticks", "recovery_ticks" ]
+    },
+    "interruption" : {
+      "type" : "object",
+      "properties" : {
+        "movement" : {
+          "type" : "boolean",
+          "description" : "Whether movement interrupts the cast."
+        },
+        "damage" : {
+          "type" : "boolean",
+          "description" : "Whether health damage interrupts the cast."
+        },
+        "flinch" : {
+          "type" : "boolean",
+          "description" : "Whether Flinch interrupts the cast."
+        },
+        "stagger" : {
+          "type" : "boolean",
+          "description" : "Whether Stagger interrupts the cast."
+        },
+        "silence" : {
+          "type" : "boolean",
+          "description" : "Whether Silence interrupts the cast."
+        },
+        "weapon_swap" : {
+          "type" : "boolean",
+          "description" : "Whether weapon swap interrupts the cast."
+        }
+      },
+      "required" : [ "movement", "damage", "flinch", "stagger", "silence", "weapon_swap" ]
+    },
+    "projectile" : {
+      "type" : "object",
+      "properties" : {
+        "speed" : {
+          "type" : "number",
+          "description" : "Spell projectile launch speed.",
+          "x-unit" : "blocks_per_tick",
+          "minimum" : 1.0E-6,
+          "maximum" : 8.0
+        },
+        "gravity_per_tick" : {
+          "type" : "number",
+          "description" : "Spell projectile gravity.",
+          "x-unit" : "blocks_per_tick_squared",
+          "minimum" : 0.0,
+          "maximum" : 1.0
+        },
+        "drag_per_tick" : {
+          "type" : "number",
+          "description" : "Spell projectile drag.",
+          "x-unit" : "ratio_per_tick",
+          "minimum" : 1.0E-6,
+          "maximum" : 1.0
+        },
+        "collision_radius" : {
+          "type" : "number",
+          "description" : "Spell projectile collision radius.",
+          "x-unit" : "blocks",
+          "minimum" : 1.0E-6,
+          "maximum" : 2.0
+        },
+        "lifetime_ticks" : {
+          "type" : "integer",
+          "description" : "Spell projectile lifetime.",
+          "x-unit" : "ticks",
+          "minimum" : 1.0,
+          "maximum" : 400.0
+        },
+        "pierce_count" : {
+          "type" : "integer",
+          "description" : "Spell projectile pierce count.",
+          "x-unit" : "targets",
+          "minimum" : 0.0,
+          "maximum" : 7.0
+        },
+        "hit_group" : {
+          "type" : "string",
+          "description" : "Spell projectile once-per-target hit group."
+        }
+      }
+    },
+    "output" : {
+      "type" : "object",
+      "properties" : {
+        "arcane_school" : {
+          "type" : "string",
+          "description" : "Arcane damage channel.",
+          "enum" : [ "FIRE", "FROST", "PURE_ARCANE", "STORM", "VOID" ]
+        },
+        "power_coefficient" : {
+          "type" : "number",
+          "description" : "Catalyst-power coefficient.",
+          "x-unit" : "coefficient",
+          "minimum" : 1.0E-6
+        },
+        "posture" : {
+          "type" : "integer",
+          "description" : "Posture output.",
+          "x-unit" : "posture",
+          "minimum" : 0.0
+        },
+        "guard_pressure" : {
+          "type" : "integer",
+          "description" : "Guard-pressure output.",
+          "x-unit" : "guard_pressure",
+          "minimum" : 0.0
+        }
+      },
+      "required" : [ "arcane_school", "power_coefficient", "posture", "guard_pressure" ]
+    },
+    "presentation" : {
+      "type" : "object",
+      "properties" : {
+        "archetype" : {
+          "type" : "string",
+          "description" : "Client presentation archetype."
+        }
+      },
+      "required" : [ "archetype" ]
+    },
+    "profiles" : {
+      "type" : "object",
+      "properties" : {
+        "pve_multiplier" : {
+          "type" : "number",
+          "description" : "PvE output profile.",
+          "x-unit" : "multiplier",
+          "minimum" : 1.0E-6
+        },
+        "pvp_multiplier" : {
+          "type" : "number",
+          "description" : "PvP output profile.",
+          "x-unit" : "multiplier",
+          "minimum" : 1.0E-6
+        }
+      },
+      "required" : [ "pve_multiplier", "pvp_multiplier" ]
     }
   },
-  "required" : [ "definition_id", "schema_version", "cast_type", "target_type", "delivery" ]
+  "required" : [ "definition_id", "schema_version", "cast_type", "target_type", "delivery", "art", "requirements", "cost", "phases", "interruption", "output", "presentation", "profiles" ]
 }

@@ -54,6 +54,75 @@ public record CombatResources(
                 reservedMana);
     }
 
+    public CombatResources restoreMana(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("mana restore must not be negative");
+        }
+        return new CombatResources(
+                maximumHealth,
+                health,
+                maximumStamina,
+                stamina,
+                maximumMana,
+                Math.min(maximumMana, mana + amount),
+                reservedHealth,
+                reservedStamina,
+                reservedMana);
+    }
+
+    public Result<CombatResources, ActionTimelineErrorCode> reserveMana(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("mana reservation must not be negative");
+        }
+        if (mana - reservedMana < amount) {
+            return Result.failure(
+                    ActionTimelineErrorCode.NO_MANA, "Spell mana cost cannot be reserved.");
+        }
+        return Result.success(
+                new CombatResources(
+                        maximumHealth,
+                        health,
+                        maximumStamina,
+                        stamina,
+                        maximumMana,
+                        mana,
+                        reservedHealth,
+                        reservedStamina,
+                        reservedMana + amount));
+    }
+
+    public CombatResources commitReservedMana(int amount) {
+        if (amount < 0 || amount > reservedMana) {
+            throw new IllegalArgumentException("invalid committed mana reservation");
+        }
+        return new CombatResources(
+                maximumHealth,
+                health,
+                maximumStamina,
+                stamina,
+                maximumMana,
+                mana - amount,
+                reservedHealth,
+                reservedStamina,
+                reservedMana - amount);
+    }
+
+    public CombatResources releaseReservedMana(int amount) {
+        if (amount < 0 || amount > reservedMana) {
+            throw new IllegalArgumentException("invalid released mana reservation");
+        }
+        return new CombatResources(
+                maximumHealth,
+                health,
+                maximumStamina,
+                stamina,
+                maximumMana,
+                mana,
+                reservedHealth,
+                reservedStamina,
+                reservedMana - amount);
+    }
+
     public int availableStamina() {
         return stamina - reservedStamina;
     }

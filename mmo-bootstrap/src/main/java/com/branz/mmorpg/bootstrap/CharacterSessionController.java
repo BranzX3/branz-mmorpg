@@ -255,6 +255,31 @@ final class CharacterSessionController implements Listener {
                 completion);
     }
 
+    void commitCatalystUse(
+            Player player,
+            ItemId catalystItemId,
+            DefinitionId expectedDefinitionId,
+            int baseMaximumDurability,
+            int durabilityCost,
+            DefinitionId spellId,
+            UUID operationId,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        runCrossbowMutation(
+                player,
+                session ->
+                        sessions.commitCatalystUse(
+                                session,
+                                catalystItemId,
+                                expectedDefinitionId,
+                                baseMaximumDurability,
+                                durabilityCost,
+                                spellId,
+                                operationId,
+                                contentVersion),
+                completion);
+    }
+
     Optional<ItemId> equippedMainHandItemId(Player player) {
         return active(player)
                 .flatMap(session -> session.snapshot().equipment().item(EquipmentSlot.MAIN_HAND));
@@ -278,6 +303,26 @@ final class CharacterSessionController implements Listener {
                                                                 .findFirst()))
                 .map(ItemLocationRecord::payloadJson)
                 .map(CrossbowPayloadCodec::decode);
+    }
+
+    Optional<CatalystDurability> equippedCatalystDurability(Player player, int baseMaximum) {
+        return active(player)
+                .flatMap(
+                        session ->
+                                session.snapshot()
+                                        .equipment()
+                                        .item(EquipmentSlot.MAIN_HAND)
+                                        .flatMap(
+                                                itemId ->
+                                                        session.snapshot().itemRecords().stream()
+                                                                .filter(
+                                                                        record ->
+                                                                                record.itemId()
+                                                                                        .equals(
+                                                                                                itemId))
+                                                                .findFirst()))
+                .map(ItemLocationRecord::payloadJson)
+                .map(payload -> CatalystPayloadCodec.decode(payload, baseMaximum));
     }
 
     long quiverAmmoQuantity(Player player, DefinitionId definitionId) {

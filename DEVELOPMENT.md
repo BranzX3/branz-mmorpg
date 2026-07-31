@@ -171,6 +171,23 @@ with an operator/test account:
 48. Strike one fresh training target repeatedly and verify `health=current/1000.0` falls by the
     applied deterministic damage. The exact lethal hit must kill the Bukkit target and clear its
     isolated HP/posture state.
+49. Open `/mmo dev` -> `Persisted Test Item`, grant `weapon.training_bow`, then equip it in
+    Chronicle -> Character & Equipment using the normal explicit commit. Verify hotbar slot 1
+    projects a signed Bow fallback and reaches `BOW READY` after draw transition.
+50. Right-click air once to begin the local training draw, then right-click again before five
+    server ticks and verify `BOW TOO_EARLY` with no projectile. Repeat after at least five ticks and
+    verify `/mmo health` reports Bow recovery plus one active projectile after release.
+51. Release at tick five and then at/after tick twenty against the same target. Verify the full shot
+    travels faster, applies greater posture/penetration contribution, uses exact crosshair aim and
+    reports `PROJECTILE HIT damage=... health=... posture=...` without a vanilla arrow hit.
+52. Put a solid wall between the Bow and target and verify the projectile terminates at the wall.
+    Enable `/mmo combat debug` and verify only the subscribed viewer receives the flame path marker
+    while normal crit particles remain ordinary shot presentation.
+53. Hold from full draw for three seconds by delaying the second RMB. Verify `BOW STRAINED` then
+    drains four stamina/second; when the last stamina is spent the Bow lowers without firing.
+54. Swap weapon, dodge, take hard CC, teleport, die or disconnect while drawing. Verify draw/recovery
+    cancels and owned projectiles are removed on session/world teardown. `/mmo health` must show
+    `bow=IDLE` and `projectiles=0` after cleanup.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
@@ -179,7 +196,10 @@ canonical physical damage breakdown. Managed players and training targets use se
 1,000-HP runtimes; vanilla hearts/entities are presentation and death projections, never combat
 authority. Combat HP remains transient across logout/restart. Death-pouch wallet mutation,
 sanctuary routing and crash-resumable encounter HP remain later transactional boundaries. The
-client swing never declares a hit.
+client swing never declares a hit. The Basic Bow uses the same damage/HP/posture authorities and a
+server-simulated projectile; because test projections deliberately block native item use, this
+local Paper adapter uses first-RMB draw and second-RMB release. The authored ammo category is
+carried for inspection but no durable ammo lot is consumed until the Quiver transaction slice.
 
 Live engagement check:
 

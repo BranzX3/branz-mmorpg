@@ -651,7 +651,7 @@ Failure/recovery behavior:
 
 Remaining Milestone 4 work:
 
-- shape-specific dimensions/resolvers for CAPSULE/BOX/SPHERE/RAY/PROJECTILE plus
+- shape-specific dimensions/resolvers for CAPSULE/BOX/SPHERE/RAY plus
   region/friendly-provider filters;
 - death-pouch/wallet saga, sanctuary checkpoint selection and encounter health ownership;
 - provider-authored combatant health, posture and CC profiles;
@@ -705,7 +705,7 @@ Non-goals:
 
 - provider/encounter-authored HP profiles for player and enemy combatants;
 - PvP/party/region ownership policy and weak-point provider data;
-- capsule, box, sphere, ray, projectile and swept-arc runtime;
+- capsule, box, sphere and ray runtime;
 - knockback, posture, guard, status and encounter rewards.
 
 Schema impact: item schema adds optional `weapon_profile.family` and positive
@@ -950,7 +950,7 @@ Non-goals:
 
 - production observability streaming, database trace retention or cross-server trace lookup;
 - persistent multi-action history and full damage/posture/CC packet capture;
-- swept-path/projectile visualization and detailed per-candidate rejection text.
+- detailed per-candidate rejection text and persisted multi-action inspection.
 
 Config/migration impact: none. Inspection remains gated by the existing `dev-tools.enabled`,
 environment allowlist and `branzmmo.dev` permission.
@@ -1042,7 +1042,7 @@ Non-goals:
 
 - `CAPSULE`, `BOX`, `SPHERE` and `RAY` collision semantics until the content schema declares their
   required radius/width/depth/offset dimensions instead of overloading ARC fields;
-- projectile simulation, provider weak-point volumes and region/party filters;
+- provider weak-point volumes and region/party filters;
 - rollback/rewind against client-reported historical transforms.
 
 Config/schema/migration impact: none; the existing ARC contract and local training content remain
@@ -1100,3 +1100,74 @@ Config impact: `combat.training-incoming-health-damage` defaults to `100.0` and
 `combat.environmental-health-scale` defaults to `50.0`. Migration impact: none. Combat HP and HUD
 state are transient/derived under the current persistence contract; durable death-pouch value will
 be introduced with its own idempotent wallet transaction rather than per-hit database writes.
+
+## Milestone 5 — authoritative projectile and Basic Bow slice
+
+Implemented:
+
+- immutable projectile identity retains server projectile/owner UUIDs, source move, content
+  version, ammo category and hit group for the complete transient lifetime;
+- authored projectile physics declare speed, per-tick gravity/drag, collision radius, lifetime and
+  pierce count with explicit units and bounded compiler validation;
+- the pure projectile engine performs swept-sphere entity contact, deterministic
+  contact-fraction/UUID ordering, once-per-target ownership, block-first tie resolution, bounded
+  piercing and exact lifetime expiry;
+- the Paper adapter advances active MMO projectiles once per server tick, ray-checks a
+  radius-aware seven-path block envelope, resolves non-player living targets and never trusts a
+  vanilla arrow entity for force, collision or damage;
+- the Bow charge runtime owns `DRAWING`, `READY_DRAW`, `FULL_DRAW`, `STRAINED`, release and cancel
+  transitions from server ticks; quick shots are valid from tick five and full draw occurs at tick
+  twenty for the authored training profile;
+- full draw holds freely for the canonical three seconds, then drains four stamina/second; reaching
+  zero lowers the Bow without firing;
+- charge scales velocity/range, posture and bounded penetration while aim remains the exact
+  server-known crosshair direction with no random spread or hidden accuracy roll;
+- training Bow and arrow definitions compile through the same Item/Move Engine and generated JSON
+  schemas as runtime; invalid/missing Bow or projectile fields enter startup maintenance;
+- a signed equipped Bow projects as a safe vanilla Bow fallback and local RMB begins/release the
+  deterministic draw; a six-tick authored recovery follows a successful shot;
+- projectile hits reuse the canonical physical damage, 1,000-HP and posture authorities, kill the
+  Bukkit target only on the lethal transition and expose Bow phase/projectile count through
+  `/mmo health`;
+- normal projectile particles provide gameplay presentation while `/mmo combat debug` adds
+  viewer-scoped path markers;
+- projectile ownership is capped at 32 per caster and cleared on logout, death, teleport/world
+  change or plugin shutdown.
+
+Tests:
+
+- swept contact catches a target crossed between endpoints and a block wins an exact entity tie;
+- piercing contacts remain globally ordered across 1,000 shuffled candidate collections and never
+  repeat a target;
+- gravity, drag and lifetime use exact tick boundaries and terminal projectiles cannot advance;
+- minimum/full release, three-second free hold, strained drain and zero-stamina lowering use exact
+  server-tick boundaries;
+- Item/Move Engine fixtures compile the Bow/projectile contracts and reject missing shape-specific
+  fields.
+
+Failure/recovery behavior:
+
+- non-finite/out-of-bound physics, charge and Bow tuning fail closed before runtime activation;
+- block collision terminates before an entity at the same path fraction and excessive caster
+  projectile count rejects another draw/shot;
+- weapon swap, hard CC, dodge, death and forced teleport cancel transient Bow draw/recovery; session
+  and world teardown discard owned projectiles;
+- no client force, vanilla projectile hit, wall-clock duration or collection iteration order is
+  accepted as gameplay authority.
+
+Non-goals:
+
+- durable Quiver preparation, ammo-lot reservation/consumption/recovery and Shift+Q cycling;
+- native press/held/release edges; the local Paper/test-projection adapter uses explicit RMB toggle
+  until the optional packet provider supplies held/release observations;
+- Bow Shove, Crossbow checkpoints, projectile deflection/bounce, player PvP and party/region
+  filtering;
+- provider weak points, projectile payload status effects and full projectile events in exported
+  combat traces.
+
+Schema/config impact: Item schema adds optional `weapon_profile.bow.*`; Move schema adds
+shape-specific `hitboxes.*.projectile.*`; Item stable-ID namespace accepts `ammo.*`; generated
+schemas and the example content snapshot add the training Bow, arrow and quick-shot move.
+`combat.max-active-projectiles-per-caster` defaults to `32`. Migration impact: additive content
+contract only, documented by ADR 0006; no SQL migration or durable ammo mutation occurs in this
+slice.

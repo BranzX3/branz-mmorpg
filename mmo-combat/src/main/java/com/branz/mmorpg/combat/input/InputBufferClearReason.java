@@ -1,6 +1,7 @@
 package com.branz.mmorpg.combat.input;
 
 public enum InputBufferClearReason {
+    ACTION_STARTED,
     DODGE,
     WEAPON_SWAP,
     HARD_CC,

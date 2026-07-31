@@ -237,6 +237,24 @@ public final class BranzMmoPlugin extends JavaPlugin {
             resourcePackGate = null;
             return "Active content is missing the required training combat move.";
         }
+        com.branz.mmorpg.combat.move.MoveDefinition trainingBowMove =
+                activeMoveEngine
+                        .get()
+                        .find(
+                                com.branz.mmorpg.api.identity.DefinitionId.of(
+                                        "move.training_bow.quick_shot"))
+                        .orElse(null);
+        if (trainingBowMove == null
+                || !trainingBowMove.family().equals("BOW")
+                || trainingBowMove.input().action()
+                        != com.branz.mmorpg.combat.input.SemanticInput.SECONDARY
+                || trainingBowMove.hitboxes().size() != 1
+                || trainingBowMove.hitboxes().getFirst().projectile().isEmpty()) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            resourcePackGate = null;
+            return "Training Bow move requires one SECONDARY PROJECTILE hitbox.";
+        }
         com.branz.mmorpg.items.definition.WeaponCombatProfile trainingWeapon =
                 activeItemEngine
                         .get()
@@ -250,6 +268,20 @@ public final class BranzMmoPlugin extends JavaPlugin {
             activeMoveEngine.set(null);
             resourcePackGate = null;
             return "Training blade requires a SWORD weapon_profile.";
+        }
+        com.branz.mmorpg.items.definition.WeaponCombatProfile trainingBow =
+                activeItemEngine
+                        .get()
+                        .find(com.branz.mmorpg.api.identity.DefinitionId.of("weapon.training_bow"))
+                        .flatMap(com.branz.mmorpg.items.definition.ItemDefinition::weaponProfile)
+                        .orElse(null);
+        if (trainingBow == null
+                || !trainingBow.family().equals("BOW")
+                || trainingBow.bowProfile().isEmpty()) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            resourcePackGate = null;
+            return "Training Bow requires a BOW weapon_profile with handling fields.";
         }
         BukkitItemProjectionCodec projectionCodec =
                 new BukkitItemProjectionCodec(this, ProjectionTokenSigner.random());
@@ -265,6 +297,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
         int weaponDrawTicks = getConfig().getInt("combat.weapon-draw-ticks", 6);
         int weaponSheatheTicks = getConfig().getInt("combat.weapon-sheathe-ticks", 4);
         int engagementExitTicks = getConfig().getInt("combat.engagement-exit-ticks", 160);
+        int maximumActiveProjectilesPerCaster =
+                getConfig().getInt("combat.max-active-projectiles-per-caster", 32);
         double trainingIncomingGuardPressure =
                 getConfig().getDouble("combat.training-incoming-guard-pressure", 10.0);
         double trainingIncomingHealthDamage =
@@ -310,6 +344,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
         if (weaponDrawTicks < 1
                 || weaponSheatheTicks < 1
                 || engagementExitTicks < 1
+                || maximumActiveProjectilesPerCaster < 1
+                || maximumActiveProjectilesPerCaster > 128
                 || !Double.isFinite(trainingIncomingGuardPressure)
                 || trainingIncomingGuardPressure <= 0
                 || !Double.isFinite(trainingIncomingHealthDamage)
@@ -331,9 +367,11 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 new CombatSessionController(
                         this,
                         characterSessionController,
+                        activeItemEngine.get(),
                         activeMoveEngine.get(),
                         snapshot.manifest().contentVersion(),
                         trainingWeapon.power(),
+                        maximumActiveProjectilesPerCaster,
                         weaponDrawTicks,
                         weaponSheatheTicks,
                         engagementExitTicks,

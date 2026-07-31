@@ -35,6 +35,60 @@
           "description" : "Base deterministic weapon power.",
           "x-unit" : "power",
           "minimum" : 1.0E-6
+        },
+        "bow" : {
+          "type" : "object",
+          "properties" : {
+            "minimum_draw_ticks" : {
+              "type" : "integer",
+              "description" : "Earliest valid Bow release.",
+              "x-unit" : "ticks",
+              "minimum" : 1.0,
+              "maximum" : 99.0
+            },
+            "full_draw_ticks" : {
+              "type" : "integer",
+              "description" : "Tick at which Bow charge reaches full draw.",
+              "x-unit" : "ticks",
+              "minimum" : 2.0,
+              "maximum" : 100.0
+            },
+            "free_full_draw_hold_ticks" : {
+              "type" : "integer",
+              "description" : "Full-draw hold before strain begins.",
+              "x-unit" : "ticks",
+              "minimum" : 0.0,
+              "maximum" : 200.0
+            },
+            "strain_stamina_per_second" : {
+              "type" : "number",
+              "description" : "Strained Bow hold drain.",
+              "x-unit" : "stamina_per_second",
+              "minimum" : 1.0E-6,
+              "maximum" : 20.0
+            },
+            "minimum_velocity_multiplier" : {
+              "type" : "number",
+              "description" : "Quick-shot projectile velocity floor.",
+              "x-unit" : "ratio",
+              "minimum" : 1.0E-6,
+              "maximum" : 1.0
+            },
+            "minimum_posture_multiplier" : {
+              "type" : "number",
+              "description" : "Quick-shot posture-output floor.",
+              "x-unit" : "ratio",
+              "minimum" : 1.0E-6,
+              "maximum" : 1.0
+            },
+            "maximum_penetration_percentage" : {
+              "type" : "number",
+              "description" : "Full-draw armor penetration.",
+              "x-unit" : "ratio",
+              "minimum" : 0.0,
+              "maximum" : 0.4
+            }
+          }
         }
       }
     }

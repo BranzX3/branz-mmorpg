@@ -5,6 +5,7 @@ import com.branz.mmorpg.combat.input.DirectionSnapshot;
 import com.branz.mmorpg.combat.input.SemanticInput;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Immutable server-authoritative move definition compiled from one content snapshot. */
 public record MoveDefinition(
@@ -104,10 +105,12 @@ public record MoveDefinition(
             double angleDegrees,
             double height,
             int maxTargets,
-            String hitGroup) {
+            String hitGroup,
+            Optional<ProjectileDefinition> projectile) {
         public Hitbox {
             Objects.requireNonNull(shape, "shape");
             hitGroup = requireText(hitGroup, "hitGroup");
+            Objects.requireNonNull(projectile, "projectile");
             if (tick < 0
                     || !Double.isFinite(range)
                     || range <= 0
@@ -119,6 +122,57 @@ public record MoveDefinition(
                     || maxTargets < 1
                     || maxTargets > 8) {
                 throw new IllegalArgumentException("invalid hitbox bounds");
+            }
+            if ((shape == HitboxShape.PROJECTILE) != projectile.isPresent()) {
+                throw new IllegalArgumentException(
+                        "PROJECTILE hitbox requires projectile fields and other shapes forbid them");
+            }
+            if (projectile.isPresent()
+                    && maxTargets != projectile.orElseThrow().pierceCount() + 1) {
+                throw new IllegalArgumentException(
+                        "PROJECTILE max_targets must equal pierce_count plus one");
+            }
+        }
+
+        public Hitbox(
+                int tick,
+                HitboxShape shape,
+                double range,
+                double angleDegrees,
+                double height,
+                int maxTargets,
+                String hitGroup) {
+            this(tick, shape, range, angleDegrees, height, maxTargets, hitGroup, Optional.empty());
+        }
+    }
+
+    public record ProjectileDefinition(
+            double speed,
+            double gravityPerTick,
+            double dragPerTick,
+            double collisionRadius,
+            int lifetimeTicks,
+            int pierceCount,
+            DefinitionId ammoCategory) {
+        public ProjectileDefinition {
+            Objects.requireNonNull(ammoCategory, "ammoCategory");
+            if (!Double.isFinite(speed)
+                    || speed <= 0
+                    || speed > 8
+                    || !Double.isFinite(gravityPerTick)
+                    || gravityPerTick < 0
+                    || gravityPerTick > 1
+                    || !Double.isFinite(dragPerTick)
+                    || dragPerTick <= 0
+                    || dragPerTick > 1
+                    || !Double.isFinite(collisionRadius)
+                    || collisionRadius <= 0
+                    || collisionRadius > 2
+                    || lifetimeTicks < 1
+                    || lifetimeTicks > 400
+                    || pierceCount < 0
+                    || pierceCount > 7) {
+                throw new IllegalArgumentException("invalid projectile hitbox fields");
             }
         }
     }

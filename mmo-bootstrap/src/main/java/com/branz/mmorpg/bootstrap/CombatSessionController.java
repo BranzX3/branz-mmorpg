@@ -9,6 +9,14 @@ import com.branz.mmorpg.combat.action.ActionTraceEvent;
 import com.branz.mmorpg.combat.action.ActionTraceEventType;
 import com.branz.mmorpg.combat.action.CombatResources;
 import com.branz.mmorpg.combat.action.ResourceCommitState;
+import com.branz.mmorpg.combat.bow.BowDrawEngine;
+import com.branz.mmorpg.combat.bow.BowDrawPhase;
+import com.branz.mmorpg.combat.bow.BowDrawProfile;
+import com.branz.mmorpg.combat.bow.BowDrawRuntime;
+import com.branz.mmorpg.combat.bow.BowReleaseOutcome;
+import com.branz.mmorpg.combat.bow.BowReleaseResolution;
+import com.branz.mmorpg.combat.bow.BowShotCharge;
+import com.branz.mmorpg.combat.bow.BowTickResolution;
 import com.branz.mmorpg.combat.cc.CcApplication;
 import com.branz.mmorpg.combat.cc.CcEngine;
 import com.branz.mmorpg.combat.cc.CcRequest;
@@ -72,6 +80,12 @@ import com.branz.mmorpg.combat.posture.PosturePhase;
 import com.branz.mmorpg.combat.posture.PostureProfile;
 import com.branz.mmorpg.combat.posture.PostureResolution;
 import com.branz.mmorpg.combat.posture.PostureRuntime;
+import com.branz.mmorpg.combat.projectile.ProjectileEngine;
+import com.branz.mmorpg.combat.projectile.ProjectileIdentity;
+import com.branz.mmorpg.combat.projectile.ProjectileProfile;
+import com.branz.mmorpg.combat.projectile.ProjectileRuntime;
+import com.branz.mmorpg.combat.projectile.ProjectileTickQuery;
+import com.branz.mmorpg.combat.projectile.ProjectileTickResolution;
 import com.branz.mmorpg.combat.state.ActionState;
 import com.branz.mmorpg.combat.state.EngagementState;
 import com.branz.mmorpg.combat.state.UiState;
@@ -85,12 +99,17 @@ import com.branz.mmorpg.combat.weapon.SelectedSlotKind;
 import com.branz.mmorpg.combat.weapon.WeaponTransitionErrorCode;
 import com.branz.mmorpg.combat.weapon.WeaponTransitionMachine;
 import com.branz.mmorpg.combat.weapon.WeaponTransitionSnapshot;
+import com.branz.mmorpg.items.definition.BowWeaponProfile;
+import com.branz.mmorpg.items.definition.ItemDefinition;
+import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -122,23 +141,33 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.RayTraceResult;
 
 /** Main-thread Paper adapter for the deterministic training-move combat kernel. */
 final class CombatSessionController implements Listener {
     private static final DefinitionId TRAINING_MOVE =
             DefinitionId.of("move.training_blade.primary_1");
+    private static final DefinitionId TRAINING_BOW_MOVE =
+            DefinitionId.of("move.training_bow.quick_shot");
+    private static final DefinitionId TRAINING_BOW_ITEM = DefinitionId.of("weapon.training_bow");
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
     private final MoveEngine moves;
+    private final ItemEngine items;
     private final String contentVersion;
     private final MoveDefinition trainingMove;
+    private final MoveDefinition trainingBowMove;
     private final double trainingWeaponPower;
+    private final double trainingBowPower;
+    private final BowDrawEngine bowDraws;
+    private final int maximumActiveProjectilesPerCaster;
     private final WeaponTransitionMachine weapons;
     private final CombatInputPolicy inputPolicy = new CombatInputPolicy();
     private final SweptArcHitboxResolver hitboxes = new SweptArcHitboxResolver();
     private final ArcDebugGeometry arcDebugGeometry = new ArcDebugGeometry();
     private final PhysicalDamageResolver damage = new PhysicalDamageResolver();
+    private final ProjectileEngine projectiles = new ProjectileEngine();
     private final EngagementTracker engagement;
     private final DodgeProfile dodgeProfile;
     private final DodgeEngine dodges = new DodgeEngine();
@@ -162,15 +191,18 @@ final class CombatSessionController implements Listener {
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
     private final Map<UUID, CombatHealthRuntime> trainingTargetHealth = new HashMap<>();
     private final Map<UUID, PostureRuntime> trainingTargetPosture = new HashMap<>();
+    private final Map<UUID, LiveProjectile> activeProjectiles = new HashMap<>();
     private final Map<UUID, java.util.Set<UUID>> debugViewers = new HashMap<>();
     private int tickTaskId = -1;
 
     CombatSessionController(
             JavaPlugin plugin,
             CharacterSessionController characters,
+            ItemEngine items,
             MoveEngine moves,
             String contentVersion,
             double trainingWeaponPower,
+            int maximumActiveProjectilesPerCaster,
             int drawTicks,
             int sheatheTicks,
             int engagementExitTicks,
@@ -185,6 +217,7 @@ final class CombatSessionController implements Listener {
             double trainingPerfectGuardPostureDamage) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
+        this.items = Objects.requireNonNull(items, "items");
         this.moves = Objects.requireNonNull(moves, "moves");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
         if (contentVersion.isBlank()) {
@@ -196,10 +229,53 @@ final class CombatSessionController implements Listener {
                                 () ->
                                         new IllegalArgumentException(
                                                 "active content is missing " + TRAINING_MOVE));
+        trainingBowMove =
+                moves.find(TRAINING_BOW_MOVE)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "active content is missing " + TRAINING_BOW_MOVE));
+        if (!trainingBowMove.family().equals("BOW")
+                || trainingBowMove.input().action() != SemanticInput.SECONDARY
+                || trainingBowMove.hitboxes().size() != 1
+                || trainingBowMove.hitboxes().getFirst().projectile().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "training Bow move requires one SECONDARY PROJECTILE hitbox");
+        }
         if (!Double.isFinite(trainingWeaponPower) || trainingWeaponPower <= 0) {
             throw new IllegalArgumentException("trainingWeaponPower must be positive");
         }
         this.trainingWeaponPower = trainingWeaponPower;
+        WeaponCombatProfile bowWeapon =
+                items.find(TRAINING_BOW_ITEM)
+                        .flatMap(ItemDefinition::weaponProfile)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "active content is missing Bow weapon profile"));
+        BowWeaponProfile bow =
+                bowWeapon
+                        .bowProfile()
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "training Bow requires Bow handling profile"));
+        trainingBowPower = bowWeapon.power();
+        bowDraws =
+                new BowDrawEngine(
+                        new BowDrawProfile(
+                                bow.minimumDrawTicks(),
+                                bow.fullDrawTicks(),
+                                bow.freeFullDrawHoldTicks(),
+                                bow.strainStaminaPerSecond(),
+                                bow.minimumVelocityMultiplier(),
+                                bow.minimumPostureMultiplier(),
+                                bow.maximumPenetrationPercentage()));
+        if (maximumActiveProjectilesPerCaster < 1 || maximumActiveProjectilesPerCaster > 128) {
+            throw new IllegalArgumentException(
+                    "maximumActiveProjectilesPerCaster must be between 1 and 128");
+        }
+        this.maximumActiveProjectilesPerCaster = maximumActiveProjectilesPerCaster;
         weapons = new WeaponTransitionMachine(drawTicks, sheatheTicks);
         engagement = new EngagementTracker(engagementExitTicks);
         this.dodgeProfile = Objects.requireNonNull(dodgeProfile, "dodgeProfile");
@@ -248,6 +324,7 @@ final class CombatSessionController implements Listener {
             tickTaskId = -1;
         }
         sessions.clear();
+        activeProjectiles.clear();
         trainingTargetHealth.clear();
         trainingTargetPosture.clear();
         debugViewers.clear();
@@ -281,6 +358,13 @@ final class CombatSessionController implements Listener {
                                 session.engagement, plugin.getServer().getCurrentTick()),
                         session.weapon.state(),
                         Optional.ofNullable(session.timeline).map(ActionTimeline::phase),
+                        Optional.ofNullable(session.bowDraw).map(BowDrawRuntime::phase),
+                        (int)
+                                Math.max(
+                                        0,
+                                        session.bowRecoveryUntilTick
+                                                - plugin.getServer().getCurrentTick()),
+                        activeProjectilesFor(player.getUniqueId()),
                         dodgeProfile.load(),
                         Optional.ofNullable(session.dodge)
                                 .map(
@@ -366,6 +450,7 @@ final class CombatSessionController implements Listener {
             return;
         }
         cancelAction(session, "WEAPON_SWAP");
+        cancelBow(session, "WEAPON_SWAP");
         releaseGuard(session);
         session.input.clearBuffer(InputBufferClearReason.WEAPON_SWAP);
         select(session, selectedSlot(event.getPlayer(), event.getNewSlot()));
@@ -509,8 +594,47 @@ final class CombatSessionController implements Listener {
         LiveSession session = sessions.get(event.getPlayer().getUniqueId());
         if (session == null
                 || !characters.ready(event.getPlayer())
-                || session.weapon.state() != WeaponState.READY
-                || session.engagement.state() != EngagementState.ENGAGED) {
+                || session.weapon.state() != WeaponState.READY) {
+            return;
+        }
+        String family = equippedWeaponFamily(event.getPlayer()).orElse("");
+        if (family.equals("BOW")) {
+            if (event.getAction() == Action.RIGHT_CLICK_BLOCK
+                    && session.engagement.state() != EngagementState.ENGAGED) {
+                return;
+            }
+            event.setCancelled(true);
+            Result<CombatInputRequest, InputRejectionCode> observed =
+                    session.input.observe(
+                            new InputObservation(
+                                    plugin.getServer().getCurrentTick(),
+                                    SemanticInput.SECONDARY,
+                                    DirectionSnapshot.NEUTRAL,
+                                    trainingBowMove.input().branch(),
+                                    new InputDeduplicationKey("MAIN_HAND", "BOW_DRAW_TOGGLE")));
+            if (!(observed
+                    instanceof Result.Success<CombatInputRequest, InputRejectionCode> input)) {
+                return;
+            }
+            if (session.bowDraw != null) {
+                releaseBow(event.getPlayer(), session);
+                return;
+            }
+            Result<SemanticInput, InputRejectionCode> semantic =
+                    inputPolicy.resolve(
+                            ClientAction.USE, policyContext(event.getPlayer(), session));
+            if (semantic instanceof Result.Success<SemanticInput, InputRejectionCode> success
+                    && success.value() == SemanticInput.SECONDARY) {
+                Result<InputRouteOutcome, InputRejectionCode> routed =
+                        session.input.routeFrame(
+                                List.of(input.value()), routingContext(event.getPlayer(), session));
+                if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode>) {
+                    startBowDraw(event.getPlayer(), session);
+                }
+            }
+            return;
+        }
+        if (!family.equals("SWORD") || session.engagement.state() != EngagementState.ENGAGED) {
             return;
         }
         Result<SemanticInput, InputRejectionCode> semantic =
@@ -620,6 +744,8 @@ final class CombatSessionController implements Listener {
         long tick = plugin.getServer().getCurrentTick();
         session.health = playerHealth.kill(session.health, tick);
         cancelAction(session, "DEATH");
+        cancelBow(session, "DEATH");
+        removeOwnerProjectiles(player.getUniqueId());
         session.input.clearBuffer(InputBufferClearReason.DEATH);
         releaseGuard(session);
         session.dodge = null;
@@ -648,6 +774,8 @@ final class CombatSessionController implements Listener {
             session.health = playerHealth.kill(session.health, tick);
         }
         session.health = playerHealth.respawn(session.health, tick);
+        session.bowDraw = null;
+        session.bowRecoveryUntilTick = -1;
         session.engagement = EngagementRuntime.initial(tick);
         session.guard = GuardRuntime.initial(guards.profile(), tick);
         session.poise = PoiseRuntime.initial(tick);
@@ -665,6 +793,7 @@ final class CombatSessionController implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
         sessions.remove(playerId);
+        removeOwnerProjectiles(playerId);
         debugViewers.remove(playerId);
         debugViewers.values().forEach(viewers -> viewers.remove(playerId));
         debugViewers.entrySet().removeIf(entry -> entry.getValue().isEmpty());
@@ -682,6 +811,8 @@ final class CombatSessionController implements Listener {
             return;
         }
         cancelAction(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
+        cancelBow(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
+        removeOwnerProjectiles(event.getPlayer().getUniqueId());
         session.input.clearBuffer(InputBufferClearReason.WORLD_CHANGE);
         releaseGuard(session);
         session.dodge = null;
@@ -698,6 +829,7 @@ final class CombatSessionController implements Listener {
 
     private void tickAll() {
         tickTrainingPosture();
+        tickProjectiles();
         for (Map.Entry<UUID, LiveSession> entry : sessions.entrySet()) {
             Player player = plugin.getServer().getPlayer(entry.getKey());
             if (player == null || !player.isOnline()) {
@@ -708,10 +840,14 @@ final class CombatSessionController implements Listener {
             WeaponState priorWeapon = session.weapon.state();
             session.weapon = weapons.tick(session.weapon);
             if (priorWeapon != WeaponState.READY && session.weapon.state() == WeaponState.READY) {
-                player.sendActionBar(Component.text("Training blade READY", NamedTextColor.GREEN));
+                player.sendActionBar(
+                        Component.text(
+                                equippedWeaponFamily(player).orElse("Combat weapon") + " READY",
+                                NamedTextColor.GREEN));
                 pollBuffered(player, session);
             }
             tickSneakPress(player, session);
+            tickBow(player, session);
             tickDodge(player, session);
             session.guard = guards.tick(session.guard, plugin.getServer().getCurrentTick());
             session.poise = poise.tick(session.poise, plugin.getServer().getCurrentTick());
@@ -939,6 +1075,228 @@ final class CombatSessionController implements Listener {
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
     }
 
+    private void tickProjectiles() {
+        java.util.Iterator<Map.Entry<UUID, LiveProjectile>> iterator =
+                activeProjectiles.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, LiveProjectile> entry = iterator.next();
+            LiveProjectile live = entry.getValue();
+            org.bukkit.World world = plugin.getServer().getWorld(live.worldId());
+            Player owner = plugin.getServer().getPlayer(live.runtime().identity().ownerEntityId());
+            if (world == null || owner == null || !owner.isOnline()) {
+                iterator.remove();
+                continue;
+            }
+            ProjectileRuntime runtime = live.runtime();
+            CombatVector start = runtime.position();
+            CombatVector completeEnd = start.add(runtime.velocity());
+            double segmentLength = runtime.velocity().length();
+            OptionalDouble blockContact =
+                    blockContactFraction(
+                            world,
+                            start,
+                            runtime.velocity(),
+                            segmentLength,
+                            runtime.profile().collisionRadius());
+            CombatVector midpoint = midpoint(start, completeEnd);
+            double radius = segmentLength / 2.0 + runtime.profile().collisionRadius() + 1.5;
+            Map<UUID, LivingEntity> entities = new HashMap<>();
+            List<TargetCollider> candidates =
+                    world
+                            .getNearbyEntities(
+                                    new Location(world, midpoint.x(), midpoint.y(), midpoint.z()),
+                                    radius,
+                                    radius,
+                                    radius)
+                            .stream()
+                            .filter(LivingEntity.class::isInstance)
+                            .map(LivingEntity.class::cast)
+                            .filter(entity -> entity != owner)
+                            .peek(entity -> entities.put(entity.getUniqueId(), entity))
+                            .map(
+                                    entity ->
+                                            new TargetCollider(
+                                                    entity.getUniqueId(),
+                                                    new CombatVector(
+                                                            entity.getLocation().getX(),
+                                                            entity.getLocation().getY(),
+                                                            entity.getLocation().getZ()),
+                                                    Math.max(
+                                                                    entity.getBoundingBox()
+                                                                            .getWidthX(),
+                                                                    entity.getBoundingBox()
+                                                                            .getWidthZ())
+                                                            / 2.0,
+                                                    entity.getBoundingBox().getHeight(),
+                                                    !(entity instanceof Player)
+                                                            && !(entity instanceof ArmorStand)
+                                                            && !entity.isDead(),
+                                                    true,
+                                                    false))
+                            .toList();
+            ProjectileTickResolution resolution =
+                    projectiles.advance(new ProjectileTickQuery(runtime, candidates, blockContact));
+            world.spawnParticle(
+                    Particle.CRIT,
+                    new Location(
+                            world,
+                            resolution.pathEnd().x(),
+                            resolution.pathEnd().y(),
+                            resolution.pathEnd().z()),
+                    2,
+                    0.02,
+                    0.02,
+                    0.02,
+                    0);
+            renderProjectileDebug(owner.getUniqueId(), world, resolution);
+            applyProjectileHits(owner, live, resolution, entities);
+            if (resolution.runtime().status().terminal()) {
+                iterator.remove();
+            } else {
+                entry.setValue(
+                        new LiveProjectile(live.worldId(), resolution.runtime(), live.charge()));
+            }
+        }
+    }
+
+    private static OptionalDouble blockContactFraction(
+            org.bukkit.World world,
+            CombatVector start,
+            CombatVector velocity,
+            double segmentLength,
+            double collisionRadius) {
+        if (segmentLength < 1.0e-9) {
+            return OptionalDouble.empty();
+        }
+        org.bukkit.util.Vector direction =
+                new org.bukkit.util.Vector(velocity.x(), velocity.y(), velocity.z()).normalize();
+        double nearest = Double.POSITIVE_INFINITY;
+        double[][] offsets = {
+            {0, 0, 0},
+            {collisionRadius, 0, 0},
+            {-collisionRadius, 0, 0},
+            {0, collisionRadius, 0},
+            {0, -collisionRadius, 0},
+            {0, 0, collisionRadius},
+            {0, 0, -collisionRadius}
+        };
+        for (double[] offset : offsets) {
+            Location origin =
+                    new Location(
+                            world,
+                            start.x() + offset[0],
+                            start.y() + offset[1],
+                            start.z() + offset[2]);
+            RayTraceResult trace =
+                    world.rayTraceBlocks(
+                            origin, direction, segmentLength, FluidCollisionMode.NEVER, true);
+            if (trace != null) {
+                nearest =
+                        Math.min(
+                                nearest,
+                                trace.getHitPosition().distance(origin.toVector()) / segmentLength);
+            }
+        }
+        return Double.isFinite(nearest)
+                ? OptionalDouble.of(Math.max(0, Math.min(1, nearest)))
+                : OptionalDouble.empty();
+    }
+
+    private void applyProjectileHits(
+            Player owner,
+            LiveProjectile live,
+            ProjectileTickResolution resolution,
+            Map<UUID, LivingEntity> entities) {
+        LiveSession ownerSession = sessions.get(owner.getUniqueId());
+        for (com.branz.mmorpg.combat.projectile.ProjectileHit hit : resolution.hits()) {
+            LivingEntity entity = entities.get(hit.entityId());
+            if (entity == null || entity.isDead()) {
+                continue;
+            }
+            long tick = plugin.getServer().getCurrentTick();
+            PostureRuntime posture = postureAt(hit.entityId(), tick);
+            java.util.EnumSet<ConditionalAdvantage> advantages =
+                    java.util.EnumSet.noneOf(ConditionalAdvantage.class);
+            if (postures.phaseAt(posture, tick) == PosturePhase.BROKEN) {
+                advantages.add(ConditionalAdvantage.POSTURE_BREAK);
+            }
+            if (hit.weakPoint()) {
+                advantages.add(ConditionalAdvantage.WEAK_POINT);
+            }
+            double armor =
+                    entity.getAttribute(Attribute.ARMOR) == null
+                            ? 0
+                            : Objects.requireNonNull(entity.getAttribute(Attribute.ARMOR))
+                                    .getValue();
+            PhysicalDamageBreakdown breakdown =
+                    damage.resolve(
+                            new PhysicalDamageRequest(
+                                    trainingBowPower,
+                                    trainingBowMove.outputs().moveCoefficient(),
+                                    0,
+                                    armor,
+                                    live.charge().penetrationPercentage(),
+                                    0,
+                                    0,
+                                    advantages,
+                                    trainingBowMove.profiles().pveMultiplier()));
+            CombatHealthRuntime targetHealth =
+                    trainingTargetHealth.computeIfAbsent(
+                            hit.entityId(),
+                            ignored -> CombatHealthRuntime.full(enemyHealth.profile(), tick));
+            CombatHealthResolution health =
+                    enemyHealth.damage(targetHealth, tick, breakdown.finalDamage());
+            trainingTargetHealth.put(hit.entityId(), health.runtime());
+            int postureDamage =
+                    (int)
+                            Math.round(
+                                    trainingBowMove.outputs().posture()
+                                            * live.charge().postureMultiplier());
+            PostureResolution postureResolution = postures.damage(posture, tick, postureDamage);
+            trainingTargetPosture.put(hit.entityId(), postureResolution.runtime());
+            if (ownerSession != null) {
+                ownerSession.lastResolution =
+                        "PROJECTILE HIT damage="
+                                + roundOne(health.appliedAmount())
+                                + " health="
+                                + roundOne(health.runtime().current())
+                                + " posture="
+                                + postureLabel(postureResolution.runtime(), tick);
+                owner.sendActionBar(
+                        Component.text(ownerSession.lastResolution, NamedTextColor.GREEN));
+            }
+            if (health.lethalNow()) {
+                entity.setHealth(0);
+            }
+        }
+    }
+
+    private void renderProjectileDebug(
+            UUID ownerId, org.bukkit.World world, ProjectileTickResolution resolution) {
+        java.util.Set<UUID> viewerIds = debugViewers.get(ownerId);
+        if (viewerIds == null) {
+            return;
+        }
+        for (UUID viewerId : List.copyOf(viewerIds)) {
+            Player viewer = plugin.getServer().getPlayer(viewerId);
+            if (viewer == null || !viewer.isOnline() || viewer.getWorld() != world) {
+                continue;
+            }
+            viewer.spawnParticle(
+                    Particle.FLAME,
+                    new Location(
+                            world,
+                            resolution.pathEnd().x(),
+                            resolution.pathEnd().y(),
+                            resolution.pathEnd().z()),
+                    1,
+                    0,
+                    0,
+                    0,
+                    0);
+        }
+    }
+
     private void renderArcDebug(
             Player owner,
             ArcHitboxQuery previousQuery,
@@ -1112,6 +1470,7 @@ final class CombatSessionController implements Listener {
             return;
         }
         cancelAction(session, "CC_" + severity);
+        cancelBow(session, "CC_" + severity);
         session.input.clearBuffer(InputBufferClearReason.HARD_CC);
         releaseGuard(session);
         session.dodge = null;
@@ -1167,6 +1526,7 @@ final class CombatSessionController implements Listener {
                 || session.timeline != null
                 || session.dodge != null
                 || session.guard.active()
+                || (session.bowDraw != null && session.bowDraw.phase() == BowDrawPhase.STRAINED)
                 || session.resources.stamina() >= session.resources.maximumStamina()) {
             return;
         }
@@ -1250,6 +1610,7 @@ final class CombatSessionController implements Listener {
         session.resources =
                 postCancelResources.spendStamina(dodgeProfile.staminaCost()).orElseThrow();
         releaseGuard(session);
+        cancelBow(session, "DODGE");
         session.timeline = null;
         session.previousActionTransform = null;
         session.action = ActionState.IDLE;
@@ -1349,6 +1710,170 @@ final class CombatSessionController implements Listener {
             return success.value().resources();
         }
         return session.timeline.resources();
+    }
+
+    private void startBowDraw(Player player, LiveSession session) {
+        long tick = plugin.getServer().getCurrentTick();
+        if (session.action != ActionState.IDLE
+                || session.timeline != null
+                || session.dodge != null
+                || session.guard.active()
+                || session.bowRecoveryUntilTick > tick) {
+            player.sendActionBar(Component.text("Bow draw is action-locked.", NamedTextColor.RED));
+            return;
+        }
+        if (activeProjectilesFor(player.getUniqueId()) >= maximumActiveProjectilesPerCaster) {
+            player.sendActionBar(
+                    Component.text(
+                            "Projectile limit reached for this caster.", NamedTextColor.RED));
+            return;
+        }
+        session.bowDraw = bowDraws.start(tick);
+        session.action = ActionState.CHANNELING;
+        session.input.clearBuffer(InputBufferClearReason.ACTION_STARTED);
+        player.sendActionBar(
+                Component.text("BOW DRAWING — RMB again to release", NamedTextColor.AQUA));
+    }
+
+    private void tickBow(Player player, LiveSession session) {
+        long tick = plugin.getServer().getCurrentTick();
+        if (session.bowDraw == null) {
+            if (session.bowRecoveryUntilTick >= 0 && tick >= session.bowRecoveryUntilTick) {
+                session.bowRecoveryUntilTick = -1;
+                if (!session.action.hardControl()) {
+                    session.action = ActionState.IDLE;
+                }
+            }
+            return;
+        }
+        BowDrawPhase previous = session.bowDraw.phase();
+        BowTickResolution resolution =
+                bowDraws.tick(session.bowDraw, tick, session.resources.availableStamina());
+        spendBowStamina(session, resolution.staminaSpent(), tick);
+        if (resolution.loweredForExhaustion()) {
+            session.bowDraw = null;
+            session.action = ActionState.IDLE;
+            session.lastResolution = "BOW CANCELLED exhausted";
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            return;
+        }
+        session.bowDraw = resolution.runtime();
+        session.action = ActionState.CHANNELING;
+        if (previous != session.bowDraw.phase()) {
+            player.sendActionBar(
+                    Component.text(
+                            "BOW "
+                                    + session.bowDraw.phase()
+                                    + " stamina="
+                                    + session.resources.stamina(),
+                            session.bowDraw.phase() == BowDrawPhase.STRAINED
+                                    ? NamedTextColor.RED
+                                    : NamedTextColor.AQUA));
+        }
+    }
+
+    private void releaseBow(Player player, LiveSession session) {
+        long tick = plugin.getServer().getCurrentTick();
+        BowReleaseResolution release =
+                bowDraws.release(session.bowDraw, tick, session.resources.availableStamina());
+        spendBowStamina(session, release.staminaSpent(), tick);
+        session.bowDraw = null;
+        if (release.outcome() != BowReleaseOutcome.FIRED) {
+            session.action = ActionState.IDLE;
+            session.lastResolution = "BOW " + release.outcome();
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            return;
+        }
+        if (activeProjectilesFor(player.getUniqueId()) >= maximumActiveProjectilesPerCaster) {
+            session.action = ActionState.IDLE;
+            session.lastResolution = "BOW PROJECTILE_LIMIT";
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            return;
+        }
+        launchTrainingProjectile(player, session, release.shot().orElseThrow());
+        session.bowRecoveryUntilTick = tick + trainingBowMove.phases().recoveryTicks();
+        session.action = ActionState.RECOVERY;
+    }
+
+    private void spendBowStamina(LiveSession session, int amount, long tick) {
+        if (amount == 0) {
+            return;
+        }
+        session.resources = session.resources.spendStamina(amount).orElseThrow();
+        session.lastStaminaSpendTick = tick;
+        session.staminaRegenRemainder = 0;
+    }
+
+    private void launchTrainingProjectile(Player player, LiveSession session, BowShotCharge shot) {
+        MoveDefinition.Hitbox hitbox = trainingBowMove.hitboxes().getFirst();
+        MoveDefinition.ProjectileDefinition authored = hitbox.projectile().orElseThrow();
+        ProjectileProfile profile =
+                new ProjectileProfile(
+                        authored.speed(),
+                        authored.gravityPerTick(),
+                        authored.dragPerTick(),
+                        authored.collisionRadius(),
+                        authored.lifetimeTicks(),
+                        authored.pierceCount());
+        Location eye = player.getEyeLocation();
+        org.bukkit.util.Vector look = eye.getDirection().normalize();
+        CombatVector direction = new CombatVector(look.getX(), look.getY(), look.getZ());
+        CombatVector origin =
+                new CombatVector(eye.getX(), eye.getY(), eye.getZ()).add(direction.multiply(0.35));
+        UUID projectileId = UUID.randomUUID();
+        ProjectileIdentity identity =
+                new ProjectileIdentity(
+                        projectileId,
+                        player.getUniqueId(),
+                        trainingBowMove.id(),
+                        contentVersion,
+                        Optional.of(authored.ammoCategory()),
+                        hitbox.hitGroup());
+        ProjectileRuntime runtime =
+                ProjectileRuntime.launch(
+                        identity, profile, origin, direction, shot.velocityMultiplier());
+        activeProjectiles.put(
+                projectileId, new LiveProjectile(player.getWorld().getUID(), runtime, shot));
+        markHostile(player, session);
+        session.lastResolution =
+                "BOW FIRED charge="
+                        + roundOne(shot.drawRatio() * 100)
+                        + "% projectile="
+                        + projectileId.toString().substring(0, 8);
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
+    }
+
+    private void cancelBow(LiveSession session, String reason) {
+        if (session.bowDraw != null) {
+            bowDraws.cancel(session.bowDraw, plugin.getServer().getCurrentTick());
+            session.bowDraw = null;
+            session.lastResolution = "BOW CANCELLED " + reason;
+        }
+        session.bowRecoveryUntilTick = -1;
+        if (!session.action.hardControl()) {
+            session.action = ActionState.IDLE;
+        }
+    }
+
+    private int activeProjectilesFor(UUID ownerId) {
+        return (int)
+                activeProjectiles.values().stream()
+                        .filter(
+                                projectile ->
+                                        projectile
+                                                .runtime()
+                                                .identity()
+                                                .ownerEntityId()
+                                                .equals(ownerId))
+                        .count();
+    }
+
+    private void removeOwnerProjectiles(UUID ownerId) {
+        activeProjectiles
+                .values()
+                .removeIf(
+                        projectile ->
+                                projectile.runtime().identity().ownerEntityId().equals(ownerId));
     }
 
     private void toggleGuard(Player player, LiveSession session) {
@@ -1538,7 +2063,17 @@ final class CombatSessionController implements Listener {
     }
 
     private void startMove(Player player, LiveSession session) {
-        if (session.timeline != null || session.dodge != null || session.guard.active()) {
+        if (!equippedWeaponFamily(player).filter("SWORD"::equals).isPresent()) {
+            player.sendActionBar(
+                    Component.text(
+                            "Training slash requires the training blade.", NamedTextColor.RED));
+            return;
+        }
+        if (session.action != ActionState.IDLE
+                || session.timeline != null
+                || session.bowDraw != null
+                || session.dodge != null
+                || session.guard.active()) {
             if (session.dodge != null) {
                 player.sendActionBar(
                         Component.text("Attack locked during dodge recovery.", NamedTextColor.RED));
@@ -1661,6 +2196,32 @@ final class CombatSessionController implements Listener {
                 : new SelectedHotbarSlot(slot, SelectedSlotKind.TOOL_OR_BLOCK);
     }
 
+    private Optional<String> equippedWeaponFamily(Player player) {
+        return characters
+                .active(player)
+                .flatMap(
+                        session ->
+                                session.snapshot()
+                                        .equipment()
+                                        .item(EquipmentSlot.MAIN_HAND)
+                                        .flatMap(
+                                                itemId ->
+                                                        session.snapshot().itemRecords().stream()
+                                                                .filter(
+                                                                        record ->
+                                                                                record.itemId()
+                                                                                        .equals(
+                                                                                                itemId))
+                                                                .findFirst()
+                                                                .flatMap(
+                                                                        record ->
+                                                                                items.find(
+                                                                                        record
+                                                                                                .definitionId()))))
+                .flatMap(ItemDefinition::weaponProfile)
+                .map(WeaponCombatProfile::family);
+    }
+
     private void select(LiveSession session, SelectedHotbarSlot selected) {
         Result<WeaponTransitionSnapshot, WeaponTransitionErrorCode> result =
                 weapons.select(session.weapon, selected);
@@ -1688,6 +2249,14 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    private record LiveProjectile(UUID worldId, ProjectileRuntime runtime, BowShotCharge charge) {
+        private LiveProjectile {
+            Objects.requireNonNull(worldId, "worldId");
+            Objects.requireNonNull(runtime, "runtime");
+            Objects.requireNonNull(charge, "charge");
+        }
+    }
+
     private static final class LiveSession {
         private EngagementRuntime engagement;
         private WeaponTransitionSnapshot weapon = WeaponTransitionSnapshot.initial();
@@ -1695,6 +2264,8 @@ final class CombatSessionController implements Listener {
         private CombatResources resources = CombatResources.full(1000, 100, 100);
         private final InputRouter input = new InputRouter();
         private ActionTimeline timeline;
+        private BowDrawRuntime bowDraw;
+        private long bowRecoveryUntilTick = -1;
         private CombatTransform previousActionTransform;
         private DodgeRuntime dodge;
         private GuardRuntime guard;

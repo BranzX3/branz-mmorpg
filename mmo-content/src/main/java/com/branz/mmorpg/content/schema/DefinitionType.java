@@ -7,7 +7,7 @@ import java.util.Set;
 
 /** Runtime definition categories. Namespace prefixes are identity contracts, not display names. */
 public enum DefinitionType {
-    ITEM(Set.of("weapon", "material", "food", "consumable", "equipment", "cosmetic")),
+    ITEM(Set.of("weapon", "ammo", "material", "food", "consumable", "equipment", "cosmetic")),
     MOVE(Set.of("move")),
     SPELL(Set.of("spell")),
     STATUS(Set.of("status")),

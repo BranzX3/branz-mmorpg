@@ -57,7 +57,56 @@ public final class DefinitionSchemas {
                                         0.000001,
                                         null,
                                         "power",
-                                        "Base deterministic weapon power.")),
+                                        "Base deterministic weapon power."),
+                                optionalRanged(
+                                        "weapon_profile.bow.minimum_draw_ticks",
+                                        INTEGER,
+                                        1,
+                                        99,
+                                        "ticks",
+                                        "Earliest valid Bow release."),
+                                optionalRanged(
+                                        "weapon_profile.bow.full_draw_ticks",
+                                        INTEGER,
+                                        2,
+                                        100,
+                                        "ticks",
+                                        "Tick at which Bow charge reaches full draw."),
+                                optionalRanged(
+                                        "weapon_profile.bow.free_full_draw_hold_ticks",
+                                        INTEGER,
+                                        0,
+                                        200,
+                                        "ticks",
+                                        "Full-draw hold before strain begins."),
+                                optionalRanged(
+                                        "weapon_profile.bow.strain_stamina_per_second",
+                                        NUMBER,
+                                        0.000001,
+                                        20,
+                                        "stamina_per_second",
+                                        "Strained Bow hold drain."),
+                                optionalRanged(
+                                        "weapon_profile.bow.minimum_velocity_multiplier",
+                                        NUMBER,
+                                        0.000001,
+                                        1,
+                                        "ratio",
+                                        "Quick-shot projectile velocity floor."),
+                                optionalRanged(
+                                        "weapon_profile.bow.minimum_posture_multiplier",
+                                        NUMBER,
+                                        0.000001,
+                                        1,
+                                        "ratio",
+                                        "Quick-shot posture-output floor."),
+                                optionalRanged(
+                                        "weapon_profile.bow.maximum_penetration_percentage",
+                                        NUMBER,
+                                        0,
+                                        0.40,
+                                        "ratio",
+                                        "Full-draw armor penetration.")),
                         List.of(to(DefinitionType.TRAIT, "traits", "authored_pool", "*"))));
         schemas.put(
                 DefinitionType.MOVE,
@@ -203,6 +252,53 @@ public final class DefinitionSchemas {
                                         STRING,
                                         "",
                                         "Once-per-group hit identity."),
+                                optionalRanged(
+                                        "hitboxes.*.projectile.speed",
+                                        NUMBER,
+                                        0.000001,
+                                        8,
+                                        "blocks_per_tick",
+                                        "Projectile launch speed."),
+                                optionalRanged(
+                                        "hitboxes.*.projectile.gravity_per_tick",
+                                        NUMBER,
+                                        0,
+                                        1,
+                                        "blocks_per_tick_squared",
+                                        "Downward projectile acceleration."),
+                                optionalRanged(
+                                        "hitboxes.*.projectile.drag_per_tick",
+                                        NUMBER,
+                                        0.000001,
+                                        1,
+                                        "ratio_per_tick",
+                                        "Velocity retained per tick."),
+                                optionalRanged(
+                                        "hitboxes.*.projectile.collision_radius",
+                                        NUMBER,
+                                        0.000001,
+                                        2,
+                                        "blocks",
+                                        "Swept projectile radius."),
+                                optionalRanged(
+                                        "hitboxes.*.projectile.lifetime_ticks",
+                                        INTEGER,
+                                        1,
+                                        400,
+                                        "ticks",
+                                        "Maximum authoritative lifetime."),
+                                optionalRanged(
+                                        "hitboxes.*.projectile.pierce_count",
+                                        INTEGER,
+                                        0,
+                                        7,
+                                        "targets",
+                                        "Additional contacts after the first."),
+                                optional(
+                                        "hitboxes.*.projectile.ammo_category",
+                                        STRING,
+                                        "",
+                                        "Ammo definition carried by the projectile."),
                                 required("outputs", OBJECT, "", "Authoritative impact outputs."),
                                 allowed(
                                         "outputs.health.physical_type",
@@ -287,7 +383,13 @@ public final class DefinitionSchemas {
                                         null,
                                         "multiplier",
                                         "PvP output profile.")),
-                        List.of()));
+                        List.of(
+                                to(
+                                        DefinitionType.ITEM,
+                                        "hitboxes",
+                                        "*",
+                                        "projectile",
+                                        "ammo_category"))));
         schemas.put(
                 DefinitionType.SPELL,
                 definition(

@@ -331,6 +331,21 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                             + status.actionPhase()
                                                                     .map(Enum::name)
                                                                     .orElse("IDLE")
+                                                            + " | bow="
+                                                            + status.bowDrawPhase()
+                                                                    .map(Enum::name)
+                                                                    .orElseGet(
+                                                                            () ->
+                                                                                    status
+                                                                                                            .bowRecoveryTicksRemaining()
+                                                                                                    > 0
+                                                                                            ? "RECOVERY("
+                                                                                                    + status
+                                                                                                            .bowRecoveryTicksRemaining()
+                                                                                                    + "t)"
+                                                                                            : "IDLE")
+                                                            + " | projectiles="
+                                                            + status.activeProjectiles()
                                                             + " | dodge="
                                                             + status.dodgeLoad()
                                                             + "/"

@@ -1,0 +1,6 @@
+definition_id: ammo.training_arrow
+schema_version: 1
+asset_id: ammo.training_arrow
+item_class: STACKABLE_LOT
+status: approved
+owning_team: combat

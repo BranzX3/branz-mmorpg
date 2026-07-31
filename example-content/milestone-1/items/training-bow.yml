@@ -1,0 +1,18 @@
+definition_id: weapon.training_bow
+schema_version: 1
+asset_id: weapon.training_bow
+item_class: UNIQUE_DURABLE
+base_max_durability: 100
+weapon_profile:
+  family: BOW
+  power: 90
+  bow:
+    minimum_draw_ticks: 5
+    full_draw_ticks: 20
+    free_full_draw_hold_ticks: 60
+    strain_stamina_per_second: 4
+    minimum_velocity_multiplier: 0.55
+    minimum_posture_multiplier: 0.5
+    maximum_penetration_percentage: 0.2
+status: approved
+owning_team: combat

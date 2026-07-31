@@ -59,6 +59,54 @@ class MoveEngineTest {
                 ((Result.Failure<MoveEngine, MoveEngineErrorCode>) result).error());
     }
 
+    @Test
+    void compilesProjectilePhysicsAndRejectsInconsistentShapeContract() throws Exception {
+        String projectile =
+                validBody()
+                        .replace("\"family\": \"SWORD\"", "\"family\": \"BOW\"")
+                        .replace("\"max_targets\": 4", "\"max_targets\": 1")
+                        .replace(
+                                "\"shape\": \"ARC\"",
+                                """
+                                "shape": "PROJECTILE",
+                                "projectile": {
+                                  "speed": 2.5,
+                                  "gravity_per_tick": 0.05,
+                                  "drag_per_tick": 0.99,
+                                  "collision_radius": 0.15,
+                                  "lifetime_ticks": 80,
+                                  "pierce_count": 0,
+                                  "ammo_category": "ammo.test.arrow"
+                                }""");
+
+        Result<MoveEngine, MoveEngineErrorCode> compiled = MoveEngine.compile(snapshot(projectile));
+        Result<MoveEngine, MoveEngineErrorCode> rejected =
+                MoveEngine.compile(
+                        snapshot(projectile.replace("\"projectile\": {", "\"ignored\": {")));
+        Result<MoveEngine, MoveEngineErrorCode> mismatchedTargets =
+                MoveEngine.compile(
+                        snapshot(projectile.replace("\"max_targets\": 1", "\"max_targets\": 2")));
+
+        MoveDefinition.ProjectileDefinition definition =
+                ((Result.Success<MoveEngine, MoveEngineErrorCode>) compiled)
+                        .value()
+                        .find(DefinitionId.of("move.test.training_slash"))
+                        .orElseThrow()
+                        .hitboxes()
+                        .getFirst()
+                        .projectile()
+                        .orElseThrow();
+        assertEquals(2.5, definition.speed());
+        assertEquals(80, definition.lifetimeTicks());
+        assertEquals(DefinitionId.of("ammo.test.arrow"), definition.ammoCategory());
+        assertEquals(
+                MoveEngineErrorCode.MOVE_HITBOX_INVALID,
+                ((Result.Failure<MoveEngine, MoveEngineErrorCode>) rejected).error());
+        assertEquals(
+                MoveEngineErrorCode.MOVE_HITBOX_INVALID,
+                ((Result.Failure<MoveEngine, MoveEngineErrorCode>) mismatchedTargets).error());
+    }
+
     static ContentSnapshot snapshot(String body) throws Exception {
         ContentDefinition definition =
                 new ContentDefinition(

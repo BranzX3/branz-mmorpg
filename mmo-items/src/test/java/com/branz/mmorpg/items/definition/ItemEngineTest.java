@@ -82,6 +82,53 @@ class ItemEngineTest {
                 ((Result.Failure<ItemEngine, ItemEngineErrorCode>) result).error());
     }
 
+    @Test
+    void compilesBowHandlingAndRejectsMissingBowContract() throws Exception {
+        String valid =
+                """
+                {
+                  "asset_id": "weapon.test.bow",
+                  "item_class": "UNIQUE_DURABLE",
+                  "base_max_durability": 100,
+                  "weapon_profile": {
+                    "family": "BOW",
+                    "power": 90,
+                    "bow": {
+                      "minimum_draw_ticks": 5,
+                      "full_draw_ticks": 20,
+                      "free_full_draw_hold_ticks": 60,
+                      "strain_stamina_per_second": 4,
+                      "minimum_velocity_multiplier": 0.55,
+                      "minimum_posture_multiplier": 0.5,
+                      "maximum_penetration_percentage": 0.2
+                    }
+                  }
+                }
+                """;
+
+        Result<ItemEngine, ItemEngineErrorCode> compiled =
+                ItemEngine.compile(snapshot(definition("weapon.test.bow", valid)));
+        String missing = valid.replace("\"bow\": {", "\"ignored\": {");
+        Result<ItemEngine, ItemEngineErrorCode> rejected =
+                ItemEngine.compile(snapshot(definition("weapon.test.bow", missing)));
+
+        BowWeaponProfile bow =
+                ((Result.Success<ItemEngine, ItemEngineErrorCode>) compiled)
+                        .value()
+                        .find(DefinitionId.of("weapon.test.bow"))
+                        .orElseThrow()
+                        .weaponProfile()
+                        .orElseThrow()
+                        .bowProfile()
+                        .orElseThrow();
+        assertEquals(5, bow.minimumDrawTicks());
+        assertEquals(60, bow.freeFullDrawHoldTicks());
+        assertEquals(0.2, bow.maximumPenetrationPercentage());
+        assertEquals(
+                ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID,
+                ((Result.Failure<ItemEngine, ItemEngineErrorCode>) rejected).error());
+    }
+
     private static ContentDefinition definition(String id, String body) throws Exception {
         return new ContentDefinition(
                 DefinitionId.of(id),

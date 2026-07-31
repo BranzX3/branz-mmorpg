@@ -58,7 +58,7 @@ final class BukkitItemProjectionCodec {
                     "projection definition does not match item definition");
         }
 
-        ItemStack item = new ItemStack(Material.BARRIER);
+        ItemStack item = new ItemStack(fallbackMaterial(definition));
         item.setAmount(Math.min(projection.quantity(), item.getMaxStackSize()));
         item.editMeta(
                 meta -> {
@@ -85,6 +85,24 @@ final class BukkitItemProjectionCodec {
                     write(meta.getPersistentDataContainer(), projection);
                 });
         return item;
+    }
+
+    private static Material fallbackMaterial(ItemDefinition definition) {
+        if (definition.id().value().startsWith("ammo.")) {
+            return Material.ARROW;
+        }
+        return definition
+                .weaponProfile()
+                .map(
+                        profile ->
+                                switch (profile.family()) {
+                                    case "BOW" -> Material.BOW;
+                                    case "CROSSBOW" -> Material.CROSSBOW;
+                                    case "SWORD", "GREATSWORD" -> Material.IRON_SWORD;
+                                    case "STAFF" -> Material.BLAZE_ROD;
+                                    default -> Material.BARRIER;
+                                })
+                .orElse(Material.BARRIER);
     }
 
     Optional<ObservedProjection> decode(ItemStack item, int slot) {

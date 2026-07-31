@@ -1,6 +1,7 @@
 package com.branz.mmorpg.bootstrap;
 
 import com.branz.mmorpg.combat.action.ActionPhase;
+import com.branz.mmorpg.combat.bow.BowDrawPhase;
 import com.branz.mmorpg.combat.cc.CcSeverity;
 import com.branz.mmorpg.combat.dodge.DodgeLoad;
 import com.branz.mmorpg.combat.dodge.DodgePhase;
@@ -15,6 +16,9 @@ record CombatSessionStatus(
         int engagementExitTicksRemaining,
         WeaponState weaponState,
         Optional<ActionPhase> actionPhase,
+        Optional<BowDrawPhase> bowDrawPhase,
+        int bowRecoveryTicksRemaining,
+        int activeProjectiles,
         DodgeLoad dodgeLoad,
         Optional<DodgePhase> dodgePhase,
         GuardPhase guardPhase,
@@ -31,12 +35,15 @@ record CombatSessionStatus(
         Objects.requireNonNull(engagementState, "engagementState");
         Objects.requireNonNull(weaponState, "weaponState");
         Objects.requireNonNull(actionPhase, "actionPhase");
+        Objects.requireNonNull(bowDrawPhase, "bowDrawPhase");
         Objects.requireNonNull(dodgeLoad, "dodgeLoad");
         Objects.requireNonNull(dodgePhase, "dodgePhase");
         Objects.requireNonNull(guardPhase, "guardPhase");
         Objects.requireNonNull(crowdControl, "crowdControl");
         Objects.requireNonNull(lastResolution, "lastResolution");
         if (engagementExitTicksRemaining < 0
+                || bowRecoveryTicksRemaining < 0
+                || activeProjectiles < 0
                 || !Double.isFinite(guardStability)
                 || guardStability < 0
                 || crowdControlTicksRemaining < 0

@@ -134,13 +134,46 @@ public final class MoveEngine {
                                 requiredNumber(node.path("angle_degrees"), "angle_degrees"),
                                 requiredNumber(node.path("height"), "height"),
                                 requiredInteger(node.path("max_targets"), "max_targets"),
-                                requiredText(node.path("hit_group"), "hit_group")));
+                                requiredText(node.path("hit_group"), "hit_group"),
+                                projectile(
+                                        MoveDefinition.HitboxShape.valueOf(
+                                                requiredText(node.path("shape"), "shape")),
+                                        node.path("projectile"))));
             }
         } catch (IllegalArgumentException exception) {
             throw new MoveCompileException(
                     MoveEngineErrorCode.MOVE_HITBOX_INVALID, exception.getMessage());
         }
         return List.copyOf(result);
+    }
+
+    private static Optional<MoveDefinition.ProjectileDefinition> projectile(
+            MoveDefinition.HitboxShape shape, JsonNode node) {
+        if (shape != MoveDefinition.HitboxShape.PROJECTILE) {
+            if (!node.isMissingNode() && !node.isNull()) {
+                throw new IllegalArgumentException(
+                        "projectile fields are valid only for PROJECTILE shape");
+            }
+            return Optional.empty();
+        }
+        if (!node.isObject()) {
+            throw new IllegalArgumentException("PROJECTILE shape requires projectile fields");
+        }
+        Result<DefinitionId, ?> ammo =
+                DefinitionId.parse(requiredText(node.path("ammo_category"), "ammo_category"));
+        if (ammo instanceof Result.Failure<?, ?> failure) {
+            throw new IllegalArgumentException(
+                    "projectile ammo_category is invalid: " + failure.detail());
+        }
+        return Optional.of(
+                new MoveDefinition.ProjectileDefinition(
+                        requiredNumber(node.path("speed"), "speed"),
+                        requiredNumber(node.path("gravity_per_tick"), "gravity_per_tick"),
+                        requiredNumber(node.path("drag_per_tick"), "drag_per_tick"),
+                        requiredNumber(node.path("collision_radius"), "collision_radius"),
+                        requiredInteger(node.path("lifetime_ticks"), "lifetime_ticks"),
+                        requiredInteger(node.path("pierce_count"), "pierce_count"),
+                        ((Result.Success<DefinitionId, ?>) ammo).value()));
     }
 
     private static List<MoveDefinition.ChainWindow> chainWindows(JsonNode nodes) {

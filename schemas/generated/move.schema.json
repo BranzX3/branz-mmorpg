@@ -170,6 +170,57 @@
           "hit_group" : {
             "type" : "string",
             "description" : "Once-per-group hit identity."
+          },
+          "projectile" : {
+            "type" : "object",
+            "properties" : {
+              "speed" : {
+                "type" : "number",
+                "description" : "Projectile launch speed.",
+                "x-unit" : "blocks_per_tick",
+                "minimum" : 1.0E-6,
+                "maximum" : 8.0
+              },
+              "gravity_per_tick" : {
+                "type" : "number",
+                "description" : "Downward projectile acceleration.",
+                "x-unit" : "blocks_per_tick_squared",
+                "minimum" : 0.0,
+                "maximum" : 1.0
+              },
+              "drag_per_tick" : {
+                "type" : "number",
+                "description" : "Velocity retained per tick.",
+                "x-unit" : "ratio_per_tick",
+                "minimum" : 1.0E-6,
+                "maximum" : 1.0
+              },
+              "collision_radius" : {
+                "type" : "number",
+                "description" : "Swept projectile radius.",
+                "x-unit" : "blocks",
+                "minimum" : 1.0E-6,
+                "maximum" : 2.0
+              },
+              "lifetime_ticks" : {
+                "type" : "integer",
+                "description" : "Maximum authoritative lifetime.",
+                "x-unit" : "ticks",
+                "minimum" : 1.0,
+                "maximum" : 400.0
+              },
+              "pierce_count" : {
+                "type" : "integer",
+                "description" : "Additional contacts after the first.",
+                "x-unit" : "targets",
+                "minimum" : 0.0,
+                "maximum" : 7.0
+              },
+              "ammo_category" : {
+                "type" : "string",
+                "description" : "Ammo definition carried by the projectile."
+              }
+            }
           }
         },
         "required" : [ "tick", "shape", "max_targets", "range", "angle_degrees", "height", "hit_group" ]

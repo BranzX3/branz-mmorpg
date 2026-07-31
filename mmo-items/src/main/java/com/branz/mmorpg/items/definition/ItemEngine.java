@@ -97,10 +97,62 @@ public final class ItemEngine {
                         ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID,
                         "weapon_profile requires non-blank family and positive power");
             }
-            weaponProfile = Optional.of(new WeaponCombatProfile(family, power.doubleValue()));
+            Optional<BowWeaponProfile> bowProfile;
+            try {
+                bowProfile = compileBowProfile(family, weaponNode.get("bow"));
+            } catch (IllegalArgumentException exception) {
+                return Result.failure(
+                        ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID, exception.getMessage());
+            }
+            weaponProfile =
+                    Optional.of(new WeaponCombatProfile(family, power.doubleValue(), bowProfile));
         }
         return Result.success(
                 new ItemDefinition(
                         source.id(), assetId, itemClass, durability, cosmetic, weaponProfile));
+    }
+
+    private static Optional<BowWeaponProfile> compileBowProfile(String family, JsonNode bowNode) {
+        boolean declared = bowNode != null && !bowNode.isNull();
+        if (!family.equals("BOW")) {
+            if (declared) {
+                throw new IllegalArgumentException(
+                        "weapon_profile.bow is valid only for BOW family");
+            }
+            return Optional.empty();
+        }
+        if (!declared || !bowNode.isObject()) {
+            throw new IllegalArgumentException("BOW weapon_profile requires bow handling fields");
+        }
+        try {
+            return Optional.of(
+                    new BowWeaponProfile(
+                            requiredInteger(bowNode, "minimum_draw_ticks"),
+                            requiredInteger(bowNode, "full_draw_ticks"),
+                            requiredInteger(bowNode, "free_full_draw_hold_ticks"),
+                            requiredNumber(bowNode, "strain_stamina_per_second"),
+                            requiredNumber(bowNode, "minimum_velocity_multiplier"),
+                            requiredNumber(bowNode, "minimum_posture_multiplier"),
+                            requiredNumber(bowNode, "maximum_penetration_percentage")));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                    "invalid weapon_profile.bow: " + exception.getMessage(), exception);
+        }
+    }
+
+    private static int requiredInteger(JsonNode root, String field) {
+        JsonNode node = root.get(field);
+        if (node == null || !node.isIntegralNumber() || !node.canConvertToInt()) {
+            throw new IllegalArgumentException(field + " must be an integer");
+        }
+        return node.intValue();
+    }
+
+    private static double requiredNumber(JsonNode root, String field) {
+        JsonNode node = root.get(field);
+        if (node == null || !node.isNumber() || !Double.isFinite(node.doubleValue())) {
+            throw new IllegalArgumentException(field + " must be a finite number");
+        }
+        return node.doubleValue();
     }
 }

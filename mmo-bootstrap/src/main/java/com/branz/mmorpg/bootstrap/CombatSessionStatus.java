@@ -21,6 +21,9 @@ record CombatSessionStatus(
         double guardStability,
         Optional<CcSeverity> crowdControl,
         int crowdControlTicksRemaining,
+        double health,
+        double maximumHealth,
+        boolean dead,
         int stamina,
         int reservedStamina,
         Optional<String> lastResolution) {
@@ -37,6 +40,12 @@ record CombatSessionStatus(
                 || !Double.isFinite(guardStability)
                 || guardStability < 0
                 || crowdControlTicksRemaining < 0
+                || !Double.isFinite(health)
+                || health < 0
+                || !Double.isFinite(maximumHealth)
+                || maximumHealth <= 0
+                || health > maximumHealth
+                || dead != (health == 0)
                 || stamina < 0
                 || reservedStamina < 0) {
             throw new IllegalArgumentException("combat resources must not be negative");

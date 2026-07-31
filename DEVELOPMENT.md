@@ -156,12 +156,29 @@ with an operator/test account:
     crossed between the two server poses resolves once rather than tunnelling or double-hitting.
 42. Teleport during Windup with `/tp` and verify the move/buffer/guard/dodge state resets. Repeat a
     normal directional dodge and verify its four plugin-owned movement steps remain allowed.
+43. Run `/mmo health` with a fresh session and verify `health=1000.0/1000.0`. Take an ordinary
+    unguarded zombie hit and verify it applies 100 internal damage while the vanilla hit itself is
+    cancelled; ten such accepted hits from full health produce normal death.
+44. Repeat a front hit during normal guard and verify only 20 chip damage reaches MMO HP; repeat
+    inside the perfect-guard window and verify MMO HP is unchanged.
+45. Take non-entity environmental damage and verify the action bar reports `ENVIRONMENT` with 50
+    MMO damage per vanilla damage point. Confirm `/mmo health` and the vanilla heart ratio agree.
+46. Leave combat after taking damage. Verify HP does not recover before 400 quiet ticks, then rises
+    at five HP/second in `EXPLORATION` and stops at 800/1000.
+47. Die with the Chronicle, equipped blade, persisted test items and experience present. Verify no
+    item/experience drop is created, then respawn and confirm full MMO HP/resources plus a safe
+    weapon transition from the selected slot.
+48. Strike one fresh training target repeatedly and verify `health=current/1000.0` falls by the
+    applied deterministic damage. The exact lethal hit must kill the Bukkit target and clear its
+    isolated HP/posture state.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
 resolves an authoritative ARC against server bounding boxes/line of sight and calculates the
-canonical physical damage breakdown. It keeps isolated 1,000-HP training accounting rather than
-applying vanilla damage; persistent MMO health/death is a later combat/encounter boundary. The
+canonical physical damage breakdown. Managed players and training targets use server-owned
+1,000-HP runtimes; vanilla hearts/entities are presentation and death projections, never combat
+authority. Combat HP remains transient across logout/restart. Death-pouch wallet mutation,
+sanctuary routing and crash-resumable encounter HP remain later transactional boundaries. The
 client swing never declares a hit.
 
 Live engagement check:

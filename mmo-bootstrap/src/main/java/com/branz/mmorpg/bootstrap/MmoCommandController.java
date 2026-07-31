@@ -355,6 +355,15 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                                                                     .crowdControlTicksRemaining()
                                                                                             + "t)")
                                                                     .orElse("NONE")
+                                                            + " | health="
+                                                            + Math.round(status.health() * 10.0)
+                                                                    / 10.0
+                                                            + "/"
+                                                            + Math.round(
+                                                                            status.maximumHealth()
+                                                                                    * 10.0)
+                                                                    / 10.0
+                                                            + (status.dead() ? "(DEAD)" : "")
                                                             + " | stamina="
                                                             + status.stamina()
                                                             + " (reserved="

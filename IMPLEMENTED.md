@@ -653,8 +653,8 @@ Remaining Milestone 4 work:
 
 - shape-specific dimensions/resolvers for CAPSULE/BOX/SPHERE/RAY/PROJECTILE plus
   region/friendly-provider filters;
-- persistent MMO health application and death/encounter integration;
-- persistent combatant status/health integration and provider-authored posture/CC profiles;
+- death-pouch/wallet saga, sanctuary checkpoint selection and encounter health ownership;
+- provider-authored combatant health, posture and CC profiles;
 - additional rejection-reason overlays plus persisted/inspectable multi-action trace history;
 
 Schema/config impact: move schema gains the complete runtime fields. Local config adds positive
@@ -681,8 +681,7 @@ Implemented:
   line-of-sight;
 - players and armor stands are excluded from the current PvE training profile;
 - server-resolved MISS/HIT target count and damage feedback plus last resolution in `/mmo health`;
-- isolated 1,000-HP training-target accounting without trusting or applying vanilla attack
-  damage.
+- server-owned 1,000-HP training-target accounting without trusting vanilla attack damage.
 
 Tests:
 
@@ -700,11 +699,11 @@ Failure/recovery behavior:
 - malformed weapon profiles fail Item Engine activation;
 - missing/mismatched training blade profile enters maintenance before sessions;
 - Paper cancels vanilla attack damage and reports server ARC resolution only;
-- no persistent health/reward/value is mutated by this training slice.
+- no reward or durable value is mutated by this training slice.
 
 Non-goals:
 
-- applying internal MMO HP to persistent player/enemy combatants;
+- provider/encounter-authored HP profiles for player and enemy combatants;
 - PvP/party/region ownership policy and weak-point provider data;
 - capsule, box, sphere, ray, projectile and swept-arc runtime;
 - knockback, posture, guard, status and encounter rewards.
@@ -748,7 +747,7 @@ Non-goals:
 
 - persistent threat tables or encounter hard-lock integration;
 - dodge, guard, posture, poise and crowd control;
-- out-of-combat HP regeneration and persistent combat health.
+- encounter hard-lock integration and safe/rest-context regeneration.
 
 Config impact: `combat.engagement-exit-ticks` defaults to `160`. Migration impact: none;
 engagement remains transient and is never restored after login.
@@ -795,7 +794,7 @@ Failure/recovery behavior:
 - insufficient stamina and closed cancel windows reject without cancelling the current action;
 - logout/session replacement drops dodge, movement and pending Shift state;
 - solid collision stops movement while the dodge timeline/recovery continues;
-- vanilla environmental damage is never cancelled by this slice.
+- invalid load/profile tuning rejects at startup before a combat session exists.
 
 Non-goals:
 
@@ -851,7 +850,7 @@ Non-goals:
   right-click toggle until the optional packet provider supplies held/release edges;
 - shield profiles, elemental leakage, unblockable/provider attack tags and PvP tuning;
 - shield profiles, equipment-derived poise and provider-authored attack tags;
-- persistent player HP; normal guard chip still flows through the current vanilla training event.
+- shield/equipment-derived health and persistent encounter checkpoints.
 
 Config impact: `combat.training-incoming-guard-pressure` defaults to `10.0`. Migration impact:
 none; guard runtime is transient.
@@ -903,7 +902,7 @@ Failure/recovery behavior:
 
 Non-goals:
 
-- persistent MMO HP/death, encounter rewards and boss-specific posture phases/immunity;
+- death-pouch/encounter rewards and boss-specific posture phases/immunity;
 - equipment-derived poise, provider-authored hyper armor and attack-specific CC/poise tags;
 - launch/knockback movement, grab pairing, animations and client-side posture-bar presentation.
 
@@ -1048,3 +1047,56 @@ Non-goals:
 
 Config/schema/migration impact: none; the existing ARC contract and local training content remain
 compatible.
+
+## Milestone 4 — authoritative MMO health and death slice
+
+Implemented:
+
+- immutable deterministic health profiles, runtimes and resolutions own damage, healing, lethal
+  transitions, respawn and open-world recovery without reading the wall clock;
+- the local player and training-enemy profiles use the reference 1,000 HP scale;
+- managed entity attacks are cancelled at the Paper boundary and resolve a configurable 100 MMO
+  damage through dodge, guard and chip before mutating the server-owned player runtime;
+- non-entity environmental damage is cancelled and converted from vanilla damage points with a
+  configurable 50 MMO-HP multiplier;
+- the vanilla heart bar is a continuously reconciled presentation of the internal HP ratio and is
+  never the combat source of truth;
+- training ARC hits mutate isolated server-owned enemy HP, report applied damage/current HP and
+  kill the Bukkit entity only on the exact lethal transition;
+- player HP reaching zero drives the normal Paper death event, interrupts all transient combat
+  state and retains inventory, equipment projection, experience level and experience;
+- local respawn restores full MMO HP/resources and safely rebuilds the weapon transition from the
+  currently selected slot;
+- open-world recovery starts 400 ticks after the last damage, restores 0.5% maximum HP per second
+  only in `EXPLORATION` and stops at 80% maximum HP;
+- `/mmo health` exposes current/maximum MMO HP and the exact dead state.
+
+Tests:
+
+- damage clamps at zero and emits the lethal transition exactly once;
+- healing cannot revive and explicit respawn restores the authored ratio;
+- open-world recovery observes the exact 400-tick boundary and 80% cap;
+- 100,000 seeded mixed damage/heal/recovery/respawn transitions remain deterministic and bounded.
+
+Failure/recovery behavior:
+
+- non-finite/negative health amounts, invalid profiles, over-maximum state and server-tick
+  regression fail closed;
+- dead runtimes reject ordinary healing and cannot begin stamina regeneration or another combat
+  action;
+- logout/session replacement intentionally discards transient HP and a newly admitted local
+  session starts full;
+- death-pouch currency mutation is not guessed or partially applied before the wallet saga exists.
+
+Non-goals:
+
+- death-pouch creation/recovery/expiry, wallet deduction and sanctuary checkpoint routing;
+- crash-resumable encounter HP, logout snapshots and cross-server combat transfer;
+- safe/rest-context regeneration, healing consumables and provider-authored combatant profiles;
+- player-authored self-HP action costs until the action resource ledger and health authority share
+  one commit boundary.
+
+Config impact: `combat.training-incoming-health-damage` defaults to `100.0` and
+`combat.environmental-health-scale` defaults to `50.0`. Migration impact: none. Combat HP and HUD
+state are transient/derived under the current persistence contract; durable death-pouch value will
+be introduced with its own idempotent wallet transaction rather than per-hit database writes.

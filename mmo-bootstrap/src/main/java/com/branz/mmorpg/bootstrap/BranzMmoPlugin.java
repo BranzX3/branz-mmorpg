@@ -267,6 +267,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
         int engagementExitTicks = getConfig().getInt("combat.engagement-exit-ticks", 160);
         double trainingIncomingGuardPressure =
                 getConfig().getDouble("combat.training-incoming-guard-pressure", 10.0);
+        double trainingIncomingHealthDamage =
+                getConfig().getDouble("combat.training-incoming-health-damage", 100.0);
+        double environmentalHealthScale =
+                getConfig().getDouble("combat.environmental-health-scale", 50.0);
         double trainingIncomingPoiseDamage =
                 getConfig().getDouble("combat.training-incoming-poise-damage", 35.0);
         int trainingIncomingCcTicks = getConfig().getInt("combat.training-incoming-cc-ticks", 6);
@@ -308,6 +312,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 || engagementExitTicks < 1
                 || !Double.isFinite(trainingIncomingGuardPressure)
                 || trainingIncomingGuardPressure <= 0
+                || !Double.isFinite(trainingIncomingHealthDamage)
+                || trainingIncomingHealthDamage <= 0
+                || !Double.isFinite(environmentalHealthScale)
+                || environmentalHealthScale <= 0
                 || !Double.isFinite(trainingIncomingPoiseDamage)
                 || trainingIncomingPoiseDamage <= 0
                 || trainingIncomingCcTicks < 1
@@ -333,6 +341,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         new com.branz.mmorpg.combat.guard.GuardEngine(
                                 com.branz.mmorpg.combat.guard.GuardProfile.trainingWeapon()),
                         trainingIncomingGuardPressure,
+                        trainingIncomingHealthDamage,
+                        environmentalHealthScale,
                         trainingIncomingPoiseDamage,
                         trainingIncomingCcSeverity,
                         trainingIncomingCcTicks,

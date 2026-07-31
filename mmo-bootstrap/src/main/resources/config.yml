@@ -20,6 +20,8 @@ combat:
   engagement-exit-ticks: 160
   training-dodge-load: MEDIUM
   training-incoming-guard-pressure: 10.0
+  training-incoming-health-damage: 100.0
+  environmental-health-scale: 50.0
   training-incoming-poise-damage: 35.0
   training-incoming-cc-severity: FLINCH
   training-incoming-cc-ticks: 6

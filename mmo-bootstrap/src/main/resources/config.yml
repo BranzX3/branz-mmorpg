@@ -18,6 +18,7 @@ combat:
   weapon-draw-ticks: 6
   weapon-sheathe-ticks: 4
   engagement-exit-ticks: 160
+  training-dodge-load: MEDIUM
 
 database:
   # EMBEDDED_LOCAL is restricted to LOCAL/INTEGRATION and makes runServer

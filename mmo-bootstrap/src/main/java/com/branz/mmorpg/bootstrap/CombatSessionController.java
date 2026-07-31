@@ -12,6 +12,11 @@ import com.branz.mmorpg.combat.action.ResourceCommitState;
 import com.branz.mmorpg.combat.damage.PhysicalDamageBreakdown;
 import com.branz.mmorpg.combat.damage.PhysicalDamageRequest;
 import com.branz.mmorpg.combat.damage.PhysicalDamageResolver;
+import com.branz.mmorpg.combat.dodge.DodgeEngine;
+import com.branz.mmorpg.combat.dodge.DodgeErrorCode;
+import com.branz.mmorpg.combat.dodge.DodgePhase;
+import com.branz.mmorpg.combat.dodge.DodgeProfile;
+import com.branz.mmorpg.combat.dodge.DodgeRuntime;
 import com.branz.mmorpg.combat.engagement.EngagementRuntime;
 import com.branz.mmorpg.combat.engagement.EngagementTickContext;
 import com.branz.mmorpg.combat.engagement.EngagementTracker;
@@ -33,9 +38,13 @@ import com.branz.mmorpg.combat.input.InputRouteOutcome;
 import com.branz.mmorpg.combat.input.InputRouter;
 import com.branz.mmorpg.combat.input.InputRoutingContext;
 import com.branz.mmorpg.combat.input.SemanticInput;
+import com.branz.mmorpg.combat.input.SneakPressDecision;
+import com.branz.mmorpg.combat.input.SneakPressResolver;
+import com.branz.mmorpg.combat.input.SneakPressWindow;
 import com.branz.mmorpg.combat.move.MoveDefinition;
 import com.branz.mmorpg.combat.move.MoveEngine;
 import com.branz.mmorpg.combat.state.ActionState;
+import com.branz.mmorpg.combat.state.EngagementState;
 import com.branz.mmorpg.combat.state.UiState;
 import com.branz.mmorpg.combat.state.WeaponState;
 import com.branz.mmorpg.combat.weapon.SelectedHotbarSlot;
@@ -52,6 +61,8 @@ import java.util.Optional;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.FluidCollisionMode;
+import org.bukkit.Input;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
@@ -68,6 +79,8 @@ import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /** Main-thread Paper adapter for the deterministic training-move combat kernel. */
@@ -84,6 +97,9 @@ final class CombatSessionController implements Listener {
     private final ArcHitboxResolver hitboxes = new ArcHitboxResolver();
     private final PhysicalDamageResolver damage = new PhysicalDamageResolver();
     private final EngagementTracker engagement;
+    private final DodgeProfile dodgeProfile;
+    private final DodgeEngine dodges = new DodgeEngine();
+    private final SneakPressResolver sneakPresses = new SneakPressResolver();
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
     private final Map<UUID, Double> trainingTargetHealth = new HashMap<>();
     private int tickTaskId = -1;
@@ -95,7 +111,8 @@ final class CombatSessionController implements Listener {
             double trainingWeaponPower,
             int drawTicks,
             int sheatheTicks,
-            int engagementExitTicks) {
+            int engagementExitTicks,
+            DodgeProfile dodgeProfile) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
         Objects.requireNonNull(moves, "moves");
@@ -111,6 +128,7 @@ final class CombatSessionController implements Listener {
         this.trainingWeaponPower = trainingWeaponPower;
         weapons = new WeaponTransitionMachine(drawTicks, sheatheTicks);
         engagement = new EngagementTracker(engagementExitTicks);
+        this.dodgeProfile = Objects.requireNonNull(dodgeProfile, "dodgeProfile");
     }
 
     void start() {
@@ -149,6 +167,12 @@ final class CombatSessionController implements Listener {
                                 session.engagement, plugin.getServer().getCurrentTick()),
                         session.weapon.state(),
                         Optional.ofNullable(session.timeline).map(ActionTimeline::phase),
+                        dodgeProfile.load(),
+                        Optional.ofNullable(session.dodge)
+                                .map(
+                                        runtime ->
+                                                runtime.phaseAt(
+                                                        plugin.getServer().getCurrentTick())),
                         resources.stamina(),
                         resources.reservedStamina(),
                         Optional.ofNullable(session.lastResolution)));
@@ -220,12 +244,51 @@ final class CombatSessionController implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onVanillaCombatDamage(EntityDamageByEntityEvent event) {
+        if (event.getEntity() instanceof Player defender) {
+            LiveSession defenderSession = sessions.get(defender.getUniqueId());
+            if (defenderSession != null
+                    && defenderSession.dodge != null
+                    && dodges.avoids(
+                            defenderSession.dodge, plugin.getServer().getCurrentTick(), true)) {
+                event.setCancelled(true);
+                defenderSession.lastResolution =
+                        "DODGE iframe tick="
+                                + defenderSession.dodge.elapsed(
+                                        plugin.getServer().getCurrentTick());
+                defender.sendActionBar(
+                        Component.text(defenderSession.lastResolution, NamedTextColor.AQUA));
+                return;
+            }
+        }
         if (event.getDamageSource().getCausingEntity() instanceof Player player) {
             LiveSession session = sessions.get(player.getUniqueId());
             if (session != null
                     && (session.weapon.state() == WeaponState.READY || session.timeline != null)) {
                 event.setCancelled(true);
             }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onSneak(PlayerToggleSneakEvent event) {
+        LiveSession session = sessions.get(event.getPlayer().getUniqueId());
+        if (session == null || !characters.ready(event.getPlayer())) {
+            return;
+        }
+        if (!event.isSneaking()) {
+            session.sneakPress = null;
+            return;
+        }
+        if (!combatDodgeContext(session)) {
+            return;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        DirectionSnapshot direction = direction(event.getPlayer().getCurrentInput());
+        session.sneakPress = new SneakPressWindow(tick);
+        if (direction != DirectionSnapshot.NEUTRAL) {
+            event.setCancelled(true);
+            session.sneakPress = null;
+            requestDodge(event.getPlayer(), session, direction);
         }
     }
 
@@ -285,6 +348,8 @@ final class CombatSessionController implements Listener {
                 player.sendActionBar(Component.text("Training blade READY", NamedTextColor.GREEN));
                 pollBuffered(player, session);
             }
+            tickSneakPress(player, session);
+            tickDodge(player, session);
             tickAction(player, session);
             tickEngagement(player, session);
             regenerateStamina(session);
@@ -429,6 +494,7 @@ final class CombatSessionController implements Listener {
 
     private void regenerateStamina(LiveSession session) {
         if (session.timeline != null
+                || session.dodge != null
                 || session.resources.stamina() >= session.resources.maximumStamina()) {
             return;
         }
@@ -442,6 +508,210 @@ final class CombatSessionController implements Listener {
             session.resources = session.resources.restoreStamina(whole);
             session.staminaRegenRemainder -= whole;
         }
+    }
+
+    private void tickSneakPress(Player player, LiveSession session) {
+        if (session.sneakPress == null) {
+            return;
+        }
+        DirectionSnapshot direction = direction(player.getCurrentInput());
+        SneakPressDecision decision =
+                sneakPresses.resolve(
+                        session.sneakPress,
+                        plugin.getServer().getCurrentTick(),
+                        player.isSneaking(),
+                        direction);
+        if (decision == SneakPressDecision.DODGE) {
+            session.sneakPress = null;
+            player.setSneaking(false);
+            requestDodge(player, session, direction);
+        } else if (decision != SneakPressDecision.WAITING) {
+            session.sneakPress = null;
+        }
+    }
+
+    private void requestDodge(Player player, LiveSession session, DirectionSnapshot direction) {
+        long tick = plugin.getServer().getCurrentTick();
+        if (!dodgeWindowOpen(session)) {
+            player.sendActionBar(Component.text("Dodge window is closed.", NamedTextColor.RED));
+            return;
+        }
+        Result<SemanticInput, InputRejectionCode> semantic =
+                inputPolicy.resolve(
+                        ClientAction.SNEAK_PRESS, policyContext(player, session, direction));
+        if (!(semantic instanceof Result.Success<SemanticInput, InputRejectionCode> intent)
+                || intent.value() != SemanticInput.DODGE) {
+            return;
+        }
+        CombatResources postCancelResources = resourcesAfterDodgeCancel(session);
+        Result<DodgeRuntime, DodgeErrorCode> started =
+                dodges.start(
+                        Optional.ofNullable(session.dodge),
+                        dodgeProfile,
+                        direction,
+                        postCancelResources.availableStamina(),
+                        tick);
+        if (started instanceof Result.Failure<DodgeRuntime, DodgeErrorCode> failure) {
+            player.sendActionBar(
+                    Component.text("Dodge rejected: " + failure.error(), NamedTextColor.RED));
+            return;
+        }
+        Result<CombatInputRequest, InputRejectionCode> observed =
+                session.input.observe(
+                        new InputObservation(
+                                tick,
+                                intent.value(),
+                                direction,
+                                "dodge",
+                                new InputDeduplicationKey("FEET", "SNEAK_PRESS")));
+        if (!(observed instanceof Result.Success<CombatInputRequest, InputRejectionCode> success)) {
+            return;
+        }
+        Result<InputRouteOutcome, InputRejectionCode> routed =
+                session.input.routeFrame(
+                        List.of(success.value()), dodgeRoutingContext(player, session));
+        if (!(routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode>)) {
+            return;
+        }
+
+        DodgeRuntime runtime = ((Result.Success<DodgeRuntime, DodgeErrorCode>) started).value();
+        session.resources =
+                postCancelResources.spendStamina(dodgeProfile.staminaCost()).orElseThrow();
+        session.timeline = null;
+        session.action = ActionState.IDLE;
+        session.dodge = runtime;
+        session.dodgeDirection = dodgeVector(player, direction);
+        session.lastDodgeMovementElapsed = -1;
+        session.lastStaminaSpendTick = tick;
+        session.staminaRegenRemainder = 0;
+        applyDodgeMovement(player, session, tick);
+        player.sendActionBar(
+                Component.text(
+                        "DODGE " + dodgeProfile.load() + " stamina=" + session.resources.stamina(),
+                        NamedTextColor.AQUA));
+    }
+
+    private void tickDodge(Player player, LiveSession session) {
+        if (session.dodge == null) {
+            return;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        applyDodgeMovement(player, session, tick);
+        DodgePhase phase = session.dodge.phaseAt(tick);
+        if (phase == DodgePhase.COMPLETE) {
+            session.dodge = null;
+            session.dodgeDirection = null;
+            session.lastDodgeMovementElapsed = -1;
+        }
+    }
+
+    private void applyDodgeMovement(Player player, LiveSession session, long tick) {
+        if (session.dodge == null || !session.dodge.movementAppliesAt(tick)) {
+            return;
+        }
+        long elapsed = session.dodge.elapsed(tick);
+        if (elapsed <= session.lastDodgeMovementElapsed) {
+            return;
+        }
+        session.lastDodgeMovementElapsed = elapsed;
+        double step = dodgeProfile.travelDistance() / dodgeProfile.movementTicks();
+        org.bukkit.util.Vector displacement = session.dodgeDirection.clone().multiply(step);
+        if (!collisionFree(player, displacement)) {
+            session.lastResolution = "DODGE blocked by world collision";
+            return;
+        }
+        org.bukkit.Location destination = player.getLocation().add(displacement);
+        player.teleport(destination, PlayerTeleportEvent.TeleportCause.PLUGIN);
+    }
+
+    private static boolean collisionFree(Player player, org.bukkit.util.Vector displacement) {
+        org.bukkit.util.BoundingBox destination =
+                player.getBoundingBox().clone().shift(displacement);
+        int minX = (int) Math.floor(destination.getMinX());
+        int maxX = (int) Math.floor(destination.getMaxX());
+        int minY = (int) Math.floor(destination.getMinY());
+        int maxY = (int) Math.floor(destination.getMaxY());
+        int minZ = (int) Math.floor(destination.getMinZ());
+        int maxZ = (int) Math.floor(destination.getMaxZ());
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    if (player.getWorld()
+                            .getBlockAt(x, y, z)
+                            .getCollisionShape()
+                            .overlaps(destination)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return player.getWorld()
+                        .rayTraceBlocks(
+                                player.getLocation().add(0, 0.1, 0),
+                                displacement,
+                                displacement.length(),
+                                FluidCollisionMode.NEVER,
+                                true)
+                == null;
+    }
+
+    private CombatResources resourcesAfterDodgeCancel(LiveSession session) {
+        if (session.timeline == null) {
+            return session.resources;
+        }
+        Result<ActionTimeline, ActionTimelineErrorCode> cancelled =
+                session.timeline.cancel("DODGE");
+        return cancelled instanceof Result.Success<ActionTimeline, ActionTimelineErrorCode> success
+                ? success.value().resources()
+                : session.timeline.resources();
+    }
+
+    private InputRoutingContext dodgeRoutingContext(Player player, LiveSession session) {
+        InputRoutingContext base = routingContext(player, session);
+        if (base.legalNow().contains(SemanticInput.DODGE)) {
+            return base;
+        }
+        java.util.EnumSet<SemanticInput> legal = java.util.EnumSet.copyOf(base.legalNow());
+        legal.add(SemanticInput.DODGE);
+        return new InputRoutingContext(legal, base.bufferWindowOpen());
+    }
+
+    private boolean combatDodgeContext(LiveSession session) {
+        return session.engagement.state() != EngagementState.EXPLORATION
+                && (session.weapon.state() == WeaponState.READY
+                        || session.weapon.state() == WeaponState.DRAWING);
+    }
+
+    private boolean dodgeWindowOpen(LiveSession session) {
+        if (!combatDodgeContext(session) || session.action.hardControl()) {
+            return false;
+        }
+        return session.timeline == null
+                || session.timeline.tick() >= trainingMove.cancels().dodgeFromTick();
+    }
+
+    private static DirectionSnapshot direction(Input input) {
+        double forward = (input.isForward() ? 1 : 0) - (input.isBackward() ? 1 : 0);
+        double strafe = (input.isLeft() ? 1 : 0) - (input.isRight() ? 1 : 0);
+        return DirectionSnapshot.fromAxes(forward, strafe);
+    }
+
+    private static org.bukkit.util.Vector dodgeVector(Player player, DirectionSnapshot direction) {
+        org.bukkit.util.Vector forward = player.getLocation().getDirection().setY(0);
+        if (forward.lengthSquared() < 1.0e-9) {
+            forward = new org.bukkit.util.Vector(0, 0, 1);
+        } else {
+            forward.normalize();
+        }
+        org.bukkit.util.Vector left =
+                new org.bukkit.util.Vector(forward.getZ(), 0, -forward.getX());
+        return switch (direction) {
+            case FORWARD -> forward;
+            case BACK -> forward.multiply(-1);
+            case LEFT -> left;
+            case RIGHT -> left.multiply(-1);
+            case NEUTRAL -> throw new IllegalArgumentException("neutral dodge direction");
+        };
     }
 
     private void tickEngagement(Player player, LiveSession session) {
@@ -490,7 +760,11 @@ final class CombatSessionController implements Listener {
     }
 
     private void startMove(Player player, LiveSession session) {
-        if (session.timeline != null) {
+        if (session.timeline != null || session.dodge != null) {
+            if (session.dodge != null) {
+                player.sendActionBar(
+                        Component.text("Attack locked during dodge recovery.", NamedTextColor.RED));
+            }
             return;
         }
         Result<ActionTimeline, ActionTimelineErrorCode> started =
@@ -533,10 +807,20 @@ final class CombatSessionController implements Listener {
     }
 
     private InputRoutingContext routingContext(Player player, LiveSession session) {
+        if (session.dodge != null) {
+            return InputRoutingContext.legal(
+                    java.util.EnumSet.of(
+                            SemanticInput.FORCED_INTERRUPT, SemanticInput.UI_DANGER_CLOSE));
+        }
         return inputPolicy.routingContext(policyContext(player, session), false);
     }
 
     private InputPolicyContext policyContext(Player player, LiveSession session) {
+        return policyContext(player, session, DirectionSnapshot.NEUTRAL);
+    }
+
+    private InputPolicyContext policyContext(
+            Player player, LiveSession session, DirectionSnapshot direction) {
         UiState ui =
                 player.getOpenInventory().getTopInventory().getHolder()
                                 instanceof SceneInventoryHolder
@@ -548,7 +832,7 @@ final class CombatSessionController implements Listener {
                 session.action,
                 ui,
                 false,
-                DirectionSnapshot.NEUTRAL);
+                direction);
     }
 
     private SelectedHotbarSlot selectedSlot(Player player, int slot) {
@@ -595,6 +879,10 @@ final class CombatSessionController implements Listener {
         private CombatResources resources = CombatResources.full(1000, 100, 100);
         private final InputRouter input = new InputRouter();
         private ActionTimeline timeline;
+        private DodgeRuntime dodge;
+        private org.bukkit.util.Vector dodgeDirection;
+        private long lastDodgeMovementElapsed = -1;
+        private SneakPressWindow sneakPress;
         private long lastStaminaSpendTick = Long.MIN_VALUE / 2;
         private double staminaRegenRemainder;
         private String lastResolution;

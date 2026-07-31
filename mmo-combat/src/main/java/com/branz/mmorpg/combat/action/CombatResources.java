@@ -2,6 +2,7 @@ package com.branz.mmorpg.combat.action;
 
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.move.MoveDefinition;
+import java.util.Optional;
 
 public record CombatResources(
         int maximumHealth,
@@ -51,6 +52,30 @@ public record CombatResources(
                 reservedHealth,
                 reservedStamina,
                 reservedMana);
+    }
+
+    public int availableStamina() {
+        return stamina - reservedStamina;
+    }
+
+    public Optional<CombatResources> spendStamina(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("stamina spend must not be negative");
+        }
+        if (amount > availableStamina()) {
+            return Optional.empty();
+        }
+        return Optional.of(
+                new CombatResources(
+                        maximumHealth,
+                        health,
+                        maximumStamina,
+                        stamina - amount,
+                        maximumMana,
+                        mana,
+                        reservedHealth,
+                        reservedStamina,
+                        reservedMana));
     }
 
     Result<CombatResources, ActionTimelineErrorCode> reserve(MoveDefinition.ResourceCost cost) {

@@ -38,7 +38,9 @@ public final class CombatInputPolicy {
                                     ? SemanticInput.AUXILIARY
                                     : SemanticInput.VANILLA_FALLBACK;
                     case SNEAK_PRESS ->
-                            ready(context) && context.direction() != DirectionSnapshot.NEUTRAL
+                            dodgeReady(context)
+                                            && context.engagement() != EngagementState.EXPLORATION
+                                            && context.direction() != DirectionSnapshot.NEUTRAL
                                     ? SemanticInput.DODGE
                                     : SemanticInput.VANILLA_FALLBACK;
                 });
@@ -91,6 +93,10 @@ public final class CombatInputPolicy {
 
     private static boolean ready(InputPolicyContext context) {
         return context.weapon() == WeaponState.READY;
+    }
+
+    private static boolean dodgeReady(InputPolicyContext context) {
+        return context.weapon() == WeaponState.READY || context.weapon() == WeaponState.DRAWING;
     }
 
     private static boolean exclusiveUiOwnsInput(UiState ui) {

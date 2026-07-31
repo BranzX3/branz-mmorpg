@@ -103,6 +103,19 @@ with an operator/test account:
     `HIT targets=1 damage=...` and `/mmo health` retains the same last resolution.
 20. Move the target behind the player, outside 2.8 blocks or behind a solid wall; repeat and verify
     `MISS`. Put several targets in the 95-degree cone and verify no more than four are selected.
+21. While still in `EXPLORATION`, press directional Shift and verify vanilla sneak remains intact.
+22. Enter `ALERT`/`ENGAGED` with the zombie, hold a movement key and press Shift. Verify a Medium
+    dodge moves in the captured direction, spends 30 stamina and `/mmo health` reports
+    `dodge=MEDIUM/...` through recovery.
+23. Dodge directly into a solid wall and verify no step passes through it; the recovery still
+    completes normally.
+24. Let the zombie's entity attack land on the startup tick and verify it is not avoided. Repeat
+    during the four Medium i-frame ticks and verify `DODGE iframe tick=...` is retained by
+    `/mmo health`.
+25. Start the training slash and try to dodge before authored tick 9; verify rejection. Retry at or
+    after tick 9 and verify the attack cancels while already committed stamina remains spent.
+26. Change `combat.training-dodge-load` to `LIGHT`, `HEAVY` and `OVERLOADED` between local restarts;
+    verify costs 25/35/40 and confirm Overloaded movement has no i-frame immunity.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,

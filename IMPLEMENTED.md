@@ -653,7 +653,7 @@ Remaining Milestone 4 work:
 
 - remaining hitbox primitives, swept motion and region/friendly-provider filters;
 - persistent MMO health application and death/encounter integration;
-- dodge movement/i-frames, guard/posture/poise/CC;
+- guard/posture/poise/CC;
 - viewer-scoped debug rendering and in-game trace export controls;
 - latency/jitter acceptance fixtures and a complete weapon test kit.
 
@@ -752,3 +752,57 @@ Non-goals:
 
 Config impact: `combat.engagement-exit-ticks` defaults to `160`. Migration impact: none;
 engagement remains transient and is never restored after login.
+
+## Milestone 4 — directional dodge and i-frame training slice
+
+Implemented:
+
+- immutable load-tier dodge profiles and server-tick runtime phases for Light, Medium, Heavy and
+  Overloaded;
+- canonical stamina costs `25/30/35/40` and i-frame lengths `6/4/2/0` with one startup tick;
+- load-scaled training travel/recovery baselines and four authoritative movement steps;
+- six-tick Shift candidate window, three-tick movement grace and five-tick stationary crouch
+  threshold;
+- directional input captured from Paper's current input snapshot with deterministic dominant-axis
+  resolution;
+- exploration retains vanilla sneak while Alert/Engaged/Disengaging combat routes directional
+  Shift through the semantic input router;
+- dodge may overlay weapon Drawing, and may cancel an attack only at or after the move's authored
+  `dodge_from_tick`;
+- dodge clears the one-slot attack buffer and spends stamina without consuming resources reserved
+  by another action;
+- player movement uses captured facing and a collision-checked path; solid world collision stops
+  the remaining step instead of allowing wall traversal;
+- accepted entity attacks are cancelled only during the server i-frame phase; same-tick startup
+  hits remain valid and Overloaded never gains invulnerability;
+- normal attacks remain locked through dodge recovery and stamina regeneration observes the
+  post-spend delay;
+- `/mmo health` exposes the configured training load and current dodge phase.
+
+Tests:
+
+- exact profile costs, i-frame lengths, travel and total timing;
+- startup, invulnerable, recovery and completion boundaries;
+- non-dodgeable and Overloaded hits never receive i-frame immunity;
+- neutral input, insufficient stamina and active recovery reject deterministically;
+- Shift movement grace, crouch hold, release and expiry boundaries;
+- direct stamina spend cannot consume reserved stamina;
+- Exploration versus Engaged Shift ownership.
+
+Failure/recovery behavior:
+
+- invalid training load enters startup maintenance;
+- insufficient stamina and closed cancel windows reject without cancelling the current action;
+- logout/session replacement drops dodge, movement and pending Shift state;
+- solid collision stops movement while the dodge timeline/recovery continues;
+- vanilla environmental damage is never cancelled by this slice.
+
+Non-goals:
+
+- equipment-derived dynamic load calculation;
+- PvP recovery tuning and provider-authored undodgeable attack tags;
+- animation/root-motion presentation, dodge follow-up techniques and entity/boss phasing policy;
+- guard, posture, poise and crowd control.
+
+Config impact: `combat.training-dodge-load` defaults to `MEDIUM`. Migration impact: none; dodge
+runtime is transient.

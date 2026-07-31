@@ -265,6 +265,22 @@ public final class BranzMmoPlugin extends JavaPlugin {
         int weaponDrawTicks = getConfig().getInt("combat.weapon-draw-ticks", 6);
         int weaponSheatheTicks = getConfig().getInt("combat.weapon-sheathe-ticks", 4);
         int engagementExitTicks = getConfig().getInt("combat.engagement-exit-ticks", 160);
+        com.branz.mmorpg.combat.dodge.DodgeProfile dodgeProfile;
+        try {
+            dodgeProfile =
+                    com.branz.mmorpg.combat.dodge.DodgeProfile.canonical(
+                            com.branz.mmorpg.combat.dodge.DodgeLoad.valueOf(
+                                    getConfig()
+                                            .getString("combat.training-dodge-load", "MEDIUM")
+                                            .trim()
+                                            .toUpperCase(java.util.Locale.ROOT)));
+        } catch (IllegalArgumentException exception) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            resourcePackGate = null;
+            characterSessionController = null;
+            return "Combat training-dodge-load must be LIGHT, MEDIUM, HEAVY or OVERLOADED.";
+        }
         if (weaponDrawTicks < 1 || weaponSheatheTicks < 1 || engagementExitTicks < 1) {
             activeItemEngine.set(null);
             activeMoveEngine.set(null);
@@ -280,7 +296,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         trainingWeapon.power(),
                         weaponDrawTicks,
                         weaponSheatheTicks,
-                        engagementExitTicks);
+                        engagementExitTicks,
+                        dodgeProfile);
         ChronicleController chronicleController =
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         characterSessionController.addReadyHandler(chronicleController::reconcile);

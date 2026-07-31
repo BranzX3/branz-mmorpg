@@ -114,6 +114,37 @@ class CombatInputPolicyTest {
                 ((Result.Failure<SemanticInput, InputRejectionCode>) scene).error());
     }
 
+    @Test
+    void directionalShiftDodgesInCombatButExplorationKeepsVanillaSneak() {
+        InputPolicyContext engaged =
+                context(
+                        EngagementState.ENGAGED,
+                        WeaponState.READY,
+                        UiState.NONE,
+                        false,
+                        DirectionSnapshot.FORWARD);
+        InputPolicyContext exploration =
+                context(
+                        EngagementState.EXPLORATION,
+                        WeaponState.READY,
+                        UiState.NONE,
+                        false,
+                        DirectionSnapshot.FORWARD);
+
+        assertEquals(SemanticInput.DODGE, resolved(ClientAction.SNEAK_PRESS, engaged));
+        assertEquals(
+                SemanticInput.VANILLA_FALLBACK, resolved(ClientAction.SNEAK_PRESS, exploration));
+
+        InputPolicyContext drawing =
+                context(
+                        EngagementState.ENGAGED,
+                        WeaponState.DRAWING,
+                        UiState.NONE,
+                        false,
+                        DirectionSnapshot.LEFT);
+        assertEquals(SemanticInput.DODGE, resolved(ClientAction.SNEAK_PRESS, drawing));
+    }
+
     private InputPolicyContext context(
             EngagementState engagement,
             WeaponState weapon,

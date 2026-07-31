@@ -12,6 +12,9 @@ import com.branz.mmorpg.combat.action.ResourceCommitState;
 import com.branz.mmorpg.combat.damage.PhysicalDamageBreakdown;
 import com.branz.mmorpg.combat.damage.PhysicalDamageRequest;
 import com.branz.mmorpg.combat.damage.PhysicalDamageResolver;
+import com.branz.mmorpg.combat.engagement.EngagementRuntime;
+import com.branz.mmorpg.combat.engagement.EngagementTickContext;
+import com.branz.mmorpg.combat.engagement.EngagementTracker;
 import com.branz.mmorpg.combat.hitbox.ArcHitboxQuery;
 import com.branz.mmorpg.combat.hitbox.ArcHitboxResolver;
 import com.branz.mmorpg.combat.hitbox.CombatVector;
@@ -33,7 +36,6 @@ import com.branz.mmorpg.combat.input.SemanticInput;
 import com.branz.mmorpg.combat.move.MoveDefinition;
 import com.branz.mmorpg.combat.move.MoveEngine;
 import com.branz.mmorpg.combat.state.ActionState;
-import com.branz.mmorpg.combat.state.EngagementState;
 import com.branz.mmorpg.combat.state.UiState;
 import com.branz.mmorpg.combat.state.WeaponState;
 import com.branz.mmorpg.combat.weapon.SelectedHotbarSlot;
@@ -52,12 +54,16 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.player.PlayerItemHeldEvent;
@@ -77,6 +83,7 @@ final class CombatSessionController implements Listener {
     private final CombatInputPolicy inputPolicy = new CombatInputPolicy();
     private final ArcHitboxResolver hitboxes = new ArcHitboxResolver();
     private final PhysicalDamageResolver damage = new PhysicalDamageResolver();
+    private final EngagementTracker engagement;
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
     private final Map<UUID, Double> trainingTargetHealth = new HashMap<>();
     private int tickTaskId = -1;
@@ -87,7 +94,8 @@ final class CombatSessionController implements Listener {
             MoveEngine moves,
             double trainingWeaponPower,
             int drawTicks,
-            int sheatheTicks) {
+            int sheatheTicks,
+            int engagementExitTicks) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
         Objects.requireNonNull(moves, "moves");
@@ -102,6 +110,7 @@ final class CombatSessionController implements Listener {
         }
         this.trainingWeaponPower = trainingWeaponPower;
         weapons = new WeaponTransitionMachine(drawTicks, sheatheTicks);
+        engagement = new EngagementTracker(engagementExitTicks);
     }
 
     void start() {
@@ -120,7 +129,8 @@ final class CombatSessionController implements Listener {
     }
 
     void onCharacterReady(Player player) {
-        LiveSession session = new LiveSession();
+        LiveSession session =
+                new LiveSession(EngagementRuntime.initial(plugin.getServer().getCurrentTick()));
         sessions.put(player.getUniqueId(), session);
         select(session, selectedSlot(player, player.getInventory().getHeldItemSlot()));
     }
@@ -134,6 +144,9 @@ final class CombatSessionController implements Listener {
                 session.timeline == null ? session.resources : session.timeline.resources();
         return Optional.of(
                 new CombatSessionStatus(
+                        session.engagement.state(),
+                        engagement.remainingExitTicks(
+                                session.engagement, plugin.getServer().getCurrentTick()),
                         session.weapon.state(),
                         Optional.ofNullable(session.timeline).map(ActionTimeline::phase),
                         resources.stamina(),
@@ -216,6 +229,44 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onIncomingCombatDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Player player)
+                || !(event.getDamageSource().getCausingEntity() instanceof LivingEntity source)
+                || source == player) {
+            return;
+        }
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session != null) {
+            markHostile(player, session);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onMobTarget(EntityTargetLivingEntityEvent event) {
+        if (!(event.getEntity() instanceof Mob)) {
+            return;
+        }
+        UUID threatOwner = event.getEntity().getUniqueId();
+        sessions.values().forEach(session -> session.threatOwners.remove(threatOwner));
+        if (!(event.getTarget() instanceof Player player)) {
+            return;
+        }
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session == null) {
+            return;
+        }
+        session.threatOwners.add(threatOwner);
+        session.engagement =
+                engagement.alert(session.engagement, plugin.getServer().getCurrentTick());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onEntityDeath(EntityDeathEvent event) {
+        UUID threatOwner = event.getEntity().getUniqueId();
+        sessions.values().forEach(session -> session.threatOwners.remove(threatOwner));
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         sessions.remove(event.getPlayer().getUniqueId());
@@ -235,6 +286,7 @@ final class CombatSessionController implements Listener {
                 pollBuffered(player, session);
             }
             tickAction(player, session);
+            tickEngagement(player, session);
             regenerateStamina(session);
         }
     }
@@ -256,6 +308,7 @@ final class CombatSessionController implements Listener {
                 && session.timeline.resourceState() == ResourceCommitState.COMMITTED) {
             session.lastStaminaSpendTick = plugin.getServer().getCurrentTick();
             session.staminaRegenRemainder = 0;
+            markHostile(player, session);
         }
         if (session.timeline.phase() != prior) {
             player.sendActionBar(
@@ -391,6 +444,34 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    private void tickEngagement(Player player, LiveSession session) {
+        session.threatOwners.removeIf(
+                entityId -> {
+                    Entity entity = plugin.getServer().getEntity(entityId);
+                    return !(entity instanceof Mob mob)
+                            || !entity.isValid()
+                            || !player.equals(mob.getTarget());
+                });
+        session.engagement =
+                engagement.tick(
+                        session.engagement,
+                        plugin.getServer().getCurrentTick(),
+                        new EngagementTickContext(
+                                !session.threatOwners.isEmpty(),
+                                false,
+                                session.action == ActionState.DOWNED
+                                        || session.action == ActionState.DEAD));
+    }
+
+    private void markHostile(Player player, LiveSession session) {
+        session.engagement =
+                engagement.hostileActivity(session.engagement, plugin.getServer().getCurrentTick());
+        if (player.getOpenInventory().getTopInventory().getHolder()
+                instanceof SceneInventoryHolder) {
+            player.closeInventory();
+        }
+    }
+
     private void pollBuffered(Player player, LiveSession session) {
         Result<InputRouteOutcome, InputRejectionCode> result =
                 session.input.pollBuffered(
@@ -462,7 +543,7 @@ final class CombatSessionController implements Listener {
                         ? UiState.SCENE
                         : UiState.NONE;
         return new InputPolicyContext(
-                EngagementState.EXPLORATION,
+                session.engagement.state(),
                 session.weapon.state(),
                 session.action,
                 ui,
@@ -508,6 +589,7 @@ final class CombatSessionController implements Listener {
     }
 
     private static final class LiveSession {
+        private EngagementRuntime engagement;
         private WeaponTransitionSnapshot weapon = WeaponTransitionSnapshot.initial();
         private ActionState action = ActionState.IDLE;
         private CombatResources resources = CombatResources.full(1000, 100, 100);
@@ -516,5 +598,10 @@ final class CombatSessionController implements Listener {
         private long lastStaminaSpendTick = Long.MIN_VALUE / 2;
         private double staminaRegenRemainder;
         private String lastResolution;
+        private final java.util.Set<UUID> threatOwners = new java.util.HashSet<>();
+
+        private LiveSession(EngagementRuntime engagement) {
+            this.engagement = Objects.requireNonNull(engagement, "engagement");
+        }
     }
 }

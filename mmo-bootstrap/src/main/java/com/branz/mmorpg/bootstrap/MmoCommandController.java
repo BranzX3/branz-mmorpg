@@ -204,6 +204,15 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                     sender.sendMessage(
                                             Component.text(
                                                     "Combat session: "
+                                                            + status.engagementState()
+                                                            + (status.engagementExitTicksRemaining()
+                                                                            > 0
+                                                                    ? " (exit="
+                                                                            + status
+                                                                                    .engagementExitTicksRemaining()
+                                                                            + "t)"
+                                                                    : "")
+                                                            + " | weapon="
                                                             + status.weaponState()
                                                             + " | action="
                                                             + status.actionPhase()

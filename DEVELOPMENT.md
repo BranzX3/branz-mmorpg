@@ -111,6 +111,16 @@ canonical physical damage breakdown. It keeps isolated 1,000-HP training account
 applying vanilla damage; persistent MMO health/death is a later combat/encounter boundary. The
 client swing never declares a hit.
 
+Live engagement check:
+
+1. Run `/mmo health` before combat and confirm `Combat session: EXPLORATION`.
+2. Let a hostile mob acquire the player without landing a hit; confirm `ALERT`.
+3. Commit the training attack or receive an entity hit; confirm `ENGAGED`.
+4. Move until the mob clears its target. Confirm `DISENGAGING` and a decreasing `exit=...t`
+   value in `/mmo health`.
+5. Wait eight seconds without a hostile commit, damage, threat owner or encounter lock and confirm
+   the state returns to `EXPLORATION`.
+
 To test resource-pack admission, set `resource-pack.enabled: true`, configure an HTTP(S) URL and put
 the exact 64-character SHA-256 from the active `content-manifest.json` in
 `resource-pack.sha256`. A mismatch enters maintenance before new MMO sessions.

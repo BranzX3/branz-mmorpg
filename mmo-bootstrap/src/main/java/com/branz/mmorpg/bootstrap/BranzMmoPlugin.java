@@ -264,12 +264,13 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         databaseRuntime.settings());
         int weaponDrawTicks = getConfig().getInt("combat.weapon-draw-ticks", 6);
         int weaponSheatheTicks = getConfig().getInt("combat.weapon-sheathe-ticks", 4);
-        if (weaponDrawTicks < 1 || weaponSheatheTicks < 1) {
+        int engagementExitTicks = getConfig().getInt("combat.engagement-exit-ticks", 160);
+        if (weaponDrawTicks < 1 || weaponSheatheTicks < 1 || engagementExitTicks < 1) {
             activeItemEngine.set(null);
             activeMoveEngine.set(null);
             resourcePackGate = null;
             characterSessionController = null;
-            return "Combat weapon draw/sheathe ticks must be positive.";
+            return "Combat weapon draw/sheathe/engagement exit ticks must be positive.";
         }
         combatSessionController =
                 new CombatSessionController(
@@ -278,7 +279,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         activeMoveEngine.get(),
                         trainingWeapon.power(),
                         weaponDrawTicks,
-                        weaponSheatheTicks);
+                        weaponSheatheTicks,
+                        engagementExitTicks);
         ChronicleController chronicleController =
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         characterSessionController.addReadyHandler(chronicleController::reconcile);

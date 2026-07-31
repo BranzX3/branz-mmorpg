@@ -653,7 +653,7 @@ Remaining Milestone 4 work:
 
 - remaining hitbox primitives, swept motion and region/friendly-provider filters;
 - persistent MMO health application and death/encounter integration;
-- live engagement timers, dodge movement/i-frames, guard/posture/poise/CC;
+- dodge movement/i-frames, guard/posture/poise/CC;
 - viewer-scoped debug rendering and in-game trace export controls;
 - latency/jitter acceptance fixtures and a complete weapon test kit.
 
@@ -711,3 +711,44 @@ Non-goals:
 
 Schema impact: item schema adds optional `weapon_profile.family` and positive
 `weapon_profile.power`. Config/migration impact: none.
+
+## Milestone 4 — live engagement clock slice
+
+Implemented:
+
+- immutable deterministic engagement runtime driven by monotonic server ticks;
+- `EXPLORATION -> ALERT` when a hostile mob acquires the player without a committed exchange;
+- offensive resource commit and accepted incoming entity damage enter/refresh `ENGAGED`;
+- loss of threat enters `DISENGAGING`, with the canonical 160-tick quiet window before
+  `EXPLORATION`;
+- active threat ownership, encounter hard lock and downed state hold engagement;
+- Paper threat ownership follows mob target acquisition/change/death without scanning every world
+  entity each tick;
+- incoming hostile damage closes an open Scene inventory;
+- live engagement state now feeds the semantic input policy instead of a hard-coded
+  `EXPLORATION`;
+- `/mmo health` exposes engagement state and remaining exit ticks.
+
+Tests:
+
+- alert clears if no hostile exchange occurs;
+- disengagement requires the complete quiet window;
+- threat, hard lock and downed conditions hold or restore engagement;
+- hostile activity refreshes the exit clock;
+- 100,000 seeded randomized transitions produce identical runtimes with bounded countdowns.
+
+Failure/recovery behavior:
+
+- invalid/non-positive exit duration enters startup maintenance;
+- stale or dead mob threat owners are pruned on the main thread;
+- logout and session replacement discard the transient clock and threat set;
+- server-tick regression is rejected by the pure engagement runtime.
+
+Non-goals:
+
+- persistent threat tables or encounter hard-lock integration;
+- dodge, guard, posture, poise and crowd control;
+- out-of-combat HP regeneration and persistent combat health.
+
+Config impact: `combat.engagement-exit-ticks` defaults to `160`. Migration impact: none;
+engagement remains transient and is never restored after login.

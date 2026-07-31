@@ -8,6 +8,8 @@ import com.branz.mmorpg.persistence.migration.ClasspathMigrationCatalog;
 import com.branz.mmorpg.persistence.migration.MigrationCatalog;
 import com.branz.mmorpg.persistence.migration.MigrationErrorCode;
 import com.branz.mmorpg.persistence.migration.PostgresMigrationRunner;
+import com.branz.mmorpg.persistence.transaction.CharacterBuildRepository;
+import com.branz.mmorpg.persistence.transaction.JdbcCharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcReconciliationScanner;
 import com.branz.mmorpg.persistence.transaction.JdbcValueTransactionService;
 import com.branz.mmorpg.persistence.transaction.ReconciliationScanner;
@@ -27,6 +29,7 @@ final class DatabaseRuntime implements AutoCloseable {
     private final HikariDataSource pool;
     private final CharacterLeaseRepository leases;
     private final ValueTransactionService values;
+    private final CharacterBuildRepository builds;
     private final ReconciliationScanner reconciliation;
     private final ServerInstanceId serverInstanceId;
 
@@ -40,6 +43,7 @@ final class DatabaseRuntime implements AutoCloseable {
         this.pool = pool;
         leases = new JdbcCharacterLeaseRepository(dataSource);
         values = new JdbcValueTransactionService(dataSource);
+        builds = new JdbcCharacterBuildRepository(dataSource);
         reconciliation = new JdbcReconciliationScanner(dataSource);
         serverInstanceId =
                 new ServerInstanceId(
@@ -96,6 +100,10 @@ final class DatabaseRuntime implements AutoCloseable {
 
     ValueTransactionService values() {
         return values;
+    }
+
+    CharacterBuildRepository builds() {
+        return builds;
     }
 
     ReconciliationScanner reconciliation() {

@@ -13,6 +13,7 @@ import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
+import com.branz.mmorpg.progression.build.CharacterBuild;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -553,6 +554,47 @@ final class CharacterSessionController implements Listener {
                         () -> {
                             Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
                                     sessions.commitEquipment(session, desired, contentVersion);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeSnapshotMutation(
+                                                            session, result, completion));
+                        });
+    }
+
+    void commitBuild(
+            Player player,
+            CharacterBuild desired,
+            UUID operationId,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(desired, "desired");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
+                                    sessions.commitBuild(
+                                            session, desired, operationId, contentVersion);
                             plugin.getServer()
                                     .getScheduler()
                                     .runTask(

@@ -1,0 +1,227 @@
+package com.branz.mmorpg.persistence.transaction;
+
+import com.branz.mmorpg.api.identity.CharacterId;
+import com.branz.mmorpg.api.identity.TransactionId;
+import com.branz.mmorpg.api.result.Result;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.OffsetDateTime;
+import java.util.Objects;
+import java.util.Optional;
+import javax.sql.DataSource;
+
+/** Journaled optimistic repository for immediate character build commits. */
+public final class JdbcCharacterBuildRepository implements CharacterBuildRepository {
+    public static final String CHARACTER_BUILD_COMMIT = "character.build.commit";
+
+    private static final String COLUMNS =
+            """
+            character_id, build_payload, content_version, version,
+            last_transaction_id, created_at, updated_at
+            """;
+
+    private final DataSource dataSource;
+
+    public JdbcCharacterBuildRepository(DataSource dataSource) {
+        this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
+    }
+
+    @Override
+    public Result<Optional<CharacterBuildRecord>, TransactionErrorCode> find(
+            CharacterId characterId) {
+        Objects.requireNonNull(characterId, "characterId");
+        try (Connection connection = dataSource.getConnection()) {
+            return Result.success(find(connection, characterId));
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    @Override
+    public Result<CharacterBuildCommitExecution, TransactionErrorCode> commit(
+            TransactionRequest request, CharacterBuildCommit commit) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(commit, "commit");
+        if (!request.operationType().equals(CHARACTER_BUILD_COMMIT)) {
+            return Result.failure(
+                    TransactionErrorCode.TRANSACTION_OPERATION_MISMATCH,
+                    "Transaction operation does not match a character build commit.");
+        }
+        if (request.characterId().filter(commit.characterId()::equals).isEmpty()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                    "Transaction character does not match the build owner.");
+        }
+        try (Connection connection = dataSource.getConnection()) {
+            boolean originalAutoCommit = connection.getAutoCommit();
+            try {
+                connection.setAutoCommit(false);
+                Result<JournalPrepareOutcome, TransactionErrorCode> preparedResult =
+                        JdbcTransactionJournalRepository.prepare(connection, request);
+                if (preparedResult
+                        instanceof
+                        Result.Failure<JournalPrepareOutcome, TransactionErrorCode> failure) {
+                    connection.rollback();
+                    return Result.failure(failure.error(), failure.detail());
+                }
+                JournalPrepareOutcome prepared =
+                        ((Result.Success<JournalPrepareOutcome, TransactionErrorCode>)
+                                        preparedResult)
+                                .value();
+                if (!prepared.newlyPrepared()) {
+                    if (prepared.entry().state() != TransactionState.COMMITTED) {
+                        connection.rollback();
+                        return Result.failure(
+                                TransactionErrorCode.TRANSACTION_INVALID_STATE,
+                                "Existing build transaction is not committed.");
+                    }
+                    CharacterBuildRecord replayed =
+                            find(connection, commit.characterId())
+                                    .orElseThrow(
+                                            () ->
+                                                    new SQLException(
+                                                            "Committed build record is missing."));
+                    connection.commit();
+                    return Result.success(
+                            new CharacterBuildCommitExecution(
+                                    replayed, new TransactionExecution(prepared.entry(), true)));
+                }
+
+                CharacterBuildRecord record = mutate(connection, request, commit);
+                if (record == null) {
+                    connection.rollback();
+                    return Result.failure(
+                            TransactionErrorCode.VALUE_STALE_VERSION,
+                            "Character build changed before commit.");
+                }
+                appendAudit(connection, request, record);
+                Result<JournalTransitionOutcome, TransactionErrorCode> transition =
+                        JdbcTransactionJournalRepository.transition(
+                                connection, request.transactionId(), TransactionState.COMMITTED);
+                if (transition
+                        instanceof
+                        Result.Failure<JournalTransitionOutcome, TransactionErrorCode> failure) {
+                    connection.rollback();
+                    return Result.failure(failure.error(), failure.detail());
+                }
+                TransactionJournalEntry journal =
+                        ((Result.Success<JournalTransitionOutcome, TransactionErrorCode>)
+                                        transition)
+                                .value()
+                                .entry();
+                connection.commit();
+                return Result.success(
+                        new CharacterBuildCommitExecution(
+                                record, new TransactionExecution(journal, false)));
+            } catch (SQLException exception) {
+                JdbcTransactionJournalRepository.rollbackQuietly(connection);
+                return JdbcTransactionJournalRepository.failure(exception);
+            } finally {
+                JdbcTransactionJournalRepository.restoreAutoCommit(connection, originalAutoCommit);
+            }
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    private static CharacterBuildRecord mutate(
+            Connection connection, TransactionRequest request, CharacterBuildCommit commit)
+            throws SQLException {
+        String sql =
+                commit.expectedVersion() == 0
+                        ? """
+                        INSERT INTO character_build_state(
+                            character_id, build_payload, content_version, version,
+                            last_transaction_id, created_at, updated_at
+                        ) VALUES (?, CAST(? AS JSONB), ?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        ON CONFLICT (character_id) DO NOTHING
+                        RETURNING
+                        """
+                                + COLUMNS
+                        : """
+                        UPDATE character_build_state
+                        SET build_payload = CAST(? AS JSONB),
+                            content_version = ?,
+                            version = version + 1,
+                            last_transaction_id = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE character_id = ? AND version = ?
+                        RETURNING
+                        """
+                                + COLUMNS;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            if (commit.expectedVersion() == 0) {
+                statement.setObject(1, commit.characterId().value());
+                statement.setString(2, commit.replacementPayloadJson());
+                statement.setString(3, request.contentVersion());
+                statement.setObject(4, request.transactionId().value());
+            } else {
+                statement.setString(1, commit.replacementPayloadJson());
+                statement.setString(2, request.contentVersion());
+                statement.setObject(3, request.transactionId().value());
+                statement.setObject(4, commit.characterId().value());
+                statement.setLong(5, commit.expectedVersion());
+            }
+            try (ResultSet row = statement.executeQuery()) {
+                return row.next() ? read(row) : null;
+            }
+        }
+    }
+
+    private static Optional<CharacterBuildRecord> find(
+            Connection connection, CharacterId characterId) throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "SELECT "
+                                + COLUMNS
+                                + " FROM character_build_state WHERE character_id = ?")) {
+            statement.setObject(1, characterId.value());
+            try (ResultSet row = statement.executeQuery()) {
+                return row.next() ? Optional.of(read(row)) : Optional.empty();
+            }
+        }
+    }
+
+    private static CharacterBuildRecord read(ResultSet row) throws SQLException {
+        return new CharacterBuildRecord(
+                new CharacterId(row.getObject("character_id", java.util.UUID.class)),
+                row.getString("build_payload"),
+                row.getString("content_version"),
+                row.getLong("version"),
+                new TransactionId(row.getObject("last_transaction_id", java.util.UUID.class)),
+                row.getObject("created_at", OffsetDateTime.class).toInstant(),
+                row.getObject("updated_at", OffsetDateTime.class).toInstant());
+    }
+
+    private static void appendAudit(
+            Connection connection, TransactionRequest request, CharacterBuildRecord record)
+            throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        """
+                        INSERT INTO audit_log(
+                            transaction_id, actor_character_id, action_type,
+                            subject_type, subject_id, details, created_at
+                        ) VALUES (?, ?, ?, 'CHARACTER', ?, CAST(? AS JSONB), CURRENT_TIMESTAMP)
+                        """)) {
+            statement.setObject(1, request.transactionId().value());
+            statement.setObject(2, record.characterId().value());
+            statement.setString(3, CHARACTER_BUILD_COMMIT);
+            statement.setObject(4, record.characterId().value());
+            statement.setString(
+                    5,
+                    "{\"version\":"
+                            + record.version()
+                            + ",\"contentVersion\":\""
+                            + escapeJson(record.contentVersion())
+                            + "\"}");
+            statement.executeUpdate();
+        }
+    }
+
+    private static String escapeJson(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+}

@@ -5,6 +5,7 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.progression.build.CharacterBuild;
 import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,22 +24,34 @@ public final class SceneSessionManager {
 
     public synchronized Result<SceneSession, SceneErrorCode> open(
             UUID playerId, EquipmentLoadout committedEquipment) {
-        return open(playerId, committedEquipment, QuiverPreparation.empty());
+        return open(
+                playerId, committedEquipment, QuiverPreparation.empty(), CharacterBuild.initial());
     }
 
     public synchronized Result<SceneSession, SceneErrorCode> open(
             UUID playerId,
             EquipmentLoadout committedEquipment,
             QuiverPreparation committedQuiverPreparation) {
+        return open(
+                playerId, committedEquipment, committedQuiverPreparation, CharacterBuild.initial());
+    }
+
+    public synchronized Result<SceneSession, SceneErrorCode> open(
+            UUID playerId,
+            EquipmentLoadout committedEquipment,
+            QuiverPreparation committedQuiverPreparation,
+            CharacterBuild committedBuild) {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(committedEquipment, "committedEquipment");
         Objects.requireNonNull(committedQuiverPreparation, "committedQuiverPreparation");
+        Objects.requireNonNull(committedBuild, "committedBuild");
         if (sessions.containsKey(playerId)) {
             return Result.failure(
                     SceneErrorCode.SCENE_ALREADY_OPEN, "Player already owns a Scene session.");
         }
         ScenePreviewState initial =
-                new ScenePreviewState(committedEquipment, committedQuiverPreparation);
+                new ScenePreviewState(
+                        committedEquipment, committedQuiverPreparation, committedBuild);
         SceneSession session =
                 new SceneSession(
                         SceneSessionId.random(),
@@ -74,7 +87,8 @@ public final class SceneSessionManager {
                                 new ScenePreviewState(
                                         session.previewState().equipment().with(slot, itemId),
                                         session.previewState().quiverPreparation(),
-                                        session.previewState().quiverTransfer())));
+                                        session.previewState().quiverTransfer(),
+                                        session.previewState().build())));
     }
 
     public synchronized Result<SceneSession, SceneErrorCode> previewQuiverPreparation(
@@ -88,7 +102,8 @@ public final class SceneSessionManager {
                                 new ScenePreviewState(
                                         session.previewState().equipment(),
                                         quiverPreparation,
-                                        session.previewState().quiverTransfer())));
+                                        session.previewState().quiverTransfer(),
+                                        session.previewState().build())));
     }
 
     public synchronized Result<SceneSession, SceneErrorCode> previewQuiverTransfer(
@@ -102,7 +117,23 @@ public final class SceneSessionManager {
                                 new ScenePreviewState(
                                         session.previewState().equipment(),
                                         session.previewState().quiverPreparation(),
-                                        Optional.of(transfer))));
+                                        Optional.of(transfer),
+                                        session.previewState().build())));
+    }
+
+    public synchronized Result<SceneSession, SceneErrorCode> previewBuild(
+            UUID playerId, SceneSessionId sessionId, CharacterBuild build) {
+        Objects.requireNonNull(build, "build");
+        return replace(
+                playerId,
+                sessionId,
+                session ->
+                        session.withPreview(
+                                new ScenePreviewState(
+                                        session.previewState().equipment(),
+                                        session.previewState().quiverPreparation(),
+                                        session.previewState().quiverTransfer(),
+                                        build)));
     }
 
     public synchronized Result<SceneSession, SceneErrorCode> back(

@@ -1,0 +1,9 @@
+definition_id: form.wind_draw
+schema_version: 1
+families: [BOW]
+tradeoff: Easier physical follow-through at the cost of magical efficiency.
+attunement_cost: 0
+resource:
+  stamina_cost_multiplier: 0.85
+  mana_cost_multiplier: 1.25
+tags: [RANGED]

@@ -7,6 +7,7 @@ delivery: PROJECTILE
 requirements:
   catalyst_tags: [STAFF, EMBER]
   attunement: 2
+  attunement_tags: [EMBER]
 cost:
   mana: 18
 phases:

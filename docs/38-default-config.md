@@ -87,6 +87,7 @@ downed_seconds: 15
 revive_channel_seconds: 4
 revives_per_encounter: 1
 scene_preview_distance_blocks: 2.75
+rest_context_spawn_radius_blocks: 16.0
 mount_whistle_range_blocks: 96
 caravan_pack_mounts_max: 4
 ```

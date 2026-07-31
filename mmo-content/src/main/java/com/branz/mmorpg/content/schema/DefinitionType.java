@@ -9,6 +9,8 @@ import java.util.Set;
 public enum DefinitionType {
     ITEM(Set.of("weapon", "ammo", "material", "food", "consumable", "equipment", "cosmetic")),
     MOVE(Set.of("move")),
+    TECHNIQUE(Set.of("technique")),
+    FORM(Set.of("form")),
     SPELL(Set.of("spell")),
     STATUS(Set.of("status")),
     SCENE(Set.of("scene")),

@@ -16,6 +16,8 @@
   "definitions": {
     "items": 13,
     "moves": 6,
+    "techniques": 5,
+    "forms": 4,
     "spells": 1,
     "nodes": 1
   }

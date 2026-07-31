@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":mmo-combat"))
     implementation(project(":mmo-magic"))
     implementation(project(":mmo-items"))
+    implementation(project(":mmo-progression"))
     implementation(project(":mmo-persistence"))
     implementation(project(":mmo-scenes"))
     implementation(project(":mmo-integrations"))

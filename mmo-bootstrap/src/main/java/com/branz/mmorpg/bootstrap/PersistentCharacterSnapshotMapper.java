@@ -6,10 +6,13 @@ import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.projection.ExpectedProjection;
 import com.branz.mmorpg.items.projection.ProjectionValueType;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.persistence.transaction.CharacterBuildRecord;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.persistence.transaction.ValueLocation;
 import com.branz.mmorpg.persistence.transaction.ValueLocationType;
+import com.branz.mmorpg.progression.build.CharacterBuild;
+import com.branz.mmorpg.progression.build.CharacterBuildJsonCodec;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
@@ -24,9 +27,12 @@ final class PersistentCharacterSnapshotMapper {
     private PersistentCharacterSnapshotMapper() {}
 
     static PersistentCharacterSnapshot map(
-            List<ItemLocationRecord> items, List<LotLocationRecord> lots) {
+            List<ItemLocationRecord> items,
+            List<LotLocationRecord> lots,
+            Optional<CharacterBuildRecord> buildRecord) {
         Objects.requireNonNull(items, "items");
         Objects.requireNonNull(lots, "lots");
+        Objects.requireNonNull(buildRecord, "buildRecord");
         List<ExpectedProjection> inventory = new ArrayList<>();
         EquipmentLoadout equipment = EquipmentLoadout.empty();
         QuiverPreparation quiverPreparation = QuiverPreparation.empty();
@@ -62,8 +68,17 @@ final class PersistentCharacterSnapshotMapper {
                                 testProvenance(lot.lineageJson())));
             }
         }
+        CharacterBuild build =
+                buildRecord
+                        .map(record -> CharacterBuildJsonCodec.decode(record.payloadJson()))
+                        .orElseGet(CharacterBuild::initial);
         return new PersistentCharacterSnapshot(
-                inventory, equipment, quiverPreparation, items, lots);
+                inventory, equipment, quiverPreparation, build, buildRecord, items, lots);
+    }
+
+    static PersistentCharacterSnapshot map(
+            List<ItemLocationRecord> items, List<LotLocationRecord> lots) {
+        return map(items, lots, Optional.empty());
     }
 
     private static int inventorySlot(ValueLocation location) {

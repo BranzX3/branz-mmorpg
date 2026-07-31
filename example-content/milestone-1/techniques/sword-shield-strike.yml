@@ -1,0 +1,9 @@
+definition_id: technique.sword_shield.guard_strike
+schema_version: 1
+family: SWORD_SHIELD
+branch: PRIMARY_1
+move: move.training_sword_shield.primary_1
+mode: REPLACE
+supernatural: false
+attunement_cost: 0
+tags: [GUARD_COUNTER]

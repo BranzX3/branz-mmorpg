@@ -1,0 +1,59 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "technique.schema.json",
+  "title" : "TECHNIQUE definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "family" : {
+      "type" : "string",
+      "description" : "Compatible weapon family or ANY."
+    },
+    "branch" : {
+      "type" : "string",
+      "description" : "Logical moveset branch owned by the technique.",
+      "enum" : [ "DEFENSIVE_FOLLOWUP", "DODGE_FOLLOWUP", "FINISHER", "PRIMARY_1", "PRIMARY_2", "PRIMARY_3", "PRIMARY_DIRECTIONAL_BACK", "PRIMARY_DIRECTIONAL_FORWARD", "SECONDARY", "SECONDARY_DIRECTIONAL", "SIGNATURE_F", "UTILITY_Q" ]
+    },
+    "move" : {
+      "type" : "string",
+      "description" : "Move definition activated by the branch."
+    },
+    "mode" : {
+      "type" : "string",
+      "description" : "Whether the technique replaces or augments its branch.",
+      "enum" : [ "AUGMENT", "REPLACE" ]
+    },
+    "supernatural" : {
+      "type" : "boolean",
+      "description" : "Whether the technique consumes Attunement Capacity."
+    },
+    "attunement_cost" : {
+      "type" : "integer",
+      "description" : "Active supernatural load; mundane techniques use zero.",
+      "x-unit" : "capacity",
+      "minimum" : 0.0,
+      "maximum" : 32.0
+    },
+    "tags" : {
+      "type" : "array",
+      "description" : "Attunement/resonance tags.",
+      "minItems" : 1
+    },
+    "conflicts_with_tags" : {
+      "type" : "array",
+      "description" : "Tags that make this technique incompatible.",
+      "minItems" : 1
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "family", "branch", "move", "mode", "supernatural", "attunement_cost" ]
+}

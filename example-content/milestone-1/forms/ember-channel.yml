@@ -1,0 +1,10 @@
+definition_id: form.ember_channel
+schema_version: 1
+families: [STAFF]
+tradeoff: Ember resonance lowers mana cost while increasing physical stamina demand.
+attunement_cost: 2
+resource:
+  stamina_cost_multiplier: 1.2
+  mana_cost_multiplier: 0.85
+tags: [EMBER]
+conflicts_with_tags: [FROST]

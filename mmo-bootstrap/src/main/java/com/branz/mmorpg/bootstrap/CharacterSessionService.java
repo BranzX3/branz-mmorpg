@@ -16,6 +16,9 @@ import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.lease.CharacterLease;
 import com.branz.mmorpg.persistence.lease.LeaseAcquireOutcome;
 import com.branz.mmorpg.persistence.lease.LeaseErrorCode;
+import com.branz.mmorpg.persistence.transaction.CharacterBuildCommit;
+import com.branz.mmorpg.persistence.transaction.CharacterBuildCommitExecution;
+import com.branz.mmorpg.persistence.transaction.CharacterBuildRecord;
 import com.branz.mmorpg.persistence.transaction.CrossbowBoltBinding;
 import com.branz.mmorpg.persistence.transaction.ItemLocationMove;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
@@ -31,6 +34,11 @@ import com.branz.mmorpg.persistence.transaction.TransactionErrorCode;
 import com.branz.mmorpg.persistence.transaction.TransactionExecution;
 import com.branz.mmorpg.persistence.transaction.TransactionRequest;
 import com.branz.mmorpg.persistence.transaction.ValueLocation;
+import com.branz.mmorpg.progression.build.BuildEngine;
+import com.branz.mmorpg.progression.build.BuildErrorCode;
+import com.branz.mmorpg.progression.build.BuildResolution;
+import com.branz.mmorpg.progression.build.CharacterBuild;
+import com.branz.mmorpg.progression.build.CharacterBuildJsonCodec;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -40,9 +48,15 @@ import java.util.UUID;
 /** Blocking session/lease aggregate. Callers must run every method off the Paper thread. */
 final class CharacterSessionService {
     private final DatabaseRuntime database;
+    private final BuildEngine buildEngine;
 
     CharacterSessionService(DatabaseRuntime database) {
+        this(database, BuildEngine.empty());
+    }
+
+    CharacterSessionService(DatabaseRuntime database, BuildEngine buildEngine) {
         this.database = Objects.requireNonNull(database, "database");
+        this.buildEngine = Objects.requireNonNull(buildEngine, "buildEngine");
     }
 
     Result<LoadedCharacterSession, CharacterSessionErrorCode> open(UUID authenticatedPlayerId) {
@@ -103,6 +117,14 @@ final class CharacterSessionService {
             releaseQuietly(characterId, sessionId, lease);
             return persistenceFailure(failure.error(), failure.detail());
         }
+        Result<Optional<CharacterBuildRecord>, TransactionErrorCode> buildRow =
+                database.builds().find(characterId);
+        if (buildRow
+                instanceof
+                Result.Failure<Optional<CharacterBuildRecord>, TransactionErrorCode> failure) {
+            releaseQuietly(characterId, sessionId, lease);
+            return persistenceFailure(failure.error(), failure.detail());
+        }
         try {
             PersistentCharacterSnapshot snapshot =
                     PersistentCharacterSnapshotMapper.map(
@@ -111,7 +133,19 @@ final class CharacterSessionService {
                                     .value(),
                             ((Result.Success<List<LotLocationRecord>, TransactionErrorCode>)
                                             lotRows)
+                                    .value(),
+                            ((Result.Success<Optional<CharacterBuildRecord>, TransactionErrorCode>)
+                                            buildRow)
                                     .value());
+            Result<BuildResolution, BuildErrorCode> buildResolution =
+                    buildEngine.resolve(snapshot.build());
+            if (buildResolution
+                    instanceof Result.Failure<BuildResolution, BuildErrorCode> failure) {
+                releaseQuietly(characterId, sessionId, lease);
+                return Result.failure(
+                        CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                        failure.error().code() + ": " + failure.detail());
+            }
             return Result.success(
                     new LoadedCharacterSession(characterId, sessionId, lease, snapshot));
         } catch (IllegalArgumentException exception) {
@@ -756,6 +790,58 @@ final class CharacterSessionService {
         return reload(session);
     }
 
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> commitBuild(
+            LoadedCharacterSession session,
+            CharacterBuild desired,
+            UUID operationId,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(desired, "desired");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Result<BuildResolution, BuildErrorCode> validation = buildEngine.resolve(desired);
+        if (validation instanceof Result.Failure<BuildResolution, BuildErrorCode> failure) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                    failure.error().code() + ": " + failure.detail());
+        }
+        if (desired.equals(session.snapshot().build())) {
+            return Result.success(session);
+        }
+        long expectedVersion =
+                session.snapshot().buildRecord().map(CharacterBuildRecord::version).orElse(0L);
+        String payload = CharacterBuildJsonCodec.encode(desired);
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "character-build:" + operationId,
+                        session.characterId(),
+                        session.sessionId(),
+                        com.branz.mmorpg.persistence.transaction.JdbcCharacterBuildRepository
+                                .CHARACTER_BUILD_COMMIT,
+                        "{\"expectedVersion\":" + expectedVersion + "}",
+                        "{\"attunementCapacity\":"
+                                + desired.attunementCapacity()
+                                + ",\"techniqueCount\":"
+                                + desired.techniques().size()
+                                + "}",
+                        contentVersion);
+        Result<CharacterBuildCommitExecution, TransactionErrorCode> committed =
+                database.builds()
+                        .commit(
+                                request,
+                                new CharacterBuildCommit(
+                                        session.characterId(), expectedVersion, payload));
+        if (committed
+                instanceof
+                Result.Failure<CharacterBuildCommitExecution, TransactionErrorCode> failure) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                    failure.error().code() + ": " + failure.detail());
+        }
+        return reload(session);
+    }
+
     void close(LoadedCharacterSession session) {
         Objects.requireNonNull(session, "session");
         releaseQuietly(session.characterId(), session.sessionId(), session.lease());
@@ -775,6 +861,13 @@ final class CharacterSessionService {
                 instanceof Result.Failure<List<LotLocationRecord>, TransactionErrorCode> failure) {
             return persistenceFailure(failure.error(), failure.detail());
         }
+        Result<Optional<CharacterBuildRecord>, TransactionErrorCode> buildRow =
+                database.builds().find(session.characterId());
+        if (buildRow
+                instanceof
+                Result.Failure<Optional<CharacterBuildRecord>, TransactionErrorCode> failure) {
+            return persistenceFailure(failure.error(), failure.detail());
+        }
         try {
             PersistentCharacterSnapshot snapshot =
                     PersistentCharacterSnapshotMapper.map(
@@ -783,6 +876,9 @@ final class CharacterSessionService {
                                     .value(),
                             ((Result.Success<List<LotLocationRecord>, TransactionErrorCode>)
                                             lotRows)
+                                    .value(),
+                            ((Result.Success<Optional<CharacterBuildRecord>, TransactionErrorCode>)
+                                            buildRow)
                                     .value());
             return Result.success(
                     new LoadedCharacterSession(

@@ -14,6 +14,11 @@ resource-pack:
 dev-tools:
   enabled: true
 
+scene:
+  # Local spawn acts as the authored sanctuary/training Rest Context until
+  # regional sanctuary providers arrive in their owning milestone.
+  rest-context-spawn-radius-blocks: 16.0
+
 combat:
   weapon-draw-ticks: 6
   weapon-sheathe-ticks: 4

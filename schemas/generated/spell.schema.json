@@ -47,6 +47,16 @@
           "description" : "Required active attunement capacity.",
           "x-unit" : "capacity",
           "minimum" : 0.0
+        },
+        "attunement_tags" : {
+          "type" : "array",
+          "description" : "Spell resonance and Attunement tags.",
+          "minItems" : 1
+        },
+        "conflicts_with_tags" : {
+          "type" : "array",
+          "description" : "Tags that make this spell incompatible.",
+          "minItems" : 1
         }
       },
       "required" : [ "catalyst_tags", "attunement" ]

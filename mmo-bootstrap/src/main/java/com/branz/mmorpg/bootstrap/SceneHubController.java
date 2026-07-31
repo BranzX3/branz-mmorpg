@@ -1,10 +1,12 @@
 package com.branz.mmorpg.bootstrap;
 
+import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import com.branz.mmorpg.items.definition.WeaponLoadoutErrorCode;
 import com.branz.mmorpg.items.definition.WeaponLoadoutPolicy;
 import com.branz.mmorpg.items.definition.WeaponLoadoutResolution;
@@ -15,6 +17,13 @@ import com.branz.mmorpg.items.projection.ProjectionValueType;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.persistence.transaction.ValueLocationType;
+import com.branz.mmorpg.progression.build.AttunableEffectDefinition;
+import com.branz.mmorpg.progression.build.BuildEngine;
+import com.branz.mmorpg.progression.build.BuildErrorCode;
+import com.branz.mmorpg.progression.build.BuildResolution;
+import com.branz.mmorpg.progression.build.CharacterBuild;
+import com.branz.mmorpg.progression.build.FormDefinition;
+import com.branz.mmorpg.progression.build.TechniqueDefinition;
 import com.branz.mmorpg.scenes.QuiverAmmoTransferPreview;
 import com.branz.mmorpg.scenes.QuiverTransferDirection;
 import com.branz.mmorpg.scenes.SceneCloseReason;
@@ -70,6 +79,9 @@ final class SceneHubController implements Listener {
     private final ChronicleService chronicle;
     private final CharacterSessionController characterSessions;
     private final ItemEngine itemEngine;
+    private final BuildEngine buildEngine;
+    private final CombatSessionController combat;
+    private final double restContextSpawnRadiusSquared;
     private final String contentVersion;
     private final SceneSessionManager sessions = new SceneSessionManager(Clock.systemUTC());
     private final ScenePreviewProvider previewProvider = new CompactScenePreviewProvider();
@@ -85,6 +97,8 @@ final class SceneHubController implements Listener {
             ChronicleService chronicle,
             CharacterSessionController characterSessions,
             ItemEngine itemEngine,
+            BuildEngine buildEngine,
+            CombatSessionController combat,
             String contentVersion) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
@@ -92,6 +106,14 @@ final class SceneHubController implements Listener {
         this.chronicle = Objects.requireNonNull(chronicle, "chronicle");
         this.characterSessions = Objects.requireNonNull(characterSessions, "characterSessions");
         this.itemEngine = Objects.requireNonNull(itemEngine, "itemEngine");
+        this.buildEngine = Objects.requireNonNull(buildEngine, "buildEngine");
+        this.combat = Objects.requireNonNull(combat, "combat");
+        double restRadius =
+                plugin.getConfig().getDouble("scene.rest-context-spawn-radius-blocks", 16.0);
+        if (!Double.isFinite(restRadius) || restRadius <= 0) {
+            throw new IllegalArgumentException("scene rest-context spawn radius must be positive");
+        }
+        restContextSpawnRadiusSquared = restRadius * restRadius;
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
         actionKey = new NamespacedKey(plugin, "scene_action");
     }
@@ -113,7 +135,11 @@ final class SceneHubController implements Listener {
                                 .active(player)
                                 .map(session -> session.snapshot().equipment())
                                 .orElse(EquipmentLoadout.empty()),
-                        characterSessions.quiverPreparation(player));
+                        characterSessions.quiverPreparation(player),
+                        characterSessions
+                                .active(player)
+                                .map(session -> session.snapshot().build())
+                                .orElseGet(CharacterBuild::initial));
         if (!opened.isSuccess()) {
             return opened;
         }
@@ -214,6 +240,26 @@ final class SceneHubController implements Listener {
         }
         if ("confirm-equipment".equals(action)) {
             confirmEquipment(player, holder);
+            return;
+        }
+        if (action.startsWith("technique:")) {
+            previewTechnique(player, holder, action.substring("technique:".length()));
+            return;
+        }
+        if (action.startsWith("form:")) {
+            previewForm(player, holder, action.substring("form:".length()));
+            return;
+        }
+        if ("clear-form".equals(action)) {
+            previewForm(player, holder, null);
+            return;
+        }
+        if (action.startsWith("attune:")) {
+            previewAttunement(player, holder, action.substring("attune:".length()));
+            return;
+        }
+        if ("confirm-build".equals(action)) {
+            confirmBuild(player, holder);
             return;
         }
         SceneMode mode;
@@ -340,6 +386,10 @@ final class SceneHubController implements Listener {
         } else {
             if (session.mode() == SceneMode.EQUIPMENT) {
                 populateEquipmentPage(player, inventory, session);
+            } else if (session.mode() == SceneMode.COMBAT_ARTS) {
+                populateCombatArtsPage(player, inventory, session);
+            } else if (session.mode() == SceneMode.MAGIC_ATTUNEMENT) {
+                populateMagicAttunementPage(player, inventory, session);
             } else {
                 inventory.setItem(
                         22,
@@ -576,6 +626,335 @@ final class SceneHubController implements Listener {
                                 ? "Confirm Scene transaction"
                                 : "No Scene change",
                         "confirm-equipment"));
+    }
+
+    private void populateCombatArtsPage(
+            Player player, Inventory inventory, SceneSession sceneSession) {
+        String family = previewWeaponFamily(player, sceneSession).orElse(null);
+        if (family == null) {
+            inventory.setItem(
+                    22,
+                    button(
+                            Material.BARRIER,
+                            "Equip a supported weapon before preparing Combat Arts",
+                            "noop"));
+            return;
+        }
+        int slot = 10;
+        for (TechniqueDefinition technique : buildEngine.techniques()) {
+            if (!technique.supports(family) || slot > 25) {
+                continue;
+            }
+            boolean selected =
+                    technique
+                            .id()
+                            .equals(
+                                    sceneSession
+                                            .previewState()
+                                            .build()
+                                            .techniques()
+                                            .get(technique.branch()));
+            inventory.setItem(
+                    slot++,
+                    button(
+                            selected ? Material.LIME_DYE : Material.IRON_SWORD,
+                            (selected ? "Selected: " : "Technique: ")
+                                    + technique.id().value()
+                                    + " ["
+                                    + technique.branch().name()
+                                    + "]",
+                            "technique:" + technique.id().value()));
+        }
+        slot = 28;
+        for (FormDefinition form : buildEngine.forms()) {
+            if (!form.supports(family) || slot > 34) {
+                continue;
+            }
+            boolean selected =
+                    sceneSession
+                            .previewState()
+                            .build()
+                            .form()
+                            .filter(form.id()::equals)
+                            .isPresent();
+            inventory.setItem(
+                    slot++,
+                    button(
+                            selected ? Material.GLOWSTONE_DUST : Material.BLAZE_POWDER,
+                            (selected ? "Selected form: " : "Form: ")
+                                    + form.id().value()
+                                    + " — "
+                                    + form.tradeoff(),
+                            "form:" + form.id().value()));
+        }
+        inventory.setItem(37, button(Material.GRAY_DYE, "Clear active form", "clear-form"));
+        populateBuildCommitStatus(player, inventory, sceneSession, family);
+    }
+
+    private void populateMagicAttunementPage(
+            Player player, Inventory inventory, SceneSession sceneSession) {
+        int slot = 10;
+        for (AttunableEffectDefinition effect : buildEngine.attunableEffects()) {
+            if (slot > 34) {
+                break;
+            }
+            boolean selected =
+                    sceneSession.previewState().build().attunedEffects().contains(effect.id());
+            inventory.setItem(
+                    slot++,
+                    button(
+                            selected ? Material.ENCHANTED_BOOK : Material.BOOK,
+                            (selected ? "Attuned: " : "Available: ")
+                                    + effect.id().value()
+                                    + " ["
+                                    + effect.attunementCost()
+                                    + " capacity]",
+                            "attune:" + effect.id().value()));
+        }
+        populateBuildCommitStatus(
+                player,
+                inventory,
+                sceneSession,
+                previewWeaponFamily(player, sceneSession).orElse(null));
+    }
+
+    private void populateBuildCommitStatus(
+            Player player, Inventory inventory, SceneSession sceneSession, String family) {
+        Result<BuildResolution, BuildErrorCode> resolved =
+                resolveBuild(sceneSession.previewState().build(), family);
+        if (resolved instanceof Result.Success<BuildResolution, BuildErrorCode> success) {
+            BuildResolution value = success.value();
+            inventory.setItem(
+                    39,
+                    button(
+                            Material.AMETHYST_SHARD,
+                            "Attunement "
+                                    + value.attunementLoad()
+                                    + "/"
+                                    + value.build().attunementCapacity(),
+                            "noop"));
+        } else {
+            Result.Failure<BuildResolution, BuildErrorCode> failure =
+                    (Result.Failure<BuildResolution, BuildErrorCode>) resolved;
+            inventory.setItem(
+                    39,
+                    button(
+                            Material.BARRIER,
+                            failure.error().code() + ": " + failure.detail(),
+                            "noop"));
+        }
+        inventory.setItem(
+                40,
+                button(
+                        restContext(player) ? Material.CAMPFIRE : Material.REDSTONE_TORCH,
+                        restContext(player)
+                                ? "Rest Context ready"
+                                : "Return to spawn sanctuary outside combat",
+                        "noop"));
+        inventory.setItem(
+                41,
+                button(
+                        sceneSession.hasUncommittedPreview()
+                                ? Material.LIME_DYE
+                                : Material.GRAY_DYE,
+                        sceneSession.hasUncommittedPreview()
+                                ? "Confirm prepared build"
+                                : "No build change",
+                        "confirm-build"));
+    }
+
+    private void previewTechnique(Player player, SceneInventoryHolder holder, String definitionId) {
+        try {
+            requireRestContext(player);
+            TechniqueDefinition technique =
+                    buildEngine
+                            .technique(DefinitionId.of(definitionId))
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalArgumentException(
+                                                    "Technique is unavailable."));
+            SceneSession current = sessions.find(player.getUniqueId()).orElseThrow();
+            DefinitionId selected =
+                    current.previewState().build().techniques().get(technique.branch());
+            CharacterBuild desired =
+                    current.previewState()
+                            .build()
+                            .withTechnique(
+                                    technique.branch(),
+                                    technique.id().equals(selected)
+                                            ? Optional.empty()
+                                            : Optional.of(technique.id()));
+            previewBuild(player, holder, desired);
+        } catch (IllegalArgumentException | java.util.NoSuchElementException exception) {
+            player.sendActionBar(Component.text(message(exception), NamedTextColor.RED));
+        }
+    }
+
+    private void previewForm(Player player, SceneInventoryHolder holder, String definitionId) {
+        try {
+            requireRestContext(player);
+            Optional<DefinitionId> form =
+                    definitionId == null
+                            ? Optional.empty()
+                            : Optional.of(
+                                    buildEngine
+                                            .form(DefinitionId.of(definitionId))
+                                            .orElseThrow(
+                                                    () ->
+                                                            new IllegalArgumentException(
+                                                                    "Form is unavailable."))
+                                            .id());
+            SceneSession current = sessions.find(player.getUniqueId()).orElseThrow();
+            previewBuild(player, holder, current.previewState().build().withForm(form));
+        } catch (IllegalArgumentException | java.util.NoSuchElementException exception) {
+            player.sendActionBar(Component.text(message(exception), NamedTextColor.RED));
+        }
+    }
+
+    private void previewAttunement(
+            Player player, SceneInventoryHolder holder, String definitionId) {
+        try {
+            requireRestContext(player);
+            DefinitionId effectId = DefinitionId.of(definitionId);
+            if (buildEngine.attunableEffects().stream()
+                    .noneMatch(effect -> effect.id().equals(effectId))) {
+                throw new IllegalArgumentException("Attunable effect is unavailable.");
+            }
+            SceneSession current = sessions.find(player.getUniqueId()).orElseThrow();
+            previewBuild(
+                    player, holder, current.previewState().build().toggleAttunedEffect(effectId));
+        } catch (IllegalArgumentException | java.util.NoSuchElementException exception) {
+            player.sendActionBar(Component.text(message(exception), NamedTextColor.RED));
+        }
+    }
+
+    private void previewBuild(Player player, SceneInventoryHolder holder, CharacterBuild desired) {
+        SceneSession current = sessions.find(player.getUniqueId()).orElseThrow();
+        String family = previewWeaponFamily(player, current).orElse(null);
+        Result<BuildResolution, BuildErrorCode> validation = resolveBuild(desired, family);
+        if (validation instanceof Result.Failure<BuildResolution, BuildErrorCode> failure) {
+            throw new IllegalArgumentException(failure.error().code() + ": " + failure.detail());
+        }
+        Result<SceneSession, SceneErrorCode> result =
+                sessions.previewBuild(player.getUniqueId(), holder.sessionId(), desired);
+        result.map(
+                session -> {
+                    navigate(player, session);
+                    return session;
+                });
+    }
+
+    private void confirmBuild(Player player, SceneInventoryHolder holder) {
+        if (!committing.add(player.getUniqueId())) {
+            return;
+        }
+        SceneSession sceneSession = sessions.find(player.getUniqueId()).orElse(null);
+        if (sceneSession == null
+                || !sceneSession.sessionId().equals(holder.sessionId())
+                || !sceneSession.hasUncommittedPreview()) {
+            committing.remove(player.getUniqueId());
+            return;
+        }
+        try {
+            requireRestContext(player);
+        } catch (IllegalArgumentException exception) {
+            committing.remove(player.getUniqueId());
+            player.sendActionBar(Component.text(exception.getMessage(), NamedTextColor.RED));
+            return;
+        }
+        String family = previewWeaponFamily(player, sceneSession).orElse(null);
+        Result<BuildResolution, BuildErrorCode> validation =
+                resolveBuild(sceneSession.previewState().build(), family);
+        if (validation instanceof Result.Failure<BuildResolution, BuildErrorCode> failure) {
+            committing.remove(player.getUniqueId());
+            player.sendActionBar(
+                    Component.text(
+                            failure.error().code() + ": " + failure.detail(), NamedTextColor.RED));
+            return;
+        }
+        player.sendActionBar(Component.text("Committing prepared build...", NamedTextColor.YELLOW));
+        characterSessions.commitBuild(
+                player,
+                sceneSession.previewState().build(),
+                UUID.randomUUID(),
+                contentVersion,
+                result -> {
+                    committing.remove(player.getUniqueId());
+                    if (result
+                            instanceof
+                            Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
+                                    failure) {
+                        player.sendActionBar(
+                                Component.text(
+                                        failure.error().code() + ": " + failure.detail(),
+                                        NamedTextColor.RED));
+                        return;
+                    }
+                    LoadedCharacterSession updated =
+                            ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                            result)
+                                    .value();
+                    Result<SceneSession, SceneErrorCode> confirmed =
+                            sessions.confirm(
+                                    player.getUniqueId(),
+                                    holder.sessionId(),
+                                    ignored ->
+                                            Result.success(
+                                                    new ScenePreviewState(
+                                                            updated.snapshot().equipment(),
+                                                            updated.snapshot().quiverPreparation(),
+                                                            updated.snapshot().build())));
+                    if (confirmed instanceof Result.Success<SceneSession, SceneErrorCode> success) {
+                        player.sendActionBar(
+                                Component.text(
+                                        "Build committed at Rest Context.", NamedTextColor.GREEN));
+                        navigate(player, success.value());
+                    }
+                });
+    }
+
+    private Result<BuildResolution, BuildErrorCode> resolveBuild(
+            CharacterBuild build, String family) {
+        return family == null ? buildEngine.resolve(build) : buildEngine.resolve(build, family);
+    }
+
+    private Optional<String> previewWeaponFamily(Player player, SceneSession sceneSession) {
+        LoadedCharacterSession character = characterSessions.active(player).orElse(null);
+        if (character == null) {
+            return Optional.empty();
+        }
+        ItemDefinition main =
+                equipmentDefinition(
+                        character,
+                        sceneSession.previewState().equipment(),
+                        EquipmentSlot.MAIN_HAND);
+        return main == null
+                ? Optional.empty()
+                : main.weaponProfile().map(WeaponCombatProfile::family);
+    }
+
+    private boolean restContext(Player player) {
+        CombatSessionStatus status = combat.status(player).orElse(null);
+        if (status == null
+                || status.engagementState()
+                        != com.branz.mmorpg.combat.state.EngagementState.EXPLORATION) {
+            return false;
+        }
+        Location spawn = player.getWorld().getSpawnLocation();
+        return player.getLocation().distanceSquared(spawn) <= restContextSpawnRadiusSquared;
+    }
+
+    private void requireRestContext(Player player) {
+        if (!restContext(player)) {
+            throw new IllegalArgumentException(
+                    "Build changes require Rest Context: return near world spawn outside combat.");
+        }
+    }
+
+    private static String message(Exception exception) {
+        return exception.getMessage() == null || exception.getMessage().isBlank()
+                ? "Build preview is stale or invalid."
+                : exception.getMessage();
     }
 
     private void previewMainHand(Player player, SceneInventoryHolder holder, String itemUuid) {
@@ -831,7 +1210,8 @@ final class SceneHubController implements Listener {
                                                             new ScenePreviewState(
                                                                     updated.snapshot().equipment(),
                                                                     updated.snapshot()
-                                                                            .quiverPreparation())));
+                                                                            .quiverPreparation(),
+                                                                    updated.snapshot().build())));
                             if (confirmed
                                     instanceof
                                     Result.Success<SceneSession, SceneErrorCode> success) {

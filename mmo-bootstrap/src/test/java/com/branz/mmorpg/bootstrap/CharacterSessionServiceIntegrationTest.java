@@ -8,6 +8,9 @@ import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
+import com.branz.mmorpg.content.snapshot.ContentLoadFailure;
+import com.branz.mmorpg.content.snapshot.ContentSnapshot;
+import com.branz.mmorpg.content.snapshot.ContentSnapshotLoader;
 import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.AmmoProfile;
 import com.branz.mmorpg.items.definition.CatalystProfile;
@@ -20,8 +23,13 @@ import com.branz.mmorpg.items.definition.ShieldProfile;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.progression.build.BuildEngine;
+import com.branz.mmorpg.progression.build.BuildErrorCode;
+import com.branz.mmorpg.progression.build.CharacterBuild;
+import com.branz.mmorpg.progression.build.MovesetBranch;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -29,6 +37,50 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CharacterSessionServiceIntegrationTest {
+    @Test
+    void committedBuildSurvivesDatabaseRestart(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(10));
+        BuildEngine builds = fixtureBuildEngine();
+        UUID playerId = UUID.randomUUID();
+        CharacterBuild desired =
+                new CharacterBuild(
+                        Map.of(MovesetBranch.PRIMARY_1, DefinitionId.of("technique.staff.sweep")),
+                        Optional.of(DefinitionId.of("form.ember_channel")),
+                        Set.of(DefinitionId.of("spell.ember.fire_lance")),
+                        6);
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database, builds);
+            LoadedCharacterSession session = success(service.open(playerId));
+            LoadedCharacterSession committed =
+                    success(
+                            service.commitBuild(
+                                    session, desired, UUID.randomUUID(), "content.test.1"));
+            assertEquals(desired, committed.snapshot().build());
+            assertEquals(1, committed.snapshot().buildRecord().orElseThrow().version());
+            service.close(committed);
+        }
+        try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(restarted, builds);
+            LoadedCharacterSession restored = success(service.open(playerId));
+            assertEquals(desired, restored.snapshot().build());
+            assertEquals(1, restored.snapshot().buildRecord().orElseThrow().version());
+            service.close(restored);
+        }
+    }
+
     @Test
     void linkedMainAndOffHandCommitAtomicallyAndSurviveDatabaseRestart(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
@@ -656,6 +708,18 @@ class CharacterSessionServiceIntegrationTest {
                         .findFirst()
                         .orElseThrow()
                         .valueId());
+    }
+
+    private static BuildEngine fixtureBuildEngine() {
+        Path fixture = Path.of("..", "example-content", "milestone-1").toAbsolutePath().normalize();
+        Result<ContentSnapshot, ContentLoadFailure> loaded =
+                new ContentSnapshotLoader().load(fixture);
+        assertTrue(loaded.isSuccess());
+        Result<BuildEngine, BuildErrorCode> compiled =
+                BuildEngine.compile(
+                        ((Result.Success<ContentSnapshot, ContentLoadFailure>) loaded).value());
+        assertTrue(compiled.isSuccess());
+        return ((Result.Success<BuildEngine, BuildErrorCode>) compiled).value();
     }
 
     private static LoadedCharacterSession success(

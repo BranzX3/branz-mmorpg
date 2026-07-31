@@ -295,6 +295,18 @@ with an operator/test account:
 85. Disconnect/reconnect and restart Paper after equipping Sword and Shield. Verify both exact item
     UUIDs return to their native slots. Preview empty off hand and Confirm; the same Shield UUID must
     move to one free authoritative inventory slot without duplicating its projection.
+86. Return to the world spawn Rest Context in `EXPLORATION`, open Chronicle slot 9 and enter Combat
+    Arts. Select the Technique and Form compatible with the equipped Staff, preview them, close the
+    inventory and reopen it; database truth must remain unchanged until Confirm.
+87. Confirm the Staff Technique plus Ember Channel Form. Reopen Chronicle and verify both selections
+    are restored. Equip another weapon family and verify an incompatible build is rejected visibly
+    before combat readiness rather than silently using the wrong move.
+88. In Magic Attunement select Fire Lance, confirm, then cast with the Staff. Remove its attunement
+    in a new preview and confirm; the same RMB must report that Fire Lance is not attuned. Exceeding
+    capacity or selecting authored conflicting tags must reject without changing the committed row.
+89. Enter `ENGAGED` or leave the configured spawn radius and attempt to open/commit build editing.
+    Verify Chronicle reports that a Rest Context is required. Disconnect/reconnect and restart Paper
+    after a valid build commit; the Technique, Form, attunement set and build version must return.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
@@ -312,8 +324,10 @@ from only the selected stored category before projectile creation. Crossbow relo
 stored Bolt at `BOLT_PLACED`, persists `LOADED` on the item UUID and clears it before projectile
 creation. Staff casting reserves mana before release, commits one item-owned catalyst durability
 through PostgreSQL before Fire Lance creation and uses the same authoritative projectile/HP/posture
-engines with a separate arcane damage channel. Persistent attunement/build selection, the rest of
-the Ember art, Runic Imbuement, encounter recovery and lot merging remain later slices. Greatsword
+engines with a separate arcane damage channel. Technique, Form and Magic Attunement selections are
+character-owned versioned state edited only from a Rest Context; learned-content gating belongs to
+Milestone 6. The rest of the Ember art, Runic Imbuement, encounter recovery and lot merging remain
+later slices. Greatsword
 and Sword & Shield use the same move/damage authority, while one shared item loadout policy validates
 their empty-off-hand or Shield requirement before Scene commit and combat readiness.
 

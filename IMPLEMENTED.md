@@ -1505,3 +1505,52 @@ Non-goals:
 Schema/config impact: item schema adds additive off-hand and guard contracts; the example snapshot
 adds Greatsword, Sword, Shield and two primary moves. Migration impact: no SQL migration; existing
 native equipment locations and batch journal are reused, documented by ADR 0012.
+
+## Milestone 5 - persistent Techniques, Forms and Magic Attunement slice
+
+Implemented:
+
+- `mmo-progression` compiles immutable `technique.*` and `form.*` definitions together with
+  attunable `spell.*` effects; the example snapshot contains one Technique for each of the five V1
+  weapon families, four Forms and Ember Fire Lance attunement metadata;
+- a character build owns at most one Technique per branch, one optional Form, an attuned-effect set
+  and bounded capacity. Resolution rejects unknown definitions, weapon-family mismatches, excess
+  load and declared tag conflicts;
+- combat resolves the committed primary Technique for melee families and applies the active Form's
+  bounded stamina/mana tradeoff. Staff casting requires Fire Lance in the committed attunement set;
+- Chronicle exposes Combat Arts and Magic Attunement previews, validates against the previewed
+  equipment family and commits only from `EXPLORATION` inside the local Rest Context;
+- `character_build_state` stores versioned deterministic JSON; `character.build.commit` performs
+  expected-version CAS, journal transition and character audit in one PostgreSQL transaction;
+- Character Session loads and validates the build before entering `ACTIVE`, and reconnect/database
+  restart restore its exact selections and authority version.
+
+Tests:
+
+- Build Engine tests compile all fixtures, resolve Technique replacement and Form resource scaling,
+  reject family/capacity violations and round-trip deterministic JSON;
+- embedded PostgreSQL tests prove insert, idempotent replay, optimistic update, stale rejection,
+  audit emission and database-restart restoration;
+- Character Session integration commits a Staff Technique, Ember Form and Fire Lance attunement,
+  then restores the same build after replacing the database runtime;
+- generated schemas and the 30-definition content snapshot validate with all references resolved.
+
+Failure/recovery behavior:
+
+- preview is non-authoritative and lost Rest Context, combat engagement, stale version, invalid
+  family/capacity/conflicts or corrupt persisted JSON fail closed without a partial build;
+- absent rows map to the empty six-capacity build for existing characters; non-empty rows are never
+  silently downgraded when content changes;
+- journal replay is exactly once and a successful commit reloads database truth before combat can
+  consume the new selection.
+
+Non-goals:
+
+- learned-Technique acquisition and mastery prerequisites, which belong to Milestone 6 progression;
+- production regional sanctuary discovery; the local world-spawn radius is an authored test
+  fixture;
+- the remaining Ember deliveries and Runic Imbuement, delivered by the next Milestone 5 slice.
+
+Schema/config/migration impact: public content adds `TECHNIQUE` and `FORM`, spell schema adds
+attunement tag/conflict metadata, and config adds `scene.rest-context-spawn-radius-blocks` (16 by
+default). Migration V0004 adds `character_build_state`, documented by ADR 0013.

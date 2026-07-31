@@ -1,0 +1,9 @@
+definition_id: form.iron_root
+schema_version: 1
+families: [GREATSWORD, SWORD_SHIELD]
+tradeoff: Stronger stamina discipline for slower mana conversion.
+attunement_cost: 0
+resource:
+  stamina_cost_multiplier: 0.9
+  mana_cost_multiplier: 1.2
+tags: [MARTIAL]

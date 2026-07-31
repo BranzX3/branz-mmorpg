@@ -1,0 +1,9 @@
+definition_id: technique.crossbow.ready_shot
+schema_version: 1
+family: CROSSBOW
+branch: SECONDARY
+move: move.training_crossbow.shot
+mode: REPLACE
+supernatural: false
+attunement_cost: 0
+tags: [LOADED_SHOT]

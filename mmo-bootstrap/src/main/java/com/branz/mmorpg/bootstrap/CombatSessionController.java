@@ -133,6 +133,10 @@ import com.branz.mmorpg.magic.definition.ArcaneSchool;
 import com.branz.mmorpg.magic.definition.SpellDefinition;
 import com.branz.mmorpg.magic.definition.SpellDeliveryType;
 import com.branz.mmorpg.magic.definition.SpellEngine;
+import com.branz.mmorpg.progression.build.BuildEngine;
+import com.branz.mmorpg.progression.build.BuildErrorCode;
+import com.branz.mmorpg.progression.build.BuildResolution;
+import com.branz.mmorpg.progression.build.MovesetBranch;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -196,13 +200,13 @@ final class CombatSessionController implements Listener {
     private static final DefinitionId TRAINING_STAFF_ITEM =
             DefinitionId.of("weapon.training_staff");
     private static final DefinitionId EMBER_FIRE_LANCE = DefinitionId.of("spell.ember.fire_lance");
-    private static final int TRAINING_ATTUNEMENT_CAPACITY = 2;
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
     private final MoveEngine moves;
     private final SpellEngine spells;
     private final ItemEngine items;
+    private final BuildEngine builds;
     private final String contentVersion;
     private final MoveDefinition trainingMove;
     private final MoveDefinition trainingGreatswordMove;
@@ -266,6 +270,7 @@ final class CombatSessionController implements Listener {
             ItemEngine items,
             MoveEngine moves,
             SpellEngine spells,
+            BuildEngine builds,
             String contentVersion,
             double trainingWeaponPower,
             int maximumActiveProjectilesPerCaster,
@@ -286,6 +291,7 @@ final class CombatSessionController implements Listener {
         this.items = Objects.requireNonNull(items, "items");
         this.moves = Objects.requireNonNull(moves, "moves");
         this.spells = Objects.requireNonNull(spells, "spells");
+        this.builds = Objects.requireNonNull(builds, "builds");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
         if (contentVersion.isBlank()) {
             throw new IllegalArgumentException("contentVersion must not be blank");
@@ -2753,9 +2759,23 @@ final class CombatSessionController implements Listener {
         Result<WeaponLoadoutResolution, WeaponLoadoutErrorCode> resolved =
                 WeaponLoadoutPolicy.resolve(
                         main, equippedDefinition(player, EquipmentSlot.OFF_HAND));
-        return resolved
-                        instanceof
-                        Result.Failure<WeaponLoadoutResolution, WeaponLoadoutErrorCode> failure
+        if (resolved
+                instanceof
+                Result.Failure<WeaponLoadoutResolution, WeaponLoadoutErrorCode> failure) {
+            return Optional.of("Combat not ready: " + failure.detail());
+        }
+        String family =
+                ((Result.Success<WeaponLoadoutResolution, WeaponLoadoutErrorCode>) resolved)
+                        .value()
+                        .weapon()
+                        .family();
+        LoadedCharacterSession character = characters.active(player).orElse(null);
+        if (character == null) {
+            return Optional.of("Combat not ready: character build is unavailable.");
+        }
+        Result<BuildResolution, BuildErrorCode> build =
+                builds.resolve(character.snapshot().build(), family);
+        return build instanceof Result.Failure<BuildResolution, BuildErrorCode> failure
                 ? Optional.of("Combat not ready: " + failure.detail())
                 : Optional.empty();
     }
@@ -2857,14 +2877,98 @@ final class CombatSessionController implements Listener {
         }
         return equippedWeaponFamily(player)
                 .flatMap(
-                        family ->
-                                switch (family) {
-                                    case "SWORD" -> Optional.of(trainingMove);
-                                    case "GREATSWORD" -> Optional.of(trainingGreatswordMove);
-                                    case "SWORD_SHIELD" -> Optional.of(trainingSwordShieldMove);
-                                    case "STAFF" -> Optional.of(trainingStaffMove);
-                                    default -> Optional.empty();
-                                });
+                        family -> {
+                            MoveDefinition fallback =
+                                    switch (family) {
+                                        case "SWORD" -> trainingMove;
+                                        case "GREATSWORD" -> trainingGreatswordMove;
+                                        case "SWORD_SHIELD" -> trainingSwordShieldMove;
+                                        case "STAFF" -> trainingStaffMove;
+                                        default -> null;
+                                    };
+                            if (fallback == null) {
+                                return Optional.empty();
+                            }
+                            return buildResolution(player, family)
+                                    .flatMap(
+                                            resolution ->
+                                                    Optional.ofNullable(
+                                                                    resolution
+                                                                            .resolvedMoves()
+                                                                            .get(
+                                                                                    MovesetBranch
+                                                                                            .PRIMARY_1))
+                                                            .flatMap(moves::find)
+                                                            .or(() -> Optional.of(fallback)))
+                                    .map(move -> moveWithBuildCosts(player, family, move));
+                        });
+    }
+
+    private Optional<BuildResolution> buildResolution(Player player, String family) {
+        return characters
+                .active(player)
+                .flatMap(
+                        character -> {
+                            Result<BuildResolution, BuildErrorCode> result =
+                                    builds.resolve(character.snapshot().build(), family);
+                            return result
+                                            instanceof
+                                            Result.Success<BuildResolution, BuildErrorCode> success
+                                    ? Optional.of(success.value())
+                                    : Optional.empty();
+                        });
+    }
+
+    private MoveDefinition moveWithBuildCosts(Player player, String family, MoveDefinition move) {
+        BuildResolution build = buildResolution(player, family).orElse(null);
+        if (build == null) {
+            return move;
+        }
+        MoveDefinition.ResourceCost costs = move.costs();
+        int stamina = build.scaleStaminaCost(costs.stamina());
+        int setupStamina = Math.min(stamina, build.scaleStaminaCost(costs.setupStamina()));
+        int mana = build.scaleManaCost(costs.mana());
+        if (stamina == costs.stamina()
+                && setupStamina == costs.setupStamina()
+                && mana == costs.mana()) {
+            return move;
+        }
+        return new MoveDefinition(
+                move.id(),
+                move.family(),
+                move.input(),
+                move.phases(),
+                move.commitTick(),
+                new MoveDefinition.ResourceCost(stamina, mana, costs.health(), setupStamina),
+                move.movement(),
+                move.hitboxes(),
+                move.outputs(),
+                move.cancels(),
+                move.interruptResistance(),
+                move.presentationArchetype(),
+                move.profiles());
+    }
+
+    private static SpellDefinition spellWithBuildCosts(
+            SpellDefinition spell, BuildResolution build) {
+        int manaCost = build.scaleManaCost(spell.manaCost());
+        if (manaCost == spell.manaCost()) {
+            return spell;
+        }
+        return new SpellDefinition(
+                spell.id(),
+                spell.artId(),
+                spell.castType(),
+                spell.targetType(),
+                spell.deliveryType(),
+                spell.requirements(),
+                manaCost,
+                spell.phases(),
+                spell.interruption(),
+                spell.projectile(),
+                spell.output(),
+                spell.presentationArchetype(),
+                spell.profiles());
     }
 
     private void select(LiveSession session, SelectedHotbarSlot selected) {
@@ -2944,12 +3048,25 @@ final class CombatSessionController implements Listener {
             player.sendActionBar(Component.text("CATALYST BROKEN", NamedTextColor.RED));
             return;
         }
+        LoadedCharacterSession character = characters.active(player).orElse(null);
+        if (character == null
+                || !character.snapshot().build().attunedEffects().contains(EMBER_FIRE_LANCE)) {
+            player.sendActionBar(
+                    Component.text("ATTUNE EMBER FIRE LANCE AT REST", NamedTextColor.RED));
+            return;
+        }
+        BuildResolution build = buildResolution(player, "STAFF").orElse(null);
+        if (build == null) {
+            player.sendActionBar(Component.text("BUILD NOT READY", NamedTextColor.RED));
+            return;
+        }
+        SpellDefinition activeSpell = spellWithBuildCosts(emberFireLance, build);
         Result<SpellCastRuntime, SpellCastErrorCode> started =
                 spellCasts.start(
-                        emberFireLance,
+                        activeSpell,
                         session.resources,
                         trainingStaffCatalyst.tags(),
-                        TRAINING_ATTUNEMENT_CAPACITY,
+                        character.snapshot().build().attunementCapacity(),
                         tick);
         if (!(started instanceof Result.Success<SpellCastRuntime, SpellCastErrorCode> success)) {
             SpellCastErrorCode error =
@@ -2961,7 +3078,7 @@ final class CombatSessionController implements Listener {
         session.spellCast = success.value();
         session.resources = session.spellCast.resources();
         session.action = ActionState.WINDUP;
-        session.lastResolution = "FIRE LANCE WINDUP mana-reserved=" + emberFireLance.manaCost();
+        session.lastResolution = "FIRE LANCE WINDUP mana-reserved=" + activeSpell.manaCost();
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GOLD));
     }
 

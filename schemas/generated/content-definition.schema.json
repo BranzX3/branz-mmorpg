@@ -7,6 +7,10 @@
   }, {
     "$ref" : "move.schema.json"
   }, {
+    "$ref" : "technique.schema.json"
+  }, {
+    "$ref" : "form.schema.json"
+  }, {
     "$ref" : "spell.schema.json"
   }, {
     "$ref" : "status.schema.json"

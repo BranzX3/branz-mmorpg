@@ -1,0 +1,9 @@
+definition_id: technique.greatsword.cleave
+schema_version: 1
+family: GREATSWORD
+branch: PRIMARY_1
+move: move.training_greatsword.committed_cleave
+mode: REPLACE
+supernatural: false
+attunement_cost: 0
+tags: [HEAVY_ARC]

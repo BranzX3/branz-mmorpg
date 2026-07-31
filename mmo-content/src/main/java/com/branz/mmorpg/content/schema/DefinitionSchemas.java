@@ -589,6 +589,101 @@ public final class DefinitionSchemas {
                                         "projectile",
                                         "ammo_category"))));
         schemas.put(
+                DefinitionType.TECHNIQUE,
+                definition(
+                        DefinitionType.TECHNIQUE,
+                        List.of(
+                                required("family", STRING, "", "Compatible weapon family or ANY."),
+                                allowed(
+                                        "branch",
+                                        STRING,
+                                        Set.of(
+                                                "PRIMARY_1",
+                                                "PRIMARY_2",
+                                                "PRIMARY_3",
+                                                "PRIMARY_DIRECTIONAL_FORWARD",
+                                                "PRIMARY_DIRECTIONAL_BACK",
+                                                "SECONDARY",
+                                                "SECONDARY_DIRECTIONAL",
+                                                "DODGE_FOLLOWUP",
+                                                "SIGNATURE_F",
+                                                "UTILITY_Q",
+                                                "DEFENSIVE_FOLLOWUP",
+                                                "FINISHER"),
+                                        "",
+                                        "Logical moveset branch owned by the technique."),
+                                required(
+                                        "move",
+                                        STRING,
+                                        "",
+                                        "Move definition activated by the branch."),
+                                allowed(
+                                        "mode",
+                                        STRING,
+                                        Set.of("REPLACE", "AUGMENT"),
+                                        "",
+                                        "Whether the technique replaces or augments its branch."),
+                                required(
+                                        "supernatural",
+                                        BOOLEAN,
+                                        "",
+                                        "Whether the technique consumes Attunement Capacity."),
+                                ranged(
+                                        "attunement_cost",
+                                        INTEGER,
+                                        0,
+                                        32,
+                                        "capacity",
+                                        "Active supernatural load; mundane techniques use zero."),
+                                array("tags", false, 1, null, "Attunement/resonance tags."),
+                                array(
+                                        "conflicts_with_tags",
+                                        false,
+                                        1,
+                                        null,
+                                        "Tags that make this technique incompatible.")),
+                        List.of(to(DefinitionType.MOVE, "move"))));
+        schemas.put(
+                DefinitionType.FORM,
+                definition(
+                        DefinitionType.FORM,
+                        List.of(
+                                array("families", true, 1, 6, "Compatible weapon families or ANY."),
+                                required(
+                                        "tradeoff",
+                                        STRING,
+                                        "",
+                                        "Authored mechanical benefit/cost summary."),
+                                ranged(
+                                        "attunement_cost",
+                                        INTEGER,
+                                        0,
+                                        32,
+                                        "capacity",
+                                        "Active supernatural load."),
+                                ranged(
+                                        "resource.stamina_cost_multiplier",
+                                        NUMBER,
+                                        0.5,
+                                        1.5,
+                                        "multiplier",
+                                        "Form stamina behavior."),
+                                ranged(
+                                        "resource.mana_cost_multiplier",
+                                        NUMBER,
+                                        0.5,
+                                        1.5,
+                                        "multiplier",
+                                        "Form mana behavior."),
+                                array("tags", false, 1, null, "Attunement/resonance tags."),
+                                array(
+                                        "conflicts_with_tags",
+                                        false,
+                                        1,
+                                        null,
+                                        "Tags that make this form incompatible.")),
+                        List.of()));
+        schemas.put(
                 DefinitionType.SPELL,
                 definition(
                         DefinitionType.SPELL,
@@ -640,6 +735,18 @@ public final class DefinitionSchemas {
                                         null,
                                         "capacity",
                                         "Required active attunement capacity."),
+                                array(
+                                        "requirements.attunement_tags",
+                                        false,
+                                        1,
+                                        null,
+                                        "Spell resonance and Attunement tags."),
+                                array(
+                                        "requirements.conflicts_with_tags",
+                                        false,
+                                        1,
+                                        null,
+                                        "Tags that make this spell incompatible."),
                                 ranged(
                                         "cost.mana",
                                         INTEGER,

@@ -12,6 +12,8 @@ import com.branz.mmorpg.items.definition.ItemEngineErrorCode;
 import com.branz.mmorpg.items.projection.ProjectionTokenSigner;
 import com.branz.mmorpg.magic.definition.SpellEngine;
 import com.branz.mmorpg.magic.definition.SpellEngineErrorCode;
+import com.branz.mmorpg.progression.build.BuildEngine;
+import com.branz.mmorpg.progression.build.BuildErrorCode;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
@@ -30,6 +32,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private final AtomicReference<ItemEngine> activeItemEngine = new AtomicReference<>();
     private final AtomicReference<MoveEngine> activeMoveEngine = new AtomicReference<>();
     private final AtomicReference<SpellEngine> activeSpellEngine = new AtomicReference<>();
+    private final AtomicReference<BuildEngine> activeBuildEngine = new AtomicReference<>();
     private ResourcePackGate resourcePackGate;
     private SceneHubController sceneHubController;
     private MmoCommandController commandController;
@@ -136,6 +139,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         activeItemEngine.set(null);
         activeMoveEngine.set(null);
         activeSpellEngine.set(null);
+        activeBuildEngine.set(null);
         activeSnapshot.set(null);
         lifecycle.disable();
         getLogger().info("Branz MMO platform disabled cleanly.");
@@ -233,6 +237,18 @@ public final class BranzMmoPlugin extends JavaPlugin {
         }
         activeSpellEngine.set(
                 ((Result.Success<SpellEngine, SpellEngineErrorCode>) compiledSpells).value());
+        Result<BuildEngine, BuildErrorCode> compiledBuilds = BuildEngine.compile(snapshot);
+        if (compiledBuilds instanceof Result.Failure<BuildEngine, BuildErrorCode> failure) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            activeSpellEngine.set(null);
+            return "Build Engine rejected active content: "
+                    + failure.error().code()
+                    + " "
+                    + failure.detail();
+        }
+        activeBuildEngine.set(
+                ((Result.Success<BuildEngine, BuildErrorCode>) compiledBuilds).value());
         ChronicleService chronicle = new ChronicleService(this);
         resourcePackGate = new ResourcePackGate(this, snapshot);
         if (!resourcePackGate.configurationValid()) {
@@ -425,7 +441,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         characterSessionController =
                 new CharacterSessionController(
                         this,
-                        new CharacterSessionService(databaseRuntime),
+                        new CharacterSessionService(databaseRuntime, activeBuildEngine.get()),
                         new BukkitInventoryProjectionService(projectionCodec),
                         activeItemEngine.get(),
                         databaseRuntime.settings());
@@ -505,6 +521,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         activeItemEngine.get(),
                         activeMoveEngine.get(),
                         activeSpellEngine.get(),
+                        activeBuildEngine.get(),
                         snapshot.manifest().contentVersion(),
                         trainingWeapon.power(),
                         maximumActiveProjectilesPerCaster,
@@ -534,6 +551,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         chronicle,
                         characterSessionController,
                         activeItemEngine.get(),
+                        activeBuildEngine.get(),
+                        combatSessionController,
                         snapshot.manifest().contentVersion());
         commandController =
                 new MmoCommandController(
@@ -568,6 +587,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
                                 + activeMoveEngine.get().all().size()
                                 + ", spell definitions="
                                 + activeSpellEngine.get().all().size()
+                                + ", technique definitions="
+                                + activeBuildEngine.get().techniques().size()
+                                + ", form definitions="
+                                + activeBuildEngine.get().forms().size()
                                 + ", Scene preview=COMPACT_2D");
     }
 

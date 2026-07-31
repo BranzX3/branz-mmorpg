@@ -1,0 +1,67 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "form.schema.json",
+  "title" : "FORM definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "families" : {
+      "type" : "array",
+      "description" : "Compatible weapon families or ANY.",
+      "minItems" : 1,
+      "maxItems" : 6
+    },
+    "tradeoff" : {
+      "type" : "string",
+      "description" : "Authored mechanical benefit/cost summary."
+    },
+    "attunement_cost" : {
+      "type" : "integer",
+      "description" : "Active supernatural load.",
+      "x-unit" : "capacity",
+      "minimum" : 0.0,
+      "maximum" : 32.0
+    },
+    "resource" : {
+      "type" : "object",
+      "properties" : {
+        "stamina_cost_multiplier" : {
+          "type" : "number",
+          "description" : "Form stamina behavior.",
+          "x-unit" : "multiplier",
+          "minimum" : 0.5,
+          "maximum" : 1.5
+        },
+        "mana_cost_multiplier" : {
+          "type" : "number",
+          "description" : "Form mana behavior.",
+          "x-unit" : "multiplier",
+          "minimum" : 0.5,
+          "maximum" : 1.5
+        }
+      },
+      "required" : [ "stamina_cost_multiplier", "mana_cost_multiplier" ]
+    },
+    "tags" : {
+      "type" : "array",
+      "description" : "Attunement/resonance tags.",
+      "minItems" : 1
+    },
+    "conflicts_with_tags" : {
+      "type" : "array",
+      "description" : "Tags that make this form incompatible.",
+      "minItems" : 1
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "families", "tradeoff", "attunement_cost", "resource" ]
+}

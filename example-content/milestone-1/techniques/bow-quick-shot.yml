@@ -1,0 +1,9 @@
+definition_id: technique.bow.quick_shot
+schema_version: 1
+family: BOW
+branch: SECONDARY
+move: move.training_bow.quick_shot
+mode: REPLACE
+supernatural: false
+attunement_cost: 0
+tags: [RANGED_DRAW]

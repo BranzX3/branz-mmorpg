@@ -21,6 +21,7 @@ import com.branz.mmorpg.persistence.transaction.ItemPayloadUpdate;
 import com.branz.mmorpg.persistence.transaction.JdbcValueTransactionService;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotQuantityConsumption;
+import com.branz.mmorpg.persistence.transaction.LotQuantityTransfer;
 import com.branz.mmorpg.persistence.transaction.NewItemLocation;
 import com.branz.mmorpg.persistence.transaction.NewLotLocation;
 import com.branz.mmorpg.persistence.transaction.ReconciliationErrorCode;
@@ -142,9 +143,28 @@ final class CharacterSessionService {
             ItemDefinition definition,
             int inventorySlot,
             String contentVersion) {
+        return grantTestValue(session, definition, inventorySlot, 1, contentVersion);
+    }
+
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> grantTestValue(
+            LoadedCharacterSession session,
+            ItemDefinition definition,
+            int inventorySlot,
+            int lotQuantity,
+            String contentVersion) {
         Objects.requireNonNull(session, "session");
         Objects.requireNonNull(definition, "definition");
         Objects.requireNonNull(contentVersion, "contentVersion");
+        if (lotQuantity < 1 || lotQuantity > 4096) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Test lot quantity must be between 1 and 4096.");
+        }
+        if (definition.itemClass() == ItemClass.UNIQUE_DURABLE && lotQuantity != 1) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Unique test items must have quantity one.");
+        }
         UUID valueId = UUID.randomUUID();
         String provenance = "dev:" + session.characterId().value();
         String payload = "{\"displayRevision\":1,\"testProvenance\":\"" + provenance + "\"}";
@@ -158,7 +178,11 @@ final class CharacterSessionService {
                                 ? JdbcValueTransactionService.ITEM_GRANT
                                 : JdbcValueTransactionService.LOT_GRANT,
                         "{}",
-                        "{\"definitionId\":\"" + definition.id().value() + "\"}",
+                        "{\"definitionId\":\""
+                                + definition.id().value()
+                                + "\",\"quantity\":"
+                                + lotQuantity
+                                + "}",
                         contentVersion);
         Result<TransactionExecution, TransactionErrorCode> granted;
         if (definition.itemClass() == ItemClass.UNIQUE_DURABLE) {
@@ -181,7 +205,7 @@ final class CharacterSessionService {
                                             new LotId(valueId),
                                             definition.id(),
                                             "dev-test",
-                                            1,
+                                            lotQuantity,
                                             java.util.Optional.of(session.characterId()),
                                             ValueLocation.inventory("slot:" + inventorySlot),
                                             payload));
@@ -203,13 +227,17 @@ final class CharacterSessionService {
         Objects.requireNonNull(ammoDefinitionId, "ammoDefinitionId");
         Objects.requireNonNull(projectileCommitId, "projectileCommitId");
         Objects.requireNonNull(contentVersion, "contentVersion");
+        ItemId quiverId = session.snapshot().equipment().item(EquipmentSlot.QUIVER).orElse(null);
         LotLocationRecord ammo =
-                InventoryAmmoLots.select(session.snapshot().lotRecords(), ammoDefinitionId)
-                        .orElse(null);
+                quiverId == null
+                        ? null
+                        : QuiverAmmoLots.select(
+                                        session.snapshot().lotRecords(), quiverId, ammoDefinitionId)
+                                .orElse(null);
         if (ammo == null) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_AMMO_UNAVAILABLE,
-                    "No owned inventory lot is available for " + ammoDefinitionId.value());
+                    "No lot is stored in the equipped Quiver for " + ammoDefinitionId.value());
         }
         TransactionRequest request =
                 TransactionRequest.forCharacter(
@@ -240,6 +268,109 @@ final class CharacterSessionService {
                                         ammo.location(),
                                         1));
         if (consumed
+                instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                    failure.error().code() + ": " + failure.detail());
+        }
+        return reload(session);
+    }
+
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> transferQuiverAmmo(
+            LoadedCharacterSession session,
+            LotId sourceLotId,
+            long quantity,
+            boolean store,
+            int quiverCapacity,
+            UUID operationId,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(sourceLotId, "sourceLotId");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        if (quantity < 1) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Quiver transfer quantity must be positive.");
+        }
+        ItemId quiverId = session.snapshot().equipment().item(EquipmentSlot.QUIVER).orElse(null);
+        ItemLocationRecord quiver =
+                quiverId == null
+                        ? null
+                        : findItem(session.snapshot().itemRecords(), quiverId).orElse(null);
+        LotLocationRecord source =
+                session.snapshot().lotRecords().stream()
+                        .filter(record -> record.lotId().equals(sourceLotId))
+                        .findFirst()
+                        .orElse(null);
+        ValueLocation equippedLocation = ValueLocation.virtualEquipped(EquipmentSlot.QUIVER.name());
+        ValueLocation storedLocation = quiverId == null ? null : ValueLocation.quiver(quiverId);
+        if (quiver == null
+                || source == null
+                || !quiver.location().equals(equippedLocation)
+                || quantity > source.quantity()
+                || (store
+                        && source.location().type()
+                                != com.branz.mmorpg.persistence.transaction.ValueLocationType
+                                        .CHARACTER_INVENTORY)
+                || (!store && !source.location().equals(storedLocation))) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Quiver transfer source or equipped container changed.");
+        }
+        ValueLocation destination;
+        if (store) {
+            destination = storedLocation;
+        } else {
+            int freeSlot = firstFreeInventorySlot(session.snapshot());
+            if (freeSlot < 0) {
+                return Result.failure(
+                        CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                        "No free MMO inventory slot is available.");
+            }
+            destination = ValueLocation.inventory("slot:" + freeSlot);
+        }
+        LotId destinationLotId =
+                quantity == source.quantity() ? source.lotId() : new LotId(operationId);
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "quiver-lot-transfer:" + operationId,
+                        session.characterId(),
+                        session.sessionId(),
+                        JdbcValueTransactionService.LOT_TRANSFER,
+                        "{\"sourceLotId\":\""
+                                + source.lotId().value()
+                                + "\",\"version\":"
+                                + source.version()
+                                + ",\"quantity\":"
+                                + quantity
+                                + "}",
+                        "{\"destinationLotId\":\""
+                                + destinationLotId.value()
+                                + "\",\"location\":\""
+                                + destination.type().name()
+                                + "\"}",
+                        contentVersion);
+        Result<TransactionExecution, TransactionErrorCode> transferred =
+                database.values()
+                        .transferLotQuantity(
+                                request,
+                                new LotQuantityTransfer(
+                                        source.lotId(),
+                                        destinationLotId,
+                                        source.version(),
+                                        source.quantity(),
+                                        source.ownerCharacterId(),
+                                        source.location(),
+                                        destination,
+                                        quantity,
+                                        quiver.itemId(),
+                                        quiver.version(),
+                                        quiver.ownerCharacterId(),
+                                        quiver.location(),
+                                        quiverCapacity));
+        if (transferred
                 instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
@@ -448,6 +579,18 @@ final class CharacterSessionService {
     private static Optional<ItemLocationRecord> findItem(
             List<ItemLocationRecord> items, ItemId itemId) {
         return items.stream().filter(item -> item.itemId().equals(itemId)).findFirst();
+    }
+
+    private static int firstFreeInventorySlot(PersistentCharacterSnapshot snapshot) {
+        boolean[] occupied = new boolean[36];
+        occupied[ChronicleService.HOTBAR_SLOT] = true;
+        snapshot.inventory().forEach(projection -> occupied[projection.slot()] = true);
+        for (int slot = 0; slot < occupied.length; slot++) {
+            if (!occupied[slot]) {
+                return slot;
+            }
+        }
+        return -1;
     }
 
     private static boolean isNative(EquipmentSlot slot) {

@@ -1,5 +1,6 @@
 package com.branz.mmorpg.persistence.transaction;
 
+import com.branz.mmorpg.api.identity.ItemId;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -40,6 +41,13 @@ public record ValueLocation(ValueLocationType type, Optional<String> reference) 
         return new ValueLocation(
                 ValueLocationType.VIRTUAL_EQUIPPED,
                 Optional.of(Objects.requireNonNull(slotReference, "slotReference")));
+    }
+
+    public static ValueLocation quiver(ItemId quiverItemId) {
+        return new ValueLocation(
+                ValueLocationType.QUIVER,
+                Optional.of(
+                        Objects.requireNonNull(quiverItemId, "quiverItemId").value().toString()));
     }
 
     public static ValueLocation overflowClaim(String claimReference) {

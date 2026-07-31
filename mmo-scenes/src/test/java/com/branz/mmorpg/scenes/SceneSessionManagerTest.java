@@ -127,6 +127,35 @@ class SceneSessionManagerTest {
         assertEquals(prepared, committed.committedState().quiverPreparation());
     }
 
+    @Test
+    void quiverLotTransferRemainsPreviewOnlyUntilCommitterReturnsDatabaseTruth() {
+        SceneSessionManager manager = new SceneSessionManager(CLOCK);
+        UUID playerId = UUID.randomUUID();
+        SceneSession opened = success(manager.open(playerId, EquipmentLoadout.empty()));
+        QuiverAmmoTransferPreview transfer =
+                new QuiverAmmoTransferPreview(UUID.randomUUID(), 64, QuiverTransferDirection.STORE);
+
+        SceneSession previewed =
+                success(manager.previewQuiverTransfer(playerId, opened.sessionId(), transfer));
+        assertTrue(previewed.hasUncommittedPreview());
+        assertEquals(transfer, previewed.previewState().quiverTransfer().orElseThrow());
+        assertTrue(previewed.committedState().quiverTransfer().isEmpty());
+
+        SceneSession committed =
+                success(
+                        manager.confirm(
+                                playerId,
+                                opened.sessionId(),
+                                session ->
+                                        Result.success(
+                                                new ScenePreviewState(
+                                                        session.committedState().equipment(),
+                                                        session.committedState()
+                                                                .quiverPreparation()))));
+        assertFalse(committed.hasUncommittedPreview());
+        assertTrue(committed.committedState().quiverTransfer().isEmpty());
+    }
+
     private static <T> T success(Result<T, SceneErrorCode> result) {
         assertTrue(
                 result.isSuccess(),

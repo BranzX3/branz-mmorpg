@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
+import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.AmmoFamily;
+import com.branz.mmorpg.items.definition.AmmoProfile;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.QuiverProfile;
@@ -122,6 +124,79 @@ class CharacterSessionServiceIntegrationTest {
                                             .equipment()
                                             .with(EquipmentSlot.QUIVER, Optional.of(quiverId)),
                                     "content.test.1"));
+            ItemDefinition arrow =
+                    new ItemDefinition(
+                            DefinitionId.of("ammo.test.arrow"),
+                            DefinitionId.of("ammo.test.arrow"),
+                            ItemClass.STACKABLE_LOT,
+                            OptionalInt.empty(),
+                            false,
+                            Optional.empty(),
+                            Optional.of(new AmmoProfile(AmmoFamily.ARROW)),
+                            Optional.empty());
+            LoadedCharacterSession withArrow =
+                    success(service.grantTestValue(quiverEquipped, arrow, 5, 64, "content.test.1"));
+            LotId arrowLot =
+                    new LotId(
+                            withArrow.snapshot().inventory().stream()
+                                    .filter(
+                                            projection ->
+                                                    projection.definitionId().equals(arrow.id()))
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .valueId());
+            LoadedCharacterSession arrowStored =
+                    success(
+                            service.transferQuiverAmmo(
+                                    withArrow,
+                                    arrowLot,
+                                    64,
+                                    true,
+                                    96,
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
+            assertEquals(
+                    arrowLot,
+                    QuiverAmmoLots.select(
+                                    arrowStored.snapshot().lotRecords(), quiverId, arrow.id())
+                            .orElseThrow()
+                            .lotId());
+            ItemDefinition bodkin =
+                    new ItemDefinition(
+                            DefinitionId.of("ammo.test.bodkin"),
+                            DefinitionId.of("ammo.test.bodkin"),
+                            ItemClass.STACKABLE_LOT,
+                            OptionalInt.empty(),
+                            false,
+                            Optional.empty(),
+                            Optional.of(new AmmoProfile(AmmoFamily.ARROW)),
+                            Optional.empty());
+            LoadedCharacterSession withBodkin =
+                    success(service.grantTestValue(arrowStored, bodkin, 6, 64, "content.test.1"));
+            LotId bodkinLot =
+                    new LotId(
+                            withBodkin.snapshot().inventory().stream()
+                                    .filter(
+                                            projection ->
+                                                    projection.definitionId().equals(bodkin.id()))
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .valueId());
+            LoadedCharacterSession ammoStored =
+                    success(
+                            service.transferQuiverAmmo(
+                                    withBodkin,
+                                    bodkinLot,
+                                    32,
+                                    true,
+                                    96,
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
+            assertEquals(32, ammoStored.snapshot().inventory().stream()
+                    .filter(projection -> projection.definitionId().equals(bodkin.id()))
+                    .findFirst()
+                    .orElseThrow()
+                    .quantity());
             QuiverPreparation preparation =
                     QuiverPreparation.empty()
                             .toggle(DefinitionId.of("ammo.test.arrow"), 4)
@@ -130,11 +205,23 @@ class CharacterSessionServiceIntegrationTest {
             LoadedCharacterSession prepared =
                     success(
                             service.updateQuiverPreparation(
-                                    quiverEquipped,
-                                    preparation,
+                                    ammoStored, preparation, UUID.randomUUID(), "content.test.1"));
+            assertEquals(preparation, prepared.snapshot().quiverPreparation());
+            assertEquals(
+                    96, QuiverAmmoLots.usedCapacity(prepared.snapshot().lotRecords(), quiverId));
+            LoadedCharacterSession consumed =
+                    success(
+                            service.consumeAmmo(
+                                    prepared,
+                                    DefinitionId.of("ammo.test.bodkin"),
                                     UUID.randomUUID(),
                                     "content.test.1"));
-            assertEquals(preparation, prepared.snapshot().quiverPreparation());
+            assertEquals(
+                    95, QuiverAmmoLots.usedCapacity(consumed.snapshot().lotRecords(), quiverId));
+            assertEquals(
+                    64,
+                    QuiverAmmoLots.quantity(
+                            consumed.snapshot().lotRecords(), quiverId, arrow.id()));
 
             Result<LoadedCharacterSession, CharacterSessionErrorCode> conflict =
                     service.open(playerId);
@@ -144,9 +231,9 @@ class CharacterSessionServiceIntegrationTest {
                     ((Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>) conflict)
                             .error());
 
-            service.close(prepared);
+            service.close(consumed);
             LoadedCharacterSession reconnected = success(service.open(playerId));
-            assertEquals(1, reconnected.snapshot().inventory().size());
+            assertEquals(2, reconnected.snapshot().inventory().size());
             assertEquals(
                     granted.snapshot().inventory().getFirst().valueId(),
                     reconnected.snapshot().inventory().getFirst().valueId());
@@ -157,12 +244,14 @@ class CharacterSessionServiceIntegrationTest {
                     quiverId,
                     reconnected.snapshot().equipment().item(EquipmentSlot.QUIVER).orElseThrow());
             assertEquals(preparation, reconnected.snapshot().quiverPreparation());
+            assertEquals(
+                    95, QuiverAmmoLots.usedCapacity(reconnected.snapshot().lotRecords(), quiverId));
             service.close(reconnected);
         }
         try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
             CharacterSessionService service = new CharacterSessionService(restarted);
             LoadedCharacterSession afterServerRestart = success(service.open(playerId));
-            assertEquals(1, afterServerRestart.snapshot().inventory().size());
+            assertEquals(2, afterServerRestart.snapshot().inventory().size());
             assertTrue(
                     afterServerRestart
                             .snapshot()
@@ -172,6 +261,16 @@ class CharacterSessionServiceIntegrationTest {
             assertEquals(
                     DefinitionId.of("ammo.test.bodkin"),
                     afterServerRestart.snapshot().quiverPreparation().selectedAmmo().orElseThrow());
+            ItemId restartedQuiverId =
+                    afterServerRestart
+                            .snapshot()
+                            .equipment()
+                            .item(EquipmentSlot.QUIVER)
+                            .orElseThrow();
+            assertEquals(
+                    95,
+                    QuiverAmmoLots.usedCapacity(
+                            afterServerRestart.snapshot().lotRecords(), restartedQuiverId));
             service.close(afterServerRestart);
         }
     }

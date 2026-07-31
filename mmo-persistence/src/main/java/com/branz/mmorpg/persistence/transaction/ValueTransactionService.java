@@ -26,6 +26,9 @@ public interface ValueTransactionService {
     Result<TransactionExecution, TransactionErrorCode> moveLot(
             TransactionRequest request, LotLocationMove move);
 
+    Result<TransactionExecution, TransactionErrorCode> transferLotQuantity(
+            TransactionRequest request, LotQuantityTransfer transfer);
+
     Result<TransactionExecution, TransactionErrorCode> consumeLot(
             TransactionRequest request, LotQuantityConsumption consumption);
 

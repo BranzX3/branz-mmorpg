@@ -1,6 +1,8 @@
 package com.branz.mmorpg.bootstrap;
 
 import com.branz.mmorpg.api.identity.DefinitionId;
+import com.branz.mmorpg.api.identity.ItemId;
+import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
@@ -8,6 +10,7 @@ import com.branz.mmorpg.items.definition.QuiverProfile;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -98,6 +101,15 @@ final class CharacterSessionController implements Listener {
             ItemDefinition definition,
             String contentVersion,
             Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        grantTestValue(player, definition, 1, contentVersion, completion);
+    }
+
+    void grantTestValue(
+            Player player,
+            ItemDefinition definition,
+            int lotQuantity,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(definition, "definition");
         Objects.requireNonNull(contentVersion, "contentVersion");
@@ -129,7 +141,7 @@ final class CharacterSessionController implements Listener {
                         () -> {
                             Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
                                     sessions.grantTestValue(
-                                            session, definition, slot, contentVersion);
+                                            session, definition, slot, lotQuantity, contentVersion);
                             plugin.getServer()
                                     .getScheduler()
                                     .runTask(
@@ -184,14 +196,111 @@ final class CharacterSessionController implements Listener {
                         });
     }
 
-    long inventoryLotQuantity(Player player, DefinitionId definitionId) {
+    long quiverAmmoQuantity(Player player, DefinitionId definitionId) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(definitionId, "definitionId");
         LoadedCharacterSession session = active.get(player.getUniqueId());
-        if (session == null) {
-            return 0;
+        ItemId quiverId = session == null ? null : equippedQuiverItemId(session).orElse(null);
+        return quiverId == null
+                ? 0
+                : QuiverAmmoLots.quantity(session.snapshot().lotRecords(), quiverId, definitionId);
+    }
+
+    long quiverUsedCapacity(Player player) {
+        Objects.requireNonNull(player, "player");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        ItemId quiverId = session == null ? null : equippedQuiverItemId(session).orElse(null);
+        return quiverId == null
+                ? 0
+                : QuiverAmmoLots.usedCapacity(session.snapshot().lotRecords(), quiverId);
+    }
+
+    List<LotLocationRecord> equippedQuiverLots(Player player) {
+        Objects.requireNonNull(player, "player");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        ItemId quiverId = session == null ? null : equippedQuiverItemId(session).orElse(null);
+        return quiverId == null
+                ? List.of()
+                : QuiverAmmoLots.all(session.snapshot().lotRecords(), quiverId);
+    }
+
+    void transferQuiverAmmo(
+            Player player,
+            LotId sourceLotId,
+            long quantity,
+            boolean store,
+            UUID operationId,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(sourceLotId, "sourceLotId");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        QuiverProfile profile = equippedQuiverProfile(player).orElse(null);
+        LotLocationRecord source =
+                session == null
+                        ? null
+                        : session.snapshot().lotRecords().stream()
+                                .filter(record -> record.lotId().equals(sourceLotId))
+                                .findFirst()
+                                .orElse(null);
+        boolean compatible =
+                source != null
+                        && profile != null
+                        && itemEngine
+                                .find(source.definitionId())
+                                .flatMap(ItemDefinition::ammoProfile)
+                                .filter(profile::supports)
+                                .isPresent();
+        long expectedQuantity =
+                source == null || profile == null
+                        ? 0
+                        : store
+                                ? Math.min(
+                                        source.quantity(),
+                                        Math.max(
+                                                0, profile.capacity() - quiverUsedCapacity(player)))
+                                : Math.min(source.quantity(), 64);
+        if (session == null
+                || !ready(player)
+                || profile == null
+                || !compatible
+                || quantity != expectedQuantity
+                || quantity < 1) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Quiver transfer preview is stale, incompatible or has no capacity."));
+            return;
         }
-        return InventoryAmmoLots.quantity(session.snapshot().lotRecords(), definitionId);
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
+                                    sessions.transferQuiverAmmo(
+                                            session,
+                                            sourceLotId,
+                                            quantity,
+                                            store,
+                                            profile.capacity(),
+                                            operationId,
+                                            contentVersion);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeSnapshotMutation(
+                                                            session, result, completion));
+                        });
     }
 
     QuiverPreparation quiverPreparation(Player player) {
@@ -247,6 +356,22 @@ final class CharacterSessionController implements Listener {
                     Result.failure(
                             CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
                             "Prepared ammo exceeds the Quiver limit or contains an incompatible category."));
+            return;
+        }
+        boolean unstoredAddition =
+                desired.preparedAmmo().stream()
+                        .filter(
+                                ammo ->
+                                        !session.snapshot()
+                                                .quiverPreparation()
+                                                .preparedAmmo()
+                                                .contains(ammo))
+                        .anyMatch(ammo -> quiverAmmoQuantity(player, ammo) < 1);
+        if (unstoredAddition) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "New prepared ammo must already be stored in the equipped Quiver."));
             return;
         }
         if (!valueMutationInFlight.add(player.getUniqueId())) {
@@ -625,5 +750,9 @@ final class CharacterSessionController implements Listener {
                                         .filter(record -> record.itemId().equals(itemId))
                                         .findFirst())
                 .flatMap(record -> itemEngine.find(record.definitionId()));
+    }
+
+    private static Optional<ItemId> equippedQuiverItemId(LoadedCharacterSession session) {
+        return session.snapshot().equipment().item(EquipmentSlot.QUIVER);
     }
 }

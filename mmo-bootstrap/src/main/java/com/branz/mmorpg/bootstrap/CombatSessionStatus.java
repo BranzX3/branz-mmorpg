@@ -23,6 +23,8 @@ record CombatSessionStatus(
         boolean bowAmmoCommitPending,
         Optional<DefinitionId> selectedAmmo,
         long bowAmmoQuantity,
+        long quiverUsedCapacity,
+        int quiverCapacity,
         int ammoSwitchHandlingTicksRemaining,
         DodgeLoad dodgeLoad,
         Optional<DodgePhase> dodgePhase,
@@ -51,6 +53,8 @@ record CombatSessionStatus(
                 || bowRecoveryTicksRemaining < 0
                 || activeProjectiles < 0
                 || bowAmmoQuantity < 0
+                || quiverUsedCapacity < 0
+                || quiverCapacity < 0
                 || ammoSwitchHandlingTicksRemaining < 0
                 || !Double.isFinite(guardStability)
                 || guardStability < 0

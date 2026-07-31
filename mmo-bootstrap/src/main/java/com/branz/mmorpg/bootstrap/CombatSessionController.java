@@ -383,8 +383,13 @@ final class CombatSessionController implements Listener {
                         session.pendingBowLaunch != null,
                         selectedAmmo,
                         selectedAmmo
-                                .map(ammo -> characters.inventoryLotQuantity(player, ammo))
+                                .map(ammo -> characters.quiverAmmoQuantity(player, ammo))
                                 .orElse(0L),
+                        characters.quiverUsedCapacity(player),
+                        characters
+                                .equippedQuiverProfile(player)
+                                .map(QuiverProfile::capacity)
+                                .orElse(0),
                         (int)
                                 Math.max(
                                         0,
@@ -2029,7 +2034,7 @@ final class CombatSessionController implements Listener {
                         + "% projectile="
                         + pending.projectileId().toString().substring(0, 8)
                         + " ammo="
-                        + characters.inventoryLotQuantity(player, pending.ammoDefinitionId());
+                        + characters.quiverAmmoQuantity(player, pending.ammoDefinitionId());
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
     }
 

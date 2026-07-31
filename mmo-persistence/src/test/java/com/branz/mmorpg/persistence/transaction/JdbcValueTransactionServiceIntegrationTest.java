@@ -488,6 +488,163 @@ class JdbcValueTransactionServiceIntegrationTest {
     }
 
     @Test
+    void quiverTransferSplitsWithLineageEnforcesCapacityAndRollsBackAcrossCrash() {
+        ItemId quiverId = new ItemId(UUID.randomUUID());
+        LotId sourceId = new LotId(UUID.randomUUID());
+        LotId storedId = new LotId(UUID.randomUUID());
+        ValueLocation inventory = ValueLocation.inventory("slot:5");
+        ValueLocation quiver = ValueLocation.quiver(quiverId);
+        grantItem(quiverId, ValueLocation.virtualEquipped("QUIVER"));
+        grantLot(sourceId, inventory, 10);
+        TransactionRequest storeRequest =
+                request(
+                        "quiver:store:" + storedId.value(),
+                        JdbcValueTransactionService.LOT_TRANSFER,
+                        "{\"quantity\":6}",
+                        "{\"lotId\":\"" + storedId.value() + "\"}");
+        LotQuantityTransfer store =
+                new LotQuantityTransfer(
+                        sourceId,
+                        storedId,
+                        1,
+                        10,
+                        Optional.of(CHARACTER),
+                        inventory,
+                        quiver,
+                        6,
+                        quiverId,
+                        1,
+                        Optional.of(CHARACTER),
+                        ValueLocation.virtualEquipped("QUIVER"),
+                        6);
+        JdbcValueTransactionService crashing =
+                new JdbcValueTransactionService(
+                        dataSource,
+                        checkpoint -> {
+                            if (checkpoint
+                                    == JdbcValueTransactionService.Checkpoint.AFTER_MUTATION) {
+                                throw new SimulatedCrash();
+                            }
+                        });
+
+        assertThrows(SimulatedCrash.class, () -> crashing.transferLotQuantity(storeRequest, store));
+        assertEquals(10, success(service.findLot(sourceId)).orElseThrow().quantity());
+        assertEquals(Optional.empty(), success(service.findLot(storedId)));
+        assertEquals(1, success(service.findItem(quiverId)).orElseThrow().version());
+        assertEquals(Optional.empty(), success(journal.find(storeRequest.transactionId())));
+
+        assertFalse(success(service.transferLotQuantity(storeRequest, store)).replayed());
+        assertTrue(
+                success(service.transferLotQuantity(retryRequest(storeRequest), store)).replayed());
+        LotLocationRecord source = success(service.findLot(sourceId)).orElseThrow();
+        LotLocationRecord stored = success(service.findLot(storedId)).orElseThrow();
+        assertEquals(4, source.quantity());
+        assertEquals(2, source.version());
+        assertEquals(6, stored.quantity());
+        assertEquals(quiver, stored.location());
+        assertTrue(stored.lineageJson().contains(sourceId.value().toString()));
+        assertTrue(stored.lineageJson().contains(storeRequest.transactionId().value().toString()));
+        assertEquals(2, success(service.findItem(quiverId)).orElseThrow().version());
+        assertEquals(1, success(audit.findByTransaction(storeRequest.transactionId())).size());
+
+        TransactionRequest overflow =
+                request(
+                        "quiver:overflow:" + sourceId.value(),
+                        JdbcValueTransactionService.LOT_TRANSFER,
+                        "{\"quantity\":1}",
+                        "{}");
+        assertEquals(
+                TransactionErrorCode.VALUE_CAPACITY_EXCEEDED,
+                failure(
+                        service.transferLotQuantity(
+                                overflow,
+                                new LotQuantityTransfer(
+                                        sourceId,
+                                        new LotId(UUID.randomUUID()),
+                                        2,
+                                        4,
+                                        Optional.of(CHARACTER),
+                                        inventory,
+                                        quiver,
+                                        1,
+                                        quiverId,
+                                        2,
+                                        Optional.of(CHARACTER),
+                                        ValueLocation.virtualEquipped("QUIVER"),
+                                        6))));
+        assertEquals(Optional.empty(), success(journal.find(overflow.transactionId())));
+        assertEquals(2, success(service.findItem(quiverId)).orElseThrow().version());
+    }
+
+    @Test
+    void quiverWithdrawalSplitsIntoOneFreeInventorySlot() {
+        ItemId quiverId = new ItemId(UUID.randomUUID());
+        LotId storedId = new LotId(UUID.randomUUID());
+        LotId withdrawnId = new LotId(UUID.randomUUID());
+        ValueLocation quiver = ValueLocation.quiver(quiverId);
+        grantItem(quiverId, ValueLocation.virtualEquipped("QUIVER"));
+        grantLot(storedId, quiver, 96);
+        grantLot(new LotId(UUID.randomUUID()), ValueLocation.inventory("slot:5"), 1);
+
+        TransactionRequest occupied =
+                request(
+                        "quiver:withdraw:occupied",
+                        JdbcValueTransactionService.LOT_TRANSFER,
+                        "{\"quantity\":64}",
+                        "{}");
+        LotQuantityTransfer occupiedTransfer =
+                new LotQuantityTransfer(
+                        storedId,
+                        withdrawnId,
+                        1,
+                        96,
+                        Optional.of(CHARACTER),
+                        quiver,
+                        ValueLocation.inventory("slot:5"),
+                        64,
+                        quiverId,
+                        1,
+                        Optional.of(CHARACTER),
+                        ValueLocation.virtualEquipped("QUIVER"),
+                        96);
+        assertEquals(
+                TransactionErrorCode.VALUE_DESTINATION_OCCUPIED,
+                failure(service.transferLotQuantity(occupied, occupiedTransfer)));
+        assertEquals(1, success(service.findItem(quiverId)).orElseThrow().version());
+
+        TransactionRequest withdraw =
+                request(
+                        "quiver:withdraw:" + withdrawnId.value(),
+                        JdbcValueTransactionService.LOT_TRANSFER,
+                        "{\"quantity\":64}",
+                        "{\"slot\":7}");
+        LotQuantityTransfer transfer =
+                new LotQuantityTransfer(
+                        storedId,
+                        withdrawnId,
+                        1,
+                        96,
+                        Optional.of(CHARACTER),
+                        quiver,
+                        ValueLocation.inventory("slot:7"),
+                        64,
+                        quiverId,
+                        1,
+                        Optional.of(CHARACTER),
+                        ValueLocation.virtualEquipped("QUIVER"),
+                        96);
+        assertFalse(success(service.transferLotQuantity(withdraw, transfer)).replayed());
+
+        LotLocationRecord remaining = success(service.findLot(storedId)).orElseThrow();
+        LotLocationRecord withdrawn = success(service.findLot(withdrawnId)).orElseThrow();
+        assertEquals(32, remaining.quantity());
+        assertEquals(quiver, remaining.location());
+        assertEquals(64, withdrawn.quantity());
+        assertEquals(ValueLocation.inventory("slot:7"), withdrawn.location());
+        assertEquals(2, success(service.findItem(quiverId)).orElseThrow().version());
+    }
+
+    @Test
     void lotConsumptionIsReplaySafeAndTombstonesAnEmptyLot() {
         LotId lotId = new LotId(UUID.randomUUID());
         ValueLocation inventory = ValueLocation.inventory("slot:5");

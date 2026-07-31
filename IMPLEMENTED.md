@@ -1281,3 +1281,61 @@ Non-goals:
 Schema/config impact: the item schema adds `ammo_profile` and `quiver_profile`; the example snapshot
 adds `equipment.training_quiver` and `ammo.training_bodkin_arrow`. Migration impact: no SQL migration;
 the existing JSONB item payload and value journal are reused, documented by ADR 0008.
+
+## Milestone 5 — authoritative Quiver capacity and lot-transfer slice
+
+Implemented:
+
+- `QUIVER` is an authoritative lot location keyed by the unique Quiver item UUID; inventory ammo no
+  longer satisfies Bow release;
+- `lot.transfer` moves a complete lot without changing its UUID or splits an exact child quantity
+  while preserving nested parent lineage and a split transaction identity;
+- every transfer locks the source lot and equipped Quiver item through version/owner/location CAS;
+  the item lock serializes different lots against the same capacity and against preparation edits;
+- PostgreSQL sums positive stored lots under the lock and enforces the authored 96-unit training
+  capacity; failed capacity checks roll back the container version and journal preparation;
+- withdrawal uses the same transaction in reverse, verifies a free authoritative inventory slot and
+  emits at most one vanilla stack (64 units) per confirmation;
+- Scene shows inventory and stored lots separately, stores on left click, prepares stored categories
+  on left click, withdraws stored lots on right click and retains one transfer only as preview state
+  until explicit Confirm;
+- swapping Quivers switches to the selected item UUID's stored lots and preparation; reconnect and
+  restart rebuild both directly from PostgreSQL;
+- Bow consumption and `/mmo health` quantity now use only the selected category inside the equipped
+  Quiver, and health output exposes exact `quiver=used/capacity`;
+- the local dev grant UI supports Shift-click for a 64-unit lot, making capacity/split behavior
+  practical to test in Paper.
+
+Tests:
+
+- PostgreSQL integration covers crash after mutation, rollback of source/child/container/journal,
+  exactly-once replay, split lineage, capacity overflow and occupied withdrawal destination;
+- full and partial transfers cover UUID retention, child creation, source remainder, container
+  version advance and reverse withdrawal;
+- character integration fills 64+32 units from two authored ammo lots, consumes only stored selected
+  ammo and proves the 95-unit result survives reconnect and database restart;
+- pure Quiver-lot selection proves deterministic lot UUID ordering, exact definition quantity and
+  isolation between two Quiver item UUIDs;
+- Scene tests prove transfer intent is uncommitted preview state and disappears only when the
+  committer returns refreshed database truth.
+
+Failure/recovery behavior:
+
+- incompatible definitions, stale preview quantities, changed source/container rows, full capacity,
+  occupied inventory and concurrent value mutations reject without changing local selection;
+- mutation, child lineage, audit and journal commit are atomic; a crash/retry cannot duplicate or
+  lose quantity;
+- Back/Exit/interrupt discards transfer preview without touching lots, while a successful commit
+  reloads the snapshot before rebuilding projections;
+- a depleted prepared category can remain selected at quantity zero but cannot fire; it stays
+  removable from Scene even though no inventory projection exists.
+
+Non-goals:
+
+- merging lots with distinct lineage or selecting arbitrary transfer quantities in production UI;
+- Quiver ownership propagation during trade/storage, which is not yet an available item flow;
+- encounter-end deterministic ammo recovery, Pending Rewards overflow and Crossbow load binding.
+
+Schema/config impact: no content-schema change; `QUIVER` is an additive persisted location type.
+Migration impact: no SQL migration because locations are text, documented by ADR 0009. Older runtime
+versions must not read databases after `QUIVER` rows exist.

@@ -21,7 +21,7 @@ public final class JdbcReconciliationScanner implements ReconciliationScanner {
     private static final String KNOWN_LOCATIONS =
             """
             'CHARACTER_INVENTORY', 'NATIVE_EQUIPPED', 'VIRTUAL_EQUIPPED',
-            'PENDING_REWARDS', 'OVERFLOW_CLAIM', 'QUARANTINE', 'DESTROYED'
+            'QUIVER', 'PENDING_REWARDS', 'OVERFLOW_CLAIM', 'QUARANTINE', 'DESTROYED'
             """;
 
     private final DataSource dataSource;

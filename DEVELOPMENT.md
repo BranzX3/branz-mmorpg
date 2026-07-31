@@ -172,13 +172,15 @@ with an operator/test account:
     applied deterministic damage. The exact lethal hit must kill the Bukkit target and clear its
     isolated HP/posture state.
 49. Open `/mmo dev` -> `Persisted Test Item`, grant `weapon.training_bow` and
-    `ammo.training_arrow`, then equip the Bow in Chronicle -> Character & Equipment using the
-    normal explicit commit. Verify hotbar slot 1 projects a signed Bow fallback, the arrow lot is
-    visible and the weapon reaches `BOW READY` after draw transition.
+    `equipment.training_quiver`, then Shift-click `ammo.training_arrow` to grant one 64-unit lot.
+    In Chronicle -> Character & Equipment, equip and confirm the Bow, reopen, then equip and confirm
+    the Quiver as a separate transaction. Preview `[Inventory -> Quiver]` on the Arrow and confirm;
+    then left-click the stored lot to prepare it and confirm again. Verify `/mmo health` reports
+    `ammo.training_arrow=64` and `quiver=64/96` before drawing.
 50. Right-click air once to begin the local training draw, then right-click again before five
     server ticks and verify `BOW TOO_EARLY` with no projectile. Repeat after at least five ticks and
-    verify `/mmo health` reports Bow recovery, one active projectile and `ammo=0` after the
-    journaled release. Grant a fresh training-arrow lot before each later shot in this section.
+    verify `/mmo health` reports Bow recovery, one active projectile, selected ammo `=63` and
+    `quiver=63/96` only after the journaled release.
 51. Release at tick five and then at/after tick twenty against the same target. Verify the full shot
     travels faster, applies greater posture/penetration contribution, uses exact crosshair aim and
     reports `PROJECTILE HIT damage=... health=... posture=...` without a vanilla arrow hit.
@@ -190,41 +192,49 @@ with an operator/test account:
 54. Swap weapon, dodge, take hard CC, teleport, die or disconnect while drawing. Verify draw/recovery
     cancels and owned projectiles are removed on session/world teardown. `/mmo health` must show
     `bow=IDLE` and `projectiles=0` after cleanup.
-55. With no `ammo.training_arrow` lot, complete a valid draw/release and verify `BOW NO AMMO`, no
-    projectile and no recovery. `/mmo health` must continue to show `ammo=0`.
-56. Grant one training arrow, release once and observe the short `ammo=1(COMMITTING)` state if the
-    local database completion crosses a server tick. Verify the projectile appears only after the
-    commit, the inventory projection removes the exhausted stack and `ammo=0` remains after
-    reconnect/restart.
+55. In Chronicle, right-click the stored Arrow lot to preview withdrawal and confirm it. With the
+    prepared category now empty, complete a valid draw/release and verify `BOW NO AMMO`, no
+    projectile and no recovery. Inventory ammo must not satisfy the shot and `/mmo health` must show
+    the prepared ID at `=0` with `quiver=0/96`.
+56. Grant one normal-click training Arrow, store and confirm it, then release once. Observe the
+    short `ammo=1(COMMITTING)` state if the local database completion crosses a server tick. Verify
+    the projectile appears only after commit, the Quiver lot becomes a destroyed tombstone and
+    `ammo=0`, `quiver=0/96` remain after reconnect/restart.
 57. During `AMMO COMMITTING`, spam RMB and invoke another persisted dev grant. Verify the action/value
     locks prevent a second projectile and a second value transaction. One arrow produces at most
     one projectile and exactly one `lot.consume` audit/journal commit.
 58. Stop the server immediately around a release and restart. Verify the authoritative outcome is
     either an unconsumed arrow with no committed journal or one consumed arrow with one committed
     journal; retry/reconnect must never subtract the same lot version twice.
-59. Open `/mmo dev` -> `Persisted Test Item` and grant `equipment.training_quiver`,
-    `ammo.training_arrow` and `ammo.training_bodkin_arrow`. In Chronicle -> Character & Equipment,
-    preview the training Quiver and Bow, then confirm the equipment transaction. Reopen the page and
-    verify both committed virtual equipment entries remain selected.
-60. Click each available Arrow lot to prepare both categories. Verify the preview marks the first
-    category selected, then click `Confirm Scene transaction`. Reopen Chronicle and verify the
-    prepared order and selection survived the close/reopen boundary.
-61. With the Bow READY, stand still, hold sneak and scroll one hotbar step. Verify the proposed
+59. Shift-click both `ammo.training_arrow` and `ammo.training_bodkin_arrow` to grant two 64-unit
+    lots. Store and confirm the Arrow first; verify `quiver=64/96`. Preview storing the Bodkin and
+    verify the exact transfer is `x32`; confirm and verify `quiver=96/96` while the other 32 Bodkin
+    units remain in inventory. Attempting another store must report that the Quiver is full and must
+    not create a transaction preview.
+60. Right-click the stored 64-unit Arrow lot and verify a `WITHDRAW x64` preview appears. Press Back
+    and reopen to prove load remains `96/96`. Repeat and Confirm; verify the lot returns to one free
+    inventory slot and load becomes `32/96`. Store that Arrow lot again and verify load returns to
+    exactly `96/96` without changing its UUID.
+61. Left-click stored Bodkin to add it to the existing prepared Arrow list, then confirm the
+    preparation transaction. Reopen Chronicle and verify both categories, their stored quantities
+    and the selected category survived close/reopen.
+62. With the Bow READY, stand still, hold sneak and scroll one hotbar step. Verify the proposed
     hotbar slot does not change, the action bar names the newly selected category and `/mmo health`
     reports that exact ammo ID and quantity. Scroll both directions across the list boundary and
     verify selection wraps deterministically.
-62. Enter `ENGAGED`, commit an ammo switch and immediately attempt to draw. Verify the draw is
+63. Enter `ENGAGED`, commit an ammo switch and immediately attempt to draw. Verify the draw is
     rejected for the authored six handling ticks, then succeeds on the next tick. Repeat while in
     `EXPLORATION` and verify no post-commit handling delay is added.
-63. Begin a Bow draw and attempt stationary sneak+scroll. Verify the slot remains owned by ammo
+64. Begin a Bow draw and attempt stationary sneak+scroll. Verify the slot remains owned by ammo
     input but the switch reports `AMMO SWITCH ACTION LOCKED`; the in-progress draw keeps its original
     selected category. Moving while sneak+scrolling must not claim ammo-cycle input.
-64. Fire once with each prepared category. Verify only the selected PostgreSQL lot decrements, the
+65. Fire once with each prepared category. Verify only the selected `QUIVER:<item-uuid>` lot
+    decrements, the
     projectile is created after the commit and `/mmo health` follows the selected category's exact
-    remaining quantity. Depleting one category must not consume the other.
-65. Disconnect/reconnect and restart Paper after selecting the Bodkin Arrow. Verify Chronicle and
+    remaining quantity/load. Inventory remainder and the other prepared category must not decrement.
+66. Disconnect/reconnect and restart Paper after selecting the Bodkin Arrow. Verify Chronicle and
     `/mmo health` restore that selection from the equipped Quiver item payload. Swap away and back to
-    the same Quiver and verify its item-owned preparation returns.
+    the same Quiver and verify both its item-owned preparation and stored lot load return.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
@@ -235,11 +245,11 @@ authority. Combat HP remains transient across logout/restart. Death-pouch wallet
 sanctuary routing and crash-resumable encounter HP remain later transactional boundaries. The
 client swing never declares a hit. The Basic Bow uses the same damage/HP/posture authorities and a
 server-simulated projectile; because test projections deliberately block native item use, this
-local Paper adapter uses first-RMB draw and second-RMB release. The authored ammo category now
-commits one PostgreSQL-backed inventory-lot unit before projectile creation. Prepared Quiver state
-is item-owned, journaled and selected with stationary sneak+scroll; Bow release consumes the selected
-compatible category. Moving/splitting lots into authored Quiver capacity and encounter recovery
-remain later Milestone 5 slices.
+local Paper adapter uses first-RMB draw and second-RMB release. Confirmed Scene transactions move or
+split compatible lots from inventory into the equipped Quiver UUID under the authored capacity.
+Prepared state is item-owned and selected with stationary sneak+scroll; Bow release commits one unit
+from only the selected stored category before projectile creation. Encounter recovery, lot merging
+and Crossbow binding remain later Milestone 5 slices.
 
 Live engagement check:
 

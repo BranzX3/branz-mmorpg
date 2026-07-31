@@ -17,6 +17,7 @@ PLAYER_INVENTORY
 HOTBAR
 NATIVE_EQUIPPED
 VIRTUAL_EQUIPPED
+QUIVER
 CITY_STORAGE
 BANK
 MARKET_WAREHOUSE
@@ -46,9 +47,9 @@ Weight produces Light, Medium, Heavy and Overloaded tiers. Load modifies dodge, 
 
 ## Quiver and ammunition
 
-Quiver is virtual gameplay equipment and has capacity, supported ammo families, handling and swap speed. It is not a damage stat stick. Arrows and bolts are distinct ammo families that share material/effect definitions.
+Quiver is virtual gameplay equipment and has capacity, supported ammo families, handling and swap speed. It is not a damage stat stick. Arrows and bolts are distinct ammo families that share material/effect definitions. Ammo occupies the authoritative `QUIVER` location keyed by the owning Quiver item UUID; inventory ammo is not available to ranged release until a confirmed transaction moves it into the equipped Quiver. A partial move creates a child lot with immutable parent lineage, while a full move retains its lot UUID.
 
-Players prepare up to four ammo types. Neutral Shift+Q cycles prepared ammo while a ranged weapon is READY. Switching during bow draw or crossbow load queues the new type for the next shot; already loaded crossbow ammo remains locked.
+Players prepare up to four stored ammo types. Holding sneak while stationary and scrolling cycles prepared ammo while a ranged weapon is READY and the action is IDLE. Switching during active bow draw is rejected. Crossbow ammo remains locked after its load commit point.
 
 Basic ammunition has partial post-encounter recovery based on definition. Rare/special ammunition is recovered only through declared retrieval or remains consumed.
 

@@ -34,6 +34,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
     public static final String ITEM_BATCH_MOVE = "item.move.batch";
     public static final String ITEM_PAYLOAD_UPDATE = "item.payload.update";
     public static final String LOT_MOVE = "lot.move";
+    public static final String LOT_TRANSFER = "lot.transfer";
     public static final String LOT_CONSUME = "lot.consume";
 
     private static final String ITEM_COLUMNS =
@@ -155,6 +156,18 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
                 AuditSubjectType.LOT,
                 move.lotId().value(),
                 connection -> updateLotLocation(connection, request.transactionId(), move));
+    }
+
+    @Override
+    public Result<TransactionExecution, TransactionErrorCode> transferLotQuantity(
+            TransactionRequest request, LotQuantityTransfer transfer) {
+        Objects.requireNonNull(transfer, "transfer");
+        return execute(
+                request,
+                LOT_TRANSFER,
+                AuditSubjectType.TRANSACTION,
+                request.transactionId().value(),
+                connection -> transferLotQuantity(connection, request, transfer));
     }
 
     @Override
@@ -519,6 +532,285 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
                 return Result.success(MutationApplied.INSTANCE);
             }
             return classifyLotCasFailure(connection, move);
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    private static Result<MutationApplied, TransactionErrorCode> transferLotQuantity(
+            Connection connection, TransactionRequest request, LotQuantityTransfer transfer) {
+        Result<MutationApplied, TransactionErrorCode> containerLock =
+                lockQuiverContainer(connection, request.transactionId(), transfer);
+        if (!containerLock.isSuccess()) {
+            return containerLock;
+        }
+        Optional<LotLocationRecord> found;
+        try {
+            found = findLot(connection, transfer.sourceLotId());
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+        if (found.isEmpty()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_NOT_FOUND, "Source lot does not exist.");
+        }
+        LotLocationRecord source = found.orElseThrow();
+        if (source.version() != transfer.expectedSourceVersion()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_STALE_VERSION,
+                    "Source lot version changed; reload before retry.");
+        }
+        if (source.quantity() != transfer.expectedSourceQuantity()
+                || !source.ownerCharacterId().equals(transfer.expectedOwnerCharacterId())
+                || !source.location().equals(transfer.expectedSourceLocation())) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                    "Source lot quantity, owner or location changed.");
+        }
+        if (transfer.storesInQuiver()) {
+            Result<Long, TransactionErrorCode> used = quiverQuantity(connection, transfer);
+            if (used instanceof Result.Failure<Long, TransactionErrorCode> failure) {
+                return Result.failure(failure.error(), failure.detail());
+            }
+            long current = ((Result.Success<Long, TransactionErrorCode>) used).value();
+            if (current > transfer.quiverCapacity()
+                    || transfer.quantity() > transfer.quiverCapacity() - current) {
+                return Result.failure(
+                        TransactionErrorCode.VALUE_CAPACITY_EXCEEDED,
+                        "Quiver capacity would be exceeded.");
+            }
+        } else {
+            Result<MutationApplied, TransactionErrorCode> available =
+                    requireInventoryDestinationAvailable(connection, transfer);
+            if (!available.isSuccess()) {
+                return available;
+            }
+        }
+        if (transfer.fullLot()) {
+            return moveFullLot(connection, request.transactionId(), transfer);
+        }
+        Result<MutationApplied, TransactionErrorCode> reduced =
+                reduceSourceLot(connection, request.transactionId(), transfer);
+        if (!reduced.isSuccess()) {
+            return reduced;
+        }
+        return insertSplitLot(connection, request, transfer, source);
+    }
+
+    private static Result<MutationApplied, TransactionErrorCode> lockQuiverContainer(
+            Connection connection, TransactionId transactionId, LotQuantityTransfer transfer) {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        """
+                        UPDATE item_instance
+                        SET version = version + 1,
+                            last_transaction_id = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE item_uuid = ?
+                          AND version = ?
+                          AND owner_character_id IS NOT DISTINCT FROM ?
+                          AND location_type = ?
+                          AND location_ref IS NOT DISTINCT FROM ?
+                        """)) {
+            statement.setObject(1, transactionId.value());
+            statement.setObject(2, transfer.quiverItemId().value());
+            statement.setLong(3, transfer.expectedQuiverVersion());
+            setNullableCharacter(statement, 4, transfer.expectedQuiverOwnerCharacterId());
+            bindLocation(statement, 5, transfer.expectedQuiverLocation());
+            if (statement.executeUpdate() == 1) {
+                return Result.success(MutationApplied.INSTANCE);
+            }
+            Optional<ItemLocationRecord> current = findItem(connection, transfer.quiverItemId());
+            if (current.isEmpty()) {
+                return Result.failure(
+                        TransactionErrorCode.VALUE_NOT_FOUND,
+                        "Quiver capacity container does not exist.");
+            }
+            if (current.orElseThrow().version() != transfer.expectedQuiverVersion()) {
+                return Result.failure(
+                        TransactionErrorCode.VALUE_STALE_VERSION,
+                        "Quiver version changed; reload before retry.");
+            }
+            return Result.failure(
+                    TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                    "Quiver owner or equipped location changed.");
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    private static Result<Long, TransactionErrorCode> quiverQuantity(
+            Connection connection, LotQuantityTransfer transfer) {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        """
+                        SELECT COALESCE(SUM(quantity), 0)
+                        FROM commodity_lot
+                        WHERE owner_character_id IS NOT DISTINCT FROM ?
+                          AND location_type = ?
+                          AND location_ref IS NOT DISTINCT FROM ?
+                          AND quantity > 0
+                        """)) {
+            setNullableCharacter(statement, 1, transfer.expectedOwnerCharacterId());
+            bindLocation(statement, 2, ValueLocation.quiver(transfer.quiverItemId()));
+            try (ResultSet row = statement.executeQuery()) {
+                row.next();
+                return Result.success(row.getLong(1));
+            }
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    private static Result<MutationApplied, TransactionErrorCode>
+            requireInventoryDestinationAvailable(
+                    Connection connection, LotQuantityTransfer transfer) {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        """
+                        SELECT 1
+                        FROM item_instance
+                        WHERE owner_character_id IS NOT DISTINCT FROM ?
+                          AND location_type = ?
+                          AND location_ref IS NOT DISTINCT FROM ?
+                        UNION ALL
+                        SELECT 1
+                        FROM commodity_lot
+                        WHERE owner_character_id IS NOT DISTINCT FROM ?
+                          AND location_type = ?
+                          AND location_ref IS NOT DISTINCT FROM ?
+                          AND quantity > 0
+                        LIMIT 1
+                        """)) {
+            setNullableCharacter(statement, 1, transfer.expectedOwnerCharacterId());
+            bindLocation(statement, 2, transfer.destinationLocation());
+            setNullableCharacter(statement, 4, transfer.expectedOwnerCharacterId());
+            bindLocation(statement, 5, transfer.destinationLocation());
+            try (ResultSet row = statement.executeQuery()) {
+                if (row.next()) {
+                    return Result.failure(
+                            TransactionErrorCode.VALUE_DESTINATION_OCCUPIED,
+                            "Inventory destination is occupied.");
+                }
+                return Result.success(MutationApplied.INSTANCE);
+            }
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    private static Result<MutationApplied, TransactionErrorCode> moveFullLot(
+            Connection connection, TransactionId transactionId, LotQuantityTransfer transfer) {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        """
+                        UPDATE commodity_lot
+                        SET location_type = ?,
+                            location_ref = ?,
+                            version = version + 1,
+                            last_transaction_id = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE lot_uuid = ?
+                          AND version = ?
+                          AND quantity = ?
+                          AND owner_character_id IS NOT DISTINCT FROM ?
+                          AND location_type = ?
+                          AND location_ref IS NOT DISTINCT FROM ?
+                        """)) {
+            bindLocation(statement, 1, transfer.destinationLocation());
+            statement.setObject(3, transactionId.value());
+            statement.setObject(4, transfer.sourceLotId().value());
+            statement.setLong(5, transfer.expectedSourceVersion());
+            statement.setLong(6, transfer.expectedSourceQuantity());
+            setNullableCharacter(statement, 7, transfer.expectedOwnerCharacterId());
+            bindLocation(statement, 8, transfer.expectedSourceLocation());
+            if (statement.executeUpdate() == 1) {
+                return Result.success(MutationApplied.INSTANCE);
+            }
+            return Result.failure(
+                    TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                    "Source lot changed during transfer.");
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    private static Result<MutationApplied, TransactionErrorCode> reduceSourceLot(
+            Connection connection, TransactionId transactionId, LotQuantityTransfer transfer) {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        """
+                        UPDATE commodity_lot
+                        SET quantity = quantity - ?,
+                            version = version + 1,
+                            last_transaction_id = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE lot_uuid = ?
+                          AND version = ?
+                          AND quantity = ?
+                          AND owner_character_id IS NOT DISTINCT FROM ?
+                          AND location_type = ?
+                          AND location_ref IS NOT DISTINCT FROM ?
+                        """)) {
+            statement.setLong(1, transfer.quantity());
+            statement.setObject(2, transactionId.value());
+            statement.setObject(3, transfer.sourceLotId().value());
+            statement.setLong(4, transfer.expectedSourceVersion());
+            statement.setLong(5, transfer.expectedSourceQuantity());
+            setNullableCharacter(statement, 6, transfer.expectedOwnerCharacterId());
+            bindLocation(statement, 7, transfer.expectedSourceLocation());
+            if (statement.executeUpdate() == 1) {
+                return Result.success(MutationApplied.INSTANCE);
+            }
+            return Result.failure(
+                    TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                    "Source lot changed during split.");
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    private static Result<MutationApplied, TransactionErrorCode> insertSplitLot(
+            Connection connection,
+            TransactionRequest request,
+            LotQuantityTransfer transfer,
+            LotLocationRecord source) {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        """
+                        INSERT INTO commodity_lot(
+                            lot_uuid, definition_id, variant, quantity, owner_character_id,
+                            location_type, location_ref, lineage, content_version,
+                            version, last_transaction_id, created_at, updated_at
+                        )
+                        VALUES (
+                            ?, ?, ?, ?, ?, ?, ?,
+                            jsonb_build_object(
+                                'parentLotUuid', ?,
+                                'splitTransactionId', ?,
+                                'parentLineage', CAST(? AS JSONB)
+                            ),
+                            ?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                        )
+                        ON CONFLICT (lot_uuid) DO NOTHING
+                        """)) {
+            statement.setObject(1, transfer.destinationLotId().value());
+            statement.setString(2, source.definitionId().value());
+            statement.setString(3, source.variant());
+            statement.setLong(4, transfer.quantity());
+            setNullableCharacter(statement, 5, transfer.expectedOwnerCharacterId());
+            bindLocation(statement, 6, transfer.destinationLocation());
+            statement.setString(8, transfer.sourceLotId().value().toString());
+            statement.setString(9, request.transactionId().value().toString());
+            statement.setString(10, source.lineageJson());
+            statement.setString(11, source.contentVersion());
+            statement.setObject(12, request.transactionId().value());
+            if (statement.executeUpdate() == 1) {
+                return Result.success(MutationApplied.INSTANCE);
+            }
+            return Result.failure(
+                    TransactionErrorCode.VALUE_ALREADY_EXISTS,
+                    "Split child lot UUID already exists.");
         } catch (SQLException exception) {
             return JdbcTransactionJournalRepository.failure(exception);
         }

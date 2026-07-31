@@ -1,6 +1,7 @@
 package com.branz.mmorpg.bootstrap;
 
 import com.branz.mmorpg.api.identity.ItemId;
+import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
@@ -9,6 +10,10 @@ import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.projection.ExpectedProjection;
 import com.branz.mmorpg.items.projection.ProjectionValueType;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
+import com.branz.mmorpg.persistence.transaction.ValueLocationType;
+import com.branz.mmorpg.scenes.QuiverAmmoTransferPreview;
+import com.branz.mmorpg.scenes.QuiverTransferDirection;
 import com.branz.mmorpg.scenes.SceneCloseReason;
 import com.branz.mmorpg.scenes.SceneErrorCode;
 import com.branz.mmorpg.scenes.SceneMode;
@@ -179,6 +184,22 @@ final class SceneHubController implements Listener {
             previewPreparedAmmo(player, holder, action.substring("prepare-ammo:".length()));
             return;
         }
+        if (action.startsWith("store-quiver:")) {
+            previewQuiverStore(player, holder, action.substring("store-quiver:".length()));
+            return;
+        }
+        if (action.startsWith("quiver-lot:")) {
+            String[] parts = action.substring("quiver-lot:".length()).split(":", 2);
+            if (parts.length != 2) {
+                return;
+            }
+            if (event.isRightClick()) {
+                previewQuiverWithdrawal(player, holder, parts[0]);
+            } else {
+                previewPreparedAmmo(player, holder, parts[1]);
+            }
+            return;
+        }
         if ("confirm-equipment".equals(action)) {
             confirmEquipment(player, holder);
             return;
@@ -330,24 +351,52 @@ final class SceneHubController implements Listener {
             return;
         }
         int buttonSlot = 10;
-        Set<com.branz.mmorpg.api.identity.DefinitionId> shownAmmo = new HashSet<>();
+        Set<com.branz.mmorpg.api.identity.DefinitionId> storedDefinitions = new HashSet<>();
+        for (LotLocationRecord lot : characterSessions.equippedQuiverLots(player)) {
+            if (!storedDefinitions.add(lot.definitionId())) {
+                continue;
+            }
+            if (buttonSlot > 34) {
+                break;
+            }
+            boolean prepared =
+                    sceneSession
+                            .previewState()
+                            .quiverPreparation()
+                            .preparedAmmo()
+                            .contains(lot.definitionId());
+            inventory.setItem(
+                    buttonSlot++,
+                    button(
+                            Material.SPECTRAL_ARROW,
+                            (prepared ? "[Quiver Prepared] " : "[Quiver Stored] ")
+                                    + lot.definitionId().value()
+                                    + " x"
+                                    + characterSessions.quiverAmmoQuantity(
+                                            player, lot.definitionId())
+                                    + " | L prepare / R withdraw",
+                            "quiver-lot:"
+                                    + lot.lotId().value()
+                                    + ":"
+                                    + lot.definitionId().value()));
+        }
         for (com.branz.mmorpg.api.identity.DefinitionId preparedId :
                 sceneSession.previewState().quiverPreparation().preparedAmmo()) {
             ItemDefinition definition = itemEngine.find(preparedId).orElse(null);
-            if (definition == null || definition.ammoProfile().isEmpty() || buttonSlot > 34) {
+            if (definition == null
+                    || definition.ammoProfile().isEmpty()
+                    || storedDefinitions.contains(preparedId)
+                    || buttonSlot > 34) {
                 continue;
             }
-            shownAmmo.add(preparedId);
             inventory.setItem(
                     buttonSlot++,
                     button(
                             Material.ARROW,
-                            "[Prepared] "
-                                    + preparedId.value()
-                                    + " x"
-                                    + characterSessions.inventoryLotQuantity(player, preparedId),
+                            "[Prepared empty] " + preparedId.value() + " | click to remove",
                             "prepare-ammo:" + preparedId.value()));
         }
+        Set<com.branz.mmorpg.api.identity.DefinitionId> inventoryDefinitions = new HashSet<>();
         for (ExpectedProjection projection : character.snapshot().inventory()) {
             if (buttonSlot > 34) {
                 continue;
@@ -357,24 +406,19 @@ final class SceneHubController implements Listener {
                 continue;
             }
             if (projection.valueType() == ProjectionValueType.STACKABLE_LOT
-                    && definition.ammoProfile().isPresent()
-                    && shownAmmo.add(definition.id())) {
-                boolean prepared =
-                        sceneSession
-                                .previewState()
-                                .quiverPreparation()
-                                .preparedAmmo()
-                                .contains(definition.id());
+                    && definition.ammoProfile().isPresent()) {
+                if (!inventoryDefinitions.add(definition.id())) {
+                    continue;
+                }
                 inventory.setItem(
                         buttonSlot++,
                         button(
                                 Material.ARROW,
-                                (prepared ? "[Prepared] " : "[Available] ")
+                                "[Inventory -> Quiver] "
                                         + definition.id().value()
                                         + " x"
-                                        + characterSessions.inventoryLotQuantity(
-                                                player, definition.id()),
-                                "prepare-ammo:" + definition.id().value()));
+                                        + projection.quantity(),
+                                "store-quiver:" + projection.valueId()));
                 continue;
             }
             if (projection.valueType() != ProjectionValueType.UNIQUE_ITEM) {
@@ -443,7 +487,14 @@ final class SceneHubController implements Listener {
                 39,
                 button(
                         Material.ARROW,
-                        "Prepared: "
+                        "Quiver load "
+                                + characterSessions.quiverUsedCapacity(player)
+                                + "/"
+                                + characterSessions
+                                        .equippedQuiverProfile(player)
+                                        .map(profile -> Integer.toString(profile.capacity()))
+                                        .orElse("0")
+                                + " | Prepared: "
                                 + sceneSession.previewState().quiverPreparation().preparedAmmo()
                                 + " selected="
                                 + sceneSession
@@ -454,12 +505,31 @@ final class SceneHubController implements Listener {
                                         .orElse("none"),
                         "noop"));
         inventory.setItem(
+                41,
+                button(
+                        Material.HOPPER,
+                        sceneSession
+                                .previewState()
+                                .quiverTransfer()
+                                .map(
+                                        transfer ->
+                                                "Pending "
+                                                        + transfer.direction().name()
+                                                        + " x"
+                                                        + transfer.quantity()
+                                                        + " lot="
+                                                        + transfer.sourceLotId()
+                                                                .toString()
+                                                                .substring(0, 8))
+                                .orElse("No Quiver lot transfer preview"),
+                        "noop"));
+        inventory.setItem(
                 40,
                 button(
                         Material.LIME_DYE,
                         sceneSession.hasUncommittedPreview()
                                 ? "Confirm Scene transaction"
-                                : "No equipment change",
+                                : "No Scene change",
                         "confirm-equipment"));
     }
 
@@ -516,6 +586,12 @@ final class SceneHubController implements Listener {
                         "Ammo is incompatible with the equipped Quiver.");
             }
             SceneSession current = sessions.find(player.getUniqueId()).orElseThrow();
+            boolean alreadyPrepared =
+                    current.previewState().quiverPreparation().preparedAmmo().contains(ammoId);
+            if (!alreadyPrepared && characterSessions.quiverAmmoQuantity(player, ammoId) < 1) {
+                throw new IllegalArgumentException(
+                        "Store this ammo in the equipped Quiver before preparing it.");
+            }
             QuiverPreparation desired =
                     current.previewState()
                             .quiverPreparation()
@@ -531,6 +607,90 @@ final class SceneHubController implements Listener {
         } catch (IllegalArgumentException | IllegalStateException exception) {
             player.sendActionBar(Component.text(exception.getMessage(), NamedTextColor.RED));
         }
+    }
+
+    private void previewQuiverStore(
+            Player player, SceneInventoryHolder holder, String sourceLotUuid) {
+        try {
+            LotId lotId = new LotId(UUID.fromString(sourceLotUuid));
+            LoadedCharacterSession character = characterSessions.active(player).orElseThrow();
+            LotLocationRecord source =
+                    character.snapshot().lotRecords().stream()
+                            .filter(record -> record.lotId().equals(lotId))
+                            .findFirst()
+                            .orElseThrow();
+            com.branz.mmorpg.items.definition.QuiverProfile profile =
+                    characterSessions
+                            .equippedQuiverProfile(player)
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalArgumentException(
+                                                    "Equip and confirm a Quiver first."));
+            boolean compatible =
+                    source.location().type() == ValueLocationType.CHARACTER_INVENTORY
+                            && itemEngine
+                                    .find(source.definitionId())
+                                    .flatMap(ItemDefinition::ammoProfile)
+                                    .filter(profile::supports)
+                                    .isPresent();
+            long available = profile.capacity() - characterSessions.quiverUsedCapacity(player);
+            long quantity = Math.min(source.quantity(), Math.max(0, available));
+            if (!compatible || quantity < 1) {
+                throw new IllegalArgumentException(
+                        compatible
+                                ? "The equipped Quiver is full."
+                                : "This lot is not compatible inventory ammo.");
+            }
+            previewQuiverTransfer(
+                    player,
+                    holder,
+                    new QuiverAmmoTransferPreview(
+                            lotId.value(), quantity, QuiverTransferDirection.STORE));
+        } catch (IllegalArgumentException | java.util.NoSuchElementException exception) {
+            player.sendActionBar(
+                    Component.text(
+                            exception.getMessage() == null || exception.getMessage().isBlank()
+                                    ? "Quiver store preview is stale or invalid."
+                                    : exception.getMessage(),
+                            NamedTextColor.RED));
+        }
+    }
+
+    private void previewQuiverWithdrawal(
+            Player player, SceneInventoryHolder holder, String sourceLotUuid) {
+        try {
+            LotId lotId = new LotId(UUID.fromString(sourceLotUuid));
+            LotLocationRecord source =
+                    characterSessions.equippedQuiverLots(player).stream()
+                            .filter(record -> record.lotId().equals(lotId))
+                            .findFirst()
+                            .orElseThrow();
+            previewQuiverTransfer(
+                    player,
+                    holder,
+                    new QuiverAmmoTransferPreview(
+                            lotId.value(),
+                            Math.min(source.quantity(), 64),
+                            QuiverTransferDirection.WITHDRAW));
+        } catch (IllegalArgumentException | java.util.NoSuchElementException exception) {
+            player.sendActionBar(
+                    Component.text(
+                            exception.getMessage() == null || exception.getMessage().isBlank()
+                                    ? "Quiver withdrawal preview is stale or invalid."
+                                    : exception.getMessage(),
+                            NamedTextColor.RED));
+        }
+    }
+
+    private void previewQuiverTransfer(
+            Player player, SceneInventoryHolder holder, QuiverAmmoTransferPreview transfer) {
+        Result<SceneSession, SceneErrorCode> result =
+                sessions.previewQuiverTransfer(player.getUniqueId(), holder.sessionId(), transfer);
+        result.map(
+                session -> {
+                    navigate(player, session);
+                    return session;
+                });
     }
 
     private void confirmEquipment(Player player, SceneInventoryHolder holder) {
@@ -550,12 +710,21 @@ final class SceneHubController implements Listener {
                         .committedState()
                         .quiverPreparation()
                         .equals(sceneSession.previewState().quiverPreparation());
-        if (equipmentChanged && preparationChanged) {
+        boolean transferChanged = sceneSession.previewState().quiverTransfer().isPresent();
+        int mutationCount =
+                (equipmentChanged ? 1 : 0)
+                        + (preparationChanged ? 1 : 0)
+                        + (transferChanged ? 1 : 0);
+        if (mutationCount > 1) {
             committing.remove(player.getUniqueId());
             player.sendActionBar(
                     Component.text(
-                            "Confirm equipment first, then prepare ammo in a second transaction.",
+                            "Confirm equipment, lot transfer and preparation as separate transactions.",
                             NamedTextColor.RED));
+            return;
+        }
+        if (mutationCount == 0) {
+            committing.remove(player.getUniqueId());
             return;
         }
         player.sendActionBar(
@@ -602,12 +771,25 @@ final class SceneHubController implements Listener {
                                         Component.text(
                                                 preparationChanged
                                                         ? "Quiver preparation committed."
-                                                        : "Equipment committed.",
+                                                        : transferChanged
+                                                                ? "Quiver lot transfer committed."
+                                                                : "Equipment committed.",
                                                 NamedTextColor.GREEN));
                                 navigate(player, success.value());
                             }
                         };
-        if (preparationChanged) {
+        if (transferChanged) {
+            QuiverAmmoTransferPreview transfer =
+                    sceneSession.previewState().quiverTransfer().orElseThrow();
+            characterSessions.transferQuiverAmmo(
+                    player,
+                    new LotId(transfer.sourceLotId()),
+                    transfer.quantity(),
+                    transfer.direction() == QuiverTransferDirection.STORE,
+                    UUID.randomUUID(),
+                    contentVersion,
+                    completion);
+        } else if (preparationChanged) {
             characterSessions.updateQuiverPreparation(
                     player,
                     sceneSession.previewState().quiverPreparation(),

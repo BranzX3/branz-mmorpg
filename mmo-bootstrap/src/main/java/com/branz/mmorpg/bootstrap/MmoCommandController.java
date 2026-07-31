@@ -6,6 +6,7 @@ import com.branz.mmorpg.combat.move.MoveEngine;
 import com.branz.mmorpg.combat.trace.CombatSimulationErrorCode;
 import com.branz.mmorpg.combat.trace.CombatTrace;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
+import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import java.io.IOException;
@@ -251,7 +252,10 @@ final class MmoCommandController implements CommandExecutor, Listener {
                     player.sendActionBar(Component.text(action, NamedTextColor.GRAY));
                 } else if (holder.page() == DevInventoryHolder.Page.ITEM_SPAWNER
                         && action.startsWith("spawn:")) {
-                    spawnTestProjection(player, action.substring("spawn:".length()));
+                    spawnTestProjection(
+                            player,
+                            action.substring("spawn:".length()),
+                            event.isShiftClick() ? 64 : 1);
                 }
             }
         }
@@ -354,6 +358,10 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                             + (status.bowAmmoCommitPending()
                                                                     ? "(COMMITTING)"
                                                                     : "")
+                                                            + " | quiver="
+                                                            + status.quiverUsedCapacity()
+                                                            + "/"
+                                                            + status.quiverCapacity()
                                                             + (status
                                                                                     .ammoSwitchHandlingTicksRemaining()
                                                                             > 0
@@ -487,7 +495,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
                         slot++,
                         button(
                                 Material.BARRIER,
-                                definition.id().value(),
+                                definition.id().value() + " (Shift = lot x64)",
                                 "spawn:" + definition.id().value()));
             }
         }
@@ -495,7 +503,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
         player.openInventory(inventory);
     }
 
-    private void spawnTestProjection(Player player, String definitionId) {
+    private void spawnTestProjection(Player player, String definitionId, int requestedQuantity) {
         ItemEngine engine = itemEngineSource.get();
         ContentSnapshot snapshot = snapshotSource.get();
         if (engine == null || snapshot == null) {
@@ -508,17 +516,21 @@ final class MmoCommandController implements CommandExecutor, Listener {
                     Component.text("Definition is no longer active.", NamedTextColor.RED));
             return;
         }
+        int quantity = definition.itemClass() == ItemClass.STACKABLE_LOT ? requestedQuantity : 1;
         player.sendActionBar(
                 Component.text("Committing test grant through PostgreSQL…", NamedTextColor.YELLOW));
         characterSessions.grantTestValue(
                 player,
                 definition,
+                quantity,
                 snapshot.manifest().contentVersion(),
                 result -> {
                     if (result.isSuccess()) {
                         player.sendActionBar(
                                 Component.text(
-                                        "Persisted test value granted and projected.",
+                                        "Persisted test value x"
+                                                + quantity
+                                                + " granted and projected.",
                                         NamedTextColor.GREEN));
                         return;
                     }

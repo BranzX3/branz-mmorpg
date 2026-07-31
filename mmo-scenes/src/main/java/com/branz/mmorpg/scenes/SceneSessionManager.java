@@ -73,7 +73,8 @@ public final class SceneSessionManager {
                         session.withPreview(
                                 new ScenePreviewState(
                                         session.previewState().equipment().with(slot, itemId),
-                                        session.previewState().quiverPreparation())));
+                                        session.previewState().quiverPreparation(),
+                                        session.previewState().quiverTransfer())));
     }
 
     public synchronized Result<SceneSession, SceneErrorCode> previewQuiverPreparation(
@@ -85,7 +86,23 @@ public final class SceneSessionManager {
                 session ->
                         session.withPreview(
                                 new ScenePreviewState(
-                                        session.previewState().equipment(), quiverPreparation)));
+                                        session.previewState().equipment(),
+                                        quiverPreparation,
+                                        session.previewState().quiverTransfer())));
+    }
+
+    public synchronized Result<SceneSession, SceneErrorCode> previewQuiverTransfer(
+            UUID playerId, SceneSessionId sessionId, QuiverAmmoTransferPreview transfer) {
+        Objects.requireNonNull(transfer, "transfer");
+        return replace(
+                playerId,
+                sessionId,
+                session ->
+                        session.withPreview(
+                                new ScenePreviewState(
+                                        session.previewState().equipment(),
+                                        session.previewState().quiverPreparation(),
+                                        Optional.of(transfer))));
     }
 
     public synchronized Result<SceneSession, SceneErrorCode> back(

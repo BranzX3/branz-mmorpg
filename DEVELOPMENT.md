@@ -148,6 +148,9 @@ with an operator/test account:
     before a canonical `.trace` file appears under
     `plugins/BranzMMO/combat-traces`; use the optional player argument to export an inspected
     online session.
+40. Run `.\gradlew.bat :mmo-combat:test --tests com.branz.mmorpg.combat.acceptance.TrainingWeaponAcceptanceKitTest`.
+    Verify the delayed draw/buffer/replay, jitter priority and guard/CC interrupt cases all pass
+    without a live client or wall clock.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,

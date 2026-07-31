@@ -655,7 +655,6 @@ Remaining Milestone 4 work:
 - persistent MMO health application and death/encounter integration;
 - persistent combatant status/health integration and provider-authored posture/CC profiles;
 - additional rejection-reason overlays plus persisted/inspectable multi-action trace history;
-- latency/jitter acceptance fixtures and a complete weapon test kit.
 
 Schema/config impact: move schema gains the complete runtime fields. Local config adds positive
 `combat.weapon-draw-ticks` and `combat.weapon-sheathe-ticks`. Migration impact: none; combat
@@ -955,3 +954,48 @@ Non-goals:
 
 Config/migration impact: none. Inspection remains gated by the existing `dev-tools.enabled`,
 environment allowlist and `branzmmo.dev` permission.
+
+## Milestone 4 — latency/jitter and training-weapon acceptance kit
+
+Implemented:
+
+- deterministic synthetic input emissions carry a unique client sequence, emission tick, base
+  latency, signed jitter, semantic input, captured direction, branch and deduplication key;
+- effective simulated delay is bounded to 0..40 ticks and zero-delay input is delivered on the
+  next server scheduling boundary rather than retroactively in its emission tick;
+- delivery groups inputs into ascending server-tick frames and orders same-frame observations by
+  client sequence, independent of fixture collection order;
+- jitter can reorder later emissions ahead of earlier ones while InputRouter still assigns
+  authoritative server-session sequences and semantic priorities;
+- the training-weapon acceptance kit composes weapon draw, delayed opener buffering,
+  ActionTimeline completion, canonical trace replay, same-frame dodge priority, guard timing and
+  hard-CC interruption through the real pure-domain engines;
+- the kit proves a delayed guard starts its perfect window at authoritative arrival, not at the
+  untrusted client emission tick.
+
+Tests:
+
+- zero-delay next-tick delivery and positive/negative jitter boundaries;
+- stable frames across 1,000 shuffled emission collections;
+- delayed Bukkit/packet duplicates still collapse inside InputRouter's two-tick window;
+- invalid delays and duplicate synthetic client sequences fail closed;
+- a delayed attack buffers during six-tick weapon Drawing, executes on Ready, spends the exact
+  authored stamina and replays byte-identically;
+- jittered Attack/Dodge in one frame resolves Dodge regardless of arrival-list order;
+- delayed guard hits the exact perfect/normal boundary, and pre-commit heavy stagger cancels with
+  a full reservation refund while locking further attack input.
+
+Failure/recovery behavior:
+
+- negative or over-cap effective delay, invalid sequence/tick and duplicate client sequence reject
+  before any server frame exists;
+- simulator output is immutable and contains no wall clock, random clock or network dependency;
+- these fixtures never mutate a live Paper session or trust a client timestamp for gameplay.
+
+Non-goals:
+
+- rollback hit detection, client-authoritative lag compensation or acceptance of stale world state;
+- a production packet/network emulator and live artificial-lag command;
+- bow/crossbow/magic family kits, which belong to Milestone 5.
+
+Config/schema/migration impact: none; this is a headless deterministic acceptance facility.

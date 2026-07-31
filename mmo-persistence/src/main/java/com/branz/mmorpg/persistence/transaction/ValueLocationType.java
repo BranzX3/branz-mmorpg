@@ -10,5 +10,6 @@ public enum ValueLocationType {
     VIRTUAL_EQUIPPED,
     PENDING_REWARDS,
     OVERFLOW_CLAIM,
-    QUARANTINE
+    QUARANTINE,
+    DESTROYED
 }

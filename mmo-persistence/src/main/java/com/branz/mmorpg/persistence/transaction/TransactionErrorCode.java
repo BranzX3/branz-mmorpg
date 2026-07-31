@@ -13,6 +13,7 @@ public enum TransactionErrorCode implements ErrorCode {
     VALUE_ALREADY_EXISTS,
     VALUE_NOT_FOUND,
     VALUE_STALE_VERSION,
+    VALUE_INSUFFICIENT_QUANTITY,
     VALUE_EXPECTATION_MISMATCH;
 
     @Override

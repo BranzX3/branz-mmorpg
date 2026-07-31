@@ -158,6 +158,7 @@ final class CombatSessionController implements Listener {
     private final String contentVersion;
     private final MoveDefinition trainingMove;
     private final MoveDefinition trainingBowMove;
+    private final DefinitionId trainingBowAmmo;
     private final double trainingWeaponPower;
     private final double trainingBowPower;
     private final BowDrawEngine bowDraws;
@@ -242,6 +243,8 @@ final class CombatSessionController implements Listener {
             throw new IllegalArgumentException(
                     "training Bow move requires one SECONDARY PROJECTILE hitbox");
         }
+        trainingBowAmmo =
+                trainingBowMove.hitboxes().getFirst().projectile().orElseThrow().ammoCategory();
         if (!Double.isFinite(trainingWeaponPower) || trainingWeaponPower <= 0) {
             throw new IllegalArgumentException("trainingWeaponPower must be positive");
         }
@@ -365,6 +368,8 @@ final class CombatSessionController implements Listener {
                                         session.bowRecoveryUntilTick
                                                 - plugin.getServer().getCurrentTick()),
                         activeProjectilesFor(player.getUniqueId()),
+                        session.pendingBowLaunch != null,
+                        characters.inventoryLotQuantity(player, trainingBowAmmo),
                         dodgeProfile.load(),
                         Optional.ofNullable(session.dodge)
                                 .map(
@@ -1790,9 +1795,18 @@ final class CombatSessionController implements Listener {
             player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
             return;
         }
-        launchTrainingProjectile(player, session, release.shot().orElseThrow());
-        session.bowRecoveryUntilTick = tick + trainingBowMove.phases().recoveryTicks();
-        session.action = ActionState.RECOVERY;
+        PendingBowLaunch pending =
+                pendingBowLaunch(player, release.shot().orElseThrow(), UUID.randomUUID());
+        session.pendingBowLaunch = pending;
+        session.action = ActionState.ACTIVE;
+        session.lastResolution = "BOW AMMO COMMITTING";
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        characters.consumeAmmo(
+                player,
+                trainingBowAmmo,
+                pending.projectileId(),
+                contentVersion,
+                result -> completeBowAmmoCommit(player.getUniqueId(), session, pending, result));
     }
 
     private void spendBowStamina(LiveSession session, int amount, long tick) {
@@ -1804,7 +1818,63 @@ final class CombatSessionController implements Listener {
         session.staminaRegenRemainder = 0;
     }
 
-    private void launchTrainingProjectile(Player player, LiveSession session, BowShotCharge shot) {
+    private PendingBowLaunch pendingBowLaunch(
+            Player player, BowShotCharge shot, UUID projectileId) {
+        Location eye = player.getEyeLocation();
+        org.bukkit.util.Vector look = eye.getDirection().normalize();
+        CombatVector direction = new CombatVector(look.getX(), look.getY(), look.getZ());
+        CombatVector origin =
+                new CombatVector(eye.getX(), eye.getY(), eye.getZ()).add(direction.multiply(0.35));
+        return new PendingBowLaunch(
+                projectileId, player.getWorld().getUID(), origin, direction, shot);
+    }
+
+    private void completeBowAmmoCommit(
+            UUID playerId,
+            LiveSession expectedSession,
+            PendingBowLaunch pending,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> result) {
+        LiveSession session = sessions.get(playerId);
+        if (session != expectedSession || session.pendingBowLaunch != pending) {
+            return;
+        }
+        session.pendingBowLaunch = null;
+        Player player = plugin.getServer().getPlayer(playerId);
+        if (result
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            session.action = ActionState.IDLE;
+            session.lastResolution =
+                    failure.error() == CharacterSessionErrorCode.CHARACTER_AMMO_UNAVAILABLE
+                            ? "BOW NO AMMO"
+                            : "BOW AMMO COMMIT FAILED " + failure.error().code();
+            if (player != null && player.isOnline()) {
+                player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            }
+            return;
+        }
+        if (player == null
+                || !player.isOnline()
+                || player.isDead()
+                || !player.getWorld().getUID().equals(pending.worldId())) {
+            session.action = ActionState.IDLE;
+            session.lastResolution = "BOW COMMITTED WITHOUT LIVE PROJECTILE";
+            return;
+        }
+        if (activeProjectilesFor(playerId) >= maximumActiveProjectilesPerCaster) {
+            session.action = ActionState.IDLE;
+            session.lastResolution = "BOW COMMITTED PROJECTILE LIMIT";
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            return;
+        }
+        launchTrainingProjectile(player, session, pending);
+        long tick = plugin.getServer().getCurrentTick();
+        session.bowRecoveryUntilTick = tick + trainingBowMove.phases().recoveryTicks();
+        session.action = ActionState.RECOVERY;
+    }
+
+    private void launchTrainingProjectile(
+            Player player, LiveSession session, PendingBowLaunch pending) {
         MoveDefinition.Hitbox hitbox = trainingBowMove.hitboxes().getFirst();
         MoveDefinition.ProjectileDefinition authored = hitbox.projectile().orElseThrow();
         ProjectileProfile profile =
@@ -1815,15 +1885,9 @@ final class CombatSessionController implements Listener {
                         authored.collisionRadius(),
                         authored.lifetimeTicks(),
                         authored.pierceCount());
-        Location eye = player.getEyeLocation();
-        org.bukkit.util.Vector look = eye.getDirection().normalize();
-        CombatVector direction = new CombatVector(look.getX(), look.getY(), look.getZ());
-        CombatVector origin =
-                new CombatVector(eye.getX(), eye.getY(), eye.getZ()).add(direction.multiply(0.35));
-        UUID projectileId = UUID.randomUUID();
         ProjectileIdentity identity =
                 new ProjectileIdentity(
-                        projectileId,
+                        pending.projectileId(),
                         player.getUniqueId(),
                         trainingBowMove.id(),
                         contentVersion,
@@ -1831,22 +1895,32 @@ final class CombatSessionController implements Listener {
                         hitbox.hitGroup());
         ProjectileRuntime runtime =
                 ProjectileRuntime.launch(
-                        identity, profile, origin, direction, shot.velocityMultiplier());
+                        identity,
+                        profile,
+                        pending.origin(),
+                        pending.direction(),
+                        pending.charge().velocityMultiplier());
         activeProjectiles.put(
-                projectileId, new LiveProjectile(player.getWorld().getUID(), runtime, shot));
+                pending.projectileId(),
+                new LiveProjectile(pending.worldId(), runtime, pending.charge()));
         markHostile(player, session);
         session.lastResolution =
                 "BOW FIRED charge="
-                        + roundOne(shot.drawRatio() * 100)
+                        + roundOne(pending.charge().drawRatio() * 100)
                         + "% projectile="
-                        + projectileId.toString().substring(0, 8);
+                        + pending.projectileId().toString().substring(0, 8)
+                        + " ammo="
+                        + characters.inventoryLotQuantity(player, trainingBowAmmo);
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
     }
 
     private void cancelBow(LiveSession session, String reason) {
-        if (session.bowDraw != null) {
-            bowDraws.cancel(session.bowDraw, plugin.getServer().getCurrentTick());
+        if (session.bowDraw != null || session.pendingBowLaunch != null) {
+            if (session.bowDraw != null) {
+                bowDraws.cancel(session.bowDraw, plugin.getServer().getCurrentTick());
+            }
             session.bowDraw = null;
+            session.pendingBowLaunch = null;
             session.lastResolution = "BOW CANCELLED " + reason;
         }
         session.bowRecoveryUntilTick = -1;
@@ -2257,6 +2331,21 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    private record PendingBowLaunch(
+            UUID projectileId,
+            UUID worldId,
+            CombatVector origin,
+            CombatVector direction,
+            BowShotCharge charge) {
+        private PendingBowLaunch {
+            Objects.requireNonNull(projectileId, "projectileId");
+            Objects.requireNonNull(worldId, "worldId");
+            Objects.requireNonNull(origin, "origin");
+            direction = Objects.requireNonNull(direction, "direction").normalized();
+            Objects.requireNonNull(charge, "charge");
+        }
+    }
+
     private static final class LiveSession {
         private EngagementRuntime engagement;
         private WeaponTransitionSnapshot weapon = WeaponTransitionSnapshot.initial();
@@ -2265,6 +2354,7 @@ final class CombatSessionController implements Listener {
         private final InputRouter input = new InputRouter();
         private ActionTimeline timeline;
         private BowDrawRuntime bowDraw;
+        private PendingBowLaunch pendingBowLaunch;
         private long bowRecoveryUntilTick = -1;
         private CombatTransform previousActionTransform;
         private DodgeRuntime dodge;

@@ -21,7 +21,7 @@ public final class JdbcReconciliationScanner implements ReconciliationScanner {
     private static final String KNOWN_LOCATIONS =
             """
             'CHARACTER_INVENTORY', 'NATIVE_EQUIPPED', 'VIRTUAL_EQUIPPED',
-            'PENDING_REWARDS', 'OVERFLOW_CLAIM', 'QUARANTINE'
+            'PENDING_REWARDS', 'OVERFLOW_CLAIM', 'QUARANTINE', 'DESTROYED'
             """;
 
     private final DataSource dataSource;
@@ -148,6 +148,7 @@ public final class JdbcReconciliationScanner implements ReconciliationScanner {
                                         updated_at
                                     FROM commodity_lot
                                     WHERE quantity = 0
+                                      AND location_type <> 'DESTROYED'
                                 )
                                 SELECT code, subject_type, subject_id, detail, observed_at,
                                        CURRENT_TIMESTAMP AS scanned_at

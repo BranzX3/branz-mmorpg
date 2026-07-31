@@ -19,6 +19,8 @@ record CombatSessionStatus(
         Optional<BowDrawPhase> bowDrawPhase,
         int bowRecoveryTicksRemaining,
         int activeProjectiles,
+        boolean bowAmmoCommitPending,
+        long bowAmmoQuantity,
         DodgeLoad dodgeLoad,
         Optional<DodgePhase> dodgePhase,
         GuardPhase guardPhase,
@@ -44,6 +46,7 @@ record CombatSessionStatus(
         if (engagementExitTicksRemaining < 0
                 || bowRecoveryTicksRemaining < 0
                 || activeProjectiles < 0
+                || bowAmmoQuantity < 0
                 || !Double.isFinite(guardStability)
                 || guardStability < 0
                 || crowdControlTicksRemaining < 0

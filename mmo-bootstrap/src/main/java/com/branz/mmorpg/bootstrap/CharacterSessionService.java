@@ -1,6 +1,7 @@
 package com.branz.mmorpg.bootstrap;
 
 import com.branz.mmorpg.api.identity.CharacterId;
+import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.identity.SessionId;
@@ -17,6 +18,7 @@ import com.branz.mmorpg.persistence.transaction.ItemLocationMove;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.JdbcValueTransactionService;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
+import com.branz.mmorpg.persistence.transaction.LotQuantityConsumption;
 import com.branz.mmorpg.persistence.transaction.NewItemLocation;
 import com.branz.mmorpg.persistence.transaction.NewLotLocation;
 import com.branz.mmorpg.persistence.transaction.ReconciliationErrorCode;
@@ -183,6 +185,60 @@ final class CharacterSessionService {
                                             payload));
         }
         if (granted instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                    failure.error().code() + ": " + failure.detail());
+        }
+        return reload(session);
+    }
+
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> consumeAmmo(
+            LoadedCharacterSession session,
+            DefinitionId ammoDefinitionId,
+            UUID projectileCommitId,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(ammoDefinitionId, "ammoDefinitionId");
+        Objects.requireNonNull(projectileCommitId, "projectileCommitId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        LotLocationRecord ammo =
+                InventoryAmmoLots.select(session.snapshot().lotRecords(), ammoDefinitionId)
+                        .orElse(null);
+        if (ammo == null) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_AMMO_UNAVAILABLE,
+                    "No owned inventory lot is available for " + ammoDefinitionId.value());
+        }
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(projectileCommitId),
+                        "ammo-release:" + projectileCommitId,
+                        session.characterId(),
+                        session.sessionId(),
+                        JdbcValueTransactionService.LOT_CONSUME,
+                        "{\"lotId\":\""
+                                + ammo.lotId().value()
+                                + "\",\"version\":"
+                                + ammo.version()
+                                + ",\"quantity\":1}",
+                        "{\"projectileId\":\""
+                                + projectileCommitId
+                                + "\",\"ammoDefinitionId\":\""
+                                + ammoDefinitionId.value()
+                                + "\"}",
+                        contentVersion);
+        Result<TransactionExecution, TransactionErrorCode> consumed =
+                database.values()
+                        .consumeLot(
+                                request,
+                                new LotQuantityConsumption(
+                                        ammo.lotId(),
+                                        ammo.version(),
+                                        ammo.ownerCharacterId(),
+                                        ammo.location(),
+                                        1));
+        if (consumed
+                instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
                     failure.error().code() + ": " + failure.detail());

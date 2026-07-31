@@ -346,6 +346,11 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                                                             : "IDLE")
                                                             + " | projectiles="
                                                             + status.activeProjectiles()
+                                                            + " | ammo="
+                                                            + status.bowAmmoQuantity()
+                                                            + (status.bowAmmoCommitPending()
+                                                                    ? "(COMMITTING)"
+                                                                    : "")
                                                             + " | dodge="
                                                             + status.dodgeLoad()
                                                             + "/"

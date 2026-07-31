@@ -1171,3 +1171,55 @@ schemas and the example content snapshot add the training Bow, arrow and quick-s
 `combat.max-active-projectiles-per-caster` defaults to `32`. Migration impact: additive content
 contract only, documented by ADR 0006; no SQL migration or durable ammo mutation occurs in this
 slice.
+
+## Milestone 5 — durable Bow ammo commit slice
+
+Implemented:
+
+- every valid Bow release resolves the move-authored ammo category against owned
+  `CHARACTER_INVENTORY` commodity lots in stable slot/lot order;
+- one ammo unit commits through `lot.consume` using transaction journal identity equal to the
+  projectile UUID and version/owner/location compare-and-set expectations;
+- partial consumption preserves lot location and lineage while incrementing authority version;
+  exhausting a lot writes a zero-quantity `DESTROYED` tombstone that no longer projects into the
+  Bukkit inventory;
+- the Paper thread captures immutable shot context, shows `AMMO COMMITTING`, dispatches PostgreSQL
+  work asynchronously and creates no projectile until the durable commit succeeds;
+- successful mutation refreshes character/inventory truth without re-running initial ready
+  handlers or resetting live combat state; concurrent value mutations are rejected per character;
+- heartbeat completion merges only its renewed lease into the latest snapshot so it cannot restore
+  pre-consumption inventory state;
+- `/mmo health` exposes exact inventory ammo quantity and the in-flight commit marker.
+
+Tests:
+
+- crash after lot mutation rolls quantity and journal back together, then retry consumes exactly
+  once;
+- idempotency replay preserves quantity, insufficient quantity leaves no prepared journal and two
+  concurrent requests against one version produce one success;
+- final-unit consumption retains an audited `DESTROYED` tombstone without an `EMPTY_LOT`
+  reconciliation issue;
+- deterministic selection ignores destroyed, empty, differently typed and non-inventory lots and
+  counts only the exact authored ammo definition.
+
+Failure/recovery behavior:
+
+- missing ammo, database failure, stale version or another in-flight character value mutation
+  rejects the release without a projectile;
+- transaction, lot mutation and audit append share one PostgreSQL commit and replay by projectile
+  UUID;
+- death, logout or world change during an in-flight commit cancels transient launch; a commit that
+  already became durable remains consumed because projectile release is the irrevocable ammo
+  boundary;
+- projection refresh failure leaves database truth authoritative and keeps the character locked
+  rather than fabricating a local ammo count.
+
+Non-goals:
+
+- Quiver item profiles/equipment, up-to-four prepared categories and neutral Shift+Q cycling;
+- encounter-end deterministic ammo recovery and Pending Rewards overflow;
+- Crossbow `BOLT_PLACED` binding/checkpoints and PvP arena ammo snapshots.
+
+Schema/config impact: none. Migration impact: no SQL migration; the existing free-text lot location
+contract adds the recognized `DESTROYED` value and the persistence API adds journaled quantity
+consumption, documented by ADR 0007.

@@ -440,6 +440,142 @@ class JdbcValueTransactionServiceIntegrationTest {
     }
 
     @Test
+    void lotConsumptionIsReplaySafeAndTombstonesAnEmptyLot() {
+        LotId lotId = new LotId(UUID.randomUUID());
+        ValueLocation inventory = ValueLocation.inventory("slot:5");
+        grantLot(lotId, inventory, 3);
+        LotQuantityConsumption firstConsumption =
+                new LotQuantityConsumption(lotId, 1, Optional.of(CHARACTER), inventory, 1);
+        TransactionRequest first =
+                request(
+                        "lot:consume:first:" + lotId.value(),
+                        JdbcValueTransactionService.LOT_CONSUME,
+                        "{\"quantity\":1}",
+                        "{\"remaining\":2}");
+
+        assertFalse(success(service.consumeLot(first, firstConsumption)).replayed());
+        assertTrue(success(service.consumeLot(retryRequest(first), firstConsumption)).replayed());
+        LotLocationRecord remaining = success(service.findLot(lotId)).orElseThrow();
+        assertEquals(2, remaining.quantity());
+        assertEquals(2, remaining.version());
+        assertEquals(inventory, remaining.location());
+        List<AuditLogEntry> firstAudit = success(audit.findByTransaction(first.transactionId()));
+        assertEquals(1, firstAudit.size());
+        assertEquals(AuditSubjectType.LOT, firstAudit.getFirst().subjectType());
+        assertEquals(lotId.value(), firstAudit.getFirst().subjectId());
+
+        TransactionRequest insufficient =
+                request(
+                        "lot:consume:insufficient:" + lotId.value(),
+                        JdbcValueTransactionService.LOT_CONSUME,
+                        "{\"quantity\":3}",
+                        "{}");
+        assertEquals(
+                TransactionErrorCode.VALUE_INSUFFICIENT_QUANTITY,
+                failure(
+                        service.consumeLot(
+                                insufficient,
+                                new LotQuantityConsumption(
+                                        lotId, 2, Optional.of(CHARACTER), inventory, 3))));
+        assertEquals(Optional.empty(), success(journal.find(insufficient.transactionId())));
+
+        TransactionRequest finalConsumption =
+                request(
+                        "lot:consume:final:" + lotId.value(),
+                        JdbcValueTransactionService.LOT_CONSUME,
+                        "{\"quantity\":2}",
+                        "{\"remaining\":0}");
+        assertFalse(
+                success(
+                                service.consumeLot(
+                                        finalConsumption,
+                                        new LotQuantityConsumption(
+                                                lotId, 2, Optional.of(CHARACTER), inventory, 2)))
+                        .replayed());
+        LotLocationRecord destroyed = success(service.findLot(lotId)).orElseThrow();
+        assertEquals(0, destroyed.quantity());
+        assertEquals(3, destroyed.version());
+        assertEquals(ValueLocationType.DESTROYED, destroyed.location().type());
+        assertTrue(
+                destroyed
+                        .location()
+                        .reference()
+                        .orElseThrow()
+                        .contains(finalConsumption.transactionId().value().toString()));
+        assertFalse(
+                successReconciliation(reconciliation.scan(Duration.ofSeconds(30), 100))
+                        .issues()
+                        .stream()
+                        .anyMatch(issue -> issue.code() == ReconciliationIssueCode.EMPTY_LOT));
+    }
+
+    @Test
+    void crashAndConcurrentRetryCannotConsumeOneLotTwice() {
+        LotId lotId = new LotId(UUID.randomUUID());
+        ValueLocation inventory = ValueLocation.inventory("slot:6");
+        grantLot(lotId, inventory, 2);
+        LotQuantityConsumption consumption =
+                new LotQuantityConsumption(lotId, 1, Optional.of(CHARACTER), inventory, 1);
+        TransactionRequest crashed =
+                request(
+                        "lot:consume:crash:" + lotId.value(),
+                        JdbcValueTransactionService.LOT_CONSUME,
+                        "{\"quantity\":1}",
+                        "{}");
+        JdbcValueTransactionService crashing =
+                new JdbcValueTransactionService(
+                        dataSource,
+                        checkpoint -> {
+                            if (checkpoint
+                                    == JdbcValueTransactionService.Checkpoint.AFTER_MUTATION) {
+                                throw new SimulatedCrash();
+                            }
+                        });
+
+        assertThrows(SimulatedCrash.class, () -> crashing.consumeLot(crashed, consumption));
+        assertEquals(2, success(service.findLot(lotId)).orElseThrow().quantity());
+        assertEquals(Optional.empty(), success(journal.find(crashed.transactionId())));
+        assertFalse(success(service.consumeLot(crashed, consumption)).replayed());
+
+        LotQuantityConsumption second =
+                new LotQuantityConsumption(lotId, 2, Optional.of(CHARACTER), inventory, 1);
+        CompletableFuture<Result<TransactionExecution, TransactionErrorCode>> first =
+                CompletableFuture.supplyAsync(
+                        () ->
+                                service.consumeLot(
+                                        request(
+                                                "lot:consume:race-a:" + lotId.value(),
+                                                JdbcValueTransactionService.LOT_CONSUME,
+                                                "{\"quantity\":1}",
+                                                "{}"),
+                                        second));
+        CompletableFuture<Result<TransactionExecution, TransactionErrorCode>> competing =
+                CompletableFuture.supplyAsync(
+                        () ->
+                                service.consumeLot(
+                                        request(
+                                                "lot:consume:race-b:" + lotId.value(),
+                                                JdbcValueTransactionService.LOT_CONSUME,
+                                                "{\"quantity\":1}",
+                                                "{}"),
+                                        second));
+        List<Result<TransactionExecution, TransactionErrorCode>> results =
+                List.of(first.join(), competing.join());
+
+        assertEquals(1, results.stream().filter(Result::isSuccess).count());
+        assertEquals(
+                1,
+                results.stream()
+                        .filter(result -> !result.isSuccess())
+                        .map(JdbcValueTransactionServiceIntegrationTest::failure)
+                        .filter(TransactionErrorCode.VALUE_STALE_VERSION::equals)
+                        .count());
+        LotLocationRecord destroyed = success(service.findLot(lotId)).orElseThrow();
+        assertEquals(0, destroyed.quantity());
+        assertEquals(ValueLocationType.DESTROYED, destroyed.location().type());
+    }
+
+    @Test
     void ownedValueQueriesReturnOnlyTheRequestedCharacterInStableLocationOrder() {
         CharacterId otherCharacter = new CharacterId(UUID.randomUUID());
         ItemId secondItem = new ItemId(UUID.randomUUID());
@@ -594,6 +730,26 @@ class JdbcValueTransactionServiceIntegrationTest {
                         "{\"lotId\":\"" + lotId.value() + "\"}",
                         "content-test-1");
         success(service.grantLot(request, lot));
+    }
+
+    private void grantLot(LotId lotId, ValueLocation location, long quantity) {
+        NewLotLocation lot =
+                new NewLotLocation(
+                        lotId,
+                        LOT_DEFINITION,
+                        "quality=common",
+                        quantity,
+                        Optional.of(CHARACTER),
+                        location,
+                        "{\"root\":\"" + lotId.value() + "\"}");
+        success(
+                service.grantLot(
+                        request(
+                                "lot:setup:" + lotId.value(),
+                                JdbcValueTransactionService.LOT_GRANT,
+                                "{}",
+                                "{\"quantity\":" + quantity + "}"),
+                        lot));
     }
 
     private static TransactionRequest request(

@@ -171,12 +171,14 @@ with an operator/test account:
 48. Strike one fresh training target repeatedly and verify `health=current/1000.0` falls by the
     applied deterministic damage. The exact lethal hit must kill the Bukkit target and clear its
     isolated HP/posture state.
-49. Open `/mmo dev` -> `Persisted Test Item`, grant `weapon.training_bow`, then equip it in
-    Chronicle -> Character & Equipment using the normal explicit commit. Verify hotbar slot 1
-    projects a signed Bow fallback and reaches `BOW READY` after draw transition.
+49. Open `/mmo dev` -> `Persisted Test Item`, grant `weapon.training_bow` and
+    `ammo.training_arrow`, then equip the Bow in Chronicle -> Character & Equipment using the
+    normal explicit commit. Verify hotbar slot 1 projects a signed Bow fallback, the arrow lot is
+    visible and the weapon reaches `BOW READY` after draw transition.
 50. Right-click air once to begin the local training draw, then right-click again before five
     server ticks and verify `BOW TOO_EARLY` with no projectile. Repeat after at least five ticks and
-    verify `/mmo health` reports Bow recovery plus one active projectile after release.
+    verify `/mmo health` reports Bow recovery, one active projectile and `ammo=0` after the
+    journaled release. Grant a fresh training-arrow lot before each later shot in this section.
 51. Release at tick five and then at/after tick twenty against the same target. Verify the full shot
     travels faster, applies greater posture/penetration contribution, uses exact crosshair aim and
     reports `PROJECTILE HIT damage=... health=... posture=...` without a vanilla arrow hit.
@@ -188,6 +190,18 @@ with an operator/test account:
 54. Swap weapon, dodge, take hard CC, teleport, die or disconnect while drawing. Verify draw/recovery
     cancels and owned projectiles are removed on session/world teardown. `/mmo health` must show
     `bow=IDLE` and `projectiles=0` after cleanup.
+55. With no `ammo.training_arrow` lot, complete a valid draw/release and verify `BOW NO AMMO`, no
+    projectile and no recovery. `/mmo health` must continue to show `ammo=0`.
+56. Grant one training arrow, release once and observe the short `ammo=1(COMMITTING)` state if the
+    local database completion crosses a server tick. Verify the projectile appears only after the
+    commit, the inventory projection removes the exhausted stack and `ammo=0` remains after
+    reconnect/restart.
+57. During `AMMO COMMITTING`, spam RMB and invoke another persisted dev grant. Verify the action/value
+    locks prevent a second projectile and a second value transaction. One arrow produces at most
+    one projectile and exactly one `lot.consume` audit/journal commit.
+58. Stop the server immediately around a release and restart. Verify the authoritative outcome is
+    either an unconsumed arrow with no committed journal or one consumed arrow with one committed
+    journal; retry/reconnect must never subtract the same lot version twice.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
@@ -198,8 +212,9 @@ authority. Combat HP remains transient across logout/restart. Death-pouch wallet
 sanctuary routing and crash-resumable encounter HP remain later transactional boundaries. The
 client swing never declares a hit. The Basic Bow uses the same damage/HP/posture authorities and a
 server-simulated projectile; because test projections deliberately block native item use, this
-local Paper adapter uses first-RMB draw and second-RMB release. The authored ammo category is
-carried for inspection but no durable ammo lot is consumed until the Quiver transaction slice.
+local Paper adapter uses first-RMB draw and second-RMB release. The authored ammo category now
+commits one PostgreSQL-backed inventory-lot unit before projectile creation. Prepared Quiver
+selection/cycling and encounter recovery remain later Milestone 5 slices.
 
 Live engagement check:
 

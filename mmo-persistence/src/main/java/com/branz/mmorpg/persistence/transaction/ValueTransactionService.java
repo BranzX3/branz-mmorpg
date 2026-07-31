@@ -23,6 +23,9 @@ public interface ValueTransactionService {
     Result<TransactionExecution, TransactionErrorCode> moveLot(
             TransactionRequest request, LotLocationMove move);
 
+    Result<TransactionExecution, TransactionErrorCode> consumeLot(
+            TransactionRequest request, LotQuantityConsumption consumption);
+
     Result<Optional<ItemLocationRecord>, TransactionErrorCode> findItem(ItemId itemId);
 
     Result<Optional<LotLocationRecord>, TransactionErrorCode> findLot(LotId lotId);

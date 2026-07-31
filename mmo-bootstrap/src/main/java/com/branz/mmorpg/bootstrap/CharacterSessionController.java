@@ -1,5 +1,6 @@
 package com.branz.mmorpg.bootstrap;
 
+import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
@@ -44,6 +45,7 @@ final class CharacterSessionController implements Listener {
     private final Map<UUID, LoadedCharacterSession> active = new HashMap<>();
     private final Set<UUID> packReady = new HashSet<>();
     private final Set<UUID> projected = new HashSet<>();
+    private final Set<UUID> valueMutationInFlight = new HashSet<>();
     private final List<Consumer<Player>> readyHandlers = new ArrayList<>();
     private int heartbeatTaskId = -1;
 
@@ -113,6 +115,10 @@ final class CharacterSessionController implements Listener {
                             "No free inventory slot is available."));
             return;
         }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
         plugin.getServer()
                 .getScheduler()
                 .runTaskAsynchronously(
@@ -125,8 +131,64 @@ final class CharacterSessionController implements Listener {
                                     .getScheduler()
                                     .runTask(
                                             plugin,
-                                            () -> completeTestGrant(session, result, completion));
+                                            () ->
+                                                    completeSnapshotMutation(
+                                                            session, result, completion));
                         });
+    }
+
+    void consumeAmmo(
+            Player player,
+            DefinitionId ammoDefinitionId,
+            UUID projectileCommitId,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(ammoDefinitionId, "ammoDefinitionId");
+        Objects.requireNonNull(projectileCommitId, "projectileCommitId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
+                                    sessions.consumeAmmo(
+                                            session,
+                                            ammoDefinitionId,
+                                            projectileCommitId,
+                                            contentVersion);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeSnapshotMutation(
+                                                            session, result, completion));
+                        });
+    }
+
+    long inventoryLotQuantity(Player player, DefinitionId definitionId) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(definitionId, "definitionId");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null) {
+            return 0;
+        }
+        return InventoryAmmoLots.quantity(session.snapshot().lotRecords(), definitionId);
     }
 
     void commitEquipment(
@@ -146,6 +208,10 @@ final class CharacterSessionController implements Listener {
                             "Character session is not ready."));
             return;
         }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
         plugin.getServer()
                 .getScheduler()
                 .runTaskAsynchronously(
@@ -157,7 +223,9 @@ final class CharacterSessionController implements Listener {
                                     .getScheduler()
                                     .runTask(
                                             plugin,
-                                            () -> completeTestGrant(session, result, completion));
+                                            () ->
+                                                    completeSnapshotMutation(
+                                                            session, result, completion));
                         });
     }
 
@@ -171,6 +239,7 @@ final class CharacterSessionController implements Listener {
         loadAttempts.clear();
         packReady.clear();
         projected.clear();
+        valueMutationInFlight.clear();
         for (LoadedCharacterSession session : closing) {
             sessions.close(session);
         }
@@ -187,6 +256,7 @@ final class CharacterSessionController implements Listener {
         loadAttempts.remove(playerId);
         packReady.remove(playerId);
         projected.remove(playerId);
+        valueMutationInFlight.remove(playerId);
         LoadedCharacterSession session = active.remove(playerId);
         if (session != null) {
             plugin.getServer()
@@ -339,6 +409,10 @@ final class CharacterSessionController implements Listener {
     }
 
     private void applyProjectionIfReady(Player player) {
+        applyProjectionIfReady(player, true);
+    }
+
+    private void applyProjectionIfReady(Player player, boolean notifyReadyHandlers) {
         UUID playerId = player.getUniqueId();
         LoadedCharacterSession session = active.get(playerId);
         if (session == null || !packReady.contains(playerId) || projected.contains(playerId)) {
@@ -366,7 +440,9 @@ final class CharacterSessionController implements Listener {
                         "MMO character ready"
                                 + (report.changed() ? " — inventory projection repaired" : ""),
                         NamedTextColor.GREEN));
-        readyHandlers.forEach(handler -> handler.accept(player));
+        if (notifyReadyHandlers) {
+            readyHandlers.forEach(handler -> handler.accept(player));
+        }
     }
 
     private void heartbeatAll() {
@@ -396,7 +472,7 @@ final class CharacterSessionController implements Listener {
         if (result
                 instanceof
                 Result.Success<LoadedCharacterSession, CharacterSessionErrorCode> success) {
-            active.put(playerId, success.value());
+            active.put(playerId, current.withLease(success.value().lease()));
             return;
         }
         Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure =
@@ -411,33 +487,41 @@ final class CharacterSessionController implements Listener {
         }
     }
 
-    private void completeTestGrant(
+    private void completeSnapshotMutation(
             LoadedCharacterSession previous,
             Result<LoadedCharacterSession, CharacterSessionErrorCode> result,
             Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
         UUID playerId = previous.characterId().value();
+        valueMutationInFlight.remove(playerId);
         LoadedCharacterSession current = active.get(playerId);
         if (current == null || !current.sessionId().equals(previous.sessionId())) {
             completion.accept(
                     Result.failure(
                             CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
-                            "Character session changed before dev grant completed."));
+                            "Character session changed before value mutation completed."));
             return;
         }
         if (result instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>) {
             completion.accept(result);
             return;
         }
-        LoadedCharacterSession updated =
+        LoadedCharacterSession mutationResult =
                 ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result)
                         .value();
+        LoadedCharacterSession updated = current.withSnapshot(mutationResult.snapshot());
         active.put(playerId, updated);
         projected.remove(playerId);
         Player player = plugin.getServer().getPlayer(playerId);
         if (player != null && player.isOnline()) {
-            applyProjectionIfReady(player);
+            applyProjectionIfReady(player, false);
         }
         completion.accept(Result.success(updated));
+    }
+
+    private static Result<LoadedCharacterSession, CharacterSessionErrorCode> valueMutationBusy() {
+        return Result.failure(
+                CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                "Another authoritative value transaction is still in progress.");
     }
 
     private static int firstFreeStorageSlot(Player player) {

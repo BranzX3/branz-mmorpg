@@ -53,4 +53,10 @@ public record ValueLocation(ValueLocationType type, Optional<String> reference) 
                 ValueLocationType.QUARANTINE,
                 Optional.of(Objects.requireNonNull(caseReference, "caseReference")));
     }
+
+    public static ValueLocation destroyed(String transactionReference) {
+        return new ValueLocation(
+                ValueLocationType.DESTROYED,
+                Optional.of(Objects.requireNonNull(transactionReference, "transactionReference")));
+    }
 }

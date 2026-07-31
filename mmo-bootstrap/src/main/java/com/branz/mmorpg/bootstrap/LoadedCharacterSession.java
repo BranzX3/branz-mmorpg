@@ -23,4 +23,8 @@ record LoadedCharacterSession(
     LoadedCharacterSession withLease(CharacterLease nextLease) {
         return new LoadedCharacterSession(characterId, sessionId, nextLease, snapshot);
     }
+
+    LoadedCharacterSession withSnapshot(PersistentCharacterSnapshot nextSnapshot) {
+        return new LoadedCharacterSession(characterId, sessionId, lease, nextSnapshot);
+    }
 }

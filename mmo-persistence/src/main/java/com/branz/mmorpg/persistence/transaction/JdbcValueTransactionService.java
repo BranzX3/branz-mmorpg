@@ -33,6 +33,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
     public static final String ITEM_MOVE = "item.move";
     public static final String ITEM_BATCH_MOVE = "item.move.batch";
     public static final String LOT_MOVE = "lot.move";
+    public static final String LOT_CONSUME = "lot.consume";
 
     private static final String ITEM_COLUMNS =
             """
@@ -141,6 +142,18 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
                 AuditSubjectType.LOT,
                 move.lotId().value(),
                 connection -> updateLotLocation(connection, request.transactionId(), move));
+    }
+
+    @Override
+    public Result<TransactionExecution, TransactionErrorCode> consumeLot(
+            TransactionRequest request, LotQuantityConsumption consumption) {
+        Objects.requireNonNull(consumption, "consumption");
+        return execute(
+                request,
+                LOT_CONSUME,
+                AuditSubjectType.LOT,
+                consumption.lotId().value(),
+                connection -> updateLotQuantity(connection, request.transactionId(), consumption));
     }
 
     @Override
@@ -465,6 +478,52 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
         }
     }
 
+    private static Result<MutationApplied, TransactionErrorCode> updateLotQuantity(
+            Connection connection,
+            TransactionId transactionId,
+            LotQuantityConsumption consumption) {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        """
+                        UPDATE commodity_lot
+                        SET quantity = quantity - ?,
+                            location_type = CASE
+                                WHEN quantity = ? THEN 'DESTROYED'
+                                ELSE location_type
+                            END,
+                            location_ref = CASE
+                                WHEN quantity = ? THEN ?
+                                ELSE location_ref
+                            END,
+                            version = version + 1,
+                            last_transaction_id = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE lot_uuid = ?
+                          AND version = ?
+                          AND owner_character_id IS NOT DISTINCT FROM ?
+                          AND location_type = ?
+                          AND location_ref IS NOT DISTINCT FROM ?
+                          AND quantity >= ?
+                        """)) {
+            statement.setLong(1, consumption.quantity());
+            statement.setLong(2, consumption.quantity());
+            statement.setLong(3, consumption.quantity());
+            statement.setString(4, "transaction:" + transactionId.value());
+            statement.setObject(5, transactionId.value());
+            statement.setObject(6, consumption.lotId().value());
+            statement.setLong(7, consumption.expectedVersion());
+            setNullableCharacter(statement, 8, consumption.expectedOwnerCharacterId());
+            bindLocation(statement, 9, consumption.expectedLocation());
+            statement.setLong(11, consumption.quantity());
+            if (statement.executeUpdate() == 1) {
+                return Result.success(MutationApplied.INSTANCE);
+            }
+            return classifyLotConsumptionFailure(connection, consumption);
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
     private static Result<MutationApplied, TransactionErrorCode> classifyItemCasFailure(
             Connection connection, ItemLocationMove move) throws SQLException {
         Optional<ItemLocationRecord> current = findItem(connection, move.itemId());
@@ -497,6 +556,35 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
         return Result.failure(
                 TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
                 "Lot owner or location no longer matches the expected source.");
+    }
+
+    private static Result<MutationApplied, TransactionErrorCode> classifyLotConsumptionFailure(
+            Connection connection, LotQuantityConsumption consumption) throws SQLException {
+        Optional<LotLocationRecord> current = findLot(connection, consumption.lotId());
+        if (current.isEmpty()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_NOT_FOUND, "Lot location does not exist.");
+        }
+        LotLocationRecord record = current.orElseThrow();
+        if (record.version() != consumption.expectedVersion()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_STALE_VERSION,
+                    "Lot version changed; reload before retry.");
+        }
+        if (!record.ownerCharacterId().equals(consumption.expectedOwnerCharacterId())
+                || !record.location().equals(consumption.expectedLocation())) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                    "Lot owner or location no longer matches the expected source.");
+        }
+        if (record.quantity() < consumption.quantity()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_INSUFFICIENT_QUANTITY,
+                    "Lot does not contain the requested quantity.");
+        }
+        return Result.failure(
+                TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                "Lot could not be consumed under the declared expectations.");
     }
 
     private static Optional<ItemLocationRecord> findItem(Connection connection, ItemId itemId)

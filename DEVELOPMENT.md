@@ -151,6 +151,11 @@ with an operator/test account:
 40. Run `.\gradlew.bat :mmo-combat:test --tests com.branz.mmorpg.combat.acceptance.TrainingWeaponAcceptanceKitTest`.
     Verify the delayed draw/buffer/replay, jitter priority and guard/CC interrupt cases all pass
     without a live client or wall clock.
+41. Enable `/mmo combat debug`, begin a training slash and move or turn before its hitbox tick.
+    Verify the previous/current ARC outlines and cloud sweep path are viewer-only, and a target
+    crossed between the two server poses resolves once rather than tunnelling or double-hitting.
+42. Teleport during Windup with `/tp` and verify the move/buffer/guard/dodge state resets. Repeat a
+    normal directional dodge and verify its four plugin-owned movement steps remain allowed.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,

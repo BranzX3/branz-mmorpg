@@ -651,7 +651,8 @@ Failure/recovery behavior:
 
 Remaining Milestone 4 work:
 
-- remaining hitbox primitives, swept motion and region/friendly-provider filters;
+- shape-specific dimensions/resolvers for CAPSULE/BOX/SPHERE/RAY/PROJECTILE plus
+  region/friendly-provider filters;
 - persistent MMO health application and death/encounter integration;
 - persistent combatant status/health integration and provider-authored posture/CC profiles;
 - additional rejection-reason overlays plus persisted/inspectable multi-action trace history;
@@ -999,3 +1000,51 @@ Non-goals:
 - bow/crossbow/magic family kits, which belong to Milestone 5.
 
 Config/schema/migration impact: none; this is a headless deterministic acceptance facility.
+
+## Milestone 4 — swept ARC contact and teleport interruption slice
+
+Implemented:
+
+- deterministic ARC sweep between the prior and current server-owned player transform for each
+  authoritative hitbox-open tick;
+- translation is sampled at no more than 0.125 blocks/segment and shortest-yaw rotation at no more
+  than two degrees/segment, with both endpoints always present;
+- sampling is bounded at 128 segments; the Paper adapter rejects impact entirely when motion would
+  exceed that bound instead of accepting a coarse teleport-path hit;
+- the Paper broad phase expands around the midpoint of both transforms, so targets near the prior
+  pose are not omitted merely because the attacker moved before impact;
+- contacts across every sample are deduplicated by entity UUID and retain their best deterministic
+  weak-point/distance/angle metrics before the authored target cap is applied;
+- viewer-only combat debug now renders prior/current ARC outlines and sampled sweep origins in
+  addition to target selection markers;
+- non-dodge teleport/world-change events cancel the action, clear buffered input, release guard,
+  clear dodge/pending direction and rebuild the weapon transition from the selected slot;
+- authoritative dodge movement uses a narrow in-process teleport token, so unrelated plugin
+  teleports cannot masquerade as a permitted dodge step.
+
+Tests:
+
+- linear motion hits a target missed by both endpoint ARC queries;
+- shortest-yaw rotation hits an intermediate-angle target missed at either endpoint;
+- a target intersected by many samples resolves once, and 1,000 shuffled candidate collections
+  preserve identical global ordering;
+- extreme motion reports a capped sweep while retaining exact prior/current endpoints.
+
+Failure/recovery behavior:
+
+- a sweep whose shape parameters change between endpoints is rejected at construction;
+- motion beyond 16 blocks in one tick exceeds the 128-segment linear bound and produces no Paper
+  combat impact;
+- cross-world transforms never interpolate; the teleport listener cancels/reset transient combat
+  before the next action tick;
+- logout, cancellation and terminal action completion discard the prior transform.
+
+Non-goals:
+
+- `CAPSULE`, `BOX`, `SPHERE` and `RAY` collision semantics until the content schema declares their
+  required radius/width/depth/offset dimensions instead of overloading ARC fields;
+- projectile simulation, provider weak-point volumes and region/party filters;
+- rollback/rewind against client-reported historical transforms.
+
+Config/schema/migration impact: none; the existing ARC contract and local training content remain
+compatible.

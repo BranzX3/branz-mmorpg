@@ -35,9 +35,11 @@ import com.branz.mmorpg.combat.guard.GuardHitRequest;
 import com.branz.mmorpg.combat.guard.GuardRuntime;
 import com.branz.mmorpg.combat.hitbox.ArcDebugGeometry;
 import com.branz.mmorpg.combat.hitbox.ArcHitboxQuery;
-import com.branz.mmorpg.combat.hitbox.ArcHitboxResolver;
 import com.branz.mmorpg.combat.hitbox.CombatVector;
 import com.branz.mmorpg.combat.hitbox.ResolvedTarget;
+import com.branz.mmorpg.combat.hitbox.SweptArcHitboxQuery;
+import com.branz.mmorpg.combat.hitbox.SweptArcHitboxResolver;
+import com.branz.mmorpg.combat.hitbox.SweptArcResolution;
 import com.branz.mmorpg.combat.hitbox.TargetCollider;
 import com.branz.mmorpg.combat.input.ClientAction;
 import com.branz.mmorpg.combat.input.CombatInputPolicy;
@@ -127,7 +129,7 @@ final class CombatSessionController implements Listener {
     private final double trainingWeaponPower;
     private final WeaponTransitionMachine weapons;
     private final CombatInputPolicy inputPolicy = new CombatInputPolicy();
-    private final ArcHitboxResolver hitboxes = new ArcHitboxResolver();
+    private final SweptArcHitboxResolver hitboxes = new SweptArcHitboxResolver();
     private final ArcDebugGeometry arcDebugGeometry = new ArcDebugGeometry();
     private final PhysicalDamageResolver damage = new PhysicalDamageResolver();
     private final EngagementTracker engagement;
@@ -578,6 +580,32 @@ final class CombatSessionController implements Listener {
         debugViewers.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onTeleport(PlayerTeleportEvent event) {
+        LiveSession session = sessions.get(event.getPlayer().getUniqueId());
+        if (session == null) {
+            return;
+        }
+        boolean sameWorld = event.getFrom().getWorld() == event.getTo().getWorld();
+        boolean authoritativeDodgeStep = sameWorld && session.applyingDodgeTeleport;
+        if (authoritativeDodgeStep) {
+            return;
+        }
+        cancelAction(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
+        session.input.clearBuffer(InputBufferClearReason.WORLD_CHANGE);
+        releaseGuard(session);
+        session.dodge = null;
+        session.dodgeDirection = null;
+        session.sneakPress = null;
+        session.previousActionTransform = null;
+        session.weapon = weapons.resetTransient();
+        session.action = ActionState.IDLE;
+        select(
+                session,
+                selectedSlot(
+                        event.getPlayer(), event.getPlayer().getInventory().getHeldItemSlot()));
+    }
+
     private void tickAll() {
         tickTrainingPosture();
         for (Map.Entry<UUID, LiveSession> entry : sessions.entrySet()) {
@@ -607,6 +635,7 @@ final class CombatSessionController implements Listener {
         if (session.timeline == null) {
             return;
         }
+        CombatTransform currentTransform = combatTransform(player);
         ActionPhase prior = session.timeline.phase();
         ResourceCommitState priorResourceState = session.timeline.resourceState();
         int priorTraceSize = session.timeline.trace().size();
@@ -637,42 +666,66 @@ final class CombatSessionController implements Listener {
         for (ActionTraceEvent event :
                 session.timeline.trace().subList(priorTraceSize, session.timeline.trace().size())) {
             if (event.type() == ActionTraceEventType.HITBOX_OPENED) {
-                resolveTrainingHitbox(player, session);
+                resolveTrainingHitbox(player, session, currentTransform);
             }
         }
+        session.previousActionTransform = currentTransform;
         if (session.timeline.phase().terminal()) {
             session.resources = session.timeline.resources();
             finishTrace(session, session.timeline);
             session.timeline = null;
+            session.previousActionTransform = null;
             session.action = ActionState.IDLE;
         } else {
             session.action = actionState(session.timeline.phase());
         }
     }
 
-    private void resolveTrainingHitbox(Player player, LiveSession session) {
+    private void resolveTrainingHitbox(
+            Player player, LiveSession session, CombatTransform currentTransform) {
         MoveDefinition.Hitbox hitbox = trainingMove.hitboxes().getFirst();
         if (hitbox.shape() != MoveDefinition.HitboxShape.ARC) {
             session.lastResolution = "unsupported " + hitbox.shape();
             return;
         }
-        org.bukkit.Location origin = player.getLocation();
-        org.bukkit.util.Vector direction = origin.getDirection();
-        ArcHitboxQuery query =
-                new ArcHitboxQuery(
-                        new CombatVector(origin.getX(), origin.getY(), origin.getZ()),
-                        new CombatVector(direction.getX(), 0, direction.getZ()),
-                        hitbox.range(),
-                        hitbox.angleDegrees(),
-                        -0.5,
-                        hitbox.height(),
-                        hitbox.maxTargets());
+        CombatTransform previousTransform =
+                session.previousActionTransform == null
+                                || !session.previousActionTransform
+                                        .worldId()
+                                        .equals(currentTransform.worldId())
+                        ? currentTransform
+                        : session.previousActionTransform;
+        ArcHitboxQuery previousQuery = arcQuery(hitbox, previousTransform);
+        ArcHitboxQuery currentQuery = arcQuery(hitbox, currentTransform);
+        CombatVector midpoint = midpoint(previousTransform.origin(), currentTransform.origin());
+        double xRadius =
+                hitbox.range()
+                        + Math.abs(currentTransform.origin().x() - previousTransform.origin().x())
+                                / 2.0
+                        + 1;
+        double yRadius =
+                hitbox.height()
+                        + Math.abs(currentTransform.origin().y() - previousTransform.origin().y())
+                                / 2.0
+                        + 1;
+        double zRadius =
+                hitbox.range()
+                        + Math.abs(currentTransform.origin().z() - previousTransform.origin().z())
+                                / 2.0
+                        + 1;
         Map<UUID, LivingEntity> entities = new HashMap<>();
         List<TargetCollider> candidates =
                 player
                         .getWorld()
                         .getNearbyEntities(
-                                origin, hitbox.range() + 1, hitbox.height() + 1, hitbox.range() + 1)
+                                new Location(
+                                        player.getWorld(),
+                                        midpoint.x(),
+                                        midpoint.y(),
+                                        midpoint.z()),
+                                xRadius,
+                                yRadius,
+                                zRadius)
                         .stream()
                         .filter(LivingEntity.class::isInstance)
                         .map(LivingEntity.class::cast)
@@ -697,8 +750,22 @@ final class CombatSessionController implements Listener {
                                                 player.hasLineOfSight(entity),
                                                 false))
                         .toList();
-        List<ResolvedTarget> resolved = hitboxes.resolve(query, candidates);
-        renderArcDebug(player, query, candidates, resolved, entities);
+        SweptArcResolution sweep =
+                hitboxes.resolve(new SweptArcHitboxQuery(previousQuery, currentQuery), candidates);
+        List<ResolvedTarget> resolved = sweep.targets();
+        renderArcDebug(
+                player,
+                previousQuery,
+                currentQuery,
+                sweep.sampledOrigins(),
+                candidates,
+                resolved,
+                entities);
+        if (sweep.samplingCapped()) {
+            session.lastResolution = "SWEEP_REJECTED motion exceeds 16 blocks/tick";
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            return;
+        }
         if (resolved.isEmpty()) {
             session.lastResolution = "MISS tick=" + session.timeline.tick();
             player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GRAY));
@@ -762,7 +829,9 @@ final class CombatSessionController implements Listener {
 
     private void renderArcDebug(
             Player owner,
-            ArcHitboxQuery query,
+            ArcHitboxQuery previousQuery,
+            ArcHitboxQuery currentQuery,
+            List<CombatVector> sampledOrigins,
             List<TargetCollider> candidates,
             List<ResolvedTarget> resolved,
             Map<UUID, LivingEntity> entities) {
@@ -774,16 +843,37 @@ final class CombatSessionController implements Listener {
                 resolved.stream()
                         .map(ResolvedTarget::entityId)
                         .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        List<CombatVector> outline = arcDebugGeometry.outline(query, 12, 4);
+        List<CombatVector> previousOutline = arcDebugGeometry.outline(previousQuery, 12, 4);
+        List<CombatVector> currentOutline = arcDebugGeometry.outline(currentQuery, 12, 4);
         for (UUID viewerId : List.copyOf(viewerIds)) {
             Player viewer = plugin.getServer().getPlayer(viewerId);
             if (viewer == null || !viewer.isOnline() || viewer.getWorld() != owner.getWorld()) {
                 continue;
             }
-            for (CombatVector point : outline) {
+            for (CombatVector point : previousOutline) {
+                viewer.spawnParticle(
+                        Particle.ELECTRIC_SPARK,
+                        new Location(owner.getWorld(), point.x(), point.y() + 0.15, point.z()),
+                        1,
+                        0,
+                        0,
+                        0,
+                        0);
+            }
+            for (CombatVector point : currentOutline) {
                 viewer.spawnParticle(
                         Particle.END_ROD,
                         new Location(owner.getWorld(), point.x(), point.y() + 0.15, point.z()),
+                        1,
+                        0,
+                        0,
+                        0,
+                        0);
+            }
+            for (CombatVector point : sampledOrigins) {
+                viewer.spawnParticle(
+                        Particle.CLOUD,
+                        new Location(owner.getWorld(), point.x(), point.y() + 0.1, point.z()),
                         1,
                         0,
                         0,
@@ -811,6 +901,38 @@ final class CombatSessionController implements Listener {
                         0);
             }
         }
+    }
+
+    private static ArcHitboxQuery arcQuery(
+            MoveDefinition.Hitbox hitbox, CombatTransform transform) {
+        return new ArcHitboxQuery(
+                transform.origin(),
+                transform.forward(),
+                hitbox.range(),
+                hitbox.angleDegrees(),
+                -0.5,
+                hitbox.height(),
+                hitbox.maxTargets());
+    }
+
+    private static CombatTransform combatTransform(Player player) {
+        Location location = player.getLocation();
+        org.bukkit.util.Vector direction = location.getDirection().setY(0);
+        if (direction.lengthSquared() < 1.0e-9) {
+            double yaw = Math.toRadians(location.getYaw());
+            direction = new org.bukkit.util.Vector(-Math.sin(yaw), 0, Math.cos(yaw));
+        }
+        return new CombatTransform(
+                player.getWorld().getUID(),
+                new CombatVector(location.getX(), location.getY(), location.getZ()),
+                new CombatVector(direction.getX(), 0, direction.getZ()).normalizedHorizontal());
+    }
+
+    private static CombatVector midpoint(CombatVector first, CombatVector second) {
+        return new CombatVector(
+                (first.x() + second.x()) / 2.0,
+                (first.y() + second.y()) / 2.0,
+                (first.z() + second.z()) / 2.0);
     }
 
     private PostureRuntime postureAt(UUID entityId, long tick) {
@@ -994,6 +1116,7 @@ final class CombatSessionController implements Listener {
                 postCancelResources.spendStamina(dodgeProfile.staminaCost()).orElseThrow();
         releaseGuard(session);
         session.timeline = null;
+        session.previousActionTransform = null;
         session.action = ActionState.IDLE;
         session.dodge = runtime;
         session.dodgeDirection = dodgeVector(player, direction);
@@ -1037,7 +1160,12 @@ final class CombatSessionController implements Listener {
             return;
         }
         org.bukkit.Location destination = player.getLocation().add(displacement);
-        player.teleport(destination, PlayerTeleportEvent.TeleportCause.PLUGIN);
+        session.applyingDodgeTeleport = true;
+        try {
+            player.teleport(destination, PlayerTeleportEvent.TeleportCause.PLUGIN);
+        } finally {
+            session.applyingDodgeTeleport = false;
+        }
     }
 
     private static boolean collisionFree(Player player, org.bukkit.util.Vector displacement) {
@@ -1275,6 +1403,7 @@ final class CombatSessionController implements Listener {
         }
         session.timeline =
                 ((Result.Success<ActionTimeline, ActionTimelineErrorCode>) started).value();
+        session.previousActionTransform = combatTransform(player);
         session.activeTraceInitialResources = session.resources;
         session.activeTraceCommands.clear();
         session.action = actionState(session.timeline.phase());
@@ -1300,6 +1429,7 @@ final class CombatSessionController implements Listener {
             finishTrace(session, success.value());
         }
         session.timeline = null;
+        session.previousActionTransform = null;
         session.action = ActionState.IDLE;
     }
 
@@ -1395,6 +1525,14 @@ final class CombatSessionController implements Listener {
         };
     }
 
+    private record CombatTransform(UUID worldId, CombatVector origin, CombatVector forward) {
+        private CombatTransform {
+            Objects.requireNonNull(worldId, "worldId");
+            Objects.requireNonNull(origin, "origin");
+            forward = Objects.requireNonNull(forward, "forward").normalizedHorizontal();
+        }
+    }
+
     private static final class LiveSession {
         private EngagementRuntime engagement;
         private WeaponTransitionSnapshot weapon = WeaponTransitionSnapshot.initial();
@@ -1402,6 +1540,7 @@ final class CombatSessionController implements Listener {
         private CombatResources resources = CombatResources.full(1000, 100, 100);
         private final InputRouter input = new InputRouter();
         private ActionTimeline timeline;
+        private CombatTransform previousActionTransform;
         private DodgeRuntime dodge;
         private GuardRuntime guard;
         private PoiseRuntime poise;
@@ -1411,6 +1550,7 @@ final class CombatSessionController implements Listener {
                 new java.util.ArrayList<>();
         private CombatTrace lastTrace;
         private org.bukkit.util.Vector dodgeDirection;
+        private boolean applyingDodgeTeleport;
         private long lastDodgeMovementElapsed = -1;
         private SneakPressWindow sneakPress;
         private long lastStaminaSpendTick = Long.MIN_VALUE / 2;

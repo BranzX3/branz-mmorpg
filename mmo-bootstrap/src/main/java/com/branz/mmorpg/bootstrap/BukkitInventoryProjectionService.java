@@ -22,6 +22,7 @@ import org.bukkit.inventory.ItemStack;
 /** Applies a complete projection repair to a cloned inventory before one Bukkit mutation. */
 final class BukkitInventoryProjectionService {
     private static final int MAIN_HAND_LOGICAL_SLOT = 100;
+    private static final int OFF_HAND_LOGICAL_SLOT = 101;
     private static final int MAIN_HAND_PHYSICAL_SLOT = 0;
 
     private final BukkitItemProjectionCodec codec;
@@ -52,6 +53,22 @@ final class BukkitInventoryProjectionService {
                         ? null
                         : PersistentCharacterSnapshotMapper.itemProjection(
                                 mainHandRecord, MAIN_HAND_LOGICAL_SLOT);
+        ItemLocationRecord offHandRecord =
+                snapshot.itemRecords().stream()
+                        .filter(
+                                item ->
+                                        item.location().type() == ValueLocationType.NATIVE_EQUIPPED
+                                                && item.location()
+                                                        .reference()
+                                                        .filter("OFF_HAND"::equals)
+                                                        .isPresent())
+                        .findFirst()
+                        .orElse(null);
+        ExpectedProjection expectedOffHand =
+                offHandRecord == null
+                        ? null
+                        : PersistentCharacterSnapshotMapper.itemProjection(
+                                offHandRecord, OFF_HAND_LOGICAL_SLOT);
 
         ItemStack[] original = player.getInventory().getStorageContents();
         ItemStack[] planned = original.clone();
@@ -182,7 +199,64 @@ final class BukkitInventoryProjectionService {
             }
         }
 
+        ItemStack plannedOffHand = player.getInventory().getItemInOffHand();
+        if (expectedOffHand == null) {
+            if (codec.hasProjectionMarker(plannedOffHand)) {
+                plannedOffHand = null;
+                nativeRemoved++;
+            }
+        } else {
+            ItemDefinition definition =
+                    itemEngine.find(expectedOffHand.definitionId()).orElse(null);
+            if (definition == null) {
+                return Result.failure(
+                        ProjectionApplyErrorCode.PROJECTION_DEFINITION_MISSING,
+                        "Active content does not contain " + expectedOffHand.definitionId());
+            }
+            if (!matchesClass(expectedOffHand, definition)) {
+                return Result.failure(
+                        ProjectionApplyErrorCode.PROJECTION_CLASS_MISMATCH,
+                        expectedOffHand.definitionId()
+                                + " database value type does not match content");
+            }
+            List<ObservedProjection> observedOffHand =
+                    codec.decode(plannedOffHand, OFF_HAND_LOGICAL_SLOT)
+                            .map(List::of)
+                            .orElseGet(List::of);
+            if (codec.hasProjectionMarker(plannedOffHand) && observedOffHand.isEmpty()) {
+                plannedOffHand = null;
+                nativeRemoved++;
+            }
+            ProjectionReconciliationPlan offHandPlan =
+                    InventoryProjectionReconciler.reconcile(
+                            List.of(expectedOffHand), observedOffHand);
+            nativeKept += offHandPlan.keepSlots().size();
+            nativeRemoved += offHandPlan.removeSlots().size();
+            if (!offHandPlan.removeSlots().isEmpty()) {
+                plannedOffHand = null;
+            }
+            if (!offHandPlan.materialize().isEmpty()) {
+                if (plannedOffHand != null && !plannedOffHand.getType().isAir()) {
+                    int destination = findFreeSlot(planned, authoritativeSlots);
+                    if (destination < 0) {
+                        return Result.failure(
+                                ProjectionApplyErrorCode.PROJECTION_NO_SAFE_SPACE,
+                                "No free slot to preserve the current off-hand stack.");
+                    }
+                    planned[destination] = plannedOffHand;
+                    relocated++;
+                }
+                plannedOffHand = codec.render(expectedOffHand, definition);
+                nativeMaterialized++;
+            }
+        }
+
         player.getInventory().setStorageContents(planned);
+        player.getInventory()
+                .setItemInOffHand(
+                        plannedOffHand == null
+                                ? new ItemStack(org.bukkit.Material.AIR)
+                                : plannedOffHand);
         if (expectedMainHand != null) {
             player.getInventory().setHeldItemSlot(MAIN_HAND_PHYSICAL_SLOT);
         }

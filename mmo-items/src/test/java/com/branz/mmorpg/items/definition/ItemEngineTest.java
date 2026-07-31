@@ -276,6 +276,92 @@ class ItemEngineTest {
                 ((Result.Failure<ItemEngine, ItemEngineErrorCode>) rejected).error());
     }
 
+    @Test
+    void compilesGreatswordAndShieldGuardContractsAndRejectsInvalidOffhandPolicy()
+            throws Exception {
+        String guard =
+                """
+                {
+                  "cone_degrees": 120,
+                  "physical_block_ratio": 0.8,
+                  "perfect_window_ticks": 4,
+                  "maximum_stability": 100,
+                  "recovery_delay_ticks": 30,
+                  "inactive_recovery_per_second": 20,
+                  "active_recovery_per_second": 8,
+                  "break_ticks": 24,
+                  "stability_after_break": 35
+                }
+                """;
+        ContentSnapshot valid =
+                snapshot(
+                        definition(
+                                "weapon.test.greatsword",
+                                """
+                                {
+                                  "asset_id": "weapon.test.greatsword",
+                                  "item_class": "UNIQUE_DURABLE",
+                                  "base_max_durability": 160,
+                                  "weapon_profile": {
+                                    "family": "GREATSWORD",
+                                    "power": 135,
+                                    "offhand_policy": "EMPTY",
+                                    "guard": %s
+                                  }
+                                }
+                                """
+                                        .formatted(guard)),
+                        definition(
+                                "equipment.test.shield",
+                                """
+                                {
+                                  "asset_id": "equipment.test.shield",
+                                  "item_class": "UNIQUE_DURABLE",
+                                  "base_max_durability": 180,
+                                  "shield_profile": {"guard": %s}
+                                }
+                                """
+                                        .formatted(guard)));
+
+        ItemEngine engine =
+                ((Result.Success<ItemEngine, ItemEngineErrorCode>) ItemEngine.compile(valid))
+                        .value();
+        WeaponCombatProfile greatsword =
+                engine.find(DefinitionId.of("weapon.test.greatsword"))
+                        .orElseThrow()
+                        .weaponProfile()
+                        .orElseThrow();
+        ShieldProfile shield =
+                engine.find(DefinitionId.of("equipment.test.shield"))
+                        .orElseThrow()
+                        .shieldProfile()
+                        .orElseThrow();
+        assertEquals(OffhandPolicy.EMPTY, greatsword.offhandPolicy());
+        assertEquals(100, greatsword.guardProfile().orElseThrow().maximumStability());
+        assertEquals(0.8, shield.guardProfile().physicalBlockRatio());
+
+        String invalid =
+                """
+                {
+                  "asset_id": "weapon.test.greatsword",
+                  "item_class": "UNIQUE_DURABLE",
+                  "base_max_durability": 160,
+                  "weapon_profile": {
+                    "family": "GREATSWORD",
+                    "power": 135,
+                    "offhand_policy": "SHIELD",
+                    "guard": %s
+                  }
+                }
+                """
+                        .formatted(guard);
+        Result<ItemEngine, ItemEngineErrorCode> rejected =
+                ItemEngine.compile(snapshot(definition("weapon.test.greatsword", invalid)));
+        assertEquals(
+                ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID,
+                ((Result.Failure<ItemEngine, ItemEngineErrorCode>) rejected).error());
+    }
+
     private static ContentDefinition definition(String id, String body) throws Exception {
         return new ContentDefinition(
                 DefinitionId.of(id),

@@ -1,0 +1,46 @@
+definition_id: move.training_greatsword.committed_cleave
+schema_version: 1
+family: GREATSWORD
+input:
+  action: PRIMARY
+  direction: NEUTRAL
+  branch: PRIMARY_1
+phases:
+  windup_ticks: 8
+  active_ticks: 4
+  recovery_ticks: 12
+commit_tick: 6
+costs:
+  stamina: 24
+  mana: 0
+  health: 0
+  setup_stamina: 2
+movement:
+  curve: COMMITTED_STEP
+  facing_turn_degrees: 8
+hitboxes:
+  - tick: 8
+    shape: ARC
+    range: 3.4
+    angle_degrees: 125
+    height: 2.2
+    max_targets: 6
+    hit_group: PRIMARY
+outputs:
+  health:
+    physical_type: SLASH
+    move_coefficient: 1.15
+  posture: 28
+  guard_pressure: 24
+cancels:
+  dodge_from_tick: 17
+  chain_windows:
+    - from_tick: 14
+      to_tick: 19
+      branch: PRIMARY_2
+interrupt_resistance: LIGHT
+presentation:
+  archetype: GREATSWORD_COMMITTED_CLEAVE
+profiles:
+  pve_multiplier: 1.0
+  pvp_multiplier: 0.65

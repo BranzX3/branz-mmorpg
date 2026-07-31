@@ -36,6 +36,73 @@
           "x-unit" : "power",
           "minimum" : 1.0E-6
         },
+        "offhand_policy" : {
+          "type" : "string",
+          "description" : "Off-hand requirement checked before combat readiness.",
+          "enum" : [ "ANY", "EMPTY", "SHIELD" ]
+        },
+        "guard" : {
+          "type" : "object",
+          "properties" : {
+            "cone_degrees" : {
+              "type" : "number",
+              "description" : "Directional weapon-guard coverage.",
+              "x-unit" : "degrees",
+              "minimum" : 1.0E-6,
+              "maximum" : 360.0
+            },
+            "physical_block_ratio" : {
+              "type" : "number",
+              "description" : "Physical damage blocked by weapon guard.",
+              "x-unit" : "ratio",
+              "minimum" : 0.0,
+              "maximum" : 1.0
+            },
+            "perfect_window_ticks" : {
+              "type" : "integer",
+              "description" : "Unmodified perfect-guard window.",
+              "x-unit" : "ticks",
+              "minimum" : 1.0,
+              "maximum" : 20.0
+            },
+            "maximum_stability" : {
+              "type" : "number",
+              "description" : "Maximum weapon-guard stability.",
+              "x-unit" : "stability",
+              "minimum" : 1.0E-6
+            },
+            "recovery_delay_ticks" : {
+              "type" : "integer",
+              "description" : "Delay before stability recovery.",
+              "x-unit" : "ticks",
+              "minimum" : 0.0
+            },
+            "inactive_recovery_per_second" : {
+              "type" : "number",
+              "description" : "Stability recovery while guard is lowered.",
+              "x-unit" : "stability_per_second",
+              "minimum" : 0.0
+            },
+            "active_recovery_per_second" : {
+              "type" : "number",
+              "description" : "Stability recovery while guard is held.",
+              "x-unit" : "stability_per_second",
+              "minimum" : 0.0
+            },
+            "break_ticks" : {
+              "type" : "integer",
+              "description" : "Guard-break recovery duration.",
+              "x-unit" : "ticks",
+              "minimum" : 1.0
+            },
+            "stability_after_break" : {
+              "type" : "number",
+              "description" : "Stability restored after Guard Break.",
+              "x-unit" : "stability",
+              "minimum" : 0.0
+            }
+          }
+        },
         "bow" : {
           "type" : "object",
           "properties" : {
@@ -170,6 +237,73 @@
           "description" : "Durability consumed at spell commit.",
           "x-unit" : "durability",
           "minimum" : 1.0
+        }
+      }
+    },
+    "shield_profile" : {
+      "type" : "object",
+      "properties" : {
+        "guard" : {
+          "type" : "object",
+          "properties" : {
+            "cone_degrees" : {
+              "type" : "number",
+              "description" : "Directional shield-guard coverage.",
+              "x-unit" : "degrees",
+              "minimum" : 1.0E-6,
+              "maximum" : 360.0
+            },
+            "physical_block_ratio" : {
+              "type" : "number",
+              "description" : "Physical damage blocked by shield guard.",
+              "x-unit" : "ratio",
+              "minimum" : 0.0,
+              "maximum" : 1.0
+            },
+            "perfect_window_ticks" : {
+              "type" : "integer",
+              "description" : "Unmodified shield perfect-guard window.",
+              "x-unit" : "ticks",
+              "minimum" : 1.0,
+              "maximum" : 20.0
+            },
+            "maximum_stability" : {
+              "type" : "number",
+              "description" : "Maximum shield stability.",
+              "x-unit" : "stability",
+              "minimum" : 1.0E-6
+            },
+            "recovery_delay_ticks" : {
+              "type" : "integer",
+              "description" : "Delay before shield stability recovery.",
+              "x-unit" : "ticks",
+              "minimum" : 0.0
+            },
+            "inactive_recovery_per_second" : {
+              "type" : "number",
+              "description" : "Shield stability recovery while lowered.",
+              "x-unit" : "stability_per_second",
+              "minimum" : 0.0
+            },
+            "active_recovery_per_second" : {
+              "type" : "number",
+              "description" : "Shield stability recovery while held.",
+              "x-unit" : "stability_per_second",
+              "minimum" : 0.0
+            },
+            "break_ticks" : {
+              "type" : "integer",
+              "description" : "Shield Guard Break duration.",
+              "x-unit" : "ticks",
+              "minimum" : 1.0
+            },
+            "stability_after_break" : {
+              "type" : "number",
+              "description" : "Shield stability restored after Guard Break.",
+              "x-unit" : "stability",
+              "minimum" : 0.0
+            }
+          }
         }
       }
     }

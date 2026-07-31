@@ -1,0 +1,46 @@
+definition_id: move.training_sword_shield.primary_1
+schema_version: 1
+family: SWORD_SHIELD
+input:
+  action: PRIMARY
+  direction: NEUTRAL
+  branch: PRIMARY_1
+phases:
+  windup_ticks: 3
+  active_ticks: 3
+  recovery_ticks: 6
+commit_tick: 2
+costs:
+  stamina: 10
+  mana: 0
+  health: 0
+  setup_stamina: 0
+movement:
+  curve: RESPONSIVE_STEP
+  facing_turn_degrees: 18
+hitboxes:
+  - tick: 3
+    shape: ARC
+    range: 2.7
+    angle_degrees: 85
+    height: 2.0
+    max_targets: 3
+    hit_group: PRIMARY
+outputs:
+  health:
+    physical_type: SLASH
+    move_coefficient: 0.72
+  posture: 14
+  guard_pressure: 12
+cancels:
+  dodge_from_tick: 7
+  chain_windows:
+    - from_tick: 6
+      to_tick: 9
+      branch: PRIMARY_2
+interrupt_resistance: LIGHT
+presentation:
+  archetype: SWORD_SHIELD_RESPONSIVE_STRIKE
+profiles:
+  pve_multiplier: 1.0
+  pvp_multiplier: 0.65

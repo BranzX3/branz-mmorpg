@@ -5,6 +5,9 @@ import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.items.definition.WeaponLoadoutErrorCode;
+import com.branz.mmorpg.items.definition.WeaponLoadoutPolicy;
+import com.branz.mmorpg.items.definition.WeaponLoadoutResolution;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.projection.ExpectedProjection;
@@ -29,6 +32,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -174,6 +178,14 @@ final class SceneHubController implements Listener {
         }
         if (action.startsWith("equip-main:")) {
             previewMainHand(player, holder, action.substring("equip-main:".length()));
+            return;
+        }
+        if (action.startsWith("equip-offhand:")) {
+            previewOffHand(player, holder, action.substring("equip-offhand:".length()));
+            return;
+        }
+        if ("unequip-offhand".equals(action)) {
+            previewEquipment(player, holder, Optional.empty(), EquipmentSlot.OFF_HAND);
             return;
         }
         if (action.startsWith("equip-quiver:")) {
@@ -435,6 +447,17 @@ final class SceneHubController implements Listener {
                                 "equip-quiver:" + projection.valueId()));
                 continue;
             }
+            if (definition.shieldProfile().isPresent()) {
+                inventory.setItem(
+                        buttonSlot++,
+                        button(
+                                Material.SHIELD,
+                                definition.id().value()
+                                        + " #"
+                                        + projection.valueId().toString().substring(0, 8),
+                                "equip-offhand:" + projection.valueId()));
+                continue;
+            }
             if (definition.weaponProfile().isEmpty()) {
                 continue;
             }
@@ -463,6 +486,28 @@ final class SceneHubController implements Listener {
                         .orElse("empty");
         inventory.setItem(
                 37, button(Material.PAPER, "Main hand: " + committed + " -> " + preview, "noop"));
+        String committedOffHand =
+                sceneSession
+                        .committedState()
+                        .equipment()
+                        .item(EquipmentSlot.OFF_HAND)
+                        .map(item -> item.value().toString().substring(0, 8))
+                        .orElse("empty");
+        String previewOffHand =
+                sceneSession
+                        .previewState()
+                        .equipment()
+                        .item(EquipmentSlot.OFF_HAND)
+                        .map(item -> item.value().toString().substring(0, 8))
+                        .orElse("empty");
+        inventory.setItem(
+                36,
+                button(
+                        Material.SHIELD,
+                        "Off hand: " + committedOffHand + " -> " + previewOffHand,
+                        "noop"));
+        inventory.setItem(
+                42, button(Material.GRAY_DYE, "Preview empty off hand", "unequip-offhand"));
         String committedQuiver =
                 sceneSession
                         .committedState()
@@ -537,6 +582,10 @@ final class SceneHubController implements Listener {
         previewEquipment(player, holder, itemUuid, EquipmentSlot.MAIN_HAND);
     }
 
+    private void previewOffHand(Player player, SceneInventoryHolder holder, String itemUuid) {
+        previewEquipment(player, holder, itemUuid, EquipmentSlot.OFF_HAND);
+    }
+
     private void previewQuiver(Player player, SceneInventoryHolder holder, String itemUuid) {
         previewEquipment(player, holder, itemUuid, EquipmentSlot.QUIVER);
     }
@@ -545,12 +594,22 @@ final class SceneHubController implements Listener {
             Player player, SceneInventoryHolder holder, String itemUuid, EquipmentSlot slot) {
         try {
             ItemId itemId = new ItemId(UUID.fromString(itemUuid));
+            previewEquipment(player, holder, Optional.of(itemId), slot);
+        } catch (IllegalArgumentException exception) {
+            player.sendActionBar(
+                    Component.text("Invalid equipment selection.", NamedTextColor.RED));
+        }
+    }
+
+    private void previewEquipment(
+            Player player,
+            SceneInventoryHolder holder,
+            Optional<ItemId> itemId,
+            EquipmentSlot slot) {
+        try {
             Result<SceneSession, SceneErrorCode> result =
                     sessions.previewEquipment(
-                            player.getUniqueId(),
-                            holder.sessionId(),
-                            slot,
-                            java.util.Optional.of(itemId));
+                            player.getUniqueId(), holder.sessionId(), slot, itemId);
             result.map(
                     session -> {
                         navigate(player, session);
@@ -705,6 +764,15 @@ final class SceneHubController implements Listener {
                         .committedState()
                         .equipment()
                         .equals(sceneSession.previewState().equipment());
+        if (equipmentChanged) {
+            Optional<String> invalid =
+                    equipmentCompatibilityFailure(player, sceneSession.previewState().equipment());
+            if (invalid.isPresent()) {
+                committing.remove(player.getUniqueId());
+                player.sendActionBar(Component.text(invalid.orElseThrow(), NamedTextColor.RED));
+                return;
+            }
+        }
         boolean preparationChanged =
                 !sceneSession
                         .committedState()
@@ -800,6 +868,47 @@ final class SceneHubController implements Listener {
             characterSessions.commitEquipment(
                     player, sceneSession.previewState().equipment(), contentVersion, completion);
         }
+    }
+
+    private Optional<String> equipmentCompatibilityFailure(
+            Player player, EquipmentLoadout loadout) {
+        LoadedCharacterSession character = characterSessions.active(player).orElse(null);
+        if (character == null) {
+            return Optional.of("Character session is unavailable.");
+        }
+        ItemDefinition main = equipmentDefinition(character, loadout, EquipmentSlot.MAIN_HAND);
+        ItemDefinition offHand = equipmentDefinition(character, loadout, EquipmentSlot.OFF_HAND);
+        if (loadout.item(EquipmentSlot.MAIN_HAND).isPresent() && main == null) {
+            return Optional.of("Main-hand item is missing from authoritative character state.");
+        }
+        if (loadout.item(EquipmentSlot.OFF_HAND).isPresent() && offHand == null) {
+            return Optional.of("Off-hand item is missing from authoritative character state.");
+        }
+        if (main == null) {
+            return offHand == null
+                    ? Optional.empty()
+                    : Optional.of("Unequip the Shield or select a Sword & Shield weapon.");
+        }
+        Result<WeaponLoadoutResolution, WeaponLoadoutErrorCode> resolved =
+                WeaponLoadoutPolicy.resolve(main, Optional.ofNullable(offHand));
+        return resolved
+                        instanceof
+                        Result.Failure<WeaponLoadoutResolution, WeaponLoadoutErrorCode> failure
+                ? Optional.of(failure.detail())
+                : Optional.empty();
+    }
+
+    private ItemDefinition equipmentDefinition(
+            LoadedCharacterSession character, EquipmentLoadout loadout, EquipmentSlot slot) {
+        ItemId itemId = loadout.item(slot).orElse(null);
+        if (itemId == null) {
+            return null;
+        }
+        return character.snapshot().itemRecords().stream()
+                .filter(record -> record.itemId().equals(itemId))
+                .findFirst()
+                .flatMap(record -> itemEngine.find(record.definitionId()))
+                .orElse(null);
     }
 
     private ItemStack button(Material material, String label, String action) {

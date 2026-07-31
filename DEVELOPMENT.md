@@ -279,6 +279,22 @@ with an operator/test account:
 80. Cast once, disconnect/reconnect and restart Paper. Re-equip the same Staff UUID and cast again;
     the action bar must show catalyst durability continuing from 99/100 to 98/100 rather than
     resetting. Exhausted durability must report `CATALYST BROKEN` without mana reservation.
+81. Use `/mmo dev` to grant `weapon.training_greatsword`. In Chronicle equipment, preview an empty
+    off hand and the Greatsword before one Confirm. Verify the main-hand UUID persists, the off hand
+    is empty and `/mmo health` reaches `GREATSWORD READY` after draw.
+82. LMB with Greatsword and verify `move.training_greatsword.committed_cleave` spends 24 stamina,
+    uses the wide authored ARC and produces more posture/guard pressure than the training Sword.
+    RMB while Engaged must use the narrower, lower-stability Greatsword weapon guard.
+83. Grant `weapon.training_sword` and `equipment.training_shield`. Preview both in the same Scene
+    session and Confirm once. Verify signed IRON_SWORD/SHIELD projections appear in main/off hand,
+    LMB runs `move.training_sword_shield.primary_1` and RMB uses the Shield's 145-degree guard with
+    four exact perfect-guard ticks.
+84. Attempt Greatsword with the Shield still selected and Sword & Shield with an empty off hand.
+    Verify Scene rejects both combinations and no item location/version changes. Use the empty
+    off-hand preview to change builds atomically.
+85. Disconnect/reconnect and restart Paper after equipping Sword and Shield. Verify both exact item
+    UUIDs return to their native slots. Preview empty off hand and Confirm; the same Shield UUID must
+    move to one free authoritative inventory slot without duplicating its projection.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
@@ -297,7 +313,9 @@ stored Bolt at `BOLT_PLACED`, persists `LOADED` on the item UUID and clears it b
 creation. Staff casting reserves mana before release, commits one item-owned catalyst durability
 through PostgreSQL before Fire Lance creation and uses the same authoritative projectile/HP/posture
 engines with a separate arcane damage channel. Persistent attunement/build selection, the rest of
-the Ember art, Runic Imbuement, encounter recovery and lot merging remain later slices.
+the Ember art, Runic Imbuement, encounter recovery and lot merging remain later slices. Greatsword
+and Sword & Shield use the same move/damage authority, while one shared item loadout policy validates
+their empty-off-hand or Shield requirement before Scene commit and combat readiness.
 
 Live engagement check:
 

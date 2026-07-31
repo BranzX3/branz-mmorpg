@@ -1456,3 +1456,52 @@ Non-goals:
 Schema/config impact: item schema adds optional `catalyst_profile`; spell schema gains a complete
 charge-projectile contract and the manifest adds one item, one move and one spell. Migration impact:
 no SQL migration; existing item JSONB and value journal are reused, documented by ADR 0011.
+
+## Milestone 5 - five weapon-family and linked off-hand slice
+
+Implemented:
+
+- V1 now has explicit training runtimes and content for Greatsword, Sword and Shield, Bow,
+  Crossbow and Staff; the legacy training blade remains a compatible fixture and its stable IDs are
+  not reused;
+- Greatsword uses a high-commitment wide ARC, high posture/guard pressure, authored weapon guard
+  and an empty-off-hand invariant;
+- Sword and Shield uses a responsive ARC and an item-owned Shield guard with a wider cone, stronger
+  block and higher stability than Greatsword;
+- Item Engine compiles one shared `WeaponLoadoutPolicy` from off-hand and guard profiles; both Scene
+  commit validation and Paper combat readiness use that authority;
+- Scene can preview main hand and native off hand together, then atomically commit up to two linked
+  slots or return an unequipped Shield to one free authoritative inventory slot;
+- PostgreSQL retains both item UUIDs and versions through `item.move.batch`; reconnect and database
+  restart reconstruct the same equipment loadout;
+- Bukkit reconciliation now signs, materializes and removes the native off-hand projection without
+  trusting the client item as ownership truth;
+- changing the authoritative guard source resets transient stability, preventing Greatsword and
+  Shield stability from crossing equipment boundaries.
+
+Tests:
+
+- Item Engine compiles Greatsword/Shield guard contracts and rejects an invalid Greatsword off-hand
+  policy;
+- shared loadout-policy tests cover Shield requirement, Shield guard selection and Greatsword
+  empty-off-hand rejection;
+- embedded PostgreSQL integration commits main/off-hand together, restores both across restart and
+  proves explicit Shield unequip returns the same UUID to inventory.
+
+Failure/recovery behavior:
+
+- invalid pairs fail visibly before combat or Scene commit;
+- a linked transaction with stale ownership/version or no free unequip destination rolls back every
+  item move and audit mutation;
+- malformed/missing item definitions fail closed and signed projection reconciliation never creates
+  ownership.
+
+Non-goals:
+
+- the approximately 30 launch-content techniques and complete animation/resource-pack art;
+- shield durability loss and repair, which belongs to the later durability subsystem;
+- arbitrary dual-wield/off-hand weapon combinations outside the five V1 families.
+
+Schema/config impact: item schema adds additive off-hand and guard contracts; the example snapshot
+adds Greatsword, Sword, Shield and two primary moves. Migration impact: no SQL migration; existing
+native equipment locations and batch journal are reused, documented by ADR 0012.

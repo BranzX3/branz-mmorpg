@@ -12,9 +12,11 @@ import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.AmmoProfile;
 import com.branz.mmorpg.items.definition.CatalystProfile;
 import com.branz.mmorpg.items.definition.CrossbowWeaponProfile;
+import com.branz.mmorpg.items.definition.GuardCombatProfile;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.QuiverProfile;
+import com.branz.mmorpg.items.definition.ShieldProfile;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
@@ -27,6 +29,100 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CharacterSessionServiceIntegrationTest {
+    @Test
+    void linkedMainAndOffHandCommitAtomicallyAndSurviveDatabaseRestart(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(10));
+        UUID playerId = UUID.randomUUID();
+        ItemId swordId;
+        ItemId shieldId;
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database);
+            LoadedCharacterSession session = success(service.open(playerId));
+            ItemDefinition sword =
+                    new ItemDefinition(
+                            DefinitionId.of("weapon.test.sword"),
+                            DefinitionId.of("weapon.test.sword"),
+                            ItemClass.UNIQUE_DURABLE,
+                            OptionalInt.of(120),
+                            false);
+            ItemDefinition shield =
+                    new ItemDefinition(
+                            DefinitionId.of("equipment.test.shield"),
+                            DefinitionId.of("equipment.test.shield"),
+                            ItemClass.UNIQUE_DURABLE,
+                            OptionalInt.of(180),
+                            false,
+                            Optional.empty(),
+                            Optional.empty(),
+                            Optional.empty(),
+                            Optional.empty(),
+                            Optional.of(
+                                    new ShieldProfile(
+                                            new GuardCombatProfile(
+                                                    145, 0.9, 4, 130, 24, 24, 10, 22, 50))));
+            LoadedCharacterSession grantedSword =
+                    success(service.grantTestValue(session, sword, 2, "content.test.1"));
+            LoadedCharacterSession grantedBoth =
+                    success(service.grantTestValue(grantedSword, shield, 3, "content.test.1"));
+            swordId = itemId(grantedBoth, sword.id());
+            shieldId = itemId(grantedBoth, shield.id());
+            LoadedCharacterSession equipped =
+                    success(
+                            service.commitEquipment(
+                                    grantedBoth,
+                                    grantedBoth
+                                            .snapshot()
+                                            .equipment()
+                                            .with(EquipmentSlot.MAIN_HAND, Optional.of(swordId))
+                                            .with(EquipmentSlot.OFF_HAND, Optional.of(shieldId)),
+                                    "content.test.1"));
+            assertEquals(
+                    swordId,
+                    equipped.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElseThrow());
+            assertEquals(
+                    shieldId,
+                    equipped.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
+            service.close(equipped);
+        }
+        try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(restarted);
+            LoadedCharacterSession restored = success(service.open(playerId));
+            assertEquals(
+                    swordId,
+                    restored.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElseThrow());
+            assertEquals(
+                    shieldId,
+                    restored.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
+            LoadedCharacterSession shieldUnequipped =
+                    success(
+                            service.commitEquipment(
+                                    restored,
+                                    restored.snapshot()
+                                            .equipment()
+                                            .with(EquipmentSlot.OFF_HAND, Optional.empty()),
+                                    "content.test.1"));
+            assertTrue(
+                    shieldUnequipped.snapshot().equipment().item(EquipmentSlot.OFF_HAND).isEmpty());
+            assertTrue(
+                    shieldUnequipped.snapshot().inventory().stream()
+                            .anyMatch(value -> value.valueId().equals(shieldId.value())));
+            service.close(shieldUnequipped);
+        }
+    }
+
     @Test
     void catalystWearCommitsExactlyOnceAndSurvivesReconnectAndRestart(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
@@ -551,6 +647,15 @@ class CharacterSessionServiceIntegrationTest {
                             afterServerRestart.snapshot().lotRecords(), restartedQuiverId));
             service.close(afterServerRestart);
         }
+    }
+
+    private static ItemId itemId(LoadedCharacterSession session, DefinitionId definitionId) {
+        return new ItemId(
+                session.snapshot().inventory().stream()
+                        .filter(value -> value.definitionId().equals(definitionId))
+                        .findFirst()
+                        .orElseThrow()
+                        .valueId());
     }
 
     private static LoadedCharacterSession success(

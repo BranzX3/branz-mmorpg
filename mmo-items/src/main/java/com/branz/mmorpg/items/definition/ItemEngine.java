@@ -99,19 +99,28 @@ public final class ItemEngine {
                         ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID,
                         "weapon_profile requires non-blank family and positive power");
             }
-            Optional<BowWeaponProfile> bowProfile;
-            Optional<CrossbowWeaponProfile> crossbowProfile;
             try {
-                bowProfile = compileBowProfile(family, weaponNode.get("bow"));
-                crossbowProfile = compileCrossbowProfile(family, weaponNode.get("crossbow"));
+                Optional<BowWeaponProfile> bowProfile =
+                        compileBowProfile(family, weaponNode.get("bow"));
+                Optional<CrossbowWeaponProfile> crossbowProfile =
+                        compileCrossbowProfile(family, weaponNode.get("crossbow"));
+                OffhandPolicy offhandPolicy =
+                        OffhandPolicy.valueOf(weaponNode.path("offhand_policy").asText("ANY"));
+                Optional<GuardCombatProfile> guardProfile =
+                        compileGuardProfile(weaponNode.get("guard"));
+                weaponProfile =
+                        Optional.of(
+                                new WeaponCombatProfile(
+                                        family,
+                                        power.doubleValue(),
+                                        bowProfile,
+                                        crossbowProfile,
+                                        offhandPolicy,
+                                        guardProfile));
             } catch (IllegalArgumentException exception) {
                 return Result.failure(
                         ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID, exception.getMessage());
             }
-            weaponProfile =
-                    Optional.of(
-                            new WeaponCombatProfile(
-                                    family, power.doubleValue(), bowProfile, crossbowProfile));
         }
         Optional<AmmoProfile> ammoProfile;
         try {
@@ -135,6 +144,13 @@ public final class ItemEngine {
             return Result.failure(
                     ItemEngineErrorCode.ITEM_CATALYST_PROFILE_INVALID, exception.getMessage());
         }
+        Optional<ShieldProfile> shieldProfile;
+        try {
+            shieldProfile = compileShieldProfile(itemClass, durability, body.get("shield_profile"));
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    ItemEngineErrorCode.ITEM_SHIELD_PROFILE_INVALID, exception.getMessage());
+        }
         try {
             return Result.success(
                     new ItemDefinition(
@@ -146,7 +162,8 @@ public final class ItemEngine {
                             weaponProfile,
                             ammoProfile,
                             quiverProfile,
-                            catalystProfile));
+                            catalystProfile,
+                            shieldProfile));
         } catch (IllegalArgumentException exception) {
             return Result.failure(ItemEngineErrorCode.ITEM_CLASS_INVALID, exception.getMessage());
         }
@@ -232,6 +249,44 @@ public final class ItemEngine {
                         tags,
                         requiredNumber(catalystNode, "channel_stability"),
                         requiredInteger(catalystNode, "durability_cost_per_commit")));
+    }
+
+    private static Optional<ShieldProfile> compileShieldProfile(
+            ItemClass itemClass, OptionalInt durability, JsonNode shieldNode) {
+        if (shieldNode == null || shieldNode.isNull()) {
+            return Optional.empty();
+        }
+        if (itemClass != ItemClass.UNIQUE_DURABLE
+                || durability.isEmpty()
+                || !shieldNode.isObject()) {
+            throw new IllegalArgumentException(
+                    "shield_profile requires a durable UNIQUE_DURABLE item");
+        }
+        Optional<GuardCombatProfile> guard = compileGuardProfile(shieldNode.get("guard"));
+        if (guard.isEmpty()) {
+            throw new IllegalArgumentException("shield_profile requires guard fields");
+        }
+        return Optional.of(new ShieldProfile(guard.orElseThrow()));
+    }
+
+    private static Optional<GuardCombatProfile> compileGuardProfile(JsonNode guardNode) {
+        if (guardNode == null || guardNode.isNull()) {
+            return Optional.empty();
+        }
+        if (!guardNode.isObject()) {
+            throw new IllegalArgumentException("guard profile must be an object");
+        }
+        return Optional.of(
+                new GuardCombatProfile(
+                        requiredNumber(guardNode, "cone_degrees"),
+                        requiredNumber(guardNode, "physical_block_ratio"),
+                        requiredInteger(guardNode, "perfect_window_ticks"),
+                        requiredNumber(guardNode, "maximum_stability"),
+                        requiredInteger(guardNode, "recovery_delay_ticks"),
+                        requiredNumber(guardNode, "inactive_recovery_per_second"),
+                        requiredNumber(guardNode, "active_recovery_per_second"),
+                        requiredInteger(guardNode, "break_ticks"),
+                        requiredNumber(guardNode, "stability_after_break")));
     }
 
     private static Optional<BowWeaponProfile> compileBowProfile(String family, JsonNode bowNode) {

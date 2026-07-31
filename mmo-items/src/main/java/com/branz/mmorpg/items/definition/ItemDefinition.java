@@ -14,7 +14,8 @@ public record ItemDefinition(
         Optional<WeaponCombatProfile> weaponProfile,
         Optional<AmmoProfile> ammoProfile,
         Optional<QuiverProfile> quiverProfile,
-        Optional<CatalystProfile> catalystProfile) {
+        Optional<CatalystProfile> catalystProfile,
+        Optional<ShieldProfile> shieldProfile) {
     public ItemDefinition {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(assetId, "assetId");
@@ -24,6 +25,7 @@ public record ItemDefinition(
         Objects.requireNonNull(ammoProfile, "ammoProfile");
         Objects.requireNonNull(quiverProfile, "quiverProfile");
         Objects.requireNonNull(catalystProfile, "catalystProfile");
+        Objects.requireNonNull(shieldProfile, "shieldProfile");
         if (baseMaxDurability.isPresent() && baseMaxDurability.getAsInt() < 1) {
             throw new IllegalArgumentException("baseMaxDurability must be positive");
         }
@@ -34,11 +36,12 @@ public record ItemDefinition(
                 && (weaponProfile.isPresent()
                         || ammoProfile.isPresent()
                         || quiverProfile.isPresent()
-                        || catalystProfile.isPresent())) {
+                        || catalystProfile.isPresent()
+                        || shieldProfile.isPresent())) {
             throw new IllegalArgumentException(
                     "cosmetic definitions cannot have gameplay profiles");
         }
-        if (java.util.stream.Stream.of(weaponProfile, ammoProfile, quiverProfile)
+        if (java.util.stream.Stream.of(weaponProfile, ammoProfile, quiverProfile, shieldProfile)
                         .filter(Optional::isPresent)
                         .count()
                 > 1) {
@@ -61,6 +64,34 @@ public record ItemDefinition(
             throw new IllegalArgumentException(
                     "Catalyst profiles cannot share ammo or Quiver runtime profiles");
         }
+        if (shieldProfile.isPresent()
+                && (itemClass != ItemClass.UNIQUE_DURABLE || baseMaxDurability.isEmpty())) {
+            throw new IllegalArgumentException(
+                    "Shield profiles require a durable UNIQUE_DURABLE item");
+        }
+    }
+
+    public ItemDefinition(
+            DefinitionId id,
+            DefinitionId assetId,
+            ItemClass itemClass,
+            OptionalInt baseMaxDurability,
+            boolean cosmetic,
+            Optional<WeaponCombatProfile> weaponProfile,
+            Optional<AmmoProfile> ammoProfile,
+            Optional<QuiverProfile> quiverProfile,
+            Optional<CatalystProfile> catalystProfile) {
+        this(
+                id,
+                assetId,
+                itemClass,
+                baseMaxDurability,
+                cosmetic,
+                weaponProfile,
+                ammoProfile,
+                quiverProfile,
+                catalystProfile,
+                Optional.empty());
     }
 
     public ItemDefinition(
@@ -81,6 +112,7 @@ public record ItemDefinition(
                 weaponProfile,
                 ammoProfile,
                 quiverProfile,
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -100,6 +132,7 @@ public record ItemDefinition(
                 weaponProfile,
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -115,6 +148,7 @@ public record ItemDefinition(
                 itemClass,
                 baseMaxDurability,
                 cosmetic,
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),

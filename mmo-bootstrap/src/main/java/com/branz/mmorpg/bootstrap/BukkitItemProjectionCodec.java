@@ -94,6 +94,9 @@ final class BukkitItemProjectionCodec {
         if (definition.quiverProfile().isPresent()) {
             return Material.LEATHER;
         }
+        if (definition.shieldProfile().isPresent()) {
+            return Material.SHIELD;
+        }
         return definition
                 .weaponProfile()
                 .map(
@@ -101,7 +104,8 @@ final class BukkitItemProjectionCodec {
                                 switch (profile.family()) {
                                     case "BOW" -> Material.BOW;
                                     case "CROSSBOW" -> Material.CROSSBOW;
-                                    case "SWORD", "GREATSWORD" -> Material.IRON_SWORD;
+                                    case "SWORD", "SWORD_SHIELD" -> Material.IRON_SWORD;
+                                    case "GREATSWORD" -> Material.IRON_AXE;
                                     case "STAFF" -> Material.BLAZE_ROD;
                                     default -> Material.BARRIER;
                                 })

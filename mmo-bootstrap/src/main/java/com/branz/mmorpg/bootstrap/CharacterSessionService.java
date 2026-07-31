@@ -658,44 +658,47 @@ final class CharacterSessionService {
         if (changed.isEmpty()) {
             return Result.success(session);
         }
-        if (changed.size() != 1) {
+        if (changed.size() > 2) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
-                    "This Scene slice commits one equipment slot at a time.");
+                    "One equipment transaction may change at most two linked slots.");
         }
-        EquipmentSlot slot = changed.getFirst();
-        Optional<ItemId> desiredItem = desired.item(slot);
-        if (desiredItem.isEmpty()) {
-            return Result.failure(
-                    CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
-                    "Unequip requires an explicit free destination slot.");
-        }
-        ItemLocationRecord incoming =
-                findItem(session.snapshot().itemRecords(), desiredItem.orElseThrow()).orElse(null);
-        if (incoming == null
-                || incoming.location().type()
-                        != com.branz.mmorpg.persistence.transaction.ValueLocationType
-                                .CHARACTER_INVENTORY) {
-            return Result.failure(
-                    CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
-                    "Selected item is not in this character's inventory.");
-        }
-        ValueLocation equippedLocation =
-                isNative(slot)
-                        ? ValueLocation.nativeEquipped(slot.name())
-                        : ValueLocation.virtualEquipped(slot.name());
         List<ItemLocationMove> moves = new java.util.ArrayList<>();
-        moves.add(
-                new ItemLocationMove(
-                        incoming.itemId(),
-                        incoming.version(),
-                        incoming.ownerCharacterId(),
-                        incoming.location(),
-                        incoming.ownerCharacterId(),
-                        equippedLocation));
-
-        Optional<ItemId> currentItem = session.snapshot().equipment().item(slot);
-        if (currentItem.isPresent()) {
+        java.util.EnumMap<EquipmentSlot, ItemLocationRecord> incomingBySlot =
+                new java.util.EnumMap<>(EquipmentSlot.class);
+        for (EquipmentSlot slot : changed) {
+            Optional<ItemId> desiredItem = desired.item(slot);
+            if (desiredItem.isEmpty()) {
+                continue;
+            }
+            ItemLocationRecord incoming =
+                    findItem(session.snapshot().itemRecords(), desiredItem.orElseThrow())
+                            .orElse(null);
+            if (incoming == null
+                    || incoming.location().type()
+                            != com.branz.mmorpg.persistence.transaction.ValueLocationType
+                                    .CHARACTER_INVENTORY) {
+                return Result.failure(
+                        CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                        "Selected item is not in this character's inventory.");
+            }
+            incomingBySlot.put(slot, incoming);
+            moves.add(
+                    new ItemLocationMove(
+                            incoming.itemId(),
+                            incoming.version(),
+                            incoming.ownerCharacterId(),
+                            incoming.location(),
+                            incoming.ownerCharacterId(),
+                            equippedLocation(slot)));
+        }
+        java.util.Set<Integer> claimedInventorySlots = new java.util.HashSet<>();
+        for (EquipmentSlot slot : changed) {
+            Optional<ItemId> currentItem = session.snapshot().equipment().item(slot);
+            if (currentItem.isEmpty()) {
+                continue;
+            }
+            ValueLocation equippedLocation = equippedLocation(slot);
             ItemLocationRecord displaced =
                     findItem(session.snapshot().itemRecords(), currentItem.orElseThrow())
                             .orElse(null);
@@ -704,6 +707,21 @@ final class CharacterSessionService {
                         CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
                         "Committed equipment row does not match the Scene loadout.");
             }
+            ItemLocationRecord incoming = incomingBySlot.get(slot);
+            ValueLocation destination;
+            if (incoming != null) {
+                destination = incoming.location();
+                claimedInventorySlots.add(inventorySlot(destination));
+            } else {
+                int freeSlot = firstFreeInventorySlot(session.snapshot(), claimedInventorySlots);
+                if (freeSlot < 0) {
+                    return Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                            "Unequip requires one free MMO inventory slot.");
+                }
+                claimedInventorySlots.add(freeSlot);
+                destination = ValueLocation.inventory("slot:" + freeSlot);
+            }
             moves.add(
                     new ItemLocationMove(
                             displaced.itemId(),
@@ -711,7 +729,7 @@ final class CharacterSessionService {
                             displaced.ownerCharacterId(),
                             displaced.location(),
                             displaced.ownerCharacterId(),
-                            incoming.location()));
+                            destination));
         }
         TransactionRequest request =
                 TransactionRequest.forCharacter(
@@ -720,8 +738,12 @@ final class CharacterSessionService {
                         session.characterId(),
                         session.sessionId(),
                         JdbcValueTransactionService.ITEM_BATCH_MOVE,
-                        "{\"slot\":\"" + slot.name() + "\"}",
-                        "{\"itemId\":\"" + incoming.itemId().value() + "\"}",
+                        "{\"slots\":\""
+                                + changed.stream()
+                                        .map(EquipmentSlot::name)
+                                        .collect(java.util.stream.Collectors.joining(","))
+                                + "\"}",
+                        "{\"changedSlots\":" + changed.size() + "}",
                         contentVersion);
         Result<TransactionExecution, TransactionErrorCode> committed =
                 database.values().moveItemsAtomically(request, moves);
@@ -869,15 +891,37 @@ final class CharacterSessionService {
     }
 
     private static int firstFreeInventorySlot(PersistentCharacterSnapshot snapshot) {
+        return firstFreeInventorySlot(snapshot, java.util.Set.of());
+    }
+
+    private static int firstFreeInventorySlot(
+            PersistentCharacterSnapshot snapshot, java.util.Set<Integer> additionallyClaimed) {
         boolean[] occupied = new boolean[36];
         occupied[ChronicleService.HOTBAR_SLOT] = true;
         snapshot.inventory().forEach(projection -> occupied[projection.slot()] = true);
         for (int slot = 0; slot < occupied.length; slot++) {
-            if (!occupied[slot]) {
+            if (!occupied[slot] && !additionallyClaimed.contains(slot)) {
                 return slot;
             }
         }
         return -1;
+    }
+
+    private static int inventorySlot(ValueLocation location) {
+        String reference = location.reference().orElseThrow();
+        if (location.type()
+                        != com.branz.mmorpg.persistence.transaction.ValueLocationType
+                                .CHARACTER_INVENTORY
+                || !reference.startsWith("slot:")) {
+            throw new IllegalArgumentException("Expected an inventory slot location.");
+        }
+        return Integer.parseInt(reference.substring("slot:".length()));
+    }
+
+    private static ValueLocation equippedLocation(EquipmentSlot slot) {
+        return isNative(slot)
+                ? ValueLocation.nativeEquipped(slot.name())
+                : ValueLocation.virtualEquipped(slot.name());
     }
 
     private static boolean isNative(EquipmentSlot slot) {

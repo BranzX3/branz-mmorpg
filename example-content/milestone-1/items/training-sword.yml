@@ -1,0 +1,11 @@
+definition_id: weapon.training_sword
+schema_version: 1
+asset_id: weapon.training_sword
+item_class: UNIQUE_DURABLE
+base_max_durability: 120
+weapon_profile:
+  family: SWORD_SHIELD
+  power: 100
+  offhand_policy: SHIELD
+status: approved
+owning_team: combat

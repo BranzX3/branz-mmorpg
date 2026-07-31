@@ -49,6 +49,7 @@ import com.branz.mmorpg.combat.guard.CombatDefenseResolver;
 import com.branz.mmorpg.combat.guard.GuardEngine;
 import com.branz.mmorpg.combat.guard.GuardErrorCode;
 import com.branz.mmorpg.combat.guard.GuardHitRequest;
+import com.branz.mmorpg.combat.guard.GuardProfile;
 import com.branz.mmorpg.combat.guard.GuardRuntime;
 import com.branz.mmorpg.combat.health.CombatHealthEngine;
 import com.branz.mmorpg.combat.health.CombatHealthProfile;
@@ -112,10 +113,14 @@ import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.BowWeaponProfile;
 import com.branz.mmorpg.items.definition.CatalystProfile;
 import com.branz.mmorpg.items.definition.CrossbowWeaponProfile;
+import com.branz.mmorpg.items.definition.GuardCombatProfile;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.QuiverProfile;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
+import com.branz.mmorpg.items.definition.WeaponLoadoutErrorCode;
+import com.branz.mmorpg.items.definition.WeaponLoadoutPolicy;
+import com.branz.mmorpg.items.definition.WeaponLoadoutResolution;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.magic.cast.SpellCastEngine;
 import com.branz.mmorpg.magic.cast.SpellCastErrorCode;
@@ -171,6 +176,14 @@ import org.bukkit.util.RayTraceResult;
 final class CombatSessionController implements Listener {
     private static final DefinitionId TRAINING_MOVE =
             DefinitionId.of("move.training_blade.primary_1");
+    private static final DefinitionId TRAINING_GREATSWORD_MOVE =
+            DefinitionId.of("move.training_greatsword.committed_cleave");
+    private static final DefinitionId TRAINING_GREATSWORD_ITEM =
+            DefinitionId.of("weapon.training_greatsword");
+    private static final DefinitionId TRAINING_SWORD_SHIELD_MOVE =
+            DefinitionId.of("move.training_sword_shield.primary_1");
+    private static final DefinitionId TRAINING_SWORD_SHIELD_ITEM =
+            DefinitionId.of("weapon.training_sword");
     private static final DefinitionId TRAINING_BOW_MOVE =
             DefinitionId.of("move.training_bow.quick_shot");
     private static final DefinitionId TRAINING_BOW_ITEM = DefinitionId.of("weapon.training_bow");
@@ -192,6 +205,8 @@ final class CombatSessionController implements Listener {
     private final ItemEngine items;
     private final String contentVersion;
     private final MoveDefinition trainingMove;
+    private final MoveDefinition trainingGreatswordMove;
+    private final MoveDefinition trainingSwordShieldMove;
     private final MoveDefinition trainingBowMove;
     private final MoveDefinition trainingCrossbowMove;
     private final MoveDefinition trainingStaffMove;
@@ -203,6 +218,8 @@ final class CombatSessionController implements Listener {
     private final DefinitionId trainingCrossbowAmmo;
     private final AmmoFamily trainingCrossbowAmmoFamily;
     private final double trainingWeaponPower;
+    private final double trainingGreatswordPower;
+    private final double trainingSwordShieldPower;
     private final double trainingBowPower;
     private final double trainingCrossbowPower;
     private final double trainingStaffPower;
@@ -221,8 +238,7 @@ final class CombatSessionController implements Listener {
     private final DodgeProfile dodgeProfile;
     private final DodgeEngine dodges = new DodgeEngine();
     private final SneakPressResolver sneakPresses = new SneakPressResolver();
-    private final GuardEngine guards;
-    private final CombatDefenseResolver defense;
+    private final GuardEngine defaultGuards;
     private final double trainingIncomingGuardPressure;
     private final double trainingIncomingHealthDamage;
     private final double environmentalHealthScale;
@@ -280,6 +296,14 @@ final class CombatSessionController implements Listener {
                                 () ->
                                         new IllegalArgumentException(
                                                 "active content is missing " + TRAINING_MOVE));
+        trainingGreatswordMove = requirePrimaryMove(TRAINING_GREATSWORD_MOVE, "GREATSWORD");
+        trainingSwordShieldMove = requirePrimaryMove(TRAINING_SWORD_SHIELD_MOVE, "SWORD_SHIELD");
+        WeaponCombatProfile greatswordWeapon =
+                requireWeaponProfile(TRAINING_GREATSWORD_ITEM, "GREATSWORD");
+        WeaponCombatProfile swordShieldWeapon =
+                requireWeaponProfile(TRAINING_SWORD_SHIELD_ITEM, "SWORD_SHIELD");
+        trainingGreatswordPower = greatswordWeapon.power();
+        trainingSwordShieldPower = swordShieldWeapon.power();
         trainingBowMove =
                 moves.find(TRAINING_BOW_MOVE)
                         .orElseThrow(
@@ -444,8 +468,7 @@ final class CombatSessionController implements Listener {
         weapons = new WeaponTransitionMachine(drawTicks, sheatheTicks);
         engagement = new EngagementTracker(engagementExitTicks);
         this.dodgeProfile = Objects.requireNonNull(dodgeProfile, "dodgeProfile");
-        this.guards = Objects.requireNonNull(guards, "guards");
-        defense = new CombatDefenseResolver(dodges, guards);
+        defaultGuards = Objects.requireNonNull(guards, "guards");
         if (!Double.isFinite(trainingIncomingGuardPressure) || trainingIncomingGuardPressure <= 0) {
             throw new IllegalArgumentException("trainingIncomingGuardPressure must be positive");
         }
@@ -476,6 +499,33 @@ final class CombatSessionController implements Listener {
         this.trainingPerfectGuardPostureDamage = trainingPerfectGuardPostureDamage;
     }
 
+    private MoveDefinition requirePrimaryMove(DefinitionId id, String family) {
+        MoveDefinition move =
+                moves.find(id)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "active content is missing " + id));
+        if (!move.family().equals(family) || move.input().action() != SemanticInput.PRIMARY) {
+            throw new IllegalArgumentException(id + " must be a PRIMARY move for " + family);
+        }
+        return move;
+    }
+
+    private WeaponCombatProfile requireWeaponProfile(DefinitionId id, String family) {
+        WeaponCombatProfile profile =
+                items.find(id)
+                        .flatMap(ItemDefinition::weaponProfile)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "active content is missing weapon profile " + id));
+        if (!profile.family().equals(family)) {
+            throw new IllegalArgumentException(id + " must use weapon family " + family);
+        }
+        return profile;
+    }
+
     void start() {
         tickTaskId =
                 plugin.getServer()
@@ -497,13 +547,16 @@ final class CombatSessionController implements Listener {
 
     void onCharacterReady(Player player) {
         long tick = plugin.getServer().getCurrentTick();
+        GuardEngine guardEngine = guardEngineFor(player).orElse(defaultGuards);
         LiveSession session =
                 new LiveSession(
                         EngagementRuntime.initial(tick),
-                        GuardRuntime.initial(guards.profile(), tick),
+                        GuardRuntime.initial(guardEngine.profile(), tick),
+                        guardEngine,
                         PoiseRuntime.initial(tick),
                         CcRuntime.initial(tick),
                         CombatHealthRuntime.full(playerHealth.profile(), tick));
+        session.guardAuthorityKey = guardAuthorityKey(player);
         sessions.put(player.getUniqueId(), session);
         updateHealthPresentation(player, session);
         select(session, selectedSlot(player, player.getInventory().getHeldItemSlot()));
@@ -562,7 +615,8 @@ final class CombatSessionController implements Listener {
                                         runtime ->
                                                 runtime.phaseAt(
                                                         plugin.getServer().getCurrentTick())),
-                        guards.phaseAt(session.guard, plugin.getServer().getCurrentTick()),
+                        session.guardEngine.phaseAt(
+                                session.guard, plugin.getServer().getCurrentTick()),
                         session.guard.stability(),
                         session.crowdControl.active(),
                         session.crowdControl
@@ -794,12 +848,13 @@ final class CombatSessionController implements Listener {
             return;
         }
         CombatDefenseResolution resolved =
-                defense.resolve(
-                        Optional.ofNullable(defenderSession.dodge),
-                        defenderSession.guard,
-                        plugin.getServer().getCurrentTick(),
-                        true,
-                        guardHitRequest(defender, defenderSession, source));
+                new CombatDefenseResolver(dodges, defenderSession.guardEngine)
+                        .resolve(
+                                Optional.ofNullable(defenderSession.dodge),
+                                defenderSession.guard,
+                                plugin.getServer().getCurrentTick(),
+                                true,
+                                guardHitRequest(defender, defenderSession, source));
         long currentTick = plugin.getServer().getCurrentTick();
         defenderSession.guard = resolved.guardRuntime();
         if (resolved.staminaSpent() > 0) {
@@ -942,7 +997,8 @@ final class CombatSessionController implements Listener {
             handleStaffUse(event.getPlayer(), session);
             return;
         }
-        if (!family.equals("SWORD") || session.engagement.state() != EngagementState.ENGAGED) {
+        if (guardEngineFor(event.getPlayer()).isEmpty()
+                || session.engagement.state() != EngagementState.ENGAGED) {
             return;
         }
         Result<SemanticInput, InputRejectionCode> semantic =
@@ -1088,7 +1144,9 @@ final class CombatSessionController implements Listener {
         session.bowRecoveryUntilTick = -1;
         restoreEquippedCrossbow(player, session, tick);
         session.engagement = EngagementRuntime.initial(tick);
-        session.guard = GuardRuntime.initial(guards.profile(), tick);
+        GuardEngine guardEngine = guardEngineFor(player).orElse(defaultGuards);
+        session.guardEngine = guardEngine;
+        session.guard = GuardRuntime.initial(guardEngine.profile(), tick);
         session.poise = PoiseRuntime.initial(tick);
         session.crowdControl = CcRuntime.initial(tick);
         session.resources = CombatResources.full(1000, 100, 100);
@@ -1153,18 +1211,27 @@ final class CombatSessionController implements Listener {
             WeaponState priorWeapon = session.weapon.state();
             session.weapon = weapons.tick(session.weapon);
             if (priorWeapon != WeaponState.READY && session.weapon.state() == WeaponState.READY) {
-                player.sendActionBar(
-                        Component.text(
-                                equippedWeaponFamily(player).orElse("Combat weapon") + " READY",
-                                NamedTextColor.GREEN));
-                pollBuffered(player, session);
+                Optional<String> readinessFailure = combatReadinessFailure(player);
+                if (readinessFailure.isPresent()) {
+                    player.sendActionBar(
+                            Component.text(readinessFailure.orElseThrow(), NamedTextColor.RED));
+                    session.input.clearBuffer(InputBufferClearReason.WEAPON_SWAP);
+                } else {
+                    player.sendActionBar(
+                            Component.text(
+                                    equippedWeaponFamily(player).orElse("Combat weapon") + " READY",
+                                    NamedTextColor.GREEN));
+                    pollBuffered(player, session);
+                }
             }
             tickSneakPress(player, session);
             tickBow(player, session);
             tickCrossbow(player, session);
             tickSpell(player, session);
             tickDodge(player, session);
-            session.guard = guards.tick(session.guard, plugin.getServer().getCurrentTick());
+            refreshGuardEngine(player, session, plugin.getServer().getCurrentTick());
+            session.guard =
+                    session.guardEngine.tick(session.guard, plugin.getServer().getCurrentTick());
             session.poise = poise.tick(session.poise, plugin.getServer().getCurrentTick());
             tickAction(player, session);
             tickEngagement(player, session);
@@ -1339,9 +1406,7 @@ final class CombatSessionController implements Listener {
             PhysicalDamageBreakdown breakdown =
                     damage.resolve(
                             new PhysicalDamageRequest(
-                                    activeMove.family().equals("STAFF")
-                                            ? trainingStaffPower
-                                            : trainingWeaponPower,
+                                    meleePower(activeMove.family()),
                                     activeMove.outputs().moveCoefficient(),
                                     0,
                                     armor,
@@ -2339,7 +2404,18 @@ final class CombatSessionController implements Listener {
             player.sendActionBar(Component.text("GUARD released", NamedTextColor.GRAY));
             return;
         }
-        Result<GuardRuntime, GuardErrorCode> started = guards.start(session.guard, tick);
+        Optional<GuardEngine> available = guardEngineFor(player);
+        if (available.isEmpty()) {
+            player.sendActionBar(
+                    Component.text(
+                            combatReadinessFailure(player)
+                                    .orElse("This weapon has no defensive response."),
+                            NamedTextColor.RED));
+            return;
+        }
+        refreshGuardEngine(player, session, tick);
+        Result<GuardRuntime, GuardErrorCode> started =
+                session.guardEngine.start(session.guard, tick);
         if (started instanceof Result.Failure<GuardRuntime, GuardErrorCode> failure) {
             player.sendActionBar(
                     Component.text("Guard rejected: " + failure.error(), NamedTextColor.RED));
@@ -2354,7 +2430,7 @@ final class CombatSessionController implements Listener {
             return;
         }
         Result<GuardRuntime, GuardErrorCode> released =
-                guards.release(session.guard, plugin.getServer().getCurrentTick());
+                session.guardEngine.release(session.guard, plugin.getServer().getCurrentTick());
         if (released instanceof Result.Success<GuardRuntime, GuardErrorCode> success) {
             session.guard = success.value();
         }
@@ -2506,7 +2582,8 @@ final class CombatSessionController implements Listener {
         if (activeMove == null) {
             player.sendActionBar(
                     Component.text(
-                            "Primary strike requires the training blade or Staff.",
+                            combatReadinessFailure(player)
+                                    .orElse("Primary strike requires a supported training weapon."),
                             NamedTextColor.RED));
             return;
         }
@@ -2639,13 +2716,19 @@ final class CombatSessionController implements Listener {
     }
 
     private Optional<String> equippedWeaponFamily(Player player) {
+        return equippedDefinition(player, EquipmentSlot.MAIN_HAND)
+                .flatMap(ItemDefinition::weaponProfile)
+                .map(WeaponCombatProfile::family);
+    }
+
+    private Optional<ItemDefinition> equippedDefinition(Player player, EquipmentSlot slot) {
         return characters
                 .active(player)
                 .flatMap(
                         session ->
                                 session.snapshot()
                                         .equipment()
-                                        .item(EquipmentSlot.MAIN_HAND)
+                                        .item(slot)
                                         .flatMap(
                                                 itemId ->
                                                         session.snapshot().itemRecords().stream()
@@ -2659,9 +2742,94 @@ final class CombatSessionController implements Listener {
                                                                         record ->
                                                                                 items.find(
                                                                                         record
-                                                                                                .definitionId()))))
-                .flatMap(ItemDefinition::weaponProfile)
-                .map(WeaponCombatProfile::family);
+                                                                                                .definitionId()))));
+    }
+
+    private Optional<String> combatReadinessFailure(Player player) {
+        ItemDefinition main = equippedDefinition(player, EquipmentSlot.MAIN_HAND).orElse(null);
+        if (main == null || main.weaponProfile().isEmpty()) {
+            return Optional.empty();
+        }
+        Result<WeaponLoadoutResolution, WeaponLoadoutErrorCode> resolved =
+                WeaponLoadoutPolicy.resolve(
+                        main, equippedDefinition(player, EquipmentSlot.OFF_HAND));
+        return resolved
+                        instanceof
+                        Result.Failure<WeaponLoadoutResolution, WeaponLoadoutErrorCode> failure
+                ? Optional.of("Combat not ready: " + failure.detail())
+                : Optional.empty();
+    }
+
+    private Optional<GuardEngine> guardEngineFor(Player player) {
+        if (combatReadinessFailure(player).isPresent()) {
+            return Optional.empty();
+        }
+        ItemDefinition main = equippedDefinition(player, EquipmentSlot.MAIN_HAND).orElse(null);
+        if (main == null) {
+            return Optional.empty();
+        }
+        Result<WeaponLoadoutResolution, WeaponLoadoutErrorCode> result =
+                WeaponLoadoutPolicy.resolve(
+                        main, equippedDefinition(player, EquipmentSlot.OFF_HAND));
+        if (!(result
+                instanceof
+                Result.Success<WeaponLoadoutResolution, WeaponLoadoutErrorCode> success)) {
+            return Optional.empty();
+        }
+        WeaponCombatProfile weapon = success.value().weapon();
+        if (weapon.family().equals("SWORD")) {
+            return Optional.of(defaultGuards);
+        }
+        return success.value().guardProfile().map(value -> new GuardEngine(toGuardProfile(value)));
+    }
+
+    private String guardAuthorityKey(Player player) {
+        Optional<GuardEngine> engine = guardEngineFor(player);
+        if (engine.isEmpty()) {
+            return "NONE";
+        }
+        String family = equippedWeaponFamily(player).orElse("NONE");
+        String offHand =
+                characters
+                        .active(player)
+                        .flatMap(
+                                session ->
+                                        session.snapshot().equipment().item(EquipmentSlot.OFF_HAND))
+                        .map(ItemId::toString)
+                        .orElse("EMPTY");
+        return family + ":" + offHand + ":" + engine.orElseThrow().profile();
+    }
+
+    private void refreshGuardEngine(Player player, LiveSession session, long tick) {
+        String key = guardAuthorityKey(player);
+        if (key.equals(session.guardAuthorityKey)) {
+            return;
+        }
+        session.guardEngine = guardEngineFor(player).orElse(defaultGuards);
+        session.guard = GuardRuntime.initial(session.guardEngine.profile(), tick);
+        session.guardAuthorityKey = key;
+    }
+
+    private static GuardProfile toGuardProfile(GuardCombatProfile profile) {
+        return new GuardProfile(
+                profile.coneDegrees(),
+                profile.physicalBlockRatio(),
+                profile.perfectWindowTicks(),
+                profile.maximumStability(),
+                profile.recoveryDelayTicks(),
+                profile.inactiveRecoveryPerSecond(),
+                profile.activeRecoveryPerSecond(),
+                profile.breakTicks(),
+                profile.stabilityAfterBreak());
+    }
+
+    private double meleePower(String family) {
+        return switch (family) {
+            case "GREATSWORD" -> trainingGreatswordPower;
+            case "SWORD_SHIELD" -> trainingSwordShieldPower;
+            case "STAFF" -> trainingStaffPower;
+            default -> trainingWeaponPower;
+        };
     }
 
     private void regenerateMana(LiveSession session) {
@@ -2684,11 +2852,16 @@ final class CombatSessionController implements Listener {
     }
 
     private Optional<MoveDefinition> primaryMove(Player player) {
+        if (combatReadinessFailure(player).isPresent()) {
+            return Optional.empty();
+        }
         return equippedWeaponFamily(player)
                 .flatMap(
                         family ->
                                 switch (family) {
                                     case "SWORD" -> Optional.of(trainingMove);
+                                    case "GREATSWORD" -> Optional.of(trainingGreatswordMove);
+                                    case "SWORD_SHIELD" -> Optional.of(trainingSwordShieldMove);
                                     case "STAFF" -> Optional.of(trainingStaffMove);
                                     default -> Optional.empty();
                                 });
@@ -3528,6 +3701,8 @@ final class CombatSessionController implements Listener {
         private CombatTransform previousActionTransform;
         private DodgeRuntime dodge;
         private GuardRuntime guard;
+        private GuardEngine guardEngine;
+        private String guardAuthorityKey = "NONE";
         private PoiseRuntime poise;
         private CcRuntime crowdControl;
         private CombatHealthRuntime health;
@@ -3549,11 +3724,13 @@ final class CombatSessionController implements Listener {
         private LiveSession(
                 EngagementRuntime engagement,
                 GuardRuntime guard,
+                GuardEngine guardEngine,
                 PoiseRuntime poise,
                 CcRuntime crowdControl,
                 CombatHealthRuntime health) {
             this.engagement = Objects.requireNonNull(engagement, "engagement");
             this.guard = Objects.requireNonNull(guard, "guard");
+            this.guardEngine = Objects.requireNonNull(guardEngine, "guardEngine");
             this.poise = Objects.requireNonNull(poise, "poise");
             this.crowdControl = Objects.requireNonNull(crowdControl, "crowdControl");
             this.health = Objects.requireNonNull(health, "health");

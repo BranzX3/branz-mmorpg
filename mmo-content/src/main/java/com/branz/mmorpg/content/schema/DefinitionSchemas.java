@@ -58,6 +58,75 @@ public final class DefinitionSchemas {
                                         null,
                                         "power",
                                         "Base deterministic weapon power."),
+                                optionalAllowed(
+                                        "weapon_profile.offhand_policy",
+                                        STRING,
+                                        Set.of("ANY", "EMPTY", "SHIELD"),
+                                        "",
+                                        "Off-hand requirement checked before combat readiness."),
+                                optionalRanged(
+                                        "weapon_profile.guard.cone_degrees",
+                                        NUMBER,
+                                        0.000001,
+                                        360,
+                                        "degrees",
+                                        "Directional weapon-guard coverage."),
+                                optionalRanged(
+                                        "weapon_profile.guard.physical_block_ratio",
+                                        NUMBER,
+                                        0,
+                                        1,
+                                        "ratio",
+                                        "Physical damage blocked by weapon guard."),
+                                optionalRanged(
+                                        "weapon_profile.guard.perfect_window_ticks",
+                                        INTEGER,
+                                        1,
+                                        20,
+                                        "ticks",
+                                        "Unmodified perfect-guard window."),
+                                optionalRanged(
+                                        "weapon_profile.guard.maximum_stability",
+                                        NUMBER,
+                                        0.000001,
+                                        null,
+                                        "stability",
+                                        "Maximum weapon-guard stability."),
+                                optionalRanged(
+                                        "weapon_profile.guard.recovery_delay_ticks",
+                                        INTEGER,
+                                        0,
+                                        null,
+                                        "ticks",
+                                        "Delay before stability recovery."),
+                                optionalRanged(
+                                        "weapon_profile.guard.inactive_recovery_per_second",
+                                        NUMBER,
+                                        0,
+                                        null,
+                                        "stability_per_second",
+                                        "Stability recovery while guard is lowered."),
+                                optionalRanged(
+                                        "weapon_profile.guard.active_recovery_per_second",
+                                        NUMBER,
+                                        0,
+                                        null,
+                                        "stability_per_second",
+                                        "Stability recovery while guard is held."),
+                                optionalRanged(
+                                        "weapon_profile.guard.break_ticks",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "ticks",
+                                        "Guard-break recovery duration."),
+                                optionalRanged(
+                                        "weapon_profile.guard.stability_after_break",
+                                        NUMBER,
+                                        0,
+                                        null,
+                                        "stability",
+                                        "Stability restored after Guard Break."),
                                 optionalRanged(
                                         "weapon_profile.bow.minimum_draw_ticks",
                                         INTEGER,
@@ -172,7 +241,70 @@ public final class DefinitionSchemas {
                                         1,
                                         null,
                                         "durability",
-                                        "Durability consumed at spell commit.")),
+                                        "Durability consumed at spell commit."),
+                                optionalRanged(
+                                        "shield_profile.guard.cone_degrees",
+                                        NUMBER,
+                                        0.000001,
+                                        360,
+                                        "degrees",
+                                        "Directional shield-guard coverage."),
+                                optionalRanged(
+                                        "shield_profile.guard.physical_block_ratio",
+                                        NUMBER,
+                                        0,
+                                        1,
+                                        "ratio",
+                                        "Physical damage blocked by shield guard."),
+                                optionalRanged(
+                                        "shield_profile.guard.perfect_window_ticks",
+                                        INTEGER,
+                                        1,
+                                        20,
+                                        "ticks",
+                                        "Unmodified shield perfect-guard window."),
+                                optionalRanged(
+                                        "shield_profile.guard.maximum_stability",
+                                        NUMBER,
+                                        0.000001,
+                                        null,
+                                        "stability",
+                                        "Maximum shield stability."),
+                                optionalRanged(
+                                        "shield_profile.guard.recovery_delay_ticks",
+                                        INTEGER,
+                                        0,
+                                        null,
+                                        "ticks",
+                                        "Delay before shield stability recovery."),
+                                optionalRanged(
+                                        "shield_profile.guard.inactive_recovery_per_second",
+                                        NUMBER,
+                                        0,
+                                        null,
+                                        "stability_per_second",
+                                        "Shield stability recovery while lowered."),
+                                optionalRanged(
+                                        "shield_profile.guard.active_recovery_per_second",
+                                        NUMBER,
+                                        0,
+                                        null,
+                                        "stability_per_second",
+                                        "Shield stability recovery while held."),
+                                optionalRanged(
+                                        "shield_profile.guard.break_ticks",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "ticks",
+                                        "Shield Guard Break duration."),
+                                optionalRanged(
+                                        "shield_profile.guard.stability_after_break",
+                                        NUMBER,
+                                        0,
+                                        null,
+                                        "stability",
+                                        "Shield stability restored after Guard Break.")),
                         List.of(to(DefinitionType.TRAIT, "traits", "authored_pool", "*"))));
         schemas.put(
                 DefinitionType.MOVE,
@@ -931,6 +1063,11 @@ public final class DefinitionSchemas {
     private static FieldRule allowed(
             String path, FieldValueType type, Set<String> values, String unit, String description) {
         return rule(path, type, true, null, null, null, null, values, unit, description);
+    }
+
+    private static FieldRule optionalAllowed(
+            String path, FieldValueType type, Set<String> values, String unit, String description) {
+        return rule(path, type, false, null, null, null, null, values, unit, description);
     }
 
     private static FieldRule rule(

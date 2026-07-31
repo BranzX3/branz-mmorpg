@@ -309,6 +309,54 @@ class JdbcValueTransactionServiceIntegrationTest {
     }
 
     @Test
+    void itemPayloadUpdateRollsBackOnCrashAndReplaysExactlyOnce() {
+        ItemId itemId = new ItemId(UUID.randomUUID());
+        ValueLocation quiver = ValueLocation.virtualEquipped("QUIVER");
+        grantItem(itemId, quiver);
+        String replacement =
+                "{\"displayRevision\":2,\"quiver\":{\"preparedAmmo\":[\"ammo.test.arrow\"],\"selectedIndex\":0}}";
+        ItemPayloadUpdate update =
+                new ItemPayloadUpdate(itemId, 1, Optional.of(CHARACTER), quiver, "{}", replacement);
+        TransactionRequest request =
+                request(
+                        "item:payload:" + itemId.value(),
+                        JdbcValueTransactionService.ITEM_PAYLOAD_UPDATE,
+                        "{\"version\":1}",
+                        "{\"preparedAmmo\":1}");
+        JdbcValueTransactionService crashing =
+                new JdbcValueTransactionService(
+                        dataSource,
+                        checkpoint -> {
+                            if (checkpoint
+                                    == JdbcValueTransactionService.Checkpoint.AFTER_MUTATION) {
+                                throw new SimulatedCrash();
+                            }
+                        });
+
+        assertThrows(SimulatedCrash.class, () -> crashing.updateItemPayload(request, update));
+        assertEquals("{}", success(service.findItem(itemId)).orElseThrow().payloadJson());
+        assertEquals(Optional.empty(), success(journal.find(request.transactionId())));
+
+        assertFalse(success(service.updateItemPayload(request, update)).replayed());
+        assertTrue(success(service.updateItemPayload(retryRequest(request), update)).replayed());
+        ItemLocationRecord current = success(service.findItem(itemId)).orElseThrow();
+        assertEquals(2, current.version());
+        assertTrue(current.payloadJson().contains("ammo.test.arrow"));
+        assertEquals(1, success(audit.findByTransaction(request.transactionId())).size());
+
+        TransactionRequest stale =
+                request(
+                        "item:payload:stale:" + itemId.value(),
+                        JdbcValueTransactionService.ITEM_PAYLOAD_UPDATE,
+                        "{}",
+                        "{}");
+        assertEquals(
+                TransactionErrorCode.VALUE_STALE_VERSION,
+                failure(service.updateItemPayload(stale, update)));
+        assertEquals(Optional.empty(), success(journal.find(stale.transactionId())));
+    }
+
+    @Test
     void equipmentSwapRollsBackEveryMoveWhenOneItemIsStale() {
         ItemId incoming = new ItemId(UUID.randomUUID());
         ItemId displaced = new ItemId(UUID.randomUUID());

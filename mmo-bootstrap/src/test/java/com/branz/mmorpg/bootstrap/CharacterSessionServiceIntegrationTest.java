@@ -6,12 +6,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
+import com.branz.mmorpg.items.definition.QuiverProfile;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
+import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -87,6 +92,50 @@ class CharacterSessionServiceIntegrationTest {
                     equipped.snapshot().inventory().stream()
                             .noneMatch(projection -> projection.valueId().equals(bladeId.value())));
 
+            ItemDefinition quiver =
+                    new ItemDefinition(
+                            DefinitionId.of("equipment.test.quiver"),
+                            DefinitionId.of("equipment.test.quiver"),
+                            ItemClass.UNIQUE_DURABLE,
+                            OptionalInt.empty(),
+                            false,
+                            Optional.empty(),
+                            Optional.empty(),
+                            Optional.of(new QuiverProfile(96, Set.of(AmmoFamily.ARROW), 4, 6)));
+            LoadedCharacterSession withQuiver =
+                    success(service.grantTestValue(equipped, quiver, 4, "content.test.1"));
+            ItemId quiverId =
+                    new ItemId(
+                            withQuiver.snapshot().inventory().stream()
+                                    .filter(
+                                            projection ->
+                                                    projection.definitionId().equals(quiver.id()))
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .valueId());
+            LoadedCharacterSession quiverEquipped =
+                    success(
+                            service.commitEquipment(
+                                    withQuiver,
+                                    withQuiver
+                                            .snapshot()
+                                            .equipment()
+                                            .with(EquipmentSlot.QUIVER, Optional.of(quiverId)),
+                                    "content.test.1"));
+            QuiverPreparation preparation =
+                    QuiverPreparation.empty()
+                            .toggle(DefinitionId.of("ammo.test.arrow"), 4)
+                            .toggle(DefinitionId.of("ammo.test.bodkin"), 4)
+                            .cycle(1);
+            LoadedCharacterSession prepared =
+                    success(
+                            service.updateQuiverPreparation(
+                                    quiverEquipped,
+                                    preparation,
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
+            assertEquals(preparation, prepared.snapshot().quiverPreparation());
+
             Result<LoadedCharacterSession, CharacterSessionErrorCode> conflict =
                     service.open(playerId);
             assertTrue(conflict instanceof Result.Failure<?, ?>);
@@ -95,7 +144,7 @@ class CharacterSessionServiceIntegrationTest {
                     ((Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>) conflict)
                             .error());
 
-            service.close(equipped);
+            service.close(prepared);
             LoadedCharacterSession reconnected = success(service.open(playerId));
             assertEquals(1, reconnected.snapshot().inventory().size());
             assertEquals(
@@ -104,6 +153,10 @@ class CharacterSessionServiceIntegrationTest {
             assertEquals(
                     bladeId,
                     reconnected.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElseThrow());
+            assertEquals(
+                    quiverId,
+                    reconnected.snapshot().equipment().item(EquipmentSlot.QUIVER).orElseThrow());
+            assertEquals(preparation, reconnected.snapshot().quiverPreparation());
             service.close(reconnected);
         }
         try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
@@ -116,6 +169,9 @@ class CharacterSessionServiceIntegrationTest {
                             .equipment()
                             .item(EquipmentSlot.MAIN_HAND)
                             .isPresent());
+            assertEquals(
+                    DefinitionId.of("ammo.test.bodkin"),
+                    afterServerRestart.snapshot().quiverPreparation().selectedAmmo().orElseThrow());
             service.close(afterServerRestart);
         }
     }

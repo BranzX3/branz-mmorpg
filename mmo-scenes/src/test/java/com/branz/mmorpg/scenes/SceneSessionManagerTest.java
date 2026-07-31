@@ -8,6 +8,7 @@ import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
+import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -93,6 +94,37 @@ class SceneSessionManagerTest {
                 ((Result.Failure<SceneSession, SceneErrorCode>) stale).error());
         assertEquals(SceneMode.HUB, manager.find(playerId).orElseThrow().mode());
         assertFalse(first.sessionId().equals(second.sessionId()));
+    }
+
+    @Test
+    void quiverPreparationParticipatesInPreviewDiscardAndCommit() {
+        SceneSessionManager manager = new SceneSessionManager(CLOCK);
+        UUID playerId = UUID.randomUUID();
+        SceneSession opened = success(manager.open(playerId, EquipmentLoadout.empty()));
+        QuiverPreparation prepared =
+                QuiverPreparation.empty()
+                        .toggle(
+                                com.branz.mmorpg.api.identity.DefinitionId.of("ammo.test.arrow"),
+                                4);
+
+        SceneSession previewed =
+                success(manager.previewQuiverPreparation(playerId, opened.sessionId(), prepared));
+        assertTrue(previewed.hasUncommittedPreview());
+        assertEquals(
+                QuiverPreparation.empty(),
+                success(manager.back(playerId, opened.sessionId()))
+                        .previewState()
+                        .quiverPreparation());
+
+        success(manager.changeMode(playerId, opened.sessionId(), SceneMode.EQUIPMENT));
+        success(manager.previewQuiverPreparation(playerId, opened.sessionId(), prepared));
+        SceneSession committed =
+                success(
+                        manager.confirm(
+                                playerId,
+                                opened.sessionId(),
+                                session -> Result.success(session.previewState())));
+        assertEquals(prepared, committed.committedState().quiverPreparation());
     }
 
     private static <T> T success(Result<T, SceneErrorCode> result) {

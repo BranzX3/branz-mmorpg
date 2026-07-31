@@ -2,10 +2,13 @@ package com.branz.mmorpg.bootstrap;
 
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.items.definition.ItemDefinition;
+import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.projection.ExpectedProjection;
 import com.branz.mmorpg.items.projection.ProjectionValueType;
+import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.scenes.SceneCloseReason;
 import com.branz.mmorpg.scenes.SceneErrorCode;
 import com.branz.mmorpg.scenes.SceneMode;
@@ -57,6 +60,7 @@ final class SceneHubController implements Listener {
     private final ResourcePackGate packGate;
     private final ChronicleService chronicle;
     private final CharacterSessionController characterSessions;
+    private final ItemEngine itemEngine;
     private final String contentVersion;
     private final SceneSessionManager sessions = new SceneSessionManager(Clock.systemUTC());
     private final ScenePreviewProvider previewProvider = new CompactScenePreviewProvider();
@@ -71,12 +75,14 @@ final class SceneHubController implements Listener {
             ResourcePackGate packGate,
             ChronicleService chronicle,
             CharacterSessionController characterSessions,
+            ItemEngine itemEngine,
             String contentVersion) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.packGate = Objects.requireNonNull(packGate, "packGate");
         this.chronicle = Objects.requireNonNull(chronicle, "chronicle");
         this.characterSessions = Objects.requireNonNull(characterSessions, "characterSessions");
+        this.itemEngine = Objects.requireNonNull(itemEngine, "itemEngine");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
         actionKey = new NamespacedKey(plugin, "scene_action");
     }
@@ -97,7 +103,8 @@ final class SceneHubController implements Listener {
                         characterSessions
                                 .active(player)
                                 .map(session -> session.snapshot().equipment())
-                                .orElse(EquipmentLoadout.empty()));
+                                .orElse(EquipmentLoadout.empty()),
+                        characterSessions.quiverPreparation(player));
         if (!opened.isSuccess()) {
             return opened;
         }
@@ -162,6 +169,14 @@ final class SceneHubController implements Listener {
         }
         if (action.startsWith("equip-main:")) {
             previewMainHand(player, holder, action.substring("equip-main:".length()));
+            return;
+        }
+        if (action.startsWith("equip-quiver:")) {
+            previewQuiver(player, holder, action.substring("equip-quiver:".length()));
+            return;
+        }
+        if (action.startsWith("prepare-ammo:")) {
+            previewPreparedAmmo(player, holder, action.substring("prepare-ammo:".length()));
             return;
         }
         if ("confirm-equipment".equals(action)) {
@@ -315,8 +330,68 @@ final class SceneHubController implements Listener {
             return;
         }
         int buttonSlot = 10;
+        Set<com.branz.mmorpg.api.identity.DefinitionId> shownAmmo = new HashSet<>();
+        for (com.branz.mmorpg.api.identity.DefinitionId preparedId :
+                sceneSession.previewState().quiverPreparation().preparedAmmo()) {
+            ItemDefinition definition = itemEngine.find(preparedId).orElse(null);
+            if (definition == null || definition.ammoProfile().isEmpty() || buttonSlot > 34) {
+                continue;
+            }
+            shownAmmo.add(preparedId);
+            inventory.setItem(
+                    buttonSlot++,
+                    button(
+                            Material.ARROW,
+                            "[Prepared] "
+                                    + preparedId.value()
+                                    + " x"
+                                    + characterSessions.inventoryLotQuantity(player, preparedId),
+                            "prepare-ammo:" + preparedId.value()));
+        }
         for (ExpectedProjection projection : character.snapshot().inventory()) {
-            if (projection.valueType() != ProjectionValueType.UNIQUE_ITEM || buttonSlot > 34) {
+            if (buttonSlot > 34) {
+                continue;
+            }
+            ItemDefinition definition = itemEngine.find(projection.definitionId()).orElse(null);
+            if (definition == null) {
+                continue;
+            }
+            if (projection.valueType() == ProjectionValueType.STACKABLE_LOT
+                    && definition.ammoProfile().isPresent()
+                    && shownAmmo.add(definition.id())) {
+                boolean prepared =
+                        sceneSession
+                                .previewState()
+                                .quiverPreparation()
+                                .preparedAmmo()
+                                .contains(definition.id());
+                inventory.setItem(
+                        buttonSlot++,
+                        button(
+                                Material.ARROW,
+                                (prepared ? "[Prepared] " : "[Available] ")
+                                        + definition.id().value()
+                                        + " x"
+                                        + characterSessions.inventoryLotQuantity(
+                                                player, definition.id()),
+                                "prepare-ammo:" + definition.id().value()));
+                continue;
+            }
+            if (projection.valueType() != ProjectionValueType.UNIQUE_ITEM) {
+                continue;
+            }
+            if (definition.quiverProfile().isPresent()) {
+                inventory.setItem(
+                        buttonSlot++,
+                        button(
+                                Material.LEATHER,
+                                definition.id().value()
+                                        + " #"
+                                        + projection.valueId().toString().substring(0, 8),
+                                "equip-quiver:" + projection.valueId()));
+                continue;
+            }
+            if (definition.weaponProfile().isEmpty()) {
                 continue;
             }
             inventory.setItem(
@@ -344,24 +419,67 @@ final class SceneHubController implements Listener {
                         .orElse("empty");
         inventory.setItem(
                 37, button(Material.PAPER, "Main hand: " + committed + " -> " + preview, "noop"));
+        String committedQuiver =
+                sceneSession
+                        .committedState()
+                        .equipment()
+                        .item(EquipmentSlot.QUIVER)
+                        .map(item -> item.value().toString().substring(0, 8))
+                        .orElse("empty");
+        String previewQuiver =
+                sceneSession
+                        .previewState()
+                        .equipment()
+                        .item(EquipmentSlot.QUIVER)
+                        .map(item -> item.value().toString().substring(0, 8))
+                        .orElse("empty");
+        inventory.setItem(
+                38,
+                button(
+                        Material.LEATHER,
+                        "Quiver: " + committedQuiver + " -> " + previewQuiver,
+                        "noop"));
+        inventory.setItem(
+                39,
+                button(
+                        Material.ARROW,
+                        "Prepared: "
+                                + sceneSession.previewState().quiverPreparation().preparedAmmo()
+                                + " selected="
+                                + sceneSession
+                                        .previewState()
+                                        .quiverPreparation()
+                                        .selectedAmmo()
+                                        .map(com.branz.mmorpg.api.identity.DefinitionId::value)
+                                        .orElse("none"),
+                        "noop"));
         inventory.setItem(
                 40,
                 button(
                         Material.LIME_DYE,
                         sceneSession.hasUncommittedPreview()
-                                ? "Confirm equipment transaction"
+                                ? "Confirm Scene transaction"
                                 : "No equipment change",
                         "confirm-equipment"));
     }
 
     private void previewMainHand(Player player, SceneInventoryHolder holder, String itemUuid) {
+        previewEquipment(player, holder, itemUuid, EquipmentSlot.MAIN_HAND);
+    }
+
+    private void previewQuiver(Player player, SceneInventoryHolder holder, String itemUuid) {
+        previewEquipment(player, holder, itemUuid, EquipmentSlot.QUIVER);
+    }
+
+    private void previewEquipment(
+            Player player, SceneInventoryHolder holder, String itemUuid, EquipmentSlot slot) {
         try {
             ItemId itemId = new ItemId(UUID.fromString(itemUuid));
             Result<SceneSession, SceneErrorCode> result =
                     sessions.previewEquipment(
                             player.getUniqueId(),
                             holder.sessionId(),
-                            EquipmentSlot.MAIN_HAND,
+                            slot,
                             java.util.Optional.of(itemId));
             result.map(
                     session -> {
@@ -374,6 +492,47 @@ final class SceneHubController implements Listener {
         }
     }
 
+    private void previewPreparedAmmo(
+            Player player, SceneInventoryHolder holder, String definitionId) {
+        try {
+            com.branz.mmorpg.api.identity.DefinitionId ammoId =
+                    com.branz.mmorpg.api.identity.DefinitionId.of(definitionId);
+            ItemDefinition ammo =
+                    itemEngine
+                            .find(ammoId)
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalArgumentException(
+                                                    "Ammo definition is unavailable."));
+            com.branz.mmorpg.items.definition.QuiverProfile profile =
+                    characterSessions
+                            .equippedQuiverProfile(player)
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalArgumentException(
+                                                    "Equip and confirm a Quiver first."));
+            if (ammo.ammoProfile().filter(profile::supports).isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Ammo is incompatible with the equipped Quiver.");
+            }
+            SceneSession current = sessions.find(player.getUniqueId()).orElseThrow();
+            QuiverPreparation desired =
+                    current.previewState()
+                            .quiverPreparation()
+                            .toggle(ammoId, profile.preparedAmmoCategoryCount());
+            Result<SceneSession, SceneErrorCode> result =
+                    sessions.previewQuiverPreparation(
+                            player.getUniqueId(), holder.sessionId(), desired);
+            result.map(
+                    session -> {
+                        navigate(player, session);
+                        return session;
+                    });
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            player.sendActionBar(Component.text(exception.getMessage(), NamedTextColor.RED));
+        }
+    }
+
     private void confirmEquipment(Player player, SceneInventoryHolder holder) {
         SceneSession sceneSession = sessions.find(player.getUniqueId()).orElse(null);
         if (sceneSession == null
@@ -381,45 +540,84 @@ final class SceneHubController implements Listener {
                 || !committing.add(player.getUniqueId())) {
             return;
         }
+        boolean equipmentChanged =
+                !sceneSession
+                        .committedState()
+                        .equipment()
+                        .equals(sceneSession.previewState().equipment());
+        boolean preparationChanged =
+                !sceneSession
+                        .committedState()
+                        .quiverPreparation()
+                        .equals(sceneSession.previewState().quiverPreparation());
+        if (equipmentChanged && preparationChanged) {
+            committing.remove(player.getUniqueId());
+            player.sendActionBar(
+                    Component.text(
+                            "Confirm equipment first, then prepare ammo in a second transaction.",
+                            NamedTextColor.RED));
+            return;
+        }
         player.sendActionBar(
-                Component.text("Committing equipment transaction...", NamedTextColor.YELLOW));
-        characterSessions.commitEquipment(
-                player,
-                sceneSession.previewState().equipment(),
-                contentVersion,
-                result -> {
-                    committing.remove(player.getUniqueId());
-                    if (result
-                            instanceof
-                            Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
-                                    failure) {
-                        player.sendMessage(
-                                Component.text(
-                                        "Equipment commit rejected: "
-                                                + failure.error().code()
-                                                + " "
-                                                + failure.detail(),
-                                        NamedTextColor.RED));
-                        return;
-                    }
-                    LoadedCharacterSession updated =
-                            ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
-                                            result)
-                                    .value();
-                    Result<SceneSession, SceneErrorCode> confirmed =
-                            sessions.confirm(
-                                    player.getUniqueId(),
-                                    holder.sessionId(),
-                                    ignored ->
-                                            Result.success(
-                                                    new ScenePreviewState(
-                                                            updated.snapshot().equipment())));
-                    if (confirmed instanceof Result.Success<SceneSession, SceneErrorCode> success) {
-                        player.sendActionBar(
-                                Component.text("Equipment committed.", NamedTextColor.GREEN));
-                        navigate(player, success.value());
-                    }
-                });
+                Component.text("Committing Scene transaction...", NamedTextColor.YELLOW));
+        java.util.function.Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>>
+                completion =
+                        result -> {
+                            committing.remove(player.getUniqueId());
+                            if (result
+                                    instanceof
+                                    Result.Failure<
+                                                    LoadedCharacterSession,
+                                                    CharacterSessionErrorCode>
+                                            failure) {
+                                player.sendMessage(
+                                        Component.text(
+                                                "Scene transaction rejected: "
+                                                        + failure.error().code()
+                                                        + " "
+                                                        + failure.detail(),
+                                                NamedTextColor.RED));
+                                return;
+                            }
+                            LoadedCharacterSession updated =
+                                    ((Result.Success<
+                                                            LoadedCharacterSession,
+                                                            CharacterSessionErrorCode>)
+                                                    result)
+                                            .value();
+                            Result<SceneSession, SceneErrorCode> confirmed =
+                                    sessions.confirm(
+                                            player.getUniqueId(),
+                                            holder.sessionId(),
+                                            ignored ->
+                                                    Result.success(
+                                                            new ScenePreviewState(
+                                                                    updated.snapshot().equipment(),
+                                                                    updated.snapshot()
+                                                                            .quiverPreparation())));
+                            if (confirmed
+                                    instanceof
+                                    Result.Success<SceneSession, SceneErrorCode> success) {
+                                player.sendActionBar(
+                                        Component.text(
+                                                preparationChanged
+                                                        ? "Quiver preparation committed."
+                                                        : "Equipment committed.",
+                                                NamedTextColor.GREEN));
+                                navigate(player, success.value());
+                            }
+                        };
+        if (preparationChanged) {
+            characterSessions.updateQuiverPreparation(
+                    player,
+                    sceneSession.previewState().quiverPreparation(),
+                    UUID.randomUUID(),
+                    contentVersion,
+                    completion);
+        } else {
+            characterSessions.commitEquipment(
+                    player, sceneSession.previewState().equipment(), contentVersion, completion);
+        }
     }
 
     private ItemStack button(Material material, String label, String action) {

@@ -11,11 +11,13 @@ import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
+import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.lease.CharacterLease;
 import com.branz.mmorpg.persistence.lease.LeaseAcquireOutcome;
 import com.branz.mmorpg.persistence.lease.LeaseErrorCode;
 import com.branz.mmorpg.persistence.transaction.ItemLocationMove;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
+import com.branz.mmorpg.persistence.transaction.ItemPayloadUpdate;
 import com.branz.mmorpg.persistence.transaction.JdbcValueTransactionService;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotQuantityConsumption;
@@ -239,6 +241,73 @@ final class CharacterSessionService {
                                         1));
         if (consumed
                 instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                    failure.error().code() + ": " + failure.detail());
+        }
+        return reload(session);
+    }
+
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> updateQuiverPreparation(
+            LoadedCharacterSession session,
+            QuiverPreparation desired,
+            UUID operationId,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(desired, "desired");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        if (desired.equals(session.snapshot().quiverPreparation())) {
+            return Result.success(session);
+        }
+        ItemId quiverId = session.snapshot().equipment().item(EquipmentSlot.QUIVER).orElse(null);
+        ItemLocationRecord quiver =
+                quiverId == null
+                        ? null
+                        : findItem(session.snapshot().itemRecords(), quiverId).orElse(null);
+        ValueLocation expectedLocation = ValueLocation.virtualEquipped(EquipmentSlot.QUIVER.name());
+        if (quiver == null || !quiver.location().equals(expectedLocation)) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Prepared ammo requires one authoritative equipped Quiver item.");
+        }
+        String replacement;
+        try {
+            replacement = QuiverPayloadCodec.encode(quiver.payloadJson(), desired);
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID, exception.getMessage());
+        }
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "quiver-preparation:" + operationId,
+                        session.characterId(),
+                        session.sessionId(),
+                        JdbcValueTransactionService.ITEM_PAYLOAD_UPDATE,
+                        "{\"itemId\":\""
+                                + quiver.itemId().value()
+                                + "\",\"version\":"
+                                + quiver.version()
+                                + "}",
+                        "{\"preparedAmmo\":"
+                                + desired.preparedAmmo().size()
+                                + ",\"selectedIndex\":"
+                                + desired.selectedIndex()
+                                + "}",
+                        contentVersion);
+        Result<TransactionExecution, TransactionErrorCode> updated =
+                database.values()
+                        .updateItemPayload(
+                                request,
+                                new ItemPayloadUpdate(
+                                        quiver.itemId(),
+                                        quiver.version(),
+                                        quiver.ownerCharacterId(),
+                                        quiver.location(),
+                                        quiver.payloadJson(),
+                                        replacement));
+        if (updated instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
                     failure.error().code() + ": " + failure.detail());

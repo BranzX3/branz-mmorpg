@@ -8,6 +8,7 @@ import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -107,9 +108,86 @@ public final class ItemEngine {
             weaponProfile =
                     Optional.of(new WeaponCombatProfile(family, power.doubleValue(), bowProfile));
         }
-        return Result.success(
-                new ItemDefinition(
-                        source.id(), assetId, itemClass, durability, cosmetic, weaponProfile));
+        Optional<AmmoProfile> ammoProfile;
+        try {
+            ammoProfile = compileAmmoProfile(source.id(), itemClass, body.get("ammo_profile"));
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    ItemEngineErrorCode.ITEM_AMMO_PROFILE_INVALID, exception.getMessage());
+        }
+        Optional<QuiverProfile> quiverProfile;
+        try {
+            quiverProfile = compileQuiverProfile(itemClass, durability, body.get("quiver_profile"));
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    ItemEngineErrorCode.ITEM_QUIVER_PROFILE_INVALID, exception.getMessage());
+        }
+        try {
+            return Result.success(
+                    new ItemDefinition(
+                            source.id(),
+                            assetId,
+                            itemClass,
+                            durability,
+                            cosmetic,
+                            weaponProfile,
+                            ammoProfile,
+                            quiverProfile));
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(ItemEngineErrorCode.ITEM_CLASS_INVALID, exception.getMessage());
+        }
+    }
+
+    private static Optional<AmmoProfile> compileAmmoProfile(
+            DefinitionId id, ItemClass itemClass, JsonNode ammoNode) {
+        boolean ammoIdentity = id.value().startsWith("ammo.");
+        boolean declared = ammoNode != null && !ammoNode.isNull();
+        if (ammoIdentity != declared) {
+            throw new IllegalArgumentException(
+                    "ammo.* definitions require ammo_profile and other identities forbid it");
+        }
+        if (!declared) {
+            return Optional.empty();
+        }
+        if (itemClass != ItemClass.STACKABLE_LOT || !ammoNode.isObject()) {
+            throw new IllegalArgumentException("ammo_profile requires STACKABLE_LOT object");
+        }
+        try {
+            return Optional.of(
+                    new AmmoProfile(AmmoFamily.valueOf(ammoNode.path("family").asText(""))));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("ammo_profile.family must be ARROW or BOLT");
+        }
+    }
+
+    private static Optional<QuiverProfile> compileQuiverProfile(
+            ItemClass itemClass, OptionalInt durability, JsonNode quiverNode) {
+        if (quiverNode == null || quiverNode.isNull()) {
+            return Optional.empty();
+        }
+        if (itemClass != ItemClass.UNIQUE_DURABLE
+                || durability.isPresent()
+                || !quiverNode.isObject()) {
+            throw new IllegalArgumentException(
+                    "quiver_profile requires a non-durability UNIQUE_DURABLE item");
+        }
+        JsonNode familiesNode = quiverNode.get("supported_ammo_families");
+        if (familiesNode == null || !familiesNode.isArray()) {
+            throw new IllegalArgumentException("supported_ammo_families must be an array");
+        }
+        EnumSet<AmmoFamily> families = EnumSet.noneOf(AmmoFamily.class);
+        try {
+            familiesNode.forEach(node -> families.add(AmmoFamily.valueOf(node.asText(""))));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                    "supported_ammo_families values must be ARROW or BOLT");
+        }
+        return Optional.of(
+                new QuiverProfile(
+                        requiredInteger(quiverNode, "capacity"),
+                        families,
+                        requiredInteger(quiverNode, "prepared_ammo_category_count"),
+                        requiredInteger(quiverNode, "ammo_switch_handling_ticks")));
     }
 
     private static Optional<BowWeaponProfile> compileBowProfile(String family, JsonNode bowNode) {

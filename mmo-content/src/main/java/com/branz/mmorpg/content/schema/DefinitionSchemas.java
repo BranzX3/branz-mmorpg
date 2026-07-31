@@ -106,7 +106,39 @@ public final class DefinitionSchemas {
                                         0,
                                         0.40,
                                         "ratio",
-                                        "Full-draw armor penetration.")),
+                                        "Full-draw armor penetration."),
+                                optional(
+                                        "ammo_profile.family",
+                                        STRING,
+                                        "",
+                                        "Ammo family: ARROW or BOLT."),
+                                optionalRanged(
+                                        "quiver_profile.capacity",
+                                        INTEGER,
+                                        1,
+                                        4096,
+                                        "ammo_units",
+                                        "Maximum Quiver storage capacity."),
+                                array(
+                                        "quiver_profile.supported_ammo_families",
+                                        false,
+                                        1,
+                                        2,
+                                        "Compatible ARROW/BOLT families."),
+                                optionalRanged(
+                                        "quiver_profile.prepared_ammo_category_count",
+                                        INTEGER,
+                                        1,
+                                        4,
+                                        "categories",
+                                        "Maximum prepared ammo categories."),
+                                optionalRanged(
+                                        "quiver_profile.ammo_switch_handling_ticks",
+                                        INTEGER,
+                                        0,
+                                        40,
+                                        "ticks",
+                                        "Engaged ammo-switch handling lock.")),
                         List.of(to(DefinitionType.TRAIT, "traits", "authored_pool", "*"))));
         schemas.put(
                 DefinitionType.MOVE,

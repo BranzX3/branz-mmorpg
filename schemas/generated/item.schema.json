@@ -91,6 +91,47 @@
           }
         }
       }
+    },
+    "ammo_profile" : {
+      "type" : "object",
+      "properties" : {
+        "family" : {
+          "type" : "string",
+          "description" : "Ammo family: ARROW or BOLT."
+        }
+      }
+    },
+    "quiver_profile" : {
+      "type" : "object",
+      "properties" : {
+        "capacity" : {
+          "type" : "integer",
+          "description" : "Maximum Quiver storage capacity.",
+          "x-unit" : "ammo_units",
+          "minimum" : 1.0,
+          "maximum" : 4096.0
+        },
+        "supported_ammo_families" : {
+          "type" : "array",
+          "description" : "Compatible ARROW/BOLT families.",
+          "minItems" : 1,
+          "maxItems" : 2
+        },
+        "prepared_ammo_category_count" : {
+          "type" : "integer",
+          "description" : "Maximum prepared ammo categories.",
+          "x-unit" : "categories",
+          "minimum" : 1.0,
+          "maximum" : 4.0
+        },
+        "ammo_switch_handling_ticks" : {
+          "type" : "integer",
+          "description" : "Engaged ammo-switch handling lock.",
+          "x-unit" : "ticks",
+          "minimum" : 0.0,
+          "maximum" : 40.0
+        }
+      }
     }
   },
   "required" : [ "definition_id", "schema_version", "asset_id", "item_class" ]

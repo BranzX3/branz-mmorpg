@@ -4,7 +4,10 @@ import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.items.definition.QuiverProfile;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
+import com.branz.mmorpg.items.equipment.EquipmentSlot;
+import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -189,6 +192,83 @@ final class CharacterSessionController implements Listener {
             return 0;
         }
         return InventoryAmmoLots.quantity(session.snapshot().lotRecords(), definitionId);
+    }
+
+    QuiverPreparation quiverPreparation(Player player) {
+        return active(player)
+                .map(session -> session.snapshot().quiverPreparation())
+                .orElseGet(QuiverPreparation::empty);
+    }
+
+    Optional<QuiverProfile> equippedQuiverProfile(Player player) {
+        return active(player)
+                .flatMap(this::equippedQuiverDefinition)
+                .flatMap(ItemDefinition::quiverProfile);
+    }
+
+    void updateQuiverPreparation(
+            Player player,
+            QuiverPreparation desired,
+            UUID operationId,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(desired, "desired");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        ItemDefinition quiver = equippedQuiverDefinition(session).orElse(null);
+        QuiverProfile profile = quiver == null ? null : quiver.quiverProfile().orElse(null);
+        if (profile == null) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "An authored Quiver must be equipped first."));
+            return;
+        }
+        if (desired.preparedAmmo().size() > profile.preparedAmmoCategoryCount()
+                || desired.preparedAmmo().stream()
+                                .map(itemEngine::find)
+                                .flatMap(Optional::stream)
+                                .map(ItemDefinition::ammoProfile)
+                                .flatMap(Optional::stream)
+                                .filter(profile::supports)
+                                .count()
+                        != desired.preparedAmmo().size()) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Prepared ammo exceeds the Quiver limit or contains an incompatible category."));
+            return;
+        }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
+                                    sessions.updateQuiverPreparation(
+                                            session, desired, operationId, contentVersion);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeSnapshotMutation(
+                                                            session, result, completion));
+                        });
     }
 
     void commitEquipment(
@@ -533,5 +613,17 @@ final class CharacterSessionController implements Listener {
             }
         }
         return -1;
+    }
+
+    private Optional<ItemDefinition> equippedQuiverDefinition(LoadedCharacterSession session) {
+        return session.snapshot()
+                .equipment()
+                .item(EquipmentSlot.QUIVER)
+                .flatMap(
+                        itemId ->
+                                session.snapshot().itemRecords().stream()
+                                        .filter(record -> record.itemId().equals(itemId))
+                                        .findFirst())
+                .flatMap(record -> itemEngine.find(record.definitionId()));
     }
 }

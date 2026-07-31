@@ -129,6 +129,69 @@ class ItemEngineTest {
                 ((Result.Failure<ItemEngine, ItemEngineErrorCode>) rejected).error());
     }
 
+    @Test
+    void compilesAmmoAndQuiverProfilesAndRejectsMissingAmmoFamily() throws Exception {
+        ContentSnapshot valid =
+                snapshot(
+                        definition(
+                                "ammo.test.arrow",
+                                """
+                                {
+                                  "asset_id": "ammo.test.arrow",
+                                  "item_class": "STACKABLE_LOT",
+                                  "ammo_profile": {"family": "ARROW"}
+                                }
+                                """),
+                        definition(
+                                "equipment.test.quiver",
+                                """
+                                {
+                                  "asset_id": "equipment.test.quiver",
+                                  "item_class": "UNIQUE_DURABLE",
+                                  "quiver_profile": {
+                                    "capacity": 96,
+                                    "supported_ammo_families": ["ARROW"],
+                                    "prepared_ammo_category_count": 4,
+                                    "ammo_switch_handling_ticks": 6
+                                  }
+                                }
+                                """));
+
+        Result<ItemEngine, ItemEngineErrorCode> compiled = ItemEngine.compile(valid);
+        Result<ItemEngine, ItemEngineErrorCode> missing =
+                ItemEngine.compile(
+                        snapshot(
+                                definition(
+                                        "ammo.test.missing",
+                                        """
+                                        {
+                                          "asset_id": "ammo.test.missing",
+                                          "item_class": "STACKABLE_LOT"
+                                        }
+                                        """)));
+
+        ItemEngine engine = ((Result.Success<ItemEngine, ItemEngineErrorCode>) compiled).value();
+        assertEquals(
+                AmmoFamily.ARROW,
+                engine.find(DefinitionId.of("ammo.test.arrow"))
+                        .orElseThrow()
+                        .ammoProfile()
+                        .orElseThrow()
+                        .family());
+        QuiverProfile quiver =
+                engine.find(DefinitionId.of("equipment.test.quiver"))
+                        .orElseThrow()
+                        .quiverProfile()
+                        .orElseThrow();
+        assertEquals(96, quiver.capacity());
+        assertEquals(4, quiver.preparedAmmoCategoryCount());
+        assertEquals(6, quiver.ammoSwitchHandlingTicks());
+        assertTrue(quiver.supports(new AmmoProfile(AmmoFamily.ARROW)));
+        assertEquals(
+                ItemEngineErrorCode.ITEM_AMMO_PROFILE_INVALID,
+                ((Result.Failure<ItemEngine, ItemEngineErrorCode>) missing).error());
+    }
+
     private static ContentDefinition definition(String id, String body) throws Exception {
         return new ContentDefinition(
                 DefinitionId.of(id),

@@ -20,6 +20,9 @@ public interface ValueTransactionService {
     Result<TransactionExecution, TransactionErrorCode> moveItemsAtomically(
             TransactionRequest request, List<ItemLocationMove> moves);
 
+    Result<TransactionExecution, TransactionErrorCode> updateItemPayload(
+            TransactionRequest request, ItemPayloadUpdate update);
+
     Result<TransactionExecution, TransactionErrorCode> moveLot(
             TransactionRequest request, LotLocationMove move);
 

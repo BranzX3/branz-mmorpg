@@ -32,6 +32,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
     public static final String LOT_GRANT = "lot.grant";
     public static final String ITEM_MOVE = "item.move";
     public static final String ITEM_BATCH_MOVE = "item.move.batch";
+    public static final String ITEM_PAYLOAD_UPDATE = "item.payload.update";
     public static final String LOT_MOVE = "lot.move";
     public static final String LOT_CONSUME = "lot.consume";
 
@@ -130,6 +131,18 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
                     }
                     return Result.success(MutationApplied.INSTANCE);
                 });
+    }
+
+    @Override
+    public Result<TransactionExecution, TransactionErrorCode> updateItemPayload(
+            TransactionRequest request, ItemPayloadUpdate update) {
+        Objects.requireNonNull(update, "update");
+        return execute(
+                request,
+                ITEM_PAYLOAD_UPDATE,
+                AuditSubjectType.ITEM,
+                update.itemId().value(),
+                connection -> updateItemPayload(connection, request.transactionId(), update));
     }
 
     @Override
@@ -444,6 +457,39 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
         }
     }
 
+    private static Result<MutationApplied, TransactionErrorCode> updateItemPayload(
+            Connection connection, TransactionId transactionId, ItemPayloadUpdate update) {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        """
+                        UPDATE item_instance
+                        SET payload = CAST(? AS JSONB),
+                            version = version + 1,
+                            last_transaction_id = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE item_uuid = ?
+                          AND version = ?
+                          AND owner_character_id IS NOT DISTINCT FROM ?
+                          AND location_type = ?
+                          AND location_ref IS NOT DISTINCT FROM ?
+                          AND payload = CAST(? AS JSONB)
+                        """)) {
+            statement.setString(1, update.replacementPayloadJson());
+            statement.setObject(2, transactionId.value());
+            statement.setObject(3, update.itemId().value());
+            statement.setLong(4, update.expectedVersion());
+            setNullableCharacter(statement, 5, update.expectedOwnerCharacterId());
+            bindLocation(statement, 6, update.expectedLocation());
+            statement.setString(8, update.expectedPayloadJson());
+            if (statement.executeUpdate() == 1) {
+                return Result.success(MutationApplied.INSTANCE);
+            }
+            return classifyItemPayloadFailure(connection, update);
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
     private static Result<MutationApplied, TransactionErrorCode> updateLotLocation(
             Connection connection, TransactionId transactionId, LotLocationMove move) {
         try (PreparedStatement statement =
@@ -539,6 +585,24 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
         return Result.failure(
                 TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
                 "Item owner or location no longer matches the expected source.");
+    }
+
+    private static Result<MutationApplied, TransactionErrorCode> classifyItemPayloadFailure(
+            Connection connection, ItemPayloadUpdate update) throws SQLException {
+        Optional<ItemLocationRecord> current = findItem(connection, update.itemId());
+        if (current.isEmpty()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_NOT_FOUND, "Item location does not exist.");
+        }
+        ItemLocationRecord record = current.orElseThrow();
+        if (record.version() != update.expectedVersion()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_STALE_VERSION,
+                    "Item version changed; reload before retry.");
+        }
+        return Result.failure(
+                TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                "Item owner, location or payload no longer matches the expected state.");
     }
 
     private static Result<MutationApplied, TransactionErrorCode> classifyLotCasFailure(

@@ -91,6 +91,9 @@ final class BukkitItemProjectionCodec {
         if (definition.id().value().startsWith("ammo.")) {
             return Material.ARROW;
         }
+        if (definition.quiverProfile().isPresent()) {
+            return Material.LEATHER;
+        }
         return definition
                 .weaponProfile()
                 .map(

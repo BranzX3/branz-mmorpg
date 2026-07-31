@@ -1,6 +1,6 @@
-definition_id: ammo.training_arrow
+definition_id: ammo.training_bodkin_arrow
 schema_version: 1
-asset_id: ammo.training_arrow
+asset_id: ammo.training_bodkin_arrow
 item_class: STACKABLE_LOT
 ammo_profile:
   family: ARROW

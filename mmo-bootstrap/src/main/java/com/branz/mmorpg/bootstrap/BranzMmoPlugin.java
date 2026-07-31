@@ -283,6 +283,28 @@ public final class BranzMmoPlugin extends JavaPlugin {
             resourcePackGate = null;
             return "Training Bow requires a BOW weapon_profile with handling fields.";
         }
+        com.branz.mmorpg.items.definition.AmmoProfile trainingArrow =
+                activeItemEngine
+                        .get()
+                        .find(com.branz.mmorpg.api.identity.DefinitionId.of("ammo.training_arrow"))
+                        .flatMap(com.branz.mmorpg.items.definition.ItemDefinition::ammoProfile)
+                        .orElse(null);
+        com.branz.mmorpg.items.definition.QuiverProfile trainingQuiver =
+                activeItemEngine
+                        .get()
+                        .find(
+                                com.branz.mmorpg.api.identity.DefinitionId.of(
+                                        "equipment.training_quiver"))
+                        .flatMap(com.branz.mmorpg.items.definition.ItemDefinition::quiverProfile)
+                        .orElse(null);
+        if (trainingArrow == null
+                || trainingQuiver == null
+                || !trainingQuiver.supports(trainingArrow)) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            resourcePackGate = null;
+            return "Training Bow requires compatible ammo and Quiver profiles.";
+        }
         BukkitItemProjectionCodec projectionCodec =
                 new BukkitItemProjectionCodec(this, ProjectionTokenSigner.random());
         testItemProjections = new TestItemProjectionService(projectionCodec);
@@ -397,6 +419,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         resourcePackGate,
                         chronicle,
                         characterSessionController,
+                        activeItemEngine.get(),
                         snapshot.manifest().contentVersion());
         commandController =
                 new MmoCommandController(

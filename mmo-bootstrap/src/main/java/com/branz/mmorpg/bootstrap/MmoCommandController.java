@@ -347,9 +347,20 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                             + " | projectiles="
                                                             + status.activeProjectiles()
                                                             + " | ammo="
+                                                            + status.selectedAmmo()
+                                                                    .map(ammo -> ammo.value() + "=")
+                                                                    .orElse("none=")
                                                             + status.bowAmmoQuantity()
                                                             + (status.bowAmmoCommitPending()
                                                                     ? "(COMMITTING)"
+                                                                    : "")
+                                                            + (status
+                                                                                    .ammoSwitchHandlingTicksRemaining()
+                                                                            > 0
+                                                                    ? "(handling="
+                                                                            + status
+                                                                                    .ammoSwitchHandlingTicksRemaining()
+                                                                            + "t)"
                                                                     : "")
                                                             + " | dodge="
                                                             + status.dodgeLoad()

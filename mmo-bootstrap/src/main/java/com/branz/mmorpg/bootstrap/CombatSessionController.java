@@ -99,9 +99,11 @@ import com.branz.mmorpg.combat.weapon.SelectedSlotKind;
 import com.branz.mmorpg.combat.weapon.WeaponTransitionErrorCode;
 import com.branz.mmorpg.combat.weapon.WeaponTransitionMachine;
 import com.branz.mmorpg.combat.weapon.WeaponTransitionSnapshot;
+import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.BowWeaponProfile;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.items.definition.QuiverProfile;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import java.util.HashMap;
@@ -159,6 +161,7 @@ final class CombatSessionController implements Listener {
     private final MoveDefinition trainingMove;
     private final MoveDefinition trainingBowMove;
     private final DefinitionId trainingBowAmmo;
+    private final AmmoFamily trainingBowAmmoFamily;
     private final double trainingWeaponPower;
     private final double trainingBowPower;
     private final BowDrawEngine bowDraws;
@@ -245,6 +248,14 @@ final class CombatSessionController implements Listener {
         }
         trainingBowAmmo =
                 trainingBowMove.hitboxes().getFirst().projectile().orElseThrow().ammoCategory();
+        trainingBowAmmoFamily =
+                items.find(trainingBowAmmo)
+                        .flatMap(ItemDefinition::ammoProfile)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "training Bow projectile requires an authored ammo profile"))
+                        .family();
         if (!Double.isFinite(trainingWeaponPower) || trainingWeaponPower <= 0) {
             throw new IllegalArgumentException("trainingWeaponPower must be positive");
         }
@@ -354,6 +365,7 @@ final class CombatSessionController implements Listener {
         }
         CombatResources resources =
                 session.timeline == null ? session.resources : session.timeline.resources();
+        Optional<DefinitionId> selectedAmmo = characters.quiverPreparation(player).selectedAmmo();
         return Optional.of(
                 new CombatSessionStatus(
                         session.engagement.state(),
@@ -369,7 +381,15 @@ final class CombatSessionController implements Listener {
                                                 - plugin.getServer().getCurrentTick()),
                         activeProjectilesFor(player.getUniqueId()),
                         session.pendingBowLaunch != null,
-                        characters.inventoryLotQuantity(player, trainingBowAmmo),
+                        selectedAmmo,
+                        selectedAmmo
+                                .map(ammo -> characters.inventoryLotQuantity(player, ammo))
+                                .orElse(0L),
+                        (int)
+                                Math.max(
+                                        0,
+                                        session.ammoSwitchHandlingUntilTick
+                                                - plugin.getServer().getCurrentTick()),
                         dodgeProfile.load(),
                         Optional.ofNullable(session.dodge)
                                 .map(
@@ -448,10 +468,19 @@ final class CombatSessionController implements Listener {
         startMove(player, session);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onHeldSlot(PlayerItemHeldEvent event) {
         LiveSession session = sessions.get(event.getPlayer().getUniqueId());
         if (session == null) {
+            return;
+        }
+        if (ammoCycleIntent(event.getPlayer())) {
+            event.setCancelled(true);
+            cyclePreparedAmmo(
+                    event.getPlayer(),
+                    session,
+                    AmmoCycleInputPolicy.scrollDirection(
+                            event.getPreviousSlot(), event.getNewSlot()));
             return;
         }
         cancelAction(session, "WEAPON_SWAP");
@@ -459,6 +488,71 @@ final class CombatSessionController implements Listener {
         releaseGuard(session);
         session.input.clearBuffer(InputBufferClearReason.WEAPON_SWAP);
         select(session, selectedSlot(event.getPlayer(), event.getNewSlot()));
+    }
+
+    private boolean ammoCycleIntent(Player player) {
+        return AmmoCycleInputPolicy.ownsScroll(
+                player.isSneaking(),
+                direction(player.getCurrentInput()),
+                equippedWeaponFamily(player).orElse(""));
+    }
+
+    private void cyclePreparedAmmo(Player player, LiveSession session, int direction) {
+        if (session.weapon.state() != WeaponState.READY
+                || session.action != ActionState.IDLE
+                || session.timeline != null
+                || session.bowDraw != null
+                || session.pendingBowLaunch != null
+                || session.pendingAmmoCycleId != null) {
+            player.sendActionBar(Component.text("AMMO SWITCH ACTION LOCKED", NamedTextColor.RED));
+            return;
+        }
+        QuiverProfile profile = characters.equippedQuiverProfile(player).orElse(null);
+        com.branz.mmorpg.items.quiver.QuiverPreparation current =
+                characters.quiverPreparation(player);
+        if (profile == null || current.preparedAmmo().size() < 2) {
+            player.sendActionBar(
+                    Component.text(
+                            "Prepare at least two compatible ammo types.", NamedTextColor.RED));
+            return;
+        }
+        com.branz.mmorpg.items.quiver.QuiverPreparation desired = current.cycle(direction);
+        UUID operationId = UUID.randomUUID();
+        session.pendingAmmoCycleId = operationId;
+        session.lastResolution = "AMMO SWITCH COMMITTING";
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        characters.updateQuiverPreparation(
+                player,
+                desired,
+                operationId,
+                contentVersion,
+                result -> {
+                    LiveSession active = sessions.get(player.getUniqueId());
+                    if (active != session || !operationId.equals(session.pendingAmmoCycleId)) {
+                        return;
+                    }
+                    session.pendingAmmoCycleId = null;
+                    if (result
+                            instanceof
+                            Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
+                                    failure) {
+                        session.lastResolution = "AMMO SWITCH FAILED " + failure.error().code();
+                        player.sendActionBar(
+                                Component.text(session.lastResolution, NamedTextColor.RED));
+                        return;
+                    }
+                    if (session.engagement.state() == EngagementState.ENGAGED) {
+                        session.ammoSwitchHandlingUntilTick =
+                                plugin.getServer().getCurrentTick()
+                                        + profile.ammoSwitchHandlingTicks();
+                    } else {
+                        session.ammoSwitchHandlingUntilTick = -1;
+                    }
+                    session.lastResolution =
+                            "AMMO SELECTED " + desired.selectedAmmo().orElseThrow().value();
+                    player.sendActionBar(
+                            Component.text(session.lastResolution, NamedTextColor.GREEN));
+                });
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -1723,6 +1817,8 @@ final class CombatSessionController implements Listener {
                 || session.timeline != null
                 || session.dodge != null
                 || session.guard.active()
+                || session.pendingAmmoCycleId != null
+                || session.ammoSwitchHandlingUntilTick > tick
                 || session.bowRecoveryUntilTick > tick) {
             player.sendActionBar(Component.text("Bow draw is action-locked.", NamedTextColor.RED));
             return;
@@ -1795,15 +1891,33 @@ final class CombatSessionController implements Listener {
             player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
             return;
         }
+        DefinitionId selectedAmmo =
+                characters.quiverPreparation(player).selectedAmmo().orElse(null);
+        QuiverProfile quiver = characters.equippedQuiverProfile(player).orElse(null);
+        boolean compatible =
+                selectedAmmo != null
+                        && quiver != null
+                        && items.find(selectedAmmo)
+                                .flatMap(ItemDefinition::ammoProfile)
+                                .filter(ammo -> ammo.family() == trainingBowAmmoFamily)
+                                .filter(quiver::supports)
+                                .isPresent();
+        if (!compatible) {
+            session.action = ActionState.IDLE;
+            session.lastResolution = quiver == null ? "BOW NO QUIVER" : "BOW NO PREPARED AMMO";
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            return;
+        }
         PendingBowLaunch pending =
-                pendingBowLaunch(player, release.shot().orElseThrow(), UUID.randomUUID());
+                pendingBowLaunch(
+                        player, release.shot().orElseThrow(), UUID.randomUUID(), selectedAmmo);
         session.pendingBowLaunch = pending;
         session.action = ActionState.ACTIVE;
         session.lastResolution = "BOW AMMO COMMITTING";
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
         characters.consumeAmmo(
                 player,
-                trainingBowAmmo,
+                pending.ammoDefinitionId(),
                 pending.projectileId(),
                 contentVersion,
                 result -> completeBowAmmoCommit(player.getUniqueId(), session, pending, result));
@@ -1819,14 +1933,19 @@ final class CombatSessionController implements Listener {
     }
 
     private PendingBowLaunch pendingBowLaunch(
-            Player player, BowShotCharge shot, UUID projectileId) {
+            Player player, BowShotCharge shot, UUID projectileId, DefinitionId ammoDefinitionId) {
         Location eye = player.getEyeLocation();
         org.bukkit.util.Vector look = eye.getDirection().normalize();
         CombatVector direction = new CombatVector(look.getX(), look.getY(), look.getZ());
         CombatVector origin =
                 new CombatVector(eye.getX(), eye.getY(), eye.getZ()).add(direction.multiply(0.35));
         return new PendingBowLaunch(
-                projectileId, player.getWorld().getUID(), origin, direction, shot);
+                projectileId,
+                player.getWorld().getUID(),
+                origin,
+                direction,
+                shot,
+                ammoDefinitionId);
     }
 
     private void completeBowAmmoCommit(
@@ -1891,7 +2010,7 @@ final class CombatSessionController implements Listener {
                         player.getUniqueId(),
                         trainingBowMove.id(),
                         contentVersion,
-                        Optional.of(authored.ammoCategory()),
+                        Optional.of(pending.ammoDefinitionId()),
                         hitbox.hitGroup());
         ProjectileRuntime runtime =
                 ProjectileRuntime.launch(
@@ -1910,7 +2029,7 @@ final class CombatSessionController implements Listener {
                         + "% projectile="
                         + pending.projectileId().toString().substring(0, 8)
                         + " ammo="
-                        + characters.inventoryLotQuantity(player, trainingBowAmmo);
+                        + characters.inventoryLotQuantity(player, pending.ammoDefinitionId());
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
     }
 
@@ -1923,6 +2042,8 @@ final class CombatSessionController implements Listener {
             session.pendingBowLaunch = null;
             session.lastResolution = "BOW CANCELLED " + reason;
         }
+        session.pendingAmmoCycleId = null;
+        session.ammoSwitchHandlingUntilTick = -1;
         session.bowRecoveryUntilTick = -1;
         if (!session.action.hardControl()) {
             session.action = ActionState.IDLE;
@@ -2336,13 +2457,15 @@ final class CombatSessionController implements Listener {
             UUID worldId,
             CombatVector origin,
             CombatVector direction,
-            BowShotCharge charge) {
+            BowShotCharge charge,
+            DefinitionId ammoDefinitionId) {
         private PendingBowLaunch {
             Objects.requireNonNull(projectileId, "projectileId");
             Objects.requireNonNull(worldId, "worldId");
             Objects.requireNonNull(origin, "origin");
             direction = Objects.requireNonNull(direction, "direction").normalized();
             Objects.requireNonNull(charge, "charge");
+            Objects.requireNonNull(ammoDefinitionId, "ammoDefinitionId");
         }
     }
 
@@ -2355,6 +2478,8 @@ final class CombatSessionController implements Listener {
         private ActionTimeline timeline;
         private BowDrawRuntime bowDraw;
         private PendingBowLaunch pendingBowLaunch;
+        private UUID pendingAmmoCycleId;
+        private long ammoSwitchHandlingUntilTick = -1;
         private long bowRecoveryUntilTick = -1;
         private CombatTransform previousActionTransform;
         private DodgeRuntime dodge;

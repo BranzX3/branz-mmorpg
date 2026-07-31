@@ -1223,3 +1223,61 @@ Non-goals:
 Schema/config impact: none. Migration impact: no SQL migration; the existing free-text lot location
 contract adds the recognized `DESTROYED` value and the persistence API adds journaled quantity
 consumption, documented by ADR 0007.
+
+## Milestone 5 — persistent Quiver preparation and ammo cycling slice
+
+Implemented:
+
+- ammo item profiles declare `ARROW` or `BOLT`; unique Quiver profiles declare capacity, supported
+  families, a one-to-four prepared-category limit and bounded handling ticks;
+- the training content adds a 96-capacity Arrow Quiver and a second Bodkin Arrow category, with all
+  profiles compiled and emitted through the generated item schema;
+- an equipped Quiver item payload owns immutable prepared order and selected index while preserving
+  unrelated payload fields and advancing its display revision;
+- Scene equipment can preview and commit a virtual Quiver, then preview compatible owned ammo lots
+  and commit preparation in an explicit second transaction;
+- preparation changes use a journaled, audited item-payload compare-and-set on exact item UUID,
+  version, owner, virtual slot, location and previous JSON payload;
+- reconnect, server restart and Quiver re-equip reconstruct preparation from PostgreSQL truth;
+- stationary sneak plus hotbar scroll with a READY Bow/Crossbow cancels the proposed slot change and
+  cycles the prepared list in either direction; active draw/action state rejects the cycle;
+- a successful engaged switch applies the authored six-tick handling lock, while neutral switching
+  is immediately ready after its durable commit;
+- Bow release requires an equipped compatible Quiver and consumes the exact selected ammo category;
+  projectile identity retains that category and `/mmo health` exposes its quantity and lock state.
+
+Tests:
+
+- Item Engine fixtures compile valid ammo/Quiver profiles and reject missing, incompatible-storage
+  and out-of-bound declarations;
+- preparation tests cover uniqueness, four-category bounds, selection after removal and bidirectional
+  wrap;
+- payload codec tests cover legacy-empty decode, unrelated-field preservation, revision advance and
+  malformed-state rejection;
+- PostgreSQL integration tests cover crash rollback, exactly-once replay, audit creation and stale-CAS
+  rejection for item payload updates;
+- character integration tests prove prepared selection survives reconnect and service reconstruction;
+- Scene preview tests prove discard/commit isolation, and pure input-policy tests cover stationary
+  ownership plus hotbar wrap boundaries.
+
+Failure/recovery behavior:
+
+- invalid payloads, unsupported ammo families, excessive prepared categories and absent authored
+  Quivers fail closed;
+- a value mutation already in flight rejects a concurrent cycle/preparation edit; stale database
+  truth is reloaded rather than overwritten;
+- cycle feedback and combat handling begin only after the journal commit and main-thread snapshot
+  refresh; failed commits do not change the selected category locally;
+- death, teleport, world change, logout or weapon swap clears transient cycle/handling state, while
+  the last committed Quiver payload remains durable.
+
+Non-goals:
+
+- moving/splitting ammo lots into Quiver storage and enforcing the authored 96-unit capacity at
+  runtime;
+- encounter-end deterministic ammo recovery and Pending Rewards overflow;
+- Crossbow `BOLT_PLACED` binding/checkpoints, Bow ammo payload status effects and PvP snapshots.
+
+Schema/config impact: the item schema adds `ammo_profile` and `quiver_profile`; the example snapshot
+adds `equipment.training_quiver` and `ammo.training_bodkin_arrow`. Migration impact: no SQL migration;
+the existing JSONB item payload and value journal are reused, documented by ADR 0008.

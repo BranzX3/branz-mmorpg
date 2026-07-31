@@ -5,6 +5,7 @@ import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.projection.ExpectedProjection;
 import com.branz.mmorpg.items.projection.ProjectionValueType;
+import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.persistence.transaction.ValueLocation;
@@ -28,6 +29,7 @@ final class PersistentCharacterSnapshotMapper {
         Objects.requireNonNull(lots, "lots");
         List<ExpectedProjection> inventory = new ArrayList<>();
         EquipmentLoadout equipment = EquipmentLoadout.empty();
+        QuiverPreparation quiverPreparation = QuiverPreparation.empty();
         for (ItemLocationRecord item : items) {
             if (item.location().type() == ValueLocationType.CHARACTER_INVENTORY) {
                 inventory.add(itemProjection(item, inventorySlot(item.location())));
@@ -36,6 +38,9 @@ final class PersistentCharacterSnapshotMapper {
                 EquipmentSlot slot =
                         EquipmentSlot.valueOf(item.location().reference().orElseThrow());
                 equipment = equipment.with(slot, Optional.of(new ItemId(item.itemId().value())));
+                if (slot == EquipmentSlot.QUIVER) {
+                    quiverPreparation = QuiverPayloadCodec.decode(item.payloadJson());
+                }
             }
         }
         for (LotLocationRecord lot : lots) {
@@ -57,7 +62,8 @@ final class PersistentCharacterSnapshotMapper {
                                 testProvenance(lot.lineageJson())));
             }
         }
-        return new PersistentCharacterSnapshot(inventory, equipment, items, lots);
+        return new PersistentCharacterSnapshot(
+                inventory, equipment, quiverPreparation, items, lots);
     }
 
     private static int inventorySlot(ValueLocation location) {

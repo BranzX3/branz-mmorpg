@@ -24,7 +24,7 @@ Useful commands:
 # Validate a content directory and inspect reverse references
 .\gradlew.bat :mmo-content:run --args="validate C:\absolute\content-root"
 .\gradlew.bat :mmo-content:run --args="references material.iron_ore C:\absolute\content-root"
-.\gradlew.bat :mmo-content:run --args="validate example-content\milestone-1"
+.\gradlew.bat :mmo-content:run --args="validate $((Resolve-Path example-content\milestone-1).Path)"
 
 # Regenerate editor schemas and write validation reports
 .\gradlew.bat :mmo-content:generateContentSchemas
@@ -202,6 +202,29 @@ with an operator/test account:
 58. Stop the server immediately around a release and restart. Verify the authoritative outcome is
     either an unconsumed arrow with no committed journal or one consumed arrow with one committed
     journal; retry/reconnect must never subtract the same lot version twice.
+59. Open `/mmo dev` -> `Persisted Test Item` and grant `equipment.training_quiver`,
+    `ammo.training_arrow` and `ammo.training_bodkin_arrow`. In Chronicle -> Character & Equipment,
+    preview the training Quiver and Bow, then confirm the equipment transaction. Reopen the page and
+    verify both committed virtual equipment entries remain selected.
+60. Click each available Arrow lot to prepare both categories. Verify the preview marks the first
+    category selected, then click `Confirm Scene transaction`. Reopen Chronicle and verify the
+    prepared order and selection survived the close/reopen boundary.
+61. With the Bow READY, stand still, hold sneak and scroll one hotbar step. Verify the proposed
+    hotbar slot does not change, the action bar names the newly selected category and `/mmo health`
+    reports that exact ammo ID and quantity. Scroll both directions across the list boundary and
+    verify selection wraps deterministically.
+62. Enter `ENGAGED`, commit an ammo switch and immediately attempt to draw. Verify the draw is
+    rejected for the authored six handling ticks, then succeeds on the next tick. Repeat while in
+    `EXPLORATION` and verify no post-commit handling delay is added.
+63. Begin a Bow draw and attempt stationary sneak+scroll. Verify the slot remains owned by ammo
+    input but the switch reports `AMMO SWITCH ACTION LOCKED`; the in-progress draw keeps its original
+    selected category. Moving while sneak+scrolling must not claim ammo-cycle input.
+64. Fire once with each prepared category. Verify only the selected PostgreSQL lot decrements, the
+    projectile is created after the commit and `/mmo health` follows the selected category's exact
+    remaining quantity. Depleting one category must not consume the other.
+65. Disconnect/reconnect and restart Paper after selecting the Bodkin Arrow. Verify Chronicle and
+    `/mmo health` restore that selection from the equipped Quiver item payload. Swap away and back to
+    the same Quiver and verify its item-owned preparation returns.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
@@ -213,8 +236,10 @@ sanctuary routing and crash-resumable encounter HP remain later transactional bo
 client swing never declares a hit. The Basic Bow uses the same damage/HP/posture authorities and a
 server-simulated projectile; because test projections deliberately block native item use, this
 local Paper adapter uses first-RMB draw and second-RMB release. The authored ammo category now
-commits one PostgreSQL-backed inventory-lot unit before projectile creation. Prepared Quiver
-selection/cycling and encounter recovery remain later Milestone 5 slices.
+commits one PostgreSQL-backed inventory-lot unit before projectile creation. Prepared Quiver state
+is item-owned, journaled and selected with stationary sneak+scroll; Bow release consumes the selected
+compatible category. Moving/splitting lots into authored Quiver capacity and encounter recovery
+remain later Milestone 5 slices.
 
 Live engagement check:
 

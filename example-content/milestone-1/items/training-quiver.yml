@@ -1,0 +1,12 @@
+definition_id: equipment.training_quiver
+schema_version: 1
+asset_id: equipment.training_quiver
+item_class: UNIQUE_DURABLE
+quiver_profile:
+  capacity: 96
+  supported_ammo_families:
+    - ARROW
+  prepared_ammo_category_count: 4
+  ammo_switch_handling_ticks: 6
+status: approved
+owning_team: combat

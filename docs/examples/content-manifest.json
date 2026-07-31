@@ -1,0 +1,14 @@
+{
+  "contentVersion": "0.1.0-dev.1",
+  "schemaVersion": 1,
+  "pluginCompatibility": ">=0.1.0 <0.2.0",
+  "minecraftTarget": "26.2",
+  "resourcePackSha256": "REPLACED_BY_CI",
+  "contentBundleSha256": "REPLACED_BY_CI",
+  "gitCommit": "REPLACED_BY_CI",
+  "providers": {
+    "asset": "oraxen:pinned-by-environment",
+    "packet": "packetevents:pinned-by-environment",
+    "mob": "mythicmobs:pinned-by-environment"
+  }
+}

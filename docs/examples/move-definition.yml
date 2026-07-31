@@ -1,0 +1,50 @@
+schema_version: 1
+id: move.greatsword.light_1
+family: GREATSWORD
+input:
+  action: PRIMARY
+  direction: ANY
+requirements:
+  weapon_tags: [GREATSWORD]
+phases:
+  windup_ticks: 5
+  active_ticks: 4
+  recovery_ticks: 9
+  commit_tick: 4
+cost:
+  stamina: 8
+movement:
+  mode: STEP
+  curve_id: curve.greatsword.light_step
+facing:
+  mode: SOFT_LOCK
+  max_turn_degrees_per_tick: 12
+hitboxes:
+  - id: blade_arc
+    hit_group: main
+    shape: ARC
+    start_tick: 5
+    end_tick: 8
+    radius: 3.1
+    angle_degrees: 105
+    vertical_min: -0.6
+    vertical_max: 1.8
+    line_of_sight: true
+impact:
+  weapon_damage_coefficient: 0.82
+  physical_type: SLASH
+  posture_damage: 18
+  guard_pressure: 14
+  poise_damage: 20
+windows:
+  chain:
+    - from_tick: 11
+      to_tick: 17
+      branch: PRIMARY_2
+  dodge_cancel:
+    - from_tick: 13
+      to_tick: 18
+presentation:
+  animation: anim.greatsword.light_1
+  sound: sound.weapon.greatsword.swing_light
+  trail: vfx.weapon.greatsword.light_arc

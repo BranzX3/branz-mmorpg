@@ -1,0 +1,34 @@
+schema_version: 1
+id: weapon.greatsword.iron_wolf
+asset_id: weapon.greatsword.iron_wolf
+category: WEAPON
+family: GREATSWORD
+rarity: RELIC
+base:
+  weapon_power: 120
+  weight: 18
+  durability: 160
+  physical_profile:
+    slash: 0.75
+    blunt: 0.25
+handling:
+  minimum:
+    might: PRACTICED
+  recommended:
+    might: RELIABLE
+    coordination: PRACTICED
+roll_budget:
+  max_numeric_rolls: 1
+  allowed:
+    - stat: guard_pressure
+      min: 0.03
+      max: 0.08
+traits:
+  - trait.weapon.wolf_cleave
+forge_paths: [HEAVY, BALANCED, RUNIC]
+masterworks:
+  - masterwork.greatsword.moon_breaker
+  - masterwork.greatsword.iron_guard
+trade:
+  tradeable: true
+  narrative_bound: false

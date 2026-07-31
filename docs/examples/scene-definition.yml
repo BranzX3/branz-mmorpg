@@ -1,0 +1,28 @@
+schema_version: 1
+id: scene.character_hub
+mode: LOCAL_PREVIEW
+eligibility:
+  allowed_engagement_states: [EXPLORATION]
+  require_grounded: true
+  forbid_mount: true
+  forbid_swimming: true
+  hostile_aggro_radius: 16.0
+placement:
+  full_distance: 2.75
+  compact_distance: 1.60
+  yaw_candidates: [0, 35, -35, 70, -70, 180]
+root_pages:
+  - CHARACTER_EQUIPMENT
+  - WARDROBE_DYE
+  - COMBAT_ARTS
+  - MAGIC_ATTUNEMENT
+  - JOURNAL_REWARDS
+  - SETTINGS_HELP
+assets:
+  background: ui.scene.character.background
+  icon_character: ui.scene.icon.character
+  icon_wardrobe: ui.scene.icon.wardrobe
+  icon_arts: ui.scene.icon.arts
+  icon_magic: ui.scene.icon.magic
+  icon_journal: ui.scene.icon.journal
+  icon_settings: ui.scene.icon.settings

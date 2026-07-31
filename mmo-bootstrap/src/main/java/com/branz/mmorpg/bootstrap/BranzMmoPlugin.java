@@ -324,6 +324,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         this,
                         characterSessionController,
                         activeMoveEngine.get(),
+                        snapshot.manifest().contentVersion(),
                         trainingWeapon.power(),
                         weaponDrawTicks,
                         weaponSheatheTicks,

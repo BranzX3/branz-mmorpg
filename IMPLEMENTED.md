@@ -654,7 +654,7 @@ Remaining Milestone 4 work:
 - remaining hitbox primitives, swept motion and region/friendly-provider filters;
 - persistent MMO health application and death/encounter integration;
 - persistent combatant status/health integration and provider-authored posture/CC profiles;
-- viewer-scoped debug rendering and in-game trace export controls;
+- additional rejection-reason overlays plus persisted/inspectable multi-action trace history;
 - latency/jitter acceptance fixtures and a complete weapon test kit.
 
 Schema/config impact: move schema gains the complete runtime fields. Local config adds positive
@@ -911,3 +911,47 @@ Config impact: `combat.training-incoming-poise-damage`,
 `combat.training-incoming-cc-severity`, `combat.training-incoming-cc-ticks` and
 `combat.training-perfect-guard-posture-damage` add local training defaults. Migration impact: none;
 all runtimes and isolated target accounting remain transient.
+
+## Milestone 4 — viewer debug and live trace export slice
+
+Implemented:
+
+- pure deterministic ARC outline geometry with bounded arc/radial sample density;
+- `/mmo combat debug [player]` toggles inspection for the viewer/target pair only;
+- each authoritative ARC opening renders its outline to subscribed viewers with selected,
+  non-selected and line-of-sight-rejected target markers; no particles are broadcast globally;
+- debug ownership is removed when either the inspecting viewer or target player disconnects;
+- live action capture retains the latest completed or cancelled `ActionTimeline`, its initial/final
+  resources, cancellation command and content version;
+- `/mmo combat trace export [player]` replays the captured trace against the active Move Engine and
+  refuses export on divergence;
+- verified canonical traces are written beneath the plugin's fixed local `combat-traces` directory
+  with create-new UUID filenames;
+- debug and export commands reuse the environment-gated `branzmmo.dev` access policy, so production
+  cannot enable them through command input alone.
+
+Tests:
+
+- exact deterministic ARC outline endpoints, center ray and sample count;
+- invalid debug density is rejected;
+- canonical trace bytes are written beneath the configured directory;
+- existing complete/cancel simulation fixtures prove byte-identical export, exact replay and
+  tamper rejection.
+
+Failure/recovery behavior:
+
+- missing/offline target sessions and missing completed traces return typed player feedback;
+- replay divergence fails closed before filesystem output;
+- export I/O failures are logged and reported without changing combat state;
+- trace filenames cannot include player-controlled path segments and exports cannot escape the
+  configured directory;
+- logout/session replacement discards transient debug ownership and latest live trace.
+
+Non-goals:
+
+- production observability streaming, database trace retention or cross-server trace lookup;
+- persistent multi-action history and full damage/posture/CC packet capture;
+- swept-path/projectile visualization and detailed per-candidate rejection text.
+
+Config/migration impact: none. Inspection remains gated by the existing `dev-tools.enabled`,
+environment allowlist and `branzmmo.dev` permission.

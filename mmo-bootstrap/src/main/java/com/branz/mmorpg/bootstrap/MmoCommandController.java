@@ -3,9 +3,13 @@ package com.branz.mmorpg.bootstrap;
 import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.move.MoveEngine;
+import com.branz.mmorpg.combat.trace.CombatSimulationErrorCode;
+import com.branz.mmorpg.combat.trace.CombatTrace;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -56,6 +60,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final SceneHubController sceneHub;
     private final CharacterSessionController characterSessions;
     private final CombatSessionController combatSessions;
+    private final CombatTraceFileExporter traceExporter;
     private final NamespacedKey actionKey;
 
     MmoCommandController(
@@ -77,6 +82,9 @@ final class MmoCommandController implements CommandExecutor, Listener {
         this.sceneHub = Objects.requireNonNull(sceneHub, "sceneHub");
         this.characterSessions = Objects.requireNonNull(characterSessions, "characterSessions");
         this.combatSessions = Objects.requireNonNull(combatSessions, "combatSessions");
+        traceExporter =
+                new CombatTraceFileExporter(
+                        plugin.getDataFolder().toPath().resolve("combat-traces"));
         actionKey = new NamespacedKey(plugin, "dev_action");
     }
 
@@ -98,8 +106,113 @@ final class MmoCommandController implements CommandExecutor, Listener {
             openDevHub(player);
             return true;
         }
-        sender.sendMessage("Usage: /mmo <health|dev>");
+        if ("combat".equalsIgnoreCase(args[0])) {
+            handleCombatTool(sender, args);
+            return true;
+        }
+        sender.sendMessage("Usage: /mmo <health|dev|combat debug|combat trace export>");
         return true;
+    }
+
+    private void handleCombatTool(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player viewer)) {
+            sender.sendMessage("Combat inspection requires an in-game player viewer.");
+            return;
+        }
+        if (!devToolsAllowed(viewer)) {
+            sender.sendMessage(
+                    Component.text(
+                            "Combat inspection is disabled for this environment/account.",
+                            NamedTextColor.RED));
+            return;
+        }
+        if (args.length >= 2 && "debug".equalsIgnoreCase(args[1])) {
+            Player target = onlineTarget(viewer, args, 2);
+            if (target == null) {
+                return;
+            }
+            combatSessions
+                    .toggleDebug(viewer, target)
+                    .ifPresentOrElse(
+                            enabled ->
+                                    viewer.sendMessage(
+                                            Component.text(
+                                                    "Combat ARC debug "
+                                                            + (enabled ? "enabled" : "disabled")
+                                                            + " for "
+                                                            + target.getName()
+                                                            + ".",
+                                                    enabled
+                                                            ? NamedTextColor.GREEN
+                                                            : NamedTextColor.GRAY)),
+                            () ->
+                                    viewer.sendMessage(
+                                            Component.text(
+                                                    "Target combat session is not ready.",
+                                                    NamedTextColor.RED)));
+            return;
+        }
+        if (args.length >= 3
+                && "trace".equalsIgnoreCase(args[1])
+                && "export".equalsIgnoreCase(args[2])) {
+            Player target = onlineTarget(viewer, args, 3);
+            if (target != null) {
+                exportLatestTrace(viewer, target);
+            }
+            return;
+        }
+        viewer.sendMessage("Usage: /mmo combat debug [player] | /mmo combat trace export [player]");
+    }
+
+    private Player onlineTarget(Player viewer, String[] args, int nameIndex) {
+        if (args.length <= nameIndex) {
+            return viewer;
+        }
+        Player target = Bukkit.getPlayerExact(args[nameIndex]);
+        if (target == null) {
+            viewer.sendMessage(Component.text("Target player is not online.", NamedTextColor.RED));
+        }
+        return target;
+    }
+
+    private void exportLatestTrace(Player viewer, Player target) {
+        CombatTrace trace = combatSessions.latestTrace(target).orElse(null);
+        if (trace == null) {
+            viewer.sendMessage(
+                    Component.text(
+                            "No completed/cancelled combat trace is available for "
+                                    + target.getName()
+                                    + ".",
+                            NamedTextColor.YELLOW));
+            return;
+        }
+        Result<CombatTrace, CombatSimulationErrorCode> replayed = combatSessions.replayTrace(trace);
+        if (replayed instanceof Result.Failure<CombatTrace, CombatSimulationErrorCode> failure) {
+            viewer.sendMessage(
+                    Component.text(
+                            "Trace replay rejected: "
+                                    + failure.error().code()
+                                    + " "
+                                    + failure.detail(),
+                            NamedTextColor.RED));
+            return;
+        }
+        try {
+            Path exported = traceExporter.export(target.getUniqueId(), trace);
+            viewer.sendMessage(
+                    Component.text(
+                            "Replay verified; canonical trace exported to " + exported,
+                            NamedTextColor.GREEN));
+        } catch (IOException exception) {
+            plugin.getLogger()
+                    .log(
+                            java.util.logging.Level.WARNING,
+                            "Could not export combat trace for " + target.getUniqueId(),
+                            exception);
+            viewer.sendMessage(
+                    Component.text(
+                            "Combat trace export failed; inspect server log.", NamedTextColor.RED));
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

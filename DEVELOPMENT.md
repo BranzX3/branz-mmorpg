@@ -141,6 +141,13 @@ with an operator/test account:
 37. Deplete Guard Stability and verify Guard Break applies `HEAVY_STAGGER` for 24 PvE ticks. Inputs
     remain action-locked until the server-owned CC expires, after which `/mmo health` returns to
     `cc=NONE`.
+38. Run `/mmo combat debug` and perform a training slash. Verify only the command viewer sees the
+    ARC outline plus target markers; run the command again to disable it. An operator may inspect
+    another online session with `/mmo combat debug <player>`.
+39. Complete or cancel a training move, then run `/mmo combat trace export`. Verify replay succeeds
+    before a canonical `.trace` file appears under
+    `plugins/BranzMMO/combat-traces`; use the optional player argument to export an inspected
+    online session.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,

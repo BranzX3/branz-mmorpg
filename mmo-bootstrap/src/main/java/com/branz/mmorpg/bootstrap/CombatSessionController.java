@@ -33,6 +33,7 @@ import com.branz.mmorpg.combat.guard.GuardEngine;
 import com.branz.mmorpg.combat.guard.GuardErrorCode;
 import com.branz.mmorpg.combat.guard.GuardHitRequest;
 import com.branz.mmorpg.combat.guard.GuardRuntime;
+import com.branz.mmorpg.combat.hitbox.ArcDebugGeometry;
 import com.branz.mmorpg.combat.hitbox.ArcHitboxQuery;
 import com.branz.mmorpg.combat.hitbox.ArcHitboxResolver;
 import com.branz.mmorpg.combat.hitbox.CombatVector;
@@ -69,6 +70,10 @@ import com.branz.mmorpg.combat.state.ActionState;
 import com.branz.mmorpg.combat.state.EngagementState;
 import com.branz.mmorpg.combat.state.UiState;
 import com.branz.mmorpg.combat.state.WeaponState;
+import com.branz.mmorpg.combat.trace.ActionSimulationCommand;
+import com.branz.mmorpg.combat.trace.ActionTimelineSimulator;
+import com.branz.mmorpg.combat.trace.CombatSimulationErrorCode;
+import com.branz.mmorpg.combat.trace.CombatTrace;
 import com.branz.mmorpg.combat.weapon.SelectedHotbarSlot;
 import com.branz.mmorpg.combat.weapon.SelectedSlotKind;
 import com.branz.mmorpg.combat.weapon.WeaponTransitionErrorCode;
@@ -85,6 +90,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Input;
+import org.bukkit.Location;
+import org.bukkit.Particle;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
@@ -114,11 +121,14 @@ final class CombatSessionController implements Listener {
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
+    private final MoveEngine moves;
+    private final String contentVersion;
     private final MoveDefinition trainingMove;
     private final double trainingWeaponPower;
     private final WeaponTransitionMachine weapons;
     private final CombatInputPolicy inputPolicy = new CombatInputPolicy();
     private final ArcHitboxResolver hitboxes = new ArcHitboxResolver();
+    private final ArcDebugGeometry arcDebugGeometry = new ArcDebugGeometry();
     private final PhysicalDamageResolver damage = new PhysicalDamageResolver();
     private final EngagementTracker engagement;
     private final DodgeProfile dodgeProfile;
@@ -137,12 +147,14 @@ final class CombatSessionController implements Listener {
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
     private final Map<UUID, Double> trainingTargetHealth = new HashMap<>();
     private final Map<UUID, PostureRuntime> trainingTargetPosture = new HashMap<>();
+    private final Map<UUID, java.util.Set<UUID>> debugViewers = new HashMap<>();
     private int tickTaskId = -1;
 
     CombatSessionController(
             JavaPlugin plugin,
             CharacterSessionController characters,
             MoveEngine moves,
+            String contentVersion,
             double trainingWeaponPower,
             int drawTicks,
             int sheatheTicks,
@@ -156,7 +168,11 @@ final class CombatSessionController implements Listener {
             double trainingPerfectGuardPostureDamage) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
-        Objects.requireNonNull(moves, "moves");
+        this.moves = Objects.requireNonNull(moves, "moves");
+        this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
+        if (contentVersion.isBlank()) {
+            throw new IllegalArgumentException("contentVersion must not be blank");
+        }
         trainingMove =
                 moves.find(TRAINING_MOVE)
                         .orElseThrow(
@@ -209,6 +225,7 @@ final class CombatSessionController implements Listener {
         sessions.clear();
         trainingTargetHealth.clear();
         trainingTargetPosture.clear();
+        debugViewers.clear();
     }
 
     void onCharacterReady(Player player) {
@@ -261,6 +278,38 @@ final class CombatSessionController implements Listener {
                         resources.stamina(),
                         resources.reservedStamina(),
                         Optional.ofNullable(session.lastResolution)));
+    }
+
+    Optional<Boolean> toggleDebug(Player viewer, Player target) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(target, "target");
+        if (!sessions.containsKey(target.getUniqueId())) {
+            return Optional.empty();
+        }
+        java.util.Set<UUID> viewers =
+                debugViewers.computeIfAbsent(
+                        target.getUniqueId(), ignored -> new java.util.HashSet<>());
+        boolean enabled;
+        if (viewers.remove(viewer.getUniqueId())) {
+            enabled = false;
+        } else {
+            viewers.add(viewer.getUniqueId());
+            enabled = true;
+        }
+        if (viewers.isEmpty()) {
+            debugViewers.remove(target.getUniqueId());
+        }
+        return Optional.of(enabled);
+    }
+
+    Optional<CombatTrace> latestTrace(Player target) {
+        Objects.requireNonNull(target, "target");
+        LiveSession session = sessions.get(target.getUniqueId());
+        return session == null ? Optional.empty() : Optional.ofNullable(session.lastTrace);
+    }
+
+    Result<CombatTrace, CombatSimulationErrorCode> replayTrace(CombatTrace trace) {
+        return new ActionTimelineSimulator().replay(Objects.requireNonNull(trace, "trace"), moves);
     }
 
     void startTrainingMove(Player player) {
@@ -522,7 +571,11 @@ final class CombatSessionController implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
-        sessions.remove(event.getPlayer().getUniqueId());
+        UUID playerId = event.getPlayer().getUniqueId();
+        sessions.remove(playerId);
+        debugViewers.remove(playerId);
+        debugViewers.values().forEach(viewers -> viewers.remove(playerId));
+        debugViewers.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
     private void tickAll() {
@@ -589,6 +642,7 @@ final class CombatSessionController implements Listener {
         }
         if (session.timeline.phase().terminal()) {
             session.resources = session.timeline.resources();
+            finishTrace(session, session.timeline);
             session.timeline = null;
             session.action = ActionState.IDLE;
         } else {
@@ -644,6 +698,7 @@ final class CombatSessionController implements Listener {
                                                 false))
                         .toList();
         List<ResolvedTarget> resolved = hitboxes.resolve(query, candidates);
+        renderArcDebug(player, query, candidates, resolved, entities);
         if (resolved.isEmpty()) {
             session.lastResolution = "MISS tick=" + session.timeline.tick();
             player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GRAY));
@@ -703,6 +758,59 @@ final class CombatSessionController implements Listener {
                         + firstPosture
                         + (postureBreaks > 0 ? " breaks=" + postureBreaks : "");
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
+    }
+
+    private void renderArcDebug(
+            Player owner,
+            ArcHitboxQuery query,
+            List<TargetCollider> candidates,
+            List<ResolvedTarget> resolved,
+            Map<UUID, LivingEntity> entities) {
+        java.util.Set<UUID> viewerIds = debugViewers.get(owner.getUniqueId());
+        if (viewerIds == null || viewerIds.isEmpty()) {
+            return;
+        }
+        java.util.Set<UUID> selected =
+                resolved.stream()
+                        .map(ResolvedTarget::entityId)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        List<CombatVector> outline = arcDebugGeometry.outline(query, 12, 4);
+        for (UUID viewerId : List.copyOf(viewerIds)) {
+            Player viewer = plugin.getServer().getPlayer(viewerId);
+            if (viewer == null || !viewer.isOnline() || viewer.getWorld() != owner.getWorld()) {
+                continue;
+            }
+            for (CombatVector point : outline) {
+                viewer.spawnParticle(
+                        Particle.END_ROD,
+                        new Location(owner.getWorld(), point.x(), point.y() + 0.15, point.z()),
+                        1,
+                        0,
+                        0,
+                        0,
+                        0);
+            }
+            for (TargetCollider candidate : candidates) {
+                LivingEntity entity = entities.get(candidate.entityId());
+                if (entity == null) {
+                    continue;
+                }
+                Particle marker =
+                        selected.contains(candidate.entityId())
+                                ? Particle.HAPPY_VILLAGER
+                                : candidate.lineOfSight()
+                                        ? Particle.SMOKE
+                                        : Particle.ANGRY_VILLAGER;
+                viewer.spawnParticle(
+                        marker,
+                        entity.getLocation().add(0, entity.getHeight() * 0.6, 0),
+                        4,
+                        0.15,
+                        0.15,
+                        0.15,
+                        0);
+            }
+        }
     }
 
     private PostureRuntime postureAt(UUID entityId, long tick) {
@@ -967,11 +1075,17 @@ final class CombatSessionController implements Listener {
         if (session.timeline == null) {
             return session.resources;
         }
+        int cancellationTick = session.timeline.tick();
         Result<ActionTimeline, ActionTimelineErrorCode> cancelled =
                 session.timeline.cancel("DODGE");
-        return cancelled instanceof Result.Success<ActionTimeline, ActionTimelineErrorCode> success
-                ? success.value().resources()
-                : session.timeline.resources();
+        if (cancelled instanceof Result.Success<ActionTimeline, ActionTimelineErrorCode> success) {
+            session.activeTraceCommands.add(
+                    new ActionSimulationCommand(
+                            cancellationTick, ActionSimulationCommand.Type.CANCEL, "DODGE"));
+            finishTrace(session, success.value());
+            return success.value().resources();
+        }
+        return session.timeline.resources();
     }
 
     private void toggleGuard(Player player, LiveSession session) {
@@ -1161,6 +1275,8 @@ final class CombatSessionController implements Listener {
         }
         session.timeline =
                 ((Result.Success<ActionTimeline, ActionTimelineErrorCode>) started).value();
+        session.activeTraceInitialResources = session.resources;
+        session.activeTraceCommands.clear();
         session.action = actionState(session.timeline.phase());
         player.sendActionBar(
                 Component.text(
@@ -1174,12 +1290,34 @@ final class CombatSessionController implements Listener {
         if (session.timeline == null) {
             return;
         }
+        int cancellationTick = session.timeline.tick();
         Result<ActionTimeline, ActionTimelineErrorCode> cancelled = session.timeline.cancel(reason);
         if (cancelled instanceof Result.Success<ActionTimeline, ActionTimelineErrorCode> success) {
             session.resources = success.value().resources();
+            session.activeTraceCommands.add(
+                    new ActionSimulationCommand(
+                            cancellationTick, ActionSimulationCommand.Type.CANCEL, reason));
+            finishTrace(session, success.value());
         }
         session.timeline = null;
         session.action = ActionState.IDLE;
+    }
+
+    private void finishTrace(LiveSession session, ActionTimeline terminalTimeline) {
+        if (session.activeTraceInitialResources == null) {
+            return;
+        }
+        session.lastTrace =
+                new CombatTrace(
+                        contentVersion,
+                        trainingMove.id(),
+                        session.activeTraceInitialResources,
+                        session.activeTraceCommands,
+                        terminalTimeline.trace(),
+                        terminalTimeline.resources(),
+                        terminalTimeline.phase());
+        session.activeTraceInitialResources = null;
+        session.activeTraceCommands.clear();
     }
 
     private Optional<SemanticInput> resolvedIntent(
@@ -1268,6 +1406,10 @@ final class CombatSessionController implements Listener {
         private GuardRuntime guard;
         private PoiseRuntime poise;
         private CcRuntime crowdControl;
+        private CombatResources activeTraceInitialResources;
+        private final java.util.List<ActionSimulationCommand> activeTraceCommands =
+                new java.util.ArrayList<>();
+        private CombatTrace lastTrace;
         private org.bukkit.util.Vector dodgeDirection;
         private long lastDodgeMovementElapsed = -1;
         private SneakPressWindow sneakPress;

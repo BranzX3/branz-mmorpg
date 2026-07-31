@@ -232,6 +232,16 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                                                     * 10.0)
                                                                     / 10.0
                                                             + ")"
+                                                            + " | cc="
+                                                            + status.crowdControl()
+                                                                    .map(
+                                                                            severity ->
+                                                                                    severity
+                                                                                            + "("
+                                                                                            + status
+                                                                                                    .crowdControlTicksRemaining()
+                                                                                            + "t)")
+                                                                    .orElse("NONE")
                                                             + " | stamina="
                                                             + status.stamina()
                                                             + " (reserved="

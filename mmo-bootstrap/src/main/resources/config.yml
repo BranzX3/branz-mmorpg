@@ -20,6 +20,10 @@ combat:
   engagement-exit-ticks: 160
   training-dodge-load: MEDIUM
   training-incoming-guard-pressure: 10.0
+  training-incoming-poise-damage: 35.0
+  training-incoming-cc-severity: FLINCH
+  training-incoming-cc-ticks: 6
+  training-perfect-guard-posture-damage: 8.0
 
 database:
   # EMBEDDED_LOCAL is restricted to LOCAL/INTEGRATION and makes runServer

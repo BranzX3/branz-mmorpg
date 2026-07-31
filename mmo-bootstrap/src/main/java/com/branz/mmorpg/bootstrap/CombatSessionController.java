@@ -9,6 +9,12 @@ import com.branz.mmorpg.combat.action.ActionTraceEvent;
 import com.branz.mmorpg.combat.action.ActionTraceEventType;
 import com.branz.mmorpg.combat.action.CombatResources;
 import com.branz.mmorpg.combat.action.ResourceCommitState;
+import com.branz.mmorpg.combat.cc.CcApplication;
+import com.branz.mmorpg.combat.cc.CcEngine;
+import com.branz.mmorpg.combat.cc.CcRequest;
+import com.branz.mmorpg.combat.cc.CcRuntime;
+import com.branz.mmorpg.combat.cc.CcSeverity;
+import com.branz.mmorpg.combat.damage.ConditionalAdvantage;
 import com.branz.mmorpg.combat.damage.PhysicalDamageBreakdown;
 import com.branz.mmorpg.combat.damage.PhysicalDamageRequest;
 import com.branz.mmorpg.combat.damage.PhysicalDamageResolver;
@@ -50,6 +56,15 @@ import com.branz.mmorpg.combat.input.SneakPressResolver;
 import com.branz.mmorpg.combat.input.SneakPressWindow;
 import com.branz.mmorpg.combat.move.MoveDefinition;
 import com.branz.mmorpg.combat.move.MoveEngine;
+import com.branz.mmorpg.combat.poise.PoiseEngine;
+import com.branz.mmorpg.combat.poise.PoiseProfile;
+import com.branz.mmorpg.combat.poise.PoiseResolution;
+import com.branz.mmorpg.combat.poise.PoiseRuntime;
+import com.branz.mmorpg.combat.posture.PostureEngine;
+import com.branz.mmorpg.combat.posture.PosturePhase;
+import com.branz.mmorpg.combat.posture.PostureProfile;
+import com.branz.mmorpg.combat.posture.PostureResolution;
+import com.branz.mmorpg.combat.posture.PostureRuntime;
 import com.branz.mmorpg.combat.state.ActionState;
 import com.branz.mmorpg.combat.state.EngagementState;
 import com.branz.mmorpg.combat.state.UiState;
@@ -112,8 +127,16 @@ final class CombatSessionController implements Listener {
     private final GuardEngine guards;
     private final CombatDefenseResolver defense;
     private final double trainingIncomingGuardPressure;
+    private final double trainingIncomingPoiseDamage;
+    private final CcSeverity trainingIncomingCcSeverity;
+    private final int trainingIncomingCcTicks;
+    private final double trainingPerfectGuardPostureDamage;
+    private final PostureEngine postures = new PostureEngine(PostureProfile.trainingNormal());
+    private final PoiseEngine poise = new PoiseEngine(PoiseProfile.trainingPlayer());
+    private final CcEngine crowdControl = new CcEngine();
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
     private final Map<UUID, Double> trainingTargetHealth = new HashMap<>();
+    private final Map<UUID, PostureRuntime> trainingTargetPosture = new HashMap<>();
     private int tickTaskId = -1;
 
     CombatSessionController(
@@ -126,7 +149,11 @@ final class CombatSessionController implements Listener {
             int engagementExitTicks,
             DodgeProfile dodgeProfile,
             GuardEngine guards,
-            double trainingIncomingGuardPressure) {
+            double trainingIncomingGuardPressure,
+            double trainingIncomingPoiseDamage,
+            CcSeverity trainingIncomingCcSeverity,
+            int trainingIncomingCcTicks,
+            double trainingPerfectGuardPostureDamage) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
         Objects.requireNonNull(moves, "moves");
@@ -149,6 +176,22 @@ final class CombatSessionController implements Listener {
             throw new IllegalArgumentException("trainingIncomingGuardPressure must be positive");
         }
         this.trainingIncomingGuardPressure = trainingIncomingGuardPressure;
+        if (!Double.isFinite(trainingIncomingPoiseDamage) || trainingIncomingPoiseDamage <= 0) {
+            throw new IllegalArgumentException("trainingIncomingPoiseDamage must be positive");
+        }
+        this.trainingIncomingPoiseDamage = trainingIncomingPoiseDamage;
+        this.trainingIncomingCcSeverity =
+                Objects.requireNonNull(trainingIncomingCcSeverity, "trainingIncomingCcSeverity");
+        if (trainingIncomingCcTicks < 1) {
+            throw new IllegalArgumentException("trainingIncomingCcTicks must be positive");
+        }
+        this.trainingIncomingCcTicks = trainingIncomingCcTicks;
+        if (!Double.isFinite(trainingPerfectGuardPostureDamage)
+                || trainingPerfectGuardPostureDamage <= 0) {
+            throw new IllegalArgumentException(
+                    "trainingPerfectGuardPostureDamage must be positive");
+        }
+        this.trainingPerfectGuardPostureDamage = trainingPerfectGuardPostureDamage;
     }
 
     void start() {
@@ -164,6 +207,8 @@ final class CombatSessionController implements Listener {
             tickTaskId = -1;
         }
         sessions.clear();
+        trainingTargetHealth.clear();
+        trainingTargetPosture.clear();
     }
 
     void onCharacterReady(Player player) {
@@ -171,7 +216,9 @@ final class CombatSessionController implements Listener {
         LiveSession session =
                 new LiveSession(
                         EngagementRuntime.initial(tick),
-                        GuardRuntime.initial(guards.profile(), tick));
+                        GuardRuntime.initial(guards.profile(), tick),
+                        PoiseRuntime.initial(tick),
+                        CcRuntime.initial(tick));
         sessions.put(player.getUniqueId(), session);
         select(session, selectedSlot(player, player.getInventory().getHeldItemSlot()));
     }
@@ -198,6 +245,19 @@ final class CombatSessionController implements Listener {
                                                         plugin.getServer().getCurrentTick())),
                         guards.phaseAt(session.guard, plugin.getServer().getCurrentTick()),
                         session.guard.stability(),
+                        session.crowdControl.active(),
+                        session.crowdControl
+                                .active()
+                                .map(
+                                        ignored ->
+                                                (int)
+                                                        Math.max(
+                                                                0,
+                                                                session.crowdControl
+                                                                                .activeUntilTick()
+                                                                        - plugin.getServer()
+                                                                                .getCurrentTick()))
+                                .orElse(0),
                         resources.stamina(),
                         resources.reservedStamina(),
                         Optional.ofNullable(session.lastResolution)));
@@ -294,6 +354,9 @@ final class CombatSessionController implements Listener {
                         plugin.getServer().getCurrentTick(),
                         true,
                         guardHitRequest(defender, defenderSession, source, event.getDamage()));
+        long currentTick = plugin.getServer().getCurrentTick();
+        defenderSession.lastDefenseTick = currentTick;
+        defenderSession.lastDefenseOutcome = resolved.outcome();
         if (!resolved.defended()) {
             return;
         }
@@ -326,6 +389,24 @@ final class CombatSessionController implements Listener {
         }
         if (resolved.outcome() != CombatDefenseOutcome.DODGED) {
             markHostile(defender, defenderSession);
+        }
+        if (resolved.outcome() == CombatDefenseOutcome.PERFECT_GUARD
+                && !(source instanceof Player)) {
+            PostureResolution posture =
+                    applyPostureDamage(
+                            source.getUniqueId(), currentTick, trainingPerfectGuardPostureDamage);
+            defenderSession.lastResolution =
+                    "PERFECT_GUARD attacker-posture="
+                            + postureLabel(posture.runtime(), currentTick);
+            defender.sendActionBar(
+                    Component.text(defenderSession.lastResolution, NamedTextColor.GOLD));
+        } else if (resolved.outcome() == CombatDefenseOutcome.GUARD_BREAK) {
+            applyCc(
+                    defender,
+                    defenderSession,
+                    CcSeverity.HEAVY_STAGGER,
+                    24,
+                    source instanceof Player);
         }
     }
 
@@ -386,6 +467,29 @@ final class CombatSessionController implements Listener {
         LiveSession session = sessions.get(player.getUniqueId());
         if (session != null) {
             markHostile(player, session);
+            long tick = plugin.getServer().getCurrentTick();
+            if (session.lastDefenseTick == tick
+                    && session.lastDefenseOutcome != CombatDefenseOutcome.HIT) {
+                return;
+            }
+            PoiseResolution poiseResolution =
+                    poise.apply(
+                            session.poise,
+                            tick,
+                            trainingIncomingPoiseDamage,
+                            1.0,
+                            trainingIncomingCcSeverity);
+            session.poise = poiseResolution.runtime();
+            poiseResolution
+                    .triggeredSeverity()
+                    .ifPresent(
+                            severity ->
+                                    applyCc(
+                                            player,
+                                            session,
+                                            severity,
+                                            trainingIncomingCcTicks,
+                                            source instanceof Player));
         }
     }
 
@@ -412,6 +516,8 @@ final class CombatSessionController implements Listener {
     public void onEntityDeath(EntityDeathEvent event) {
         UUID threatOwner = event.getEntity().getUniqueId();
         sessions.values().forEach(session -> session.threatOwners.remove(threatOwner));
+        trainingTargetHealth.remove(threatOwner);
+        trainingTargetPosture.remove(threatOwner);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -420,12 +526,14 @@ final class CombatSessionController implements Listener {
     }
 
     private void tickAll() {
+        tickTrainingPosture();
         for (Map.Entry<UUID, LiveSession> entry : sessions.entrySet()) {
             Player player = plugin.getServer().getPlayer(entry.getKey());
             if (player == null || !player.isOnline()) {
                 continue;
             }
             LiveSession session = entry.getValue();
+            tickCrowdControl(session);
             WeaponState priorWeapon = session.weapon.state();
             session.weapon = weapons.tick(session.weapon);
             if (priorWeapon != WeaponState.READY && session.weapon.state() == WeaponState.READY) {
@@ -435,6 +543,7 @@ final class CombatSessionController implements Listener {
             tickSneakPress(player, session);
             tickDodge(player, session);
             session.guard = guards.tick(session.guard, plugin.getServer().getCurrentTick());
+            session.poise = poise.tick(session.poise, plugin.getServer().getCurrentTick());
             tickAction(player, session);
             tickEngagement(player, session);
             regenerateStamina(session);
@@ -541,8 +650,13 @@ final class CombatSessionController implements Listener {
             return;
         }
         double totalDamage = 0;
+        int postureBreaks = 0;
+        String firstPosture = null;
+        long currentTick = plugin.getServer().getCurrentTick();
         for (ResolvedTarget target : resolved) {
             LivingEntity entity = entities.get(target.entityId());
+            PostureRuntime posture = postureAt(target.entityId(), currentTick);
+            boolean postureBroken = postures.phaseAt(posture, currentTick) == PosturePhase.BROKEN;
             double armor =
                     entity.getAttribute(Attribute.ARMOR) == null
                             ? 0
@@ -558,7 +672,9 @@ final class CombatSessionController implements Listener {
                                     0,
                                     0,
                                     0,
-                                    java.util.Set.of(),
+                                    postureBroken
+                                            ? java.util.Set.of(ConditionalAdvantage.POSTURE_BREAK)
+                                            : java.util.Set.of(),
                                     trainingMove.profiles().pveMultiplier()));
             totalDamage += breakdown.finalDamage();
             trainingTargetHealth.compute(
@@ -568,13 +684,118 @@ final class CombatSessionController implements Listener {
                                     0,
                                     (current == null ? 1000.0 : current)
                                             - breakdown.finalDamage()));
+            PostureResolution postureResolution =
+                    postures.damage(posture, currentTick, trainingMove.outputs().posture());
+            trainingTargetPosture.put(target.entityId(), postureResolution.runtime());
+            if (postureResolution.justBroke()) {
+                postureBreaks++;
+            }
+            if (firstPosture == null) {
+                firstPosture = postureLabel(postureResolution.runtime(), currentTick);
+            }
         }
         session.lastResolution =
                 "HIT targets="
                         + resolved.size()
                         + " damage="
-                        + Math.round(totalDamage * 10.0) / 10.0;
+                        + Math.round(totalDamage * 10.0) / 10.0
+                        + " posture="
+                        + firstPosture
+                        + (postureBreaks > 0 ? " breaks=" + postureBreaks : "");
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
+    }
+
+    private PostureRuntime postureAt(UUID entityId, long tick) {
+        PostureRuntime current =
+                trainingTargetPosture.computeIfAbsent(
+                        entityId, ignored -> PostureRuntime.initial(postures.profile(), tick));
+        PostureRuntime advanced = postures.tick(current, tick);
+        trainingTargetPosture.put(entityId, advanced);
+        return advanced;
+    }
+
+    private PostureResolution applyPostureDamage(UUID entityId, long tick, double amount) {
+        PostureResolution resolution = postures.damage(postureAt(entityId, tick), tick, amount);
+        trainingTargetPosture.put(entityId, resolution.runtime());
+        return resolution;
+    }
+
+    private String postureLabel(PostureRuntime runtime, long tick) {
+        if (postures.phaseAt(runtime, tick) == PosturePhase.BROKEN) {
+            return "BROKEN(" + Math.max(0, runtime.brokenUntilTick() - tick) + "t)";
+        }
+        return roundOne(runtime.current()) + "/" + roundOne(postures.profile().maximum());
+    }
+
+    private void tickTrainingPosture() {
+        long tick = plugin.getServer().getCurrentTick();
+        java.util.Iterator<Map.Entry<UUID, PostureRuntime>> iterator =
+                trainingTargetPosture.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, PostureRuntime> entry = iterator.next();
+            Entity entity = plugin.getServer().getEntity(entry.getKey());
+            if (!(entity instanceof LivingEntity living) || !living.isValid() || living.isDead()) {
+                iterator.remove();
+                trainingTargetHealth.remove(entry.getKey());
+                continue;
+            }
+            entry.setValue(postures.tick(entry.getValue(), tick));
+        }
+    }
+
+    private void tickCrowdControl(LiveSession session) {
+        boolean wasActive = session.crowdControl.active().isPresent();
+        session.crowdControl =
+                crowdControl.tick(session.crowdControl, plugin.getServer().getCurrentTick());
+        if (wasActive && session.crowdControl.active().isEmpty()) {
+            session.action = ActionState.IDLE;
+        }
+    }
+
+    private void applyCc(
+            Player player,
+            LiveSession session,
+            CcSeverity severity,
+            int durationTicks,
+            boolean pvp) {
+        long tick = plugin.getServer().getCurrentTick();
+        CcApplication application =
+                crowdControl.apply(
+                        session.crowdControl,
+                        tick,
+                        new CcRequest(severity, durationTicks, false, pvp));
+        session.crowdControl = application.runtime();
+        if (!application.applied()) {
+            session.lastResolution = "CC " + severity + " " + application.outcome();
+            return;
+        }
+        cancelAction(session, "CC_" + severity);
+        session.input.clearBuffer(InputBufferClearReason.HARD_CC);
+        releaseGuard(session);
+        session.dodge = null;
+        session.dodgeDirection = null;
+        session.lastDodgeMovementElapsed = -1;
+        session.sneakPress = null;
+        ActionState forcedAction = actionState(severity);
+        session.action = forcedAction;
+        session.weapon = weapons.interrupt(session.weapon, forcedAction);
+        session.lastResolution =
+                "CC "
+                        + severity
+                        + " "
+                        + application.outcome()
+                        + " duration="
+                        + application.effectiveDurationTicks()
+                        + "t";
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+    }
+
+    private static ActionState actionState(CcSeverity severity) {
+        return switch (severity) {
+            case FLINCH, STAGGER, HEAVY_STAGGER, KNOCKBACK -> ActionState.STAGGERED;
+            case KNOCKDOWN, LAUNCH -> ActionState.KNOCKED_DOWN;
+            case GRAB -> ActionState.GRABBED;
+        };
     }
 
     private void regenerateStamina(LiveSession session) {
@@ -1045,17 +1266,27 @@ final class CombatSessionController implements Listener {
         private ActionTimeline timeline;
         private DodgeRuntime dodge;
         private GuardRuntime guard;
+        private PoiseRuntime poise;
+        private CcRuntime crowdControl;
         private org.bukkit.util.Vector dodgeDirection;
         private long lastDodgeMovementElapsed = -1;
         private SneakPressWindow sneakPress;
         private long lastStaminaSpendTick = Long.MIN_VALUE / 2;
         private double staminaRegenRemainder;
         private String lastResolution;
+        private long lastDefenseTick = Long.MIN_VALUE / 2;
+        private CombatDefenseOutcome lastDefenseOutcome = CombatDefenseOutcome.HIT;
         private final java.util.Set<UUID> threatOwners = new java.util.HashSet<>();
 
-        private LiveSession(EngagementRuntime engagement, GuardRuntime guard) {
+        private LiveSession(
+                EngagementRuntime engagement,
+                GuardRuntime guard,
+                PoiseRuntime poise,
+                CcRuntime crowdControl) {
             this.engagement = Objects.requireNonNull(engagement, "engagement");
             this.guard = Objects.requireNonNull(guard, "guard");
+            this.poise = Objects.requireNonNull(poise, "poise");
+            this.crowdControl = Objects.requireNonNull(crowdControl, "crowdControl");
         }
     }
 }

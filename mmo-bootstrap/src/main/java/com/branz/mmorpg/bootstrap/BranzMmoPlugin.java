@@ -267,6 +267,26 @@ public final class BranzMmoPlugin extends JavaPlugin {
         int engagementExitTicks = getConfig().getInt("combat.engagement-exit-ticks", 160);
         double trainingIncomingGuardPressure =
                 getConfig().getDouble("combat.training-incoming-guard-pressure", 10.0);
+        double trainingIncomingPoiseDamage =
+                getConfig().getDouble("combat.training-incoming-poise-damage", 35.0);
+        int trainingIncomingCcTicks = getConfig().getInt("combat.training-incoming-cc-ticks", 6);
+        double trainingPerfectGuardPostureDamage =
+                getConfig().getDouble("combat.training-perfect-guard-posture-damage", 8.0);
+        com.branz.mmorpg.combat.cc.CcSeverity trainingIncomingCcSeverity;
+        try {
+            trainingIncomingCcSeverity =
+                    com.branz.mmorpg.combat.cc.CcSeverity.valueOf(
+                            getConfig()
+                                    .getString("combat.training-incoming-cc-severity", "FLINCH")
+                                    .trim()
+                                    .toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            resourcePackGate = null;
+            characterSessionController = null;
+            return "Combat training-incoming-cc-severity is not a supported CC severity.";
+        }
         com.branz.mmorpg.combat.dodge.DodgeProfile dodgeProfile;
         try {
             dodgeProfile =
@@ -287,12 +307,17 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 || weaponSheatheTicks < 1
                 || engagementExitTicks < 1
                 || !Double.isFinite(trainingIncomingGuardPressure)
-                || trainingIncomingGuardPressure <= 0) {
+                || trainingIncomingGuardPressure <= 0
+                || !Double.isFinite(trainingIncomingPoiseDamage)
+                || trainingIncomingPoiseDamage <= 0
+                || trainingIncomingCcTicks < 1
+                || !Double.isFinite(trainingPerfectGuardPostureDamage)
+                || trainingPerfectGuardPostureDamage <= 0) {
             activeItemEngine.set(null);
             activeMoveEngine.set(null);
             resourcePackGate = null;
             characterSessionController = null;
-            return "Combat tick and training guard pressure settings must be positive.";
+            return "Combat tick and training defense settings must be positive.";
         }
         combatSessionController =
                 new CombatSessionController(
@@ -306,7 +331,11 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         dodgeProfile,
                         new com.branz.mmorpg.combat.guard.GuardEngine(
                                 com.branz.mmorpg.combat.guard.GuardProfile.trainingWeapon()),
-                        trainingIncomingGuardPressure);
+                        trainingIncomingGuardPressure,
+                        trainingIncomingPoiseDamage,
+                        trainingIncomingCcSeverity,
+                        trainingIncomingCcTicks,
+                        trainingPerfectGuardPostureDamage);
         ChronicleController chronicleController =
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         characterSessionController.addReadyHandler(chronicleController::reconcile);

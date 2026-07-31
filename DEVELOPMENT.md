@@ -128,6 +128,19 @@ with an operator/test account:
     24-tick break, then Stability returns at 35 and begins delayed recovery.
 32. Verify `/mmo health` reports `guard=PERFECT(...)`, `GUARDING(...)`, `BROKEN(...)` or
     `INACTIVE(...)`; starting an attack while active guard is rejected, while dodge releases guard.
+33. Strike the same training target nine times without waiting three seconds between hits. Verify
+    the ninth hit reports `posture=BROKEN(60t)`; later hits during that window deal the 1.35
+    posture-break damage bonus but cannot extend the broken window.
+34. Let a damaged, unbroken target go untouched for 60 ticks. Verify posture then regenerates at
+    25/second; killing, unloading or invalidating the target clears its isolated posture/health.
+35. Perfect-guard a non-player attacker and verify its action-bar response reports eight posture
+    damage (for a fresh target, `attacker-posture=92.0/100.0`).
+36. Take an ordinary unguarded mob hit. Verify hidden poise triggers `CC FLINCH ... duration=6t`,
+    the active move/buffer/guard/dodge is interrupted and `/mmo health` shows `cc=FLINCH(...)`
+    without printing an exact poise value.
+37. Deplete Guard Stability and verify Guard Break applies `HEAVY_STAGGER` for 24 PvE ticks. Inputs
+    remain action-locked until the server-owned CC expires, after which `/mmo health` returns to
+    `cc=NONE`.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,

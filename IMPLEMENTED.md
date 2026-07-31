@@ -653,7 +653,7 @@ Remaining Milestone 4 work:
 
 - remaining hitbox primitives, swept motion and region/friendly-provider filters;
 - persistent MMO health application and death/encounter integration;
-- posture/poise/CC;
+- persistent combatant status/health integration and provider-authored posture/CC profiles;
 - viewer-scoped debug rendering and in-game trace export controls;
 - latency/jitter acceptance fixtures and a complete weapon test kit.
 
@@ -850,8 +850,64 @@ Non-goals:
 - packet-level RMB release detection; the local Paper-only training adapter uses an explicit
   right-click toggle until the optional packet provider supplies held/release edges;
 - shield profiles, elemental leakage, unblockable/provider attack tags and PvP tuning;
-- attacker posture response, heavy-stagger application, poise and crowd-control runtime;
+- shield profiles, equipment-derived poise and provider-authored attack tags;
 - persistent player HP; normal guard chip still flows through the current vanilla training event.
 
 Config impact: `combat.training-incoming-guard-pressure` defaults to `10.0`. Migration impact:
 none; guard runtime is transient.
+
+## Milestone 4 — posture, poise and crowd-control training slice
+
+Implemented:
+
+- immutable normal-enemy posture runtime with 100 maximum posture, a 60-tick recovery delay,
+  25 posture/second recovery and a 60-tick broken window;
+- authored training-slash posture damage is applied after health damage, so the breaking hit does
+  not receive the posture-break bonus while later hits during the window receive the canonical
+  `POSTURE_BREAK` 1.35 advantage;
+- perfect guard applies eight posture damage to a non-player attacker and reports its resulting
+  posture state;
+- hidden player poise accumulates for ten ticks against a threshold of 30, decays at 30% of the
+  threshold per second and accepts a 0..1 hyper-armor multiplier in the pure runtime;
+- ordinary unguarded training entity hits apply 35 poise damage and request a six-tick `FLINCH`;
+  defended hits never also apply poise;
+- the complete physical CC hierarchy is encoded as
+  `FLINCH < STAGGER < HEAVY_STAGGER < KNOCKBACK < KNOCKDOWN < LAUNCH < GRAB`;
+- stronger CC replaces weaker CC, equal/lower active CC is rejected unless explicitly marked as a
+  combo continuation, and continuation duration is halved;
+- hard CC grants exact 24-tick PvE or 30-tick PvP post-control immunity at the active end tick;
+  stronger categories may break through weaker-category immunity;
+- PvP CC uses a 0.60 duration multiplier and same-category 100%/50%/immune diminishing returns
+  within 160 ticks;
+- Guard Break applies a 24-tick `HEAVY_STAGGER`; accepted CC cancels action/dodge/guard and buffered
+  input, interrupts weapon drawing and owns the player action state until expiry;
+- `/mmo health` exposes active CC and remaining ticks but intentionally does not expose the exact
+  player-poise accumulator.
+
+Tests:
+
+- exact posture damage, break, recovery-delay and recovery boundaries;
+- exact poise threshold, resistance, reset, hyper-armor and decay behavior;
+- CC replacement, rejection, continuation, immunity and stronger-category breakthrough;
+- PvP duration scaling, repeat decay and exact repeat-window reset;
+- 100,000 seeded posture transitions and 100,000 seeded CC transitions preserve bounded valid
+  runtimes.
+
+Failure/recovery behavior:
+
+- non-finite/negative posture or poise impacts and non-positive CC durations are rejected;
+- server-tick regression is rejected by every pure runtime;
+- dead, invalid or unloaded training targets discard isolated health/posture state;
+- logout/session replacement discards transient poise, CC and posture ownership;
+- rejected CC leaves the current action/control state intact.
+
+Non-goals:
+
+- persistent MMO HP/death, encounter rewards and boss-specific posture phases/immunity;
+- equipment-derived poise, provider-authored hyper armor and attack-specific CC/poise tags;
+- launch/knockback movement, grab pairing, animations and client-side posture-bar presentation.
+
+Config impact: `combat.training-incoming-poise-damage`,
+`combat.training-incoming-cc-severity`, `combat.training-incoming-cc-ticks` and
+`combat.training-perfect-guard-posture-damage` add local training defaults. Migration impact: none;
+all runtimes and isolated target accounting remain transient.

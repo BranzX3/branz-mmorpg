@@ -14,6 +14,7 @@ public record ContentManifest(
         String resourcePackSha256,
         String contentBundleSha256,
         String gitCommit,
+        Map<String, String> providerVersions,
         Map<String, Integer> definitions) {
     public ContentManifest {
         contentVersion = requireText(contentVersion, "contentVersion");
@@ -25,6 +26,7 @@ public record ContentManifest(
         resourcePackSha256 = requireText(resourcePackSha256, "resourcePackSha256");
         contentBundleSha256 = requireText(contentBundleSha256, "contentBundleSha256");
         gitCommit = requireText(gitCommit, "gitCommit");
+        providerVersions = immutableTextMap(providerVersions);
         Objects.requireNonNull(definitions, "definitions");
         LinkedHashMap<String, Integer> copy = new LinkedHashMap<>();
         definitions.forEach(
@@ -37,6 +39,19 @@ public record ContentManifest(
                     copy.put(checkedName, count);
                 });
         definitions = Collections.unmodifiableMap(copy);
+    }
+
+    private static Map<String, String> immutableTextMap(Map<String, String> values) {
+        if (values == null) {
+            return Map.of();
+        }
+        LinkedHashMap<String, String> copy = new LinkedHashMap<>();
+        values.forEach(
+                (name, version) ->
+                        copy.put(
+                                requireText(name, "provider name"),
+                                requireText(version, "provider version")));
+        return Collections.unmodifiableMap(copy);
     }
 
     private static String requireText(String value, String field) {

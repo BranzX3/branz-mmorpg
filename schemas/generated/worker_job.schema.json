@@ -1,0 +1,54 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "worker_job.schema.json",
+  "title" : "WORKER_JOB definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "role" : {
+      "type" : "string",
+      "description" : "Worker role."
+    },
+    "city" : {
+      "type" : "string",
+      "description" : "Owning city definition."
+    },
+    "duration_seconds" : {
+      "type" : "integer",
+      "description" : "Job duration.",
+      "x-unit" : "seconds",
+      "minimum" : 1.0
+    },
+    "costs" : {
+      "type" : "object",
+      "description" : "Reserved job costs."
+    },
+    "outputs" : {
+      "type" : "array",
+      "description" : "Committed job outputs.",
+      "minItems" : 1
+    },
+    "offline_allowed" : {
+      "type" : "boolean",
+      "description" : "Whether timestamp-based offline work is allowed."
+    },
+    "queue_cap_hours" : {
+      "type" : "number",
+      "description" : "Maximum offline queue duration.",
+      "x-unit" : "hours",
+      "minimum" : 0.0,
+      "maximum" : 24.0
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "role", "city", "duration_seconds", "costs", "outputs", "offline_allowed", "queue_cap_hours" ]
+}

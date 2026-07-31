@@ -1,0 +1,9 @@
+{
+  "yaml.schemas": {
+    "schemas/generated/content-definition.schema.json": [
+      "content/**/*.yml",
+      "content/**/*.yaml",
+      "mmo-content/src/test/resources/fixtures/**/*.yml"
+    ]
+  }
+}

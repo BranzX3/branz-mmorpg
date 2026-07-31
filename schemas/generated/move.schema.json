@@ -1,0 +1,287 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "move.schema.json",
+  "title" : "MOVE definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "family" : {
+      "type" : "string",
+      "description" : "Owning weapon family."
+    },
+    "input" : {
+      "type" : "object",
+      "description" : "Input branch.",
+      "properties" : {
+        "action" : {
+          "type" : "string",
+          "description" : "Semantic combat input.",
+          "enum" : [ "AUXILIARY", "PRIMARY", "SECONDARY", "SIGNATURE" ]
+        },
+        "direction" : {
+          "type" : "string",
+          "description" : "Four-way direction snapshot.",
+          "enum" : [ "BACK", "FORWARD", "LEFT", "NEUTRAL", "RIGHT" ]
+        },
+        "branch" : {
+          "type" : "string",
+          "description" : "Moveset branch identity."
+        }
+      },
+      "required" : [ "action", "direction", "branch" ]
+    },
+    "phases" : {
+      "type" : "object",
+      "description" : "Action timeline phases.",
+      "properties" : {
+        "windup_ticks" : {
+          "type" : "integer",
+          "description" : "Windup duration.",
+          "x-unit" : "ticks",
+          "minimum" : 0.0,
+          "maximum" : 40.0
+        },
+        "active_ticks" : {
+          "type" : "integer",
+          "description" : "Active duration.",
+          "x-unit" : "ticks",
+          "minimum" : 1.0,
+          "maximum" : 40.0
+        },
+        "recovery_ticks" : {
+          "type" : "integer",
+          "description" : "Recovery duration.",
+          "x-unit" : "ticks",
+          "minimum" : 0.0,
+          "maximum" : 40.0
+        }
+      },
+      "required" : [ "windup_ticks", "active_ticks", "recovery_ticks" ]
+    },
+    "commit_tick" : {
+      "type" : "integer",
+      "description" : "Cost commit tick.",
+      "x-unit" : "ticks",
+      "minimum" : 0.0
+    },
+    "costs" : {
+      "type" : "object",
+      "description" : "Reserved action resource costs.",
+      "properties" : {
+        "stamina" : {
+          "type" : "integer",
+          "description" : "Total stamina reservation.",
+          "x-unit" : "stamina",
+          "minimum" : 0.0
+        },
+        "mana" : {
+          "type" : "integer",
+          "description" : "Total mana reservation.",
+          "x-unit" : "mana",
+          "minimum" : 0.0
+        },
+        "health" : {
+          "type" : "integer",
+          "description" : "Non-lethal health reservation.",
+          "x-unit" : "health",
+          "minimum" : 0.0
+        },
+        "setup_stamina" : {
+          "type" : "integer",
+          "description" : "Stamina retained when cancelled before commit.",
+          "x-unit" : "stamina",
+          "minimum" : 0.0
+        }
+      },
+      "required" : [ "stamina", "mana", "health", "setup_stamina" ]
+    },
+    "movement" : {
+      "type" : "object",
+      "description" : "Server-authored movement and facing.",
+      "properties" : {
+        "curve" : {
+          "type" : "string",
+          "description" : "Movement-curve archetype."
+        },
+        "facing_turn_degrees" : {
+          "type" : "number",
+          "description" : "Maximum authored facing assistance.",
+          "x-unit" : "degrees",
+          "minimum" : 0.0,
+          "maximum" : 35.0
+        }
+      },
+      "required" : [ "curve", "facing_turn_degrees" ]
+    },
+    "hitboxes" : {
+      "type" : "array",
+      "description" : "Authoritative hitbox sequence.",
+      "minItems" : 1,
+      "items" : {
+        "type" : "object",
+        "properties" : {
+          "tick" : {
+            "type" : "integer",
+            "description" : "Active timeline tick.",
+            "x-unit" : "ticks",
+            "minimum" : 0.0
+          },
+          "shape" : {
+            "type" : "string",
+            "description" : "Supported hitbox shape.",
+            "enum" : [ "ARC", "BOX", "CAPSULE", "PROJECTILE", "RAY", "SPHERE" ]
+          },
+          "max_targets" : {
+            "type" : "integer",
+            "description" : "Maximum targets per hitbox.",
+            "x-unit" : "targets",
+            "minimum" : 1.0,
+            "maximum" : 8.0
+          },
+          "range" : {
+            "type" : "number",
+            "description" : "Authoritative hitbox reach.",
+            "x-unit" : "blocks",
+            "minimum" : 1.0E-6
+          },
+          "angle_degrees" : {
+            "type" : "number",
+            "description" : "Hitbox angular span.",
+            "x-unit" : "degrees",
+            "minimum" : 0.0,
+            "maximum" : 360.0
+          },
+          "height" : {
+            "type" : "number",
+            "description" : "Hitbox vertical span.",
+            "x-unit" : "blocks",
+            "minimum" : 1.0E-6
+          },
+          "hit_group" : {
+            "type" : "string",
+            "description" : "Once-per-group hit identity."
+          }
+        },
+        "required" : [ "tick", "shape", "max_targets", "range", "angle_degrees", "height", "hit_group" ]
+      }
+    },
+    "outputs" : {
+      "type" : "object",
+      "description" : "Authoritative impact outputs.",
+      "properties" : {
+        "health" : {
+          "type" : "object",
+          "properties" : {
+            "physical_type" : {
+              "type" : "string",
+              "description" : "Physical damage channel.",
+              "enum" : [ "BLUNT", "PIERCE", "SLASH" ]
+            },
+            "move_coefficient" : {
+              "type" : "number",
+              "description" : "Weapon-power coefficient.",
+              "x-unit" : "coefficient",
+              "minimum" : 1.0E-6
+            }
+          },
+          "required" : [ "physical_type", "move_coefficient" ]
+        },
+        "posture" : {
+          "type" : "integer",
+          "description" : "Enemy posture output.",
+          "x-unit" : "posture",
+          "minimum" : 0.0
+        },
+        "guard_pressure" : {
+          "type" : "integer",
+          "description" : "Guard Stability pressure.",
+          "x-unit" : "guard pressure",
+          "minimum" : 0.0
+        }
+      },
+      "required" : [ "health", "posture", "guard_pressure" ]
+    },
+    "cancels" : {
+      "type" : "object",
+      "description" : "Authored cancel windows.",
+      "properties" : {
+        "dodge_from_tick" : {
+          "type" : "integer",
+          "description" : "First legal dodge-cancel tick.",
+          "x-unit" : "ticks",
+          "minimum" : 0.0
+        },
+        "chain_windows" : {
+          "type" : "array",
+          "description" : "Authored chain windows.",
+          "items" : {
+            "type" : "object",
+            "properties" : {
+              "from_tick" : {
+                "type" : "integer",
+                "description" : "Chain-window start.",
+                "x-unit" : "ticks",
+                "minimum" : 0.0
+              },
+              "to_tick" : {
+                "type" : "integer",
+                "description" : "Chain-window end.",
+                "x-unit" : "ticks",
+                "minimum" : 0.0
+              },
+              "branch" : {
+                "type" : "string",
+                "description" : "Destination branch."
+              }
+            },
+            "required" : [ "from_tick", "to_tick", "branch" ]
+          }
+        }
+      },
+      "required" : [ "dodge_from_tick", "chain_windows" ]
+    },
+    "interrupt_resistance" : {
+      "type" : "string",
+      "description" : "Authored interruption profile."
+    },
+    "presentation" : {
+      "type" : "object",
+      "properties" : {
+        "archetype" : {
+          "type" : "string",
+          "description" : "Presentation-only animation/VFX archetype."
+        }
+      },
+      "required" : [ "archetype" ]
+    },
+    "profiles" : {
+      "type" : "object",
+      "properties" : {
+        "pve_multiplier" : {
+          "type" : "number",
+          "description" : "PvE output profile.",
+          "x-unit" : "multiplier",
+          "minimum" : 1.0E-6
+        },
+        "pvp_multiplier" : {
+          "type" : "number",
+          "description" : "PvP output profile.",
+          "x-unit" : "multiplier",
+          "minimum" : 1.0E-6
+        }
+      },
+      "required" : [ "pve_multiplier", "pvp_multiplier" ]
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "family", "input", "phases", "commit_tick", "costs", "movement", "hitboxes", "outputs", "cancels", "interrupt_resistance", "presentation", "profiles" ]
+}

@@ -1,0 +1,48 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "scene.schema.json",
+  "title" : "SCENE definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "open_requirements" : {
+      "type" : "object",
+      "description" : "Scene entry requirements."
+    },
+    "preview" : {
+      "type" : "object",
+      "description" : "Preview placement profile.",
+      "properties" : {
+        "preferred_distance" : {
+          "type" : "number",
+          "description" : "Validated local preview distance.",
+          "x-unit" : "blocks",
+          "minimum" : 2.5,
+          "maximum" : 3.0
+        }
+      },
+      "required" : [ "preferred_distance" ]
+    },
+    "modes" : {
+      "type" : "array",
+      "description" : "Available Scene modes.",
+      "minItems" : 1
+    },
+    "close_triggers" : {
+      "type" : "array",
+      "description" : "Safety interruption triggers.",
+      "minItems" : 1
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "open_requirements", "preview", "modes", "close_triggers" ]
+}

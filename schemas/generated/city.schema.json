@@ -1,0 +1,53 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "city.schema.json",
+  "title" : "CITY definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "production_categories" : {
+      "type" : "array",
+      "description" : "Primary production categories.",
+      "minItems" : 3,
+      "maxItems" : 5
+    },
+    "import_needs" : {
+      "type" : "array",
+      "description" : "Authored import needs.",
+      "minItems" : 3,
+      "maxItems" : 5
+    },
+    "trade_goods" : {
+      "type" : "array",
+      "description" : "Authored city trade goods.",
+      "minItems" : 2,
+      "maxItems" : 4
+    },
+    "workshop_specialties" : {
+      "type" : "array",
+      "description" : "Workshop specialties."
+    },
+    "base_demand" : {
+      "type" : "object",
+      "description" : "Category demand indices.",
+      "additionalProperties" : {
+        "type" : "number",
+        "description" : "City demand index.",
+        "x-unit" : "demand index",
+        "minimum" : 0.0,
+        "maximum" : 200.0
+      }
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "production_categories", "import_needs", "trade_goods", "workshop_specialties", "base_demand" ]
+}

@@ -1,0 +1,35 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "spell.schema.json",
+  "title" : "SPELL definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "cast_type" : {
+      "type" : "string",
+      "description" : "Spell cast mode.",
+      "enum" : [ "CHANNEL", "CHARGE", "INSTANT", "RITUAL", "SUSTAIN", "WINDUP" ]
+    },
+    "target_type" : {
+      "type" : "string",
+      "description" : "Spell targeting mode.",
+      "enum" : [ "CONE", "CROSSHAIR_ENTITY", "CROSSHAIR_POINT", "GROUND_AREA", "PROJECTILE", "SELF", "TETHERED_ALLY" ]
+    },
+    "delivery" : {
+      "type" : "string",
+      "description" : "Spell delivery mode.",
+      "enum" : [ "BEAM", "DIRECT", "IMBUE", "PROJECTILE", "SUMMON", "ZONE" ]
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "cast_type", "target_type", "delivery" ]
+}

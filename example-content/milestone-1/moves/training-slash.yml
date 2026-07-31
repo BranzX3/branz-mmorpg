@@ -1,0 +1,46 @@
+definition_id: move.training_blade.primary_1
+schema_version: 1
+family: SWORD
+input:
+  action: PRIMARY
+  direction: NEUTRAL
+  branch: PRIMARY_1
+phases:
+  windup_ticks: 4
+  active_ticks: 3
+  recovery_ticks: 7
+commit_tick: 3
+costs:
+  stamina: 12
+  mana: 0
+  health: 0
+  setup_stamina: 0
+movement:
+  curve: STEP
+  facing_turn_degrees: 15
+hitboxes:
+  - tick: 4
+    shape: ARC
+    range: 2.8
+    angle_degrees: 95
+    height: 2.0
+    max_targets: 4
+    hit_group: PRIMARY
+outputs:
+  health:
+    physical_type: SLASH
+    move_coefficient: 0.8
+  posture: 12
+  guard_pressure: 9
+cancels:
+  dodge_from_tick: 9
+  chain_windows:
+    - from_tick: 7
+      to_tick: 11
+      branch: PRIMARY_2
+interrupt_resistance: NONE
+presentation:
+  archetype: SWORD_HORIZONTAL_SLASH
+profiles:
+  pve_multiplier: 1.0
+  pvp_multiplier: 0.65

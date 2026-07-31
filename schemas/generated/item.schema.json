@@ -1,0 +1,28 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "item.schema.json",
+  "title" : "ITEM definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "asset_id" : {
+      "type" : "string",
+      "description" : "Stable presentation asset ID."
+    },
+    "item_class" : {
+      "type" : "string",
+      "description" : "Unique/durable or stackable-lot item class."
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "asset_id", "item_class" ]
+}

@@ -1,0 +1,6 @@
+definition_id: material.iron_ore
+schema_version: 1
+asset_id: material.iron_ore
+item_class: STACKABLE_LOT
+status: approved
+owning_team: lifeskills

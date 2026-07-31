@@ -1,0 +1,42 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "mount.schema.json",
+  "title" : "MOUNT definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "species" : {
+      "type" : "string",
+      "description" : "Mount species."
+    },
+    "base_stats" : {
+      "type" : "object",
+      "description" : "Bounded base mount stats."
+    },
+    "cargo" : {
+      "type" : "object",
+      "description" : "Cargo capacity profile."
+    },
+    "permanent_death" : {
+      "type" : "boolean",
+      "description" : "V1 mounts cannot die permanently.",
+      "enum" : [ false ]
+    },
+    "mounted_combat" : {
+      "type" : "boolean",
+      "description" : "V1 mounted combat is disabled.",
+      "enum" : [ false ]
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "species", "base_stats", "cargo", "permanent_death", "mounted_combat" ]
+}

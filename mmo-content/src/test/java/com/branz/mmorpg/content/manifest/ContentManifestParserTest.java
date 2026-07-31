@@ -23,9 +23,13 @@ class ContentManifestParserTest {
                 ((Result.Success<ContentManifest, ContentManifestErrorCode>) result).value();
         assertEquals("v1.0.0-content.1", manifest.contentVersion());
         assertEquals(120, manifest.definitions().get("items"));
+        assertEquals("1.2.3", manifest.providerVersions().get("oraxen"));
         assertThrows(
                 UnsupportedOperationException.class,
                 () -> manifest.definitions().put("spells", 12));
+        assertThrows(
+                UnsupportedOperationException.class,
+                () -> manifest.providerVersions().put("wallet", "9.9.9"));
     }
 
     @Test

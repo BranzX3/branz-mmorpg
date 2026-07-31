@@ -1,0 +1,51 @@
+content:
+  path: content
+
+environment: LOCAL
+
+resource-pack:
+  # Local development can leave this disabled. Integration/Staging/Production
+  # must configure a URL and the SHA-256 from the active content manifest.
+  enabled: false
+  required: true
+  url: ""
+  sha256: ""
+
+dev-tools:
+  enabled: true
+
+combat:
+  weapon-draw-ticks: 6
+  weapon-sheathe-ticks: 4
+
+database:
+  # EMBEDDED_LOCAL is restricted to LOCAL/INTEGRATION and makes runServer
+  # self-contained. Use EXTERNAL for a real PostgreSQL service.
+  mode: EMBEDDED_LOCAL
+  embedded-data-directory: "embedded-postgres"
+  jdbc-url: "jdbc:postgresql://127.0.0.1:5432/branz_mmo"
+  username: "branz_mmo"
+  password: ""
+  maximum-pool-size: 8
+  connection-timeout-millis: 5000
+  run-migrations: true
+  lease-ttl-seconds: 30
+  lease-heartbeat-seconds: 10
+
+providers:
+  oraxen:
+    enabled: true
+    required: false
+  mythicmobs:
+    enabled: true
+    required: false
+  packetevents:
+    enabled: true
+    required: false
+  worldguard:
+    enabled: true
+    required: false
+  wallet:
+    enabled: true
+    required: false
+    plugin-name: Wallet

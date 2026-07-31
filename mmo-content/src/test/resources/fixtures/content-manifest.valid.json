@@ -6,6 +6,10 @@
   "resourcePackSha256": "REPLACE_AT_BUILD",
   "contentBundleSha256": "REPLACE_AT_BUILD",
   "gitCommit": "REPLACE_AT_BUILD",
+  "providerVersions": {
+    "oraxen": "1.2.3",
+    "mythicmobs": "5.6.7"
+  },
   "definitions": {
     "moves": 30,
     "items": 120

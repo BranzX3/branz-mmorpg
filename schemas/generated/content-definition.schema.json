@@ -1,0 +1,30 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "content-definition.schema.json",
+  "title" : "MMO content definition",
+  "oneOf" : [ {
+    "$ref" : "item.schema.json"
+  }, {
+    "$ref" : "move.schema.json"
+  }, {
+    "$ref" : "spell.schema.json"
+  }, {
+    "$ref" : "status.schema.json"
+  }, {
+    "$ref" : "scene.schema.json"
+  }, {
+    "$ref" : "city.schema.json"
+  }, {
+    "$ref" : "trade_good.schema.json"
+  }, {
+    "$ref" : "lifeskill_node.schema.json"
+  }, {
+    "$ref" : "node_region.schema.json"
+  }, {
+    "$ref" : "mount.schema.json"
+  }, {
+    "$ref" : "worker_job.schema.json"
+  }, {
+    "$ref" : "trait.schema.json"
+  } ]
+}

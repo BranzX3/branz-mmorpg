@@ -1,0 +1,8 @@
+definition_id: node.frostpeak.iron_common
+schema_version: 1
+node_type: COMMON
+action_ticks: 50
+commit_tick: 36
+recovery_seconds: 180
+base_yields:
+  - item: material.iron_ore

@@ -1,0 +1,12 @@
+package com.branz.mmorpg.persistence.transaction;
+
+public enum ReconciliationIssueCode {
+    STALE_PREPARED_TRANSACTION,
+    ITEM_UNCOMMITTED_TRANSACTION,
+    LOT_UNCOMMITTED_TRANSACTION,
+    UNKNOWN_ITEM_LOCATION,
+    UNKNOWN_LOT_LOCATION,
+    ITEM_MISSING_OWNER,
+    LOT_MISSING_OWNER,
+    EMPTY_LOT
+}

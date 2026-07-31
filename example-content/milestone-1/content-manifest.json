@@ -1,0 +1,21 @@
+{
+  "contentVersion": "v1.milestone-1.example.1",
+  "schemaVersion": 1,
+  "pluginCompatibility": ">=1.0.0 <2.0.0",
+  "minecraftVersion": "26.2",
+  "resourcePackSha256": "LOCAL_EXAMPLE_NOT_PACKAGED",
+  "contentBundleSha256": "LOCAL_EXAMPLE_NOT_PACKAGED",
+  "gitCommit": "LOCAL_EXAMPLE",
+  "providerVersions": {
+    "oraxen": "1.2.3",
+    "mythicmobs": "5.6.7",
+    "packetevents": "2.3.4",
+    "worldguard": "7.8.9",
+    "wallet": "3.4.5"
+  },
+  "definitions": {
+    "items": 2,
+    "moves": 1,
+    "nodes": 1
+  }
+}

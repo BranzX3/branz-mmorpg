@@ -1,0 +1,47 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$id" : "status.schema.json",
+  "title" : "STATUS definition",
+  "type" : "object",
+  "additionalProperties" : true,
+  "properties" : {
+    "definition_id" : {
+      "type" : "string",
+      "description" : "Stable lowercase dotted definition identity."
+    },
+    "schema_version" : {
+      "type" : "integer",
+      "description" : "Public content schema version.",
+      "x-unit" : "schema version",
+      "minimum" : 1.0
+    },
+    "buildup_max" : {
+      "type" : "number",
+      "description" : "Trigger threshold.",
+      "x-unit" : "buildup",
+      "minimum" : 1.0E-6
+    },
+    "buildup_decay_delay_ticks" : {
+      "type" : "integer",
+      "description" : "Delay before buildup decay.",
+      "x-unit" : "ticks",
+      "minimum" : 0.0
+    },
+    "active_duration_ticks" : {
+      "type" : "integer",
+      "description" : "Active-effect duration.",
+      "x-unit" : "ticks",
+      "minimum" : 1.0
+    },
+    "resistance_channel" : {
+      "type" : "string",
+      "description" : "Resistance channel."
+    },
+    "cleanse_tags" : {
+      "type" : "array",
+      "description" : "At least one authored cleanse tag.",
+      "minItems" : 1
+    }
+  },
+  "required" : [ "definition_id", "schema_version", "buildup_max", "buildup_decay_delay_ticks", "active_duration_ticks", "resistance_channel", "cleanse_tags" ]
+}

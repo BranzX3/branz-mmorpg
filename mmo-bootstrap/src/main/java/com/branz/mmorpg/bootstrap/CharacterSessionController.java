@@ -1,0 +1,453 @@
+package com.branz.mmorpg.bootstrap;
+
+import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.items.definition.ItemDefinition;
+import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.items.equipment.EquipmentLoadout;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Consumer;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+import org.bukkit.plugin.java.JavaPlugin;
+
+/** Acquires the character lease, loads DB truth, then unlocks the Paper player projection. */
+final class CharacterSessionController implements Listener {
+    private final JavaPlugin plugin;
+    private final CharacterSessionService sessions;
+    private final BukkitInventoryProjectionService projections;
+    private final ItemEngine itemEngine;
+    private final long heartbeatTicks;
+    private final Map<UUID, UUID> loadAttempts = new HashMap<>();
+    private final Map<UUID, LoadedCharacterSession> active = new HashMap<>();
+    private final Set<UUID> packReady = new HashSet<>();
+    private final Set<UUID> projected = new HashSet<>();
+    private final List<Consumer<Player>> readyHandlers = new ArrayList<>();
+    private int heartbeatTaskId = -1;
+
+    CharacterSessionController(
+            JavaPlugin plugin,
+            CharacterSessionService sessions,
+            BukkitInventoryProjectionService projections,
+            ItemEngine itemEngine,
+            DatabaseSettings databaseSettings) {
+        this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.projections = Objects.requireNonNull(projections, "projections");
+        this.itemEngine = Objects.requireNonNull(itemEngine, "itemEngine");
+        Objects.requireNonNull(databaseSettings, "databaseSettings");
+        heartbeatTicks = Math.max(1L, databaseSettings.leaseHeartbeat().toMillis() / 50L);
+    }
+
+    void start() {
+        heartbeatTaskId =
+                plugin.getServer()
+                        .getScheduler()
+                        .scheduleSyncRepeatingTask(
+                                plugin, this::heartbeatAll, heartbeatTicks, heartbeatTicks);
+        plugin.getServer().getOnlinePlayers().forEach(this::beginLoad);
+    }
+
+    void addReadyHandler(Consumer<Player> readyHandler) {
+        readyHandlers.add(Objects.requireNonNull(readyHandler, "readyHandler"));
+    }
+
+    void onPackReady(Player player) {
+        packReady.add(player.getUniqueId());
+        applyProjectionIfReady(player);
+    }
+
+    boolean ready(Player player) {
+        return projected.contains(Objects.requireNonNull(player, "player").getUniqueId());
+    }
+
+    Optional<LoadedCharacterSession> active(Player player) {
+        return Optional.ofNullable(
+                active.get(Objects.requireNonNull(player, "player").getUniqueId()));
+    }
+
+    void grantTestValue(
+            Player player,
+            ItemDefinition definition,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(definition, "definition");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        int slot = firstFreeStorageSlot(player);
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        if (slot < 0) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "No free inventory slot is available."));
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
+                                    sessions.grantTestValue(
+                                            session, definition, slot, contentVersion);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () -> completeTestGrant(session, result, completion));
+                        });
+    }
+
+    void commitEquipment(
+            Player player,
+            EquipmentLoadout desired,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(desired, "desired");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
+                                    sessions.commitEquipment(session, desired, contentVersion);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () -> completeTestGrant(session, result, completion));
+                        });
+    }
+
+    void shutdown() {
+        if (heartbeatTaskId >= 0) {
+            plugin.getServer().getScheduler().cancelTask(heartbeatTaskId);
+            heartbeatTaskId = -1;
+        }
+        ArrayList<LoadedCharacterSession> closing = new ArrayList<>(active.values());
+        active.clear();
+        loadAttempts.clear();
+        packReady.clear();
+        projected.clear();
+        for (LoadedCharacterSession session : closing) {
+            sessions.close(session);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onJoin(PlayerJoinEvent event) {
+        beginLoad(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onQuit(PlayerQuitEvent event) {
+        UUID playerId = event.getPlayer().getUniqueId();
+        loadAttempts.remove(playerId);
+        packReady.remove(playerId);
+        projected.remove(playerId);
+        LoadedCharacterSession session = active.remove(playerId);
+        if (session != null) {
+            plugin.getServer()
+                    .getScheduler()
+                    .runTaskAsynchronously(plugin, () -> sessions.close(session));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        plugin.getServer()
+                .getScheduler()
+                .runTask(
+                        plugin,
+                        () -> {
+                            projected.remove(player.getUniqueId());
+                            applyProjectionIfReady(player);
+                        });
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMove(PlayerMoveEvent event) {
+        if (!ready(event.getPlayer()) && event.hasChangedBlock()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player player && !ready(player)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (event.getWhoClicked() instanceof Player player && !ready(player)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onInteract(PlayerInteractEvent event) {
+        if (!ready(event.getPlayer())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDrop(PlayerDropItemEvent event) {
+        if (!ready(event.getPlayer())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSwap(PlayerSwapHandItemsEvent event) {
+        if (!ready(event.getPlayer())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDamage(EntityDamageEvent event) {
+        if (event.getEntity() instanceof Player player && !ready(player)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onCommand(PlayerCommandPreprocessEvent event) {
+        if (!ready(event.getPlayer())
+                && !event.getMessage()
+                        .trim()
+                        .toLowerCase(java.util.Locale.ROOT)
+                        .startsWith("/mmo health")) {
+            event.setCancelled(true);
+            event.getPlayer()
+                    .sendActionBar(
+                            Component.text(
+                                    "Character session is still loading.", NamedTextColor.YELLOW));
+        }
+    }
+
+    private void beginLoad(Player player) {
+        UUID playerId = player.getUniqueId();
+        UUID attempt = UUID.randomUUID();
+        loadAttempts.put(playerId, attempt);
+        projected.remove(playerId);
+        player.sendActionBar(Component.text("Loading MMO character state…", NamedTextColor.YELLOW));
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode> loaded =
+                                    sessions.open(playerId);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(plugin, () -> completeLoad(playerId, attempt, loaded));
+                        });
+    }
+
+    private void completeLoad(
+            UUID playerId,
+            UUID attempt,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> loaded) {
+        if (!attempt.equals(loadAttempts.get(playerId))) {
+            if (loaded
+                    instanceof
+                    Result.Success<LoadedCharacterSession, CharacterSessionErrorCode> stale) {
+                plugin.getServer()
+                        .getScheduler()
+                        .runTaskAsynchronously(plugin, () -> sessions.close(stale.value()));
+            }
+            return;
+        }
+        Player player = plugin.getServer().getPlayer(playerId);
+        if (player == null || !player.isOnline()) {
+            loadAttempts.remove(playerId);
+            if (loaded
+                    instanceof
+                    Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>
+                            disconnected) {
+                plugin.getServer()
+                        .getScheduler()
+                        .runTaskAsynchronously(plugin, () -> sessions.close(disconnected.value()));
+            }
+            return;
+        }
+        if (loaded
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            loadAttempts.remove(playerId);
+            player.sendMessage(
+                    Component.text(
+                            "MMO character remains locked: "
+                                    + failure.error().code()
+                                    + " "
+                                    + failure.detail(),
+                            NamedTextColor.RED));
+            return;
+        }
+        LoadedCharacterSession session =
+                ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) loaded)
+                        .value();
+        active.put(playerId, session);
+        applyProjectionIfReady(player);
+    }
+
+    private void applyProjectionIfReady(Player player) {
+        UUID playerId = player.getUniqueId();
+        LoadedCharacterSession session = active.get(playerId);
+        if (session == null || !packReady.contains(playerId) || projected.contains(playerId)) {
+            return;
+        }
+        Result<ProjectionApplyReport, ProjectionApplyErrorCode> applied =
+                projections.reconcile(player, session.snapshot(), itemEngine);
+        if (applied
+                instanceof
+                Result.Failure<ProjectionApplyReport, ProjectionApplyErrorCode> failure) {
+            player.sendMessage(
+                    Component.text(
+                            "Inventory projection remains locked: "
+                                    + failure.error().code()
+                                    + " "
+                                    + failure.detail(),
+                            NamedTextColor.RED));
+            return;
+        }
+        ProjectionApplyReport report =
+                ((Result.Success<ProjectionApplyReport, ProjectionApplyErrorCode>) applied).value();
+        projected.add(playerId);
+        player.sendActionBar(
+                Component.text(
+                        "MMO character ready"
+                                + (report.changed() ? " — inventory projection repaired" : ""),
+                        NamedTextColor.GREEN));
+        readyHandlers.forEach(handler -> handler.accept(player));
+    }
+
+    private void heartbeatAll() {
+        for (LoadedCharacterSession session : List.copyOf(active.values())) {
+            plugin.getServer()
+                    .getScheduler()
+                    .runTaskAsynchronously(
+                            plugin,
+                            () -> {
+                                Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
+                                        sessions.heartbeat(session);
+                                plugin.getServer()
+                                        .getScheduler()
+                                        .runTask(plugin, () -> completeHeartbeat(session, result));
+                            });
+        }
+    }
+
+    private void completeHeartbeat(
+            LoadedCharacterSession previous,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> result) {
+        UUID playerId = previous.characterId().value();
+        LoadedCharacterSession current = active.get(playerId);
+        if (current == null || !current.sessionId().equals(previous.sessionId())) {
+            return;
+        }
+        if (result
+                instanceof
+                Result.Success<LoadedCharacterSession, CharacterSessionErrorCode> success) {
+            active.put(playerId, success.value());
+            return;
+        }
+        Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure =
+                (Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>) result;
+        active.remove(playerId);
+        projected.remove(playerId);
+        Player player = plugin.getServer().getPlayer(playerId);
+        if (player != null) {
+            player.kick(
+                    Component.text(
+                            "MMO session lease lost: " + failure.detail(), NamedTextColor.RED));
+        }
+    }
+
+    private void completeTestGrant(
+            LoadedCharacterSession previous,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> result,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        UUID playerId = previous.characterId().value();
+        LoadedCharacterSession current = active.get(playerId);
+        if (current == null || !current.sessionId().equals(previous.sessionId())) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session changed before dev grant completed."));
+            return;
+        }
+        if (result instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>) {
+            completion.accept(result);
+            return;
+        }
+        LoadedCharacterSession updated =
+                ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result)
+                        .value();
+        active.put(playerId, updated);
+        projected.remove(playerId);
+        Player player = plugin.getServer().getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            applyProjectionIfReady(player);
+        }
+        completion.accept(Result.success(updated));
+    }
+
+    private static int firstFreeStorageSlot(Player player) {
+        org.bukkit.inventory.ItemStack[] storage = player.getInventory().getStorageContents();
+        for (int slot = 0; slot < storage.length; slot++) {
+            org.bukkit.inventory.ItemStack item = storage[slot];
+            if (slot != ChronicleService.HOTBAR_SLOT && (item == null || item.getType().isAir())) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+}

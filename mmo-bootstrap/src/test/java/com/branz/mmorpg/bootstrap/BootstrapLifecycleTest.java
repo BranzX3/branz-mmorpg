@@ -1,27 +1,49 @@
 package com.branz.mmorpg.bootstrap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 class BootstrapLifecycleTest {
     @Test
-    void enablesAndDisablesCleanly() {
-        BootstrapLifecycle lifecycle = new BootstrapLifecycle();
+    void acceptsSessionsOnlyAfterReadyOrDegradedStartup() {
+        BootstrapLifecycle ready = new BootstrapLifecycle();
+        BootstrapLifecycle degraded = new BootstrapLifecycle();
 
-        lifecycle.enable();
-        assertEquals(BootstrapLifecycle.State.ENABLED, lifecycle.state());
-        lifecycle.disable();
+        ready.beginStartup();
+        degraded.beginStartup();
+        assertFalse(ready.acceptsSessions());
 
-        assertEquals(BootstrapLifecycle.State.DISABLED, lifecycle.state());
+        assertTrue(ready.completeStartup(StartupStatus.READY));
+        assertTrue(degraded.completeStartup(StartupStatus.DEGRADED));
+
+        assertTrue(ready.acceptsSessions());
+        assertTrue(degraded.acceptsSessions());
     }
 
     @Test
-    void cannotEnableTwice() {
+    void maintenanceAndDisabledStatesRejectSessions() {
         BootstrapLifecycle lifecycle = new BootstrapLifecycle();
-        lifecycle.enable();
+        lifecycle.beginStartup();
+        lifecycle.completeStartup(StartupStatus.MAINTENANCE);
 
-        assertThrows(IllegalStateException.class, lifecycle::enable);
+        assertFalse(lifecycle.acceptsSessions());
+        lifecycle.disable();
+
+        assertEquals(BootstrapLifecycle.State.DISABLED, lifecycle.state());
+        assertFalse(lifecycle.acceptsSessions());
+    }
+
+    @Test
+    void cannotStartTwiceOrCompleteAfterDisable() {
+        BootstrapLifecycle lifecycle = new BootstrapLifecycle();
+        lifecycle.beginStartup();
+
+        assertThrows(IllegalStateException.class, lifecycle::beginStartup);
+        lifecycle.disable();
+        assertFalse(lifecycle.completeStartup(StartupStatus.READY));
     }
 }

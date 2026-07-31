@@ -1,0 +1,15 @@
+{
+  "contentVersion": "v1.milestone-1.invalid.1",
+  "schemaVersion": 1,
+  "pluginCompatibility": ">=1.0.0 <2.0.0",
+  "minecraftVersion": "26.2",
+  "resourcePackSha256": "LOCAL_INVALID_FIXTURE",
+  "contentBundleSha256": "LOCAL_INVALID_FIXTURE",
+  "gitCommit": "LOCAL_INVALID_FIXTURE",
+  "providerVersions": {
+    "oraxen": "1.2.3"
+  },
+  "definitions": {
+    "nodes": 1
+  }
+}

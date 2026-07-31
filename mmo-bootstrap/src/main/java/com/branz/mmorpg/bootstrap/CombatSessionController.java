@@ -20,6 +20,13 @@ import com.branz.mmorpg.combat.dodge.DodgeRuntime;
 import com.branz.mmorpg.combat.engagement.EngagementRuntime;
 import com.branz.mmorpg.combat.engagement.EngagementTickContext;
 import com.branz.mmorpg.combat.engagement.EngagementTracker;
+import com.branz.mmorpg.combat.guard.CombatDefenseOutcome;
+import com.branz.mmorpg.combat.guard.CombatDefenseResolution;
+import com.branz.mmorpg.combat.guard.CombatDefenseResolver;
+import com.branz.mmorpg.combat.guard.GuardEngine;
+import com.branz.mmorpg.combat.guard.GuardErrorCode;
+import com.branz.mmorpg.combat.guard.GuardHitRequest;
+import com.branz.mmorpg.combat.guard.GuardRuntime;
 import com.branz.mmorpg.combat.hitbox.ArcHitboxQuery;
 import com.branz.mmorpg.combat.hitbox.ArcHitboxResolver;
 import com.branz.mmorpg.combat.hitbox.CombatVector;
@@ -72,11 +79,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -100,6 +109,9 @@ final class CombatSessionController implements Listener {
     private final DodgeProfile dodgeProfile;
     private final DodgeEngine dodges = new DodgeEngine();
     private final SneakPressResolver sneakPresses = new SneakPressResolver();
+    private final GuardEngine guards;
+    private final CombatDefenseResolver defense;
+    private final double trainingIncomingGuardPressure;
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
     private final Map<UUID, Double> trainingTargetHealth = new HashMap<>();
     private int tickTaskId = -1;
@@ -112,7 +124,9 @@ final class CombatSessionController implements Listener {
             int drawTicks,
             int sheatheTicks,
             int engagementExitTicks,
-            DodgeProfile dodgeProfile) {
+            DodgeProfile dodgeProfile,
+            GuardEngine guards,
+            double trainingIncomingGuardPressure) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
         Objects.requireNonNull(moves, "moves");
@@ -129,6 +143,12 @@ final class CombatSessionController implements Listener {
         weapons = new WeaponTransitionMachine(drawTicks, sheatheTicks);
         engagement = new EngagementTracker(engagementExitTicks);
         this.dodgeProfile = Objects.requireNonNull(dodgeProfile, "dodgeProfile");
+        this.guards = Objects.requireNonNull(guards, "guards");
+        defense = new CombatDefenseResolver(dodges, guards);
+        if (!Double.isFinite(trainingIncomingGuardPressure) || trainingIncomingGuardPressure <= 0) {
+            throw new IllegalArgumentException("trainingIncomingGuardPressure must be positive");
+        }
+        this.trainingIncomingGuardPressure = trainingIncomingGuardPressure;
     }
 
     void start() {
@@ -147,8 +167,11 @@ final class CombatSessionController implements Listener {
     }
 
     void onCharacterReady(Player player) {
+        long tick = plugin.getServer().getCurrentTick();
         LiveSession session =
-                new LiveSession(EngagementRuntime.initial(plugin.getServer().getCurrentTick()));
+                new LiveSession(
+                        EngagementRuntime.initial(tick),
+                        GuardRuntime.initial(guards.profile(), tick));
         sessions.put(player.getUniqueId(), session);
         select(session, selectedSlot(player, player.getInventory().getHeldItemSlot()));
     }
@@ -173,6 +196,8 @@ final class CombatSessionController implements Listener {
                                         runtime ->
                                                 runtime.phaseAt(
                                                         plugin.getServer().getCurrentTick())),
+                        guards.phaseAt(session.guard, plugin.getServer().getCurrentTick()),
+                        session.guard.stability(),
                         resources.stamina(),
                         resources.reservedStamina(),
                         Optional.ofNullable(session.lastResolution)));
@@ -202,6 +227,7 @@ final class CombatSessionController implements Listener {
             return;
         }
         cancelAction(session, "WEAPON_SWAP");
+        releaseGuard(session);
         session.input.clearBuffer(InputBufferClearReason.WEAPON_SWAP);
         select(session, selectedSlot(event.getPlayer(), event.getNewSlot()));
     }
@@ -244,29 +270,87 @@ final class CombatSessionController implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onVanillaCombatDamage(EntityDamageByEntityEvent event) {
-        if (event.getEntity() instanceof Player defender) {
-            LiveSession defenderSession = sessions.get(defender.getUniqueId());
-            if (defenderSession != null
-                    && defenderSession.dodge != null
-                    && dodges.avoids(
-                            defenderSession.dodge, plugin.getServer().getCurrentTick(), true)) {
+        if (event.getDamageSource().getCausingEntity() instanceof Player attacker) {
+            LiveSession attackerSession = sessions.get(attacker.getUniqueId());
+            if (attackerSession != null
+                    && (attackerSession.weapon.state() == WeaponState.READY
+                            || attackerSession.timeline != null)) {
                 event.setCancelled(true);
-                defenderSession.lastResolution =
-                        "DODGE iframe tick="
-                                + defenderSession.dodge.elapsed(
-                                        plugin.getServer().getCurrentTick());
-                defender.sendActionBar(
-                        Component.text(defenderSession.lastResolution, NamedTextColor.AQUA));
                 return;
             }
         }
-        if (event.getDamageSource().getCausingEntity() instanceof Player player) {
-            LiveSession session = sessions.get(player.getUniqueId());
-            if (session != null
-                    && (session.weapon.state() == WeaponState.READY || session.timeline != null)) {
-                event.setCancelled(true);
-            }
+        if (!(event.getEntity() instanceof Player defender)
+                || !(event.getDamageSource().getCausingEntity() instanceof LivingEntity source)) {
+            return;
         }
+        LiveSession defenderSession = sessions.get(defender.getUniqueId());
+        if (defenderSession == null) {
+            return;
+        }
+        CombatDefenseResolution resolved =
+                defense.resolve(
+                        Optional.ofNullable(defenderSession.dodge),
+                        defenderSession.guard,
+                        plugin.getServer().getCurrentTick(),
+                        true,
+                        guardHitRequest(defender, defenderSession, source, event.getDamage()));
+        if (!resolved.defended()) {
+            return;
+        }
+        defenderSession.guard = resolved.guardRuntime();
+        if (resolved.staminaSpent() > 0) {
+            defenderSession.resources =
+                    defenderSession.resources.spendStamina(resolved.staminaSpent()).orElseThrow();
+            defenderSession.lastStaminaSpendTick = plugin.getServer().getCurrentTick();
+            defenderSession.staminaRegenRemainder = 0;
+        }
+        defenderSession.lastResolution =
+                resolved.outcome()
+                        + " damage="
+                        + roundOne(resolved.finalDamage())
+                        + " stability="
+                        + roundOne(resolved.guardRuntime().stability());
+        NamedTextColor feedbackColor =
+                switch (resolved.outcome()) {
+                    case DODGED -> NamedTextColor.AQUA;
+                    case PERFECT_GUARD -> NamedTextColor.GOLD;
+                    case GUARDED, GUARD_BREAK -> NamedTextColor.YELLOW;
+                    case HIT -> NamedTextColor.RED;
+                };
+        defender.sendActionBar(Component.text(defenderSession.lastResolution, feedbackColor));
+        if (resolved.outcome() == CombatDefenseOutcome.DODGED
+                || resolved.outcome() == CombatDefenseOutcome.PERFECT_GUARD) {
+            event.setCancelled(true);
+        } else {
+            event.setDamage(resolved.finalDamage());
+        }
+        if (resolved.outcome() != CombatDefenseOutcome.DODGED) {
+            markHostile(defender, defenderSession);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onGuardUse(PlayerInteractEvent event) {
+        if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND
+                || (event.getAction() != Action.RIGHT_CLICK_AIR
+                        && event.getAction() != Action.RIGHT_CLICK_BLOCK)) {
+            return;
+        }
+        LiveSession session = sessions.get(event.getPlayer().getUniqueId());
+        if (session == null
+                || !characters.ready(event.getPlayer())
+                || session.weapon.state() != WeaponState.READY
+                || session.engagement.state() != EngagementState.ENGAGED) {
+            return;
+        }
+        Result<SemanticInput, InputRejectionCode> semantic =
+                inputPolicy.resolve(ClientAction.USE, policyContext(event.getPlayer(), session));
+        if (!(semantic instanceof Result.Success<SemanticInput, InputRejectionCode> success)
+                || success.value() != SemanticInput.SECONDARY) {
+            return;
+        }
+        event.setCancelled(true);
+        toggleGuard(event.getPlayer(), session);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -350,6 +434,7 @@ final class CombatSessionController implements Listener {
             }
             tickSneakPress(player, session);
             tickDodge(player, session);
+            session.guard = guards.tick(session.guard, plugin.getServer().getCurrentTick());
             tickAction(player, session);
             tickEngagement(player, session);
             regenerateStamina(session);
@@ -495,6 +580,7 @@ final class CombatSessionController implements Listener {
     private void regenerateStamina(LiveSession session) {
         if (session.timeline != null
                 || session.dodge != null
+                || session.guard.active()
                 || session.resources.stamina() >= session.resources.maximumStamina()) {
             return;
         }
@@ -577,6 +663,7 @@ final class CombatSessionController implements Listener {
         DodgeRuntime runtime = ((Result.Success<DodgeRuntime, DodgeErrorCode>) started).value();
         session.resources =
                 postCancelResources.spendStamina(dodgeProfile.staminaCost()).orElseThrow();
+        releaseGuard(session);
         session.timeline = null;
         session.action = ActionState.IDLE;
         session.dodge = runtime;
@@ -666,6 +753,76 @@ final class CombatSessionController implements Listener {
                 : session.timeline.resources();
     }
 
+    private void toggleGuard(Player player, LiveSession session) {
+        long tick = plugin.getServer().getCurrentTick();
+        Result<CombatInputRequest, InputRejectionCode> observed =
+                session.input.observe(
+                        new InputObservation(
+                                tick,
+                                SemanticInput.DEFENSIVE_RESPONSE,
+                                DirectionSnapshot.NEUTRAL,
+                                "weapon_guard",
+                                new InputDeduplicationKey("MAIN_HAND", "GUARD_TOGGLE")));
+        if (!(observed instanceof Result.Success<CombatInputRequest, InputRejectionCode> input)) {
+            return;
+        }
+        Result<InputRouteOutcome, InputRejectionCode> routed =
+                session.input.routeFrame(List.of(input.value()), routingContext(player, session));
+        if (!(routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode>)) {
+            player.sendActionBar(Component.text("Guard is action-locked.", NamedTextColor.RED));
+            return;
+        }
+        if (session.guard.active()) {
+            releaseGuard(session);
+            player.sendActionBar(Component.text("GUARD released", NamedTextColor.GRAY));
+            return;
+        }
+        Result<GuardRuntime, GuardErrorCode> started = guards.start(session.guard, tick);
+        if (started instanceof Result.Failure<GuardRuntime, GuardErrorCode> failure) {
+            player.sendActionBar(
+                    Component.text("Guard rejected: " + failure.error(), NamedTextColor.RED));
+            return;
+        }
+        session.guard = ((Result.Success<GuardRuntime, GuardErrorCode>) started).value();
+        player.sendActionBar(Component.text("WEAPON GUARD", NamedTextColor.YELLOW));
+    }
+
+    private void releaseGuard(LiveSession session) {
+        if (!session.guard.active()) {
+            return;
+        }
+        Result<GuardRuntime, GuardErrorCode> released =
+                guards.release(session.guard, plugin.getServer().getCurrentTick());
+        if (released instanceof Result.Success<GuardRuntime, GuardErrorCode> success) {
+            session.guard = success.value();
+        }
+    }
+
+    private GuardHitRequest guardHitRequest(
+            Player defender, LiveSession session, LivingEntity source, double incomingDamage) {
+        org.bukkit.Location facingLocation = defender.getLocation().clone();
+        facingLocation.setPitch(0);
+        org.bukkit.util.Vector facing = facingLocation.getDirection();
+        org.bukkit.util.Vector toAttacker =
+                source.getLocation().toVector().subtract(defender.getLocation().toVector());
+        toAttacker.setY(0);
+        if (toAttacker.lengthSquared() < 1.0e-9) {
+            toAttacker = facing.clone();
+        }
+        return new GuardHitRequest(
+                incomingDamage,
+                trainingIncomingGuardPressure,
+                true,
+                true,
+                new CombatVector(facing.getX(), 0, facing.getZ()),
+                new CombatVector(toAttacker.getX(), 0, toAttacker.getZ()),
+                session.resources.availableStamina());
+    }
+
+    private static double roundOne(double value) {
+        return Math.round(value * 10.0) / 10.0;
+    }
+
     private InputRoutingContext dodgeRoutingContext(Player player, LiveSession session) {
         InputRoutingContext base = routingContext(player, session);
         if (base.legalNow().contains(SemanticInput.DODGE)) {
@@ -731,6 +888,9 @@ final class CombatSessionController implements Listener {
                                 false,
                                 session.action == ActionState.DOWNED
                                         || session.action == ActionState.DEAD));
+        if (session.engagement.state() != EngagementState.ENGAGED) {
+            releaseGuard(session);
+        }
     }
 
     private void markHostile(Player player, LiveSession session) {
@@ -760,10 +920,14 @@ final class CombatSessionController implements Listener {
     }
 
     private void startMove(Player player, LiveSession session) {
-        if (session.timeline != null || session.dodge != null) {
+        if (session.timeline != null || session.dodge != null || session.guard.active()) {
             if (session.dodge != null) {
                 player.sendActionBar(
                         Component.text("Attack locked during dodge recovery.", NamedTextColor.RED));
+            }
+            if (session.guard.active()) {
+                player.sendActionBar(
+                        Component.text("Release guard before attacking.", NamedTextColor.RED));
             }
             return;
         }
@@ -880,6 +1044,7 @@ final class CombatSessionController implements Listener {
         private final InputRouter input = new InputRouter();
         private ActionTimeline timeline;
         private DodgeRuntime dodge;
+        private GuardRuntime guard;
         private org.bukkit.util.Vector dodgeDirection;
         private long lastDodgeMovementElapsed = -1;
         private SneakPressWindow sneakPress;
@@ -888,8 +1053,9 @@ final class CombatSessionController implements Listener {
         private String lastResolution;
         private final java.util.Set<UUID> threatOwners = new java.util.HashSet<>();
 
-        private LiveSession(EngagementRuntime engagement) {
+        private LiveSession(EngagementRuntime engagement, GuardRuntime guard) {
             this.engagement = Objects.requireNonNull(engagement, "engagement");
+            this.guard = Objects.requireNonNull(guard, "guard");
         }
     }
 }

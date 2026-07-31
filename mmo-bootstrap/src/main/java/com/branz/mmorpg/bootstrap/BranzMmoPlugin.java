@@ -265,6 +265,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
         int weaponDrawTicks = getConfig().getInt("combat.weapon-draw-ticks", 6);
         int weaponSheatheTicks = getConfig().getInt("combat.weapon-sheathe-ticks", 4);
         int engagementExitTicks = getConfig().getInt("combat.engagement-exit-ticks", 160);
+        double trainingIncomingGuardPressure =
+                getConfig().getDouble("combat.training-incoming-guard-pressure", 10.0);
         com.branz.mmorpg.combat.dodge.DodgeProfile dodgeProfile;
         try {
             dodgeProfile =
@@ -281,12 +283,16 @@ public final class BranzMmoPlugin extends JavaPlugin {
             characterSessionController = null;
             return "Combat training-dodge-load must be LIGHT, MEDIUM, HEAVY or OVERLOADED.";
         }
-        if (weaponDrawTicks < 1 || weaponSheatheTicks < 1 || engagementExitTicks < 1) {
+        if (weaponDrawTicks < 1
+                || weaponSheatheTicks < 1
+                || engagementExitTicks < 1
+                || !Double.isFinite(trainingIncomingGuardPressure)
+                || trainingIncomingGuardPressure <= 0) {
             activeItemEngine.set(null);
             activeMoveEngine.set(null);
             resourcePackGate = null;
             characterSessionController = null;
-            return "Combat weapon draw/sheathe/engagement exit ticks must be positive.";
+            return "Combat tick and training guard pressure settings must be positive.";
         }
         combatSessionController =
                 new CombatSessionController(
@@ -297,7 +303,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         weaponDrawTicks,
                         weaponSheatheTicks,
                         engagementExitTicks,
-                        dodgeProfile);
+                        dodgeProfile,
+                        new com.branz.mmorpg.combat.guard.GuardEngine(
+                                com.branz.mmorpg.combat.guard.GuardProfile.trainingWeapon()),
+                        trainingIncomingGuardPressure);
         ChronicleController chronicleController =
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         characterSessionController.addReadyHandler(chronicleController::reconcile);

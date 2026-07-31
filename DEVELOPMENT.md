@@ -116,6 +116,18 @@ with an operator/test account:
     after tick 9 and verify the attack cancels while already committed stamina remains spent.
 26. Change `combat.training-dodge-load` to `LIGHT`, `HEAVY` and `OVERLOADED` between local restarts;
     verify costs 25/35/40 and confirm Overloaded movement has no i-frame immunity.
+27. Stay `ENGAGED`, face the zombie and right-click once to enter training weapon guard. The
+    Paper-only adapter uses right-click toggle; right-click again releases it.
+28. Let a front hit arrive within four server ticks of guard start. Verify `PERFECT_GUARD`, zero
+    damage, five stamina spent and Stability reduced by five.
+29. Start guard early, wait beyond the four-tick window and take a front hit. Verify `GUARDED`,
+    20% chip, ten stamina spent and ten Stability pressure.
+30. Keep guard active but turn the zombie outside the 120-degree front cone; verify the hit is not
+    guarded. The exact 60-degree edge remains valid.
+31. Repeat normal blocks with full stamina until `GUARD_BREAK`; verify guard rejects during its
+    24-tick break, then Stability returns at 35 and begins delayed recovery.
+32. Verify `/mmo health` reports `guard=PERFECT(...)`, `GUARDING(...)`, `BROKEN(...)` or
+    `INACTIVE(...)`; starting an attack while active guard is rejected, while dodge releases guard.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,

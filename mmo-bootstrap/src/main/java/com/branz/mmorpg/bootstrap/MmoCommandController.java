@@ -224,6 +224,14 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                             + status.dodgePhase()
                                                                     .map(Enum::name)
                                                                     .orElse("IDLE")
+                                                            + " | guard="
+                                                            + status.guardPhase()
+                                                            + "("
+                                                            + Math.round(
+                                                                            status.guardStability()
+                                                                                    * 10.0)
+                                                                    / 10.0
+                                                            + ")"
                                                             + " | stamina="
                                                             + status.stamina()
                                                             + " (reserved="

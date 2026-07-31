@@ -653,7 +653,7 @@ Remaining Milestone 4 work:
 
 - remaining hitbox primitives, swept motion and region/friendly-provider filters;
 - persistent MMO health application and death/encounter integration;
-- guard/posture/poise/CC;
+- posture/poise/CC;
 - viewer-scoped debug rendering and in-game trace export controls;
 - latency/jitter acceptance fixtures and a complete weapon test kit.
 
@@ -806,3 +806,52 @@ Non-goals:
 
 Config impact: `combat.training-dodge-load` defaults to `MEDIUM`. Migration impact: none; dodge
 runtime is transient.
+
+## Milestone 4 — weapon guard and perfect-guard training slice
+
+Implemented:
+
+- immutable weapon-guard runtime with active, perfect, normal, broken and inactive phases;
+- deterministic 120-degree front cone including the 60-degree boundary on either side;
+- canonical four-tick perfect-guard startup window;
+- training weapon guard blocks 80% physical damage; perfect guard produces zero chip;
+- normal pressure/stamina applies at 100%, while perfect guard applies 50% pressure/stamina;
+- Guard Stability starts at 100, recovers after 30 quiet ticks at 20/s inactive or 8/s active,
+  breaks for 24 ticks and returns at 35;
+- the same-tick defense resolver used by Paper applies `dodge -> perfect guard -> guard -> hit`;
+- non-dodgeable attacks fall through dodge to guard and non-perfect-guardable attacks fall through
+  the perfect window to normal guard;
+- Paper Engaged RMB toggles the training weapon guard through the semantic defensive-response
+  route; another RMB releases it;
+- attack, weapon swap, dodge and leaving Engaged state release or block guard as appropriate;
+- guarded entity hits spend stamina, apply chip, refresh engagement and report outcome/stability;
+- normal stamina regeneration pauses while guard is active;
+- `/mmo health` exposes guard phase and Guard Stability.
+
+Tests:
+
+- exact perfect/normal timing, chip, stamina and pressure values;
+- front cone boundary, rear hit, unblockable, exhausted and non-perfect-guardable behavior;
+- stability depletion, Guard Break duration/reset and active/inactive regeneration rates;
+- release/restart creates a new fixed perfect window;
+- same-tick dodge precedence and startup/non-dodgeable fallthrough to perfect guard;
+- inactive guard falls through to an ordinary hit.
+
+Failure/recovery behavior:
+
+- invalid/non-positive training pressure enters startup maintenance;
+- insufficient stamina leaves the hit unguarded without negative resources;
+- Guard Break disables guard until its server-tick recovery completes;
+- logout/session replacement discards transient guard/stability state;
+- input duplication and action locks reject without restarting the perfect window.
+
+Non-goals:
+
+- packet-level RMB release detection; the local Paper-only training adapter uses an explicit
+  right-click toggle until the optional packet provider supplies held/release edges;
+- shield profiles, elemental leakage, unblockable/provider attack tags and PvP tuning;
+- attacker posture response, heavy-stagger application, poise and crowd-control runtime;
+- persistent player HP; normal guard chip still flows through the current vanilla training event.
+
+Config impact: `combat.training-incoming-guard-pressure` defaults to `10.0`. Migration impact:
+none; guard runtime is transient.

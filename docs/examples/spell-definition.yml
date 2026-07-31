@@ -1,27 +1,29 @@
+definition_id: spell.ember.lance
 schema_version: 1
-id: spell.ember.fire_lance
-art: magic.ember
+art: EMBER
 cast_type: CHARGE
-target_type: CROSSHAIR
+target_type: PROJECTILE
 delivery: PROJECTILE
 requirements:
-  catalyst_tags: [STAFF, FIRE_FOCUS]
+  catalyst_tags: [STAFF, FOCUS]
   attunement: 2
-cost:
-  mana: 18
+costs:
+  mana: 22
 phases:
-  windup_ticks: 8
   minimum_charge_ticks: 8
-  maximum_charge_ticks: 30
-  recovery_ticks: 12
-interruption:
-  interrupted_by_flinch: true
-  interrupted_by_stagger: true
-  poise_threshold_multiplier: 0.75
+  full_charge_ticks: 28
+  recovery_ticks: 14
 projectile:
-  definition: projectile.fire_lance
-impact:
-  definition: impact.fire_lance
-presentation:
-  cast_animation: anim.magic.ember.lance
-  cast_sound: sound.magic.ember.charge
+  speed: 1.8
+  gravity: 0.01
+  lifetime_ticks: 60
+  collision_radius: 0.25
+outputs:
+  fire_coefficient_min: 0.85
+  fire_coefficient_full: 1.35
+  burn_buildup_min: 18
+  burn_buildup_full: 32
+interrupts:
+  movement: false
+  stagger: true
+  silence: true

@@ -1,0 +1,22 @@
+environment: CONTENT_DEV
+content_root: ../../mmo-content
+artifact_output: ../../build/content-artifacts
+catalog:
+  enabled: true
+  bind: 127.0.0.1
+  port: 8787
+validation:
+  warnings_as_errors:
+    - CONTENT_ID_DUPLICATE
+    - CONTENT_REFERENCE_NOT_FOUND
+    - CONTENT_RECIPE_CYCLE
+  localization_required:
+    - th_TH
+    - en_US
+simulation:
+  default_seed: 2602001
+  max_iterations: 100000
+preview:
+  ttl_minutes: 240
+  allow_ingame_dev_console: true
+production_writes: false

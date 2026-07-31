@@ -1,23 +1,14 @@
+definition_id: status.burn
 schema_version: 1
-id: status.burn
-category: AILMENT
-buildup:
-  threshold: 100
-  decay_delay_ticks: 60
-  decay_per_second: 18
-active:
-  duration_ticks: 160
-  reapply: EXTEND_TO_CAP
-  max_duration_ticks: 300
-  tick_interval: 20
-  health_damage_fraction_per_tick: 0.012
-resistance: FIRE
-cleanse_tags: [BURN_REMEDY, DOUSE, REST_CLEANSE]
-boss_behavior:
-  hard_control_conversion: NONE
+buildup_max: 100
+buildup_decay_delay_ticks: 60
+buildup_decay_per_second: 12
+active_duration_ticks: 120
+reapplication: REFRESH_CAPPED
+resistance_channel: FIRE
+active_effects:
+  damage_per_second_ratio: 0.012
+  stamina_regen_multiplier: 0.75
+cleanse_tags: [BURN_REMEDY, WATER_DOUSE]
 pvp:
-  buildup_multiplier: 0.75
-  damage_multiplier: 0.60
-persistence:
-  logout_max_seconds: 600
-  clear_on_death: true
+  duration_multiplier: 0.65

@@ -1,13 +1,13 @@
-# ADR-0001: Single-shard V1
-
-Status: Accepted
+# ADR 0001 — Single Authoritative Shard for V1
 
 ## Decision
 
-V1 runs on one Paper game server with PostgreSQL. Architecture uses stable IDs and provider boundaries but does not implement distributed character locking, cross-server inventory or dungeon server transfer.
+V1 runs on one Paper shard with PostgreSQL. Modules are separated in code but not deployed as distributed services.
+
+## Rationale
+
+Combat, inventory, market and mount safety are easier to prove without cross-server ownership and distributed locks. Stable IDs, leases and provider interfaces leave a future migration path.
 
 ## Consequences
 
-- Faster delivery and simpler transaction semantics.
-- One character lease still exists to protect duplicate login and future expansion.
-- Multi-server support requires a later ADR and migration.
+Capacity is bounded by the performance budget. Cross-shard market, party and travel are outside V1.

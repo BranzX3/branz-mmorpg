@@ -1,77 +1,61 @@
 # Product Scope
 
-## Product statement
+## Vision
 
-Core MMO is a classless high-fantasy action MMO runtime built for Paper. Normal combat should feel fluid and expressive; elite and boss combat should reward reading telegraphs, positioning, guard, dodge, parry, posture pressure and prepared builds.
+Core MMO is a high-fantasy, classless action MMO layered on Minecraft. Normal combat provides fluid power-fantasy chains; elites and bosses demand telegraph reading, positioning, guard, dodge, posture pressure and punishment. Character identity comes from weapon family, learned techniques, forms, magic arts, equipment and preparation rather than a class selection screen.
 
-The game uses Minecraft's world and inventory as physical context while replacing level-centric MMO progression with weapon knowledge, techniques, forms, hidden mastery, body conditioning, equipment identity and player preparation.
+## Full V1 player loop
 
-## Player identity
+```text
+Choose an activity or contract
+→ prepare build, Flask, food, tools and mount
+→ travel through discovered routes
+→ fight, gather, hunt, fish, farm or trade
+→ return to camp or city
+→ process, craft, repair, enhance and store
+→ use, sell, commission or package cargo
+→ gain combat breadth, lifeskill rank, renown and civic influence
+→ unlock mentors, recipes, workshops, routes and harder encounters
+```
 
-- One Minecraft account owns one persistent character.
-- There is no class selection and no manual STR/DEX/INT allocation.
-- A character may eventually learn all weapon and magic disciplines.
-- The active build is limited by held equipment, prepared moves, form, attunement and runtime resources.
-- Veteran power is primarily breadth, mechanical knowledge and flexibility. Numeric progression is bounded.
-- Renown represents recognition and history, not combat level.
+V1 is considered playable only when this loop is recoverable across disconnects and server restarts.
 
-## Combat pillars
+## Character principles
 
-1. **Readable commitment** — every move has windup, active and recovery phases.
-2. **Minecraft-native control grammar** — hotbar selection, LMB, RMB, swap-hand action, drop action and sneak action.
-3. **No random accuracy** — hitboxes, facing, movement and line of sight determine contact.
-4. **Conditional advantage** — counter, back attack, weak point and posture break replace random critical chance.
-5. **Build expression without button bloat** — techniques replace branches in a compact moveset.
-6. **Server authority** — clients present animation and effects but do not decide outcomes.
-7. **Low irreversible punishment** — no item destruction, no enhancement downgrade and no permanent class lock.
+- One Minecraft account maps to one persistent character.
+- No permanent class, manual STR/DEX/INT allocation or alternate-character system.
+- A character can eventually learn every combat and lifeskill discipline.
+- Active strength is constrained by equipped items, moveset branches, form, attunement, preparation and carried supplies.
+- Long-term advantage is breadth, knowledge, efficiency and flexibility; raw combat power has bounded progression.
+- Combat Mastery and Body Conditioning exact values are hidden; lifeskill Rank and Mastery are visible.
 
-## V1 includes
+## World principles
 
-- Character persistence and one-character policy.
-- Classless equipment and moveset system.
-- Draw/sheathe combat readiness and engagement state.
-- Melee, ranged and one complete magic runtime.
-- Dodge, guard, perfect guard, parry technique, posture, poise and crowd control.
-- Equipment, virtual accessory slots, cosmetics and Scene Hub.
-- Item UUIDs, durability, repair, enhancement and limited rolls.
-- Flask, consumables, ailments, remedies and alchemy station crafting.
-- Personal loot, persistent pending rewards and trade-safe item inspection.
-- Party of up to five, encounter membership, boss checkpoints and reward eligibility.
-- Quest, dialogue and stationary NPC runtime.
-- PvE death pouch.
-- Duels and arena PvP with a separate balance profile.
-- Oraxen-backed resource pack and content pipeline.
-- PostgreSQL persistence, transaction journal, admin repair and observability.
+- World danger is fixed by region and encounter, not scaled to individual players.
+- Progress gates are diegetic: keys, rituals, transport, faction access, knowledge and world actions.
+- Roads, settlements, storage locations, markets and trade routes matter spatially.
+- Convenience must not erase travel, regional production or preparation.
 
-## V1 explicitly excludes
+## Full V1 systems
 
-- Open-world PvP, criminal flags and territory warfare.
-- Auction house, mail and cross-server trade.
-- Multi-shard or cross-server character sessions.
-- Player housing, guild wars and raids larger than one party.
-- Downed/crawl/revive state.
-- Offline crafting.
-- Free-form summons with independent persistent inventories.
-- Dynamic NPC schedules and full world-state simulation.
-- A client mod requirement.
+V1 includes combat, magic, equipment, quests, personal rewards, party play, scene UI, all listed lifeskills, farming, limited workers, markets, regional trade, mounts, camps, navigation, city storage, freight, activity boards, factions, civic influence and basic guilds.
 
-## Product constraints
+## Explicit V1 non-goals
 
-- The required resource pack may change visuals and GUI textures but cannot be trusted for gameplay logic.
-- Vanilla inventory behavior remains recognizable. Opening inventory does not pause the world.
-- Hotbar slot 9 is reserved for the Core Scene item. Gameplay uses slots 1–8.
-- The server must fail safely when an optional integration is unavailable.
-- All important systems require admin inspection and repair commands.
+These are not secretly required by “full V1”:
 
-## Success criteria
+- Open-world PvP, criminality, territory war or castle siege.
+- Large raids above ten players.
+- Player housing interiors and freeform land ownership.
+- Ocean sailing, ship combat and BDO-style bartering.
+- Mounted combat.
+- Permanent mount death or deep genetic breeding.
+- Player loans, interest, futures or real-money trading.
+- Marriage, pet collection or battle-pass systems.
+- Multi-shard/cross-server character migration.
 
-A V1 release is successful when a new player can:
+Interfaces may anticipate these systems, but V1 runtime must not implement speculative behavior that weakens delivery or safety.
 
-1. Join, receive the resource pack and complete onboarding.
-2. Learn a weapon foundation, equip a valid build and understand the input grammar.
-3. Defeat normal enemies and an elite using dodge, guard and posture mechanics.
-4. Obtain, repair, enhance, trade and visually customize an item without duplication or loss.
-5. Join a party, complete a boss encounter, receive personal rewards and retry from a checkpoint.
-6. Progress a technique and hidden conditioning through meaningful play with understandable qualitative feedback.
-7. Open the local Character Scene, preview gear and cosmetics, commit or cancel safely.
-8. Disconnect or experience a controlled server restart without losing ownership, encounter rewards or scene state.
+## Server topology
+
+V1 runs as one authoritative Paper shard backed by PostgreSQL and external resource-pack hosting. Services are modular but not distributed. Every active character holds a database-backed session lease to prevent duplicate login ownership.

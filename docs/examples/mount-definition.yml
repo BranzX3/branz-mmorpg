@@ -1,0 +1,17 @@
+definition_id: mount.camel.desert_courser
+schema_version: 1
+species: CAMEL
+role_tags: [RIDER, TWO_PASSENGER, LIGHT_CARGO]
+base_stats:
+  speed: 100
+  endurance: 135
+  handling: 82
+  courage: 118
+cargo:
+  general_weight: 120
+  trade_slots: 1
+abilities:
+  - CAMEL_DASH
+allowed_equipment: [SADDLE, BRIDLE, BARDING, PACK, HORSESHOE]
+permanent_death: false
+mounted_combat: false

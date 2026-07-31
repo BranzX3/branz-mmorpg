@@ -1,14 +1,13 @@
-# ADR-0002: Slot 9 Chronicle and Local Scene
-
-Status: Accepted
+# ADR 0002 — Slot 9 Chronicle and Local Scene
 
 ## Decision
 
-Hotbar slot 9 is a protected system item. RMB opens a local Scene Hub outside combat. The real player is not teleported; an owner-only preview actor is placed in front with compact fallback.
+Hotbar slot 9 is permanently reserved for the Chronicle. Right-click opens a vulnerable Local Scene Hub with an owner-only Preview Actor; daily use does not teleport.
+
+## Rationale
+
+It provides a discoverable vanilla-client menu entry and an immersive character view while avoiding fragile camera/spectator transitions for a frequently used UI.
 
 ## Consequences
 
-- Gameplay hotbar capacity is eight slots.
-- Inventory event protection must be comprehensive.
-- Damage/movement/provider failure closes the Scene and discards preview.
-- Fixed Scene Pods are not part of the everyday V1 menu.
+Gameplay has eight hotbar slots. Slot protection and compact preview fallback are mandatory. Damage closes Scene.

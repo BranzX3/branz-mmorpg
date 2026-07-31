@@ -1,0 +1,334 @@
+{
+  "name": "core-mmo-v1-full-spec",
+  "status": "implementation-baseline",
+  "target": "Minecraft Java / Paper 26.2",
+  "fileCount": 65,
+  "markdownCount": 51,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 815,
+      "sha256": "8a84b0957ead5ae1ffafe7ed4bf97f09ccf1d0eaede24e4e79d7ad7288fd86f5"
+    },
+    {
+      "path": "docs/00-README.md",
+      "bytes": 6233,
+      "sha256": "13213505bad421b13c0cde2a8b9538264bdcc8fb7ceea4d3282ec33ca927a59f"
+    },
+    {
+      "path": "docs/00-THAI-SUMMARY.md",
+      "bytes": 3629,
+      "sha256": "3088a1a516cd666e90904d59c57f2abf291f015f584e64d426190e1c811e1df6"
+    },
+    {
+      "path": "docs/01-product-scope.md",
+      "bytes": 3090,
+      "sha256": "619ddfab6d5db552e1ef99e8424aa5aa72ebff74423f5523c47d2b105b7575cf"
+    },
+    {
+      "path": "docs/02-system-invariants.md",
+      "bytes": 4014,
+      "sha256": "f955e4d574fc398a006748ac90ef34ede16a5b3f7b66ed51eb9cc1b70654a34f"
+    },
+    {
+      "path": "docs/03-architecture.md",
+      "bytes": 3405,
+      "sha256": "8b335c026c70e2218d338005bbf28604288c4b1e77b148cec018f143d0871f06"
+    },
+    {
+      "path": "docs/04-identifiers-content-contracts.md",
+      "bytes": 1798,
+      "sha256": "f10e09d7d779e6bec7a0b0e6ec56e4c15ea241d859e078373b9d40d3ef535b5a"
+    },
+    {
+      "path": "docs/05-combat-state-machine.md",
+      "bytes": 2744,
+      "sha256": "e92e8e68832b8153dfdbd1d91f079f394baca9fa75139077c62dd35ee07411ae"
+    },
+    {
+      "path": "docs/06-input-resolution.md",
+      "bytes": 2858,
+      "sha256": "113a47378f1e9ca47294d5dadb51965cf357b234e7c19926a27dbcd07957628e"
+    },
+    {
+      "path": "docs/07-moves-hitboxes-targeting.md",
+      "bytes": 2328,
+      "sha256": "aae80757abd3a2ee3576d5a56d4979100e8cb6ddd10ff513a3934e11cf6a2fc5"
+    },
+    {
+      "path": "docs/08-damage-defense-cc.md",
+      "bytes": 3601,
+      "sha256": "a3b43db0de01e39808715f320d45bf52d42b15f231c3e08057d15858736cebad"
+    },
+    {
+      "path": "docs/09-weapons-builds-forms.md",
+      "bytes": 2523,
+      "sha256": "42c1ed3f2cb4620bedc003fc7c2d1f08ddb7bf8bc626dfb841385df3686dc289"
+    },
+    {
+      "path": "docs/10-progression-renown-teaching.md",
+      "bytes": 3179,
+      "sha256": "a8a4adc0d104b8f8d1757e9a01850b454bf80236c3b0a2c5a5add211e2533289"
+    },
+    {
+      "path": "docs/11-resources-flask-consumables.md",
+      "bytes": 3190,
+      "sha256": "2af66408086b224186b4d7a13627438ed91efad585c53a0f5ac2f0c49c7132a7"
+    },
+    {
+      "path": "docs/12-status-effects.md",
+      "bytes": 2201,
+      "sha256": "7e209e3a8d2b63a7f924734e24446472c4c81b42512c3bec2c7ba29fcde0f5e0"
+    },
+    {
+      "path": "docs/13-magic-runtime.md",
+      "bytes": 2542,
+      "sha256": "4deb007a58d2dd71d27392ab8d506e53c82e8ea10a82b7044e70d62e0e3ab03e"
+    },
+    {
+      "path": "docs/14-items-equipment-durability.md",
+      "bytes": 2739,
+      "sha256": "c7d52550159c84c0a35bbdb472314beb3f379d9ff37ea741f3c36611960d9ad6"
+    },
+    {
+      "path": "docs/15-enhancement-reforge-repair.md",
+      "bytes": 1903,
+      "sha256": "9405b7cf0bd72db7f3448bce0934ccccdfee9d276c748f727985933b8f787ecc"
+    },
+    {
+      "path": "docs/16-loot-rewards-ownership.md",
+      "bytes": 2228,
+      "sha256": "051825efb0dfd0f59257c3f570bdda0a4d7982c34b1c25498005dfba2b269912"
+    },
+    {
+      "path": "docs/17-crafting-recipes-workshops.md",
+      "bytes": 1856,
+      "sha256": "b377d384e9f9fb7e708cb3d59abbc8c5d24c942ff509347ef83d6fd4008822b0"
+    },
+    {
+      "path": "docs/18-market-central-exchange.md",
+      "bytes": 2851,
+      "sha256": "11b5e71c51daa02851d670e8ad5634fcecdcf480927e41bca0e68102b81ff732"
+    },
+    {
+      "path": "docs/19-city-economy-regional-trade.md",
+      "bytes": 2735,
+      "sha256": "4d9fcb62172a01d430d4d779d2d8f53ae837b15113fd379127dd2e3fb16e1bcf"
+    },
+    {
+      "path": "docs/20-storage-logistics-freight.md",
+      "bytes": 2142,
+      "sha256": "65a2ac6ec074d63f0009a61bbaaf1324c6f02c5a5fc4ae0b791fc14ef9f7e1ce"
+    },
+    {
+      "path": "docs/21-lifeskill-overview.md",
+      "bytes": 2528,
+      "sha256": "a93ba1f0193a873d2c9a4671a4303919b4fc8dbaf5abb80376386a83c8d8bd75"
+    },
+    {
+      "path": "docs/22-gathering-resource-nodes.md",
+      "bytes": 2928,
+      "sha256": "999fdd13967486d3f97baba3e0e106a0e1b0b2b0791f0a46e7bca23536929a68"
+    },
+    {
+      "path": "docs/23-fishing-hunting.md",
+      "bytes": 2182,
+      "sha256": "b924beb1cbc3b0e5b66ee30c0e1d7f2271371357a53d292bc7e4ac2d8ae64481"
+    },
+    {
+      "path": "docs/24-processing-production.md",
+      "bytes": 1899,
+      "sha256": "1130388248c573a541aae4dffd5b7911f438323f5a2a85e29db94de0d69a73be"
+    },
+    {
+      "path": "docs/25-farming-workers.md",
+      "bytes": 2715,
+      "sha256": "03b1d12934e85a418fb90baf807eacf69b8e8f02b1d1cab650f7bb83d056b2e0"
+    },
+    {
+      "path": "docs/26-mounts-caravans-stables.md",
+      "bytes": 2757,
+      "sha256": "b03d0163026de06cae7a8833c19293212e6f15272aea9ab82c31806beb513526"
+    },
+    {
+      "path": "docs/27-rest-camp-checkpoints.md",
+      "bytes": 2195,
+      "sha256": "ee00273db3c2702785b112cbccb8d3ea94451174b8f9991e21d316419e8d2a0a"
+    },
+    {
+      "path": "docs/28-navigation-travel-network.md",
+      "bytes": 1854,
+      "sha256": "e058b56cf11c7506f9ee74028d56a6e9a0de78240eeda0786e3d57b132c71c1f"
+    },
+    {
+      "path": "docs/29-encounters-spawn-ecology.md",
+      "bytes": 2130,
+      "sha256": "ae7d5ac7bd6122f600f00f3f1b4edac1a2a9fe33eb6cb2005aed50ef5252a724"
+    },
+    {
+      "path": "docs/30-activity-board-factions-guilds.md",
+      "bytes": 1923,
+      "sha256": "e0714d82be047f9d6afedefb065afca7d8d808aff91dc65fb2ca389dd4c04ea7"
+    },
+    {
+      "path": "docs/31-party-lfg-downed-pvp.md",
+      "bytes": 2235,
+      "sha256": "9812c517ad4e1a3ef7f8c57a2316166114b81799f2d3c98ee85366662cd8ed25"
+    },
+    {
+      "path": "docs/32-quests-dialogue-npcs.md",
+      "bytes": 1958,
+      "sha256": "c780afbb75a9e89c98aa9dd1e71ea0d7259f842d3f0656131c3dc2e360cba115"
+    },
+    {
+      "path": "docs/33-scene-ui-hud-accessibility.md",
+      "bytes": 2584,
+      "sha256": "829b8cad0bd8a6d383b2fa2d34f0b0c822fa2680f880a7f8a1a9679072b47204"
+    },
+    {
+      "path": "docs/34-onboarding-player-journey.md",
+      "bytes": 1773,
+      "sha256": "e73b84ab768956eb86ada4bbdf81682de04f8eab0a3ebc6c35d6c60a192c66f6"
+    },
+    {
+      "path": "docs/35-persistence-transactions.md",
+      "bytes": 2726,
+      "sha256": "e49241f77f8f85cf99937ac2c77215c52bcb07e6874f7a663adc6b2c01b2a2dc"
+    },
+    {
+      "path": "docs/36-content-dev-pipeline.md",
+      "bytes": 2835,
+      "sha256": "1d130cdccbcaa3cd013b875e63a71540db9eafa08777e8b56063f74f4c7de270"
+    },
+    {
+      "path": "docs/37-operations-security-testing.md",
+      "bytes": 3190,
+      "sha256": "eb10133c3a2f57d9658b655e5397b81b192b42ef7c32d189ebeccdcdaeeaf280"
+    },
+    {
+      "path": "docs/38-default-config.md",
+      "bytes": 2610,
+      "sha256": "073817901d8e61ddb983733e0acbae84457251e00ae3408f35653ecfba5f170d"
+    },
+    {
+      "path": "docs/39-implementation-roadmap.md",
+      "bytes": 5362,
+      "sha256": "dfa0f4299979e6655d41773a3c090765fe242e4e6e83a8ce16caf7609f8614c9"
+    },
+    {
+      "path": "docs/40-spec-status.md",
+      "bytes": 2305,
+      "sha256": "4faa31b837cb465240beaf5350398f12c434568f31db297e21c46b423a22b509"
+    },
+    {
+      "path": "docs/41-cross-system-acceptance.md",
+      "bytes": 4958,
+      "sha256": "276ce2baedf3b05175c9ff43b618fef0e63543f693b600c81d3ea7b811b763db"
+    },
+    {
+      "path": "docs/42-ai-coding-handoff.md",
+      "bytes": 3041,
+      "sha256": "294f9492439372814b9ca17c3ee12496f9cea79fa8f7d78a2d9410479baf15f9"
+    },
+    {
+      "path": "docs/43-content-authoring-tools.md",
+      "bytes": 16693,
+      "sha256": "a3601c3c1c7997efab6fa2656fee38d0af0f43bb6ed448db8ed58a863643eaba"
+    },
+    {
+      "path": "docs/adr/0001-single-shard-v1.md",
+      "bytes": 503,
+      "sha256": "864d77da648600022824c82bfb084fcd075ae5ae86ceafbe28a33a0c09363c81"
+    },
+    {
+      "path": "docs/adr/0002-slot9-local-scene.md",
+      "bytes": 539,
+      "sha256": "e0b7687e97a880f51fc1bb281a317e6ba80259c06fde67193ca4a97ee8542f10"
+    },
+    {
+      "path": "docs/adr/0003-personal-rewards.md",
+      "bytes": 337,
+      "sha256": "d058c8f4c6b76133d77831c8cd7a9fa6d66efaa4e7b4de9a037efd2713df42ee"
+    },
+    {
+      "path": "docs/adr/0004-market-regional-cargo-boundary.md",
+      "bytes": 351,
+      "sha256": "8f3e4c7161758afd4da429e5599b6f6b244e038e726366acf5400675bd647773"
+    },
+    {
+      "path": "docs/adr/0005-worker-background-jobs.md",
+      "bytes": 354,
+      "sha256": "e91d98c2acaa70a7e344a182e605421829bea072dd02d9f1af73dec392483a71"
+    },
+    {
+      "path": "docs/examples/city-profile.yml",
+      "bytes": 489,
+      "sha256": "8948bd37f87d5c227086bdad3ac58d68c95940c2d28165b2cb06d033767e1517"
+    },
+    {
+      "path": "docs/examples/content-manifest.json",
+      "bytes": 394,
+      "sha256": "fecf5757734c23221cb576ac18915a1833c1e5707b5ba11ed85f04c92e8358eb"
+    },
+    {
+      "path": "docs/examples/content-test-scenario.yml",
+      "bytes": 860,
+      "sha256": "a70099399000ba9636f208543692287b77b5c57f670f638be2384f0271bd7042"
+    },
+    {
+      "path": "docs/examples/core-schema.sql",
+      "bytes": 2378,
+      "sha256": "a1d462c63be4a3f1f7bb96ad8e3c6bd87bd1b94f6359e62f761db75e3db71aed"
+    },
+    {
+      "path": "docs/examples/devtools-config.yml",
+      "bytes": 478,
+      "sha256": "1c4d4326006685df7babc52e47e27e9ec1ba6479b80904fc9b3f9aed4714bcf7"
+    },
+    {
+      "path": "docs/examples/item-definition.yml",
+      "bytes": 424,
+      "sha256": "1f4af4faf6fc280d8d91dd588bbf117838bc7a53890ebff514d70798ab155366"
+    },
+    {
+      "path": "docs/examples/lifeskill-node-definition.yml",
+      "bytes": 450,
+      "sha256": "f9e4c182e7e24bdf129f07dbef66427ca4ea17529c17cc1fc502fab1c7609bca"
+    },
+    {
+      "path": "docs/examples/market-order.json",
+      "bytes": 352,
+      "sha256": "1d6b1d69f49298fde1ae86cf7a8e9b6885387a89147a901989daa77a7cc6684e"
+    },
+    {
+      "path": "docs/examples/mount-definition.yml",
+      "bytes": 373,
+      "sha256": "543b5102b74aae94c1a7787bcf1f909b2150460475c2af940c08931df49910da"
+    },
+    {
+      "path": "docs/examples/move-definition.yml",
+      "bytes": 613,
+      "sha256": "973f85b37c0c7c587aebde9e5b322dd1709a680f3330298de2d075ebf12b6488"
+    },
+    {
+      "path": "docs/examples/scene-definition.yml",
+      "bytes": 396,
+      "sha256": "a3df39d4d1a4ad05c75491f84dcb246a2282082769a62d8b915a1e2c9db9a0af"
+    },
+    {
+      "path": "docs/examples/spell-definition.yml",
+      "bytes": 548,
+      "sha256": "d3ab563099c38d6574e6a6150210b4acdb0dac4472ef8714eabdeb5ed2bab58d"
+    },
+    {
+      "path": "docs/examples/status-definition.yml",
+      "bytes": 359,
+      "sha256": "5ba90f993aa93ca188b4afff52cea43fe2e228bc8843879cd461b32ff4e7d301"
+    },
+    {
+      "path": "docs/examples/worker-job-definition.yml",
+      "bytes": 363,
+      "sha256": "7040ddf1af0f8a58fcd485d1c4beb42185da495e4b8621a0719d544e8cdb4471"
+    }
+  ]
+}

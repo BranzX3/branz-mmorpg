@@ -1,0 +1,14 @@
+{
+  "orderId": "018f-order-example",
+  "characterId": "018f-character-example",
+  "side": "BUY",
+  "definitionId": "material.iron_ore",
+  "variant": "NORMAL",
+  "limitPrice": 18,
+  "originalQuantity": 1000,
+  "remainingQuantity": 600,
+  "state": "PARTIALLY_FILLED",
+  "reservedCurrency": 10800,
+  "contentVersion": "v1.0.0-content.1",
+  "version": 4
+}

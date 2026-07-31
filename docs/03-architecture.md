@@ -1,159 +1,108 @@
-# Runtime Architecture
+# Architecture
 
-## Deployment topology
-
-V1 runs as a single Paper server backed by PostgreSQL and external object storage/CDN for resource packs. A proxy may exist for connection routing, but no cross-server character migration or inventory sharing is implemented in V1.
+## Module layout
 
 ```text
-Minecraft clients
-        |
-      Paper
-        |
-+---------------- Core MMO ----------------+
-| character | combat | items | magic | UI  |
-+------------------------------------------+
-  |          |          |          |
-PostgreSQL  Providers   Oraxen    Metrics/logs
-                         |
-                    Resource-pack CDN
+mmo-platform
+├─ mmo-api
+├─ mmo-bootstrap
+├─ mmo-character
+├─ mmo-combat
+├─ mmo-magic
+├─ mmo-items
+├─ mmo-progression
+├─ mmo-quests
+├─ mmo-scenes
+├─ mmo-lifeskills
+├─ mmo-market
+├─ mmo-worldloop
+├─ mmo-social
+├─ mmo-persistence
+├─ mmo-content
+├─ mmo-devtools
+└─ mmo-integrations
+   ├─ integration-oraxen
+   ├─ integration-mythicmobs
+   ├─ integration-packetevents
+   ├─ integration-worldguard
+   └─ integration-wallet
 ```
 
-## Gradle modules
+## Ownership boundaries
 
-```text
-mmo-api
-mmo-bootstrap
-mmo-character
-mmo-combat
-mmo-moves
-mmo-magic
-mmo-items
-mmo-equipment
-mmo-progression
-mmo-economy
-mmo-party
-mmo-encounters
-mmo-quests
-mmo-scenes
-mmo-persistence
-mmo-content
-mmo-admin
-mmo-integrations
-  integration-oraxen
-  integration-packetevents
-  integration-mythicmobs
-  integration-worldguard
-  integration-wallet
-```
-
-Modules may depend on `mmo-api` and lower-level domain modules. Integration modules depend inward on interfaces; domain modules never depend on integration implementations.
-
-## Core services
-
-### CharacterSessionService
-
-Owns login acquisition, session lease, loaded aggregate, live state token and logout flush. One session token is generated per successful lease.
-
-### CombatRuntime
-
-Owns state machines, input routing, action scheduling, hit resolution, resources, defense, CC and combat telemetry. It does not create loot.
-
-### EncounterService
-
-Owns encounter membership, content snapshot, threat adapter, wipe/reset, checkpoints, contribution and completion events.
-
-### ItemService
-
-Owns item definitions and item instances. It may create display `ItemStack`s through `AssetProvider`, but persistent state lives in the item repository.
-
-### TransactionService
-
-Owns atomic transfer and mutation of valuable state. Transactions are idempotent through a caller-supplied idempotency key.
-
-### SceneService
-
-Owns local Scene eligibility, preview actor lifecycle, preview state, menu navigation and commit/cancel operations.
-
-### ContentService
-
-Loads an immutable content bundle, validates compatibility, exposes registries and controls snapshot switching.
+| Domain | Owner |
+|---|---|
+| Player combat timelines and damage | `mmo-combat` |
+| Spell runtime and attunement | `mmo-magic` |
+| Item identity, locations and equipment | `mmo-items` |
+| Combat mastery and conditioning | `mmo-progression` |
+| Lifeskill rank, nodes, farming and workers | `mmo-lifeskills` |
+| Orders, escrow, price history and commissions | `mmo-market` |
+| Camps, navigation, travel, encounters and city services | `mmo-worldloop` |
+| Party, LFG, guild and activity membership | `mmo-social` |
+| Quest/dialogue state | `mmo-quests` |
+| Scene sessions and HUD presentation | `mmo-scenes` |
+| Leases, journals, migrations and repositories | `mmo-persistence` |
 
 ## Provider interfaces
 
-Required provider boundaries:
+Gameplay code uses these interfaces:
 
 ```java
 interface AssetProvider {}
-interface PreviewActorProvider {}
-interface PacketProvider {}
 interface MobProvider {}
+interface PacketProvider {}
 interface RegionProvider {}
 interface WalletProvider {}
 interface NpcProvider {}
 interface ResourcePackProvider {}
+interface ClockProvider {}
 ```
 
-Provider capability discovery is explicit. Example: if `PreviewActorProvider` is unavailable, the Character Scene may open in compact 2D mode, but equipment transactions remain functional.
+Providers return typed results and health status. Missing optional providers degrade presentation; missing required providers place the server in safe maintenance mode rather than continuing with partial ownership behavior.
+
+## Core services
+
+```text
+CharacterSessionService
+ContentSnapshotService
+TransactionService
+ItemLocationService
+EncounterService
+ActionTimelineService
+DefinitionRegistry
+AuditService
+ReconciliationService
+```
 
 ## Domain events
 
-Events are immutable records. Internal events use an in-process event bus; durable business events are appended to an outbox in the same database transaction as state changes.
+Events are immutable records published after transaction commit where applicable. Important events include:
 
-Important events:
-
-- `CharacterSessionOpened`
-- `CharacterSessionClosed`
-- `WeaponStateChanged`
-- `EngagementChanged`
-- `ActionStarted`, `ActionCommitted`, `ActionEnded`, `ActionInterrupted`
-- `HitResolved`
-- `EncounterJoined`, `EncounterCompleted`, `EncounterReset`
+- `CharacterSessionActivated`
+- `CombatEngagementChanged`
+- `ActionStarted/Committed/Cancelled`
+- `ItemLocationChanged`
 - `RewardGranted`
-- `ItemTransferred`, `ItemMutated`
-- `SceneOpened`, `SceneClosed`, `SceneCommitted`
-- `MasteryEvidenceAccepted`
-- `DeathPouchCreated`, `DeathPouchRecovered`, `DeathPouchExpired`
+- `MarketOrderFilled`
+- `LifeskillEvidenceRecorded`
+- `CampRestCompleted`
+- `MountStateChanged`
+- `QuestStateChanged`
 
-Domain events do not expose Bukkit classes.
+Events are not commands. A listener cannot assume it may reverse the originating transaction.
 
-## Threading model
+## Threading
 
-- Database work, content parsing and file hashing occur off the main thread.
-- Live Bukkit/entity/inventory changes occur on the correct Paper scheduler context.
-- An async callback carries `character_id` and `session_token`; stale tokens are discarded.
-- Each combatant has one serialized command lane. Commands may be queued from events but are applied in deterministic tick order.
-- Cross-character transactions lock records in a stable sorted order to avoid deadlocks.
+- Minecraft entity/world mutations execute on the appropriate server thread/region scheduler.
+- Database and content parsing execute asynchronously.
+- Async results re-enter the server thread only after confirming the character session and content snapshot are still valid.
+- No async task retains mutable Bukkit entities.
 
-## Dependency failure modes
+## Failure modes
 
-| Provider | Failure behavior |
-|---|---|
-| AssetProvider | Block creation of affected new items; preserve existing item state; use missing-asset visual |
-| PreviewActorProvider | Fall back to compact Scene UI without 3D preview |
-| PacketProvider | Disable optional camera/advanced effects; combat remains functional |
-| MobProvider | Disable encounter starts that require it; do not unload characters |
-| RegionProvider | Default to conservative rules: no PvP, no Scene in unknown restricted region, normal PvE elsewhere |
-| WalletProvider | Freeze wallet transactions and death-pouch creation; do not guess balances |
-
-## Stable identifiers
-
-Use lowercase namespaced strings:
-
-```text
-weapon.greatsword.iron_wolf
-move.greatsword.light_1
-technique.greatsword.rising_moon
-form.greatsword.iron_tempest
-status.burn
-scene.character_hub
-quest.red_harbor.introduction
-```
-
-IDs are never reused for a different meaning.
-
-## Configuration ownership
-
-- Content definitions own authored gameplay content.
-- `22-default-config.md` values become server configuration defaults.
-- Runtime configuration may adjust numeric balance within declared safe bounds.
-- Invariants, state transitions and persistent schemas are not runtime toggles.
+- Database unavailable: block new sessions and value-changing actions; allow existing players a short read-only grace before safe disconnect.
+- Asset provider unavailable: preserve items as barrier/fallback representations and disable creation of missing assets.
+- Packet provider unavailable: disable Scene Preview and advanced camera effects; core ownership remains available.
+- Mob provider unavailable: stop new encounters and safely reset active provider-owned encounters.
+- Wallet provider unavailable: disable purchases, fees and death-wallet transfer; never infer balances.

@@ -1,14 +1,17 @@
 {
-  "contentVersion": "0.1.0-dev.1",
+  "contentVersion": "v1.0.0-content.1",
   "schemaVersion": 1,
-  "pluginCompatibility": ">=0.1.0 <0.2.0",
-  "minecraftTarget": "26.2",
-  "resourcePackSha256": "REPLACED_BY_CI",
-  "contentBundleSha256": "REPLACED_BY_CI",
-  "gitCommit": "REPLACED_BY_CI",
-  "providers": {
-    "asset": "oraxen:pinned-by-environment",
-    "packet": "packetevents:pinned-by-environment",
-    "mob": "mythicmobs:pinned-by-environment"
+  "pluginCompatibility": ">=1.0.0 <2.0.0",
+  "minecraftVersion": "26.2",
+  "resourcePackSha256": "REPLACE_AT_BUILD",
+  "contentBundleSha256": "REPLACE_AT_BUILD",
+  "gitCommit": "REPLACE_AT_BUILD",
+  "definitions": {
+    "moves": 30,
+    "items": 120,
+    "spells": 12,
+    "statuses": 6,
+    "nodes": 80,
+    "recipes": 100
   }
 }

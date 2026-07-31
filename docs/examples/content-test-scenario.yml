@@ -1,0 +1,34 @@
+id: scenario.market.partial-fill-crash-recovery
+content_version: 1.0.0-test
+environment: INTEGRATION
+seed: 2602001
+setup:
+  characters:
+    - id: seller_a
+      market_balance: 0
+      lots:
+        - lot_id: lot.iron_ore.a
+          definition_id: material.iron_ore
+          quantity: 300
+    - id: buyer_a
+      market_balance: 10000
+actions:
+  - create_sell_order:
+      character: seller_a
+      lot: lot.iron_ore.a
+      quantity: 300
+      unit_price: 20
+  - create_buy_order:
+      character: buyer_a
+      definition_id: material.iron_ore
+      quantity: 500
+      unit_price: 20
+  - crash_point: AFTER_FILL_COMMIT_BEFORE_DELIVERY
+  - restart_and_reconcile: MARKET
+expect:
+  seller_market_balance: 6000
+  buyer_claimable_quantity: 300
+  buyer_reserved_currency: 4000
+  active_buy_order_remaining: 200
+  duplicate_lots: 0
+  quarantined_transactions: 0

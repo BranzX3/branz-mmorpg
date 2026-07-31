@@ -1,50 +1,33 @@
+definition_id: move.greatsword.rising_cleave
 schema_version: 1
-id: move.greatsword.light_1
 family: GREATSWORD
 input:
   action: PRIMARY
-  direction: ANY
-requirements:
-  weapon_tags: [GREATSWORD]
+  direction: FORWARD
 phases:
-  windup_ticks: 5
-  active_ticks: 4
-  recovery_ticks: 9
-  commit_tick: 4
-cost:
-  stamina: 8
+  windup_ticks: 12
+  active_ticks: 5
+  recovery_ticks: 18
+commit_tick: 8
+costs:
+  stamina: 28
 movement:
-  mode: STEP
-  curve_id: curve.greatsword.light_step
-facing:
-  mode: SOFT_LOCK
-  max_turn_degrees_per_tick: 12
+  curve: LUNGE_SHORT
+  facing_turn_degrees: 8
 hitboxes:
-  - id: blade_arc
-    hit_group: main
+  - tick: 13
     shape: ARC
-    start_tick: 5
-    end_tick: 8
-    radius: 3.1
+    range: 3.4
     angle_degrees: 105
-    vertical_min: -0.6
-    vertical_max: 1.8
-    line_of_sight: true
-impact:
-  weapon_damage_coefficient: 0.82
-  physical_type: SLASH
-  posture_damage: 18
-  guard_pressure: 14
-  poise_damage: 20
-windows:
-  chain:
-    - from_tick: 11
-      to_tick: 17
-      branch: PRIMARY_2
-  dodge_cancel:
-    - from_tick: 13
-      to_tick: 18
-presentation:
-  animation: anim.greatsword.light_1
-  sound: sound.weapon.greatsword.swing_light
-  trail: vfx.weapon.greatsword.light_arc
+    height: 2.2
+    max_targets: 6
+outputs:
+  health:
+    physical_type: SLASH
+    move_coefficient: 1.45
+  posture: 34
+  guard_pressure: 22
+cancels:
+  dodge_from_tick: 20
+  chain_windows:
+    - { from_tick: 16, to_tick: 23, branch: PRIMARY_CHAIN_2 }

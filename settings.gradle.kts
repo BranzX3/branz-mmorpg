@@ -1,7 +1,26 @@
-rootProject.name = "branz-mmorpg"
+rootProject.name = "mmo-platform"
 
-include("mmorpg-api")
-include("mmorpg-content")
-include("mmorpg-storage")
-include("mmorpg-core")
-include("mmorpg-paper")
+include(
+    "mmo-api",
+    "mmo-bootstrap",
+    "mmo-character",
+    "mmo-combat",
+    "mmo-magic",
+    "mmo-items",
+    "mmo-progression",
+    "mmo-quests",
+    "mmo-scenes",
+    "mmo-lifeskills",
+    "mmo-market",
+    "mmo-worldloop",
+    "mmo-social",
+    "mmo-persistence",
+    "mmo-content",
+    "mmo-devtools",
+    "mmo-integrations",
+    "mmo-integrations:integration-oraxen",
+    "mmo-integrations:integration-mythicmobs",
+    "mmo-integrations:integration-packetevents",
+    "mmo-integrations:integration-worldguard",
+    "mmo-integrations:integration-wallet",
+)

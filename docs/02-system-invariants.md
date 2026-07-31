@@ -1,82 +1,79 @@
 # System Invariants
 
-These rules are mandatory. Code and content that violate them are invalid even if they appear to work in a local test.
+These rules are mandatory across all modules.
 
-## Identity and ownership
+## Character and session
 
-1. `character_id`, `item_uuid`, `encounter_id`, `transaction_id` and stable content IDs are immutable identities.
-2. Display names, Oraxen IDs, file paths and localized text are not persistent identities.
-3. An item instance has exactly one ownership location at a time.
-4. Every item ownership mutation occurs inside `TransactionService` and writes a transaction journal entry.
-5. Cosmetic items have no combat stats and no durability.
-6. Item data from client-visible NBT/PDC is treated as a reference, not unquestioned authority. Persistent state is verified against the server repository.
-7. Unknown or incompatible items are quarantined, never silently deleted.
+1. One account owns one character record.
+2. One character may have one active server session lease.
+3. A character session is either loading, active, closing or closed; gameplay is blocked until loading completes.
+4. Disconnect never commits preview-only state.
 
-## Character and build
+## Hotbar and control ownership
 
-1. One account owns one active persistent character in V1.
-2. No class, character level or gear score gates core content.
-3. Exact mastery and conditioning values are hidden from players, but rejection reasons and qualitative readiness are visible.
-4. Learning breadth has no permanent numeric penalty.
-5. Active power is constrained by equipment, moveset branches, form, attunement and resources.
-6. Build changes that alter moves, form or attunement require a Rest Context. Equipment and consumable hotbar changes may occur outside combat according to their own rules.
+1. Hotbar slots 1–8 hold gameplay items.
+2. Hotbar slot 9 contains the immutable `Adventurer's Chronicle` system item.
+3. Slot 9 cannot be moved, dropped, traded, stored, consumed, placed in off-hand or used as transaction value.
+4. Selecting slot 9 sheaths the current weapon; right-click opens the Local Scene Hub when allowed.
+5. Vanilla inventory remains usable during ENGAGED combat; the world continues while it is open.
 
-## Hotbar and inputs
+## Server authority
 
-1. Hotbar slots 1–8 are gameplay slots.
-2. Hotbar slot 9 contains the server-owned Scene Chronicle item.
-3. The Chronicle cannot be moved, dropped, traded, stored, consumed or used as a crafting ingredient.
-4. Selecting slot 9 does not open the Scene. Main-hand use opens it when eligibility checks pass.
-5. F means the client's swap-hand action; Q means the client's drop action. Tutorials display current keybind names, not hard-coded letters.
-6. In Combat Ready or Engaged state, Q is owned by the combat input router and never drops the held gameplay item.
-7. In Exploration state, Q uses vanilla drop behavior except for protected system items.
-8. Shift is sneak in Exploration. In Combat Ready/Engaged, directional tap is dodge; stationary hold is crouch/brace.
-9. The input buffer contains at most one future action.
+1. Client packets express intent only.
+2. Hit results, movement permissions, resources, rewards, market fills and ownership are resolved on the server.
+3. Animation/VFX timing may interpolate but cannot create an active frame or i-frame absent from the server timeline.
 
-## Combat authority
+## Items and currency
 
-1. The server decides action start, resource cost, hit, damage, status, interruption and reward eligibility.
-2. A move definition is immutable for the lifetime of an active action and encounter content snapshot.
-3. No random miss or hidden accuracy roll exists.
-4. V1 has no random critical chance. Critical-like bonuses are explicit conditional advantages.
-5. Combat actions cannot reduce the user below 1 HP when the action declares a self-HP cost.
-6. Durability does not decay from PvP.
-7. Enhancement never improves dodge invulnerability or perfect-guard timing.
-8. Combat state and weapon state are separate dimensions.
+1. Every durable, equipment, cosmetic, mount and unique item has a globally unique UUID.
+2. Stackable commodities use a lot UUID plus quantity and immutable lineage.
+3. An item or lot can occupy exactly one authoritative location at a time.
+4. Currency and ownership changes occur only through idempotent `TransactionService` operations.
+5. No system deletes unresolved value after failure; it moves to Pending Rewards, Overflow Claim or Quarantine.
+6. Cosmetic items have no combat stats or durability.
+7. Enhancement never destroys an item and never downgrades its enhancement level.
+
+## Combat
+
+1. No random hit chance or random critical chance exists.
+2. Aim, hitboxes and server collision determine hits.
+3. Critical-like bonuses are conditional advantages: counter, back attack, weak point, posture break and finisher.
+4. Enhancement never widens parry windows, perfect-guard windows or dodge i-frames.
+5. PvP never reduces item or mount-equipment durability.
+6. Weapon draw, swap and consumable use have explicit server timelines and cannot be bypassed through scroll spam.
+
+## Progression
+
+1. Combat breadth has no permanent penalty.
+2. Exact combat Mastery and Body Conditioning values are hidden, but capability and failure reasons are explainable.
+3. Lifeskill Rank and Lifeskill Mastery are visible.
+4. Progression cannot be generated by unchallenged dummy loops, repeated zero-risk interactions or client-side timing claims.
+
+## Markets and regional trade
+
+1. Central Exchange trades normal commodities and listed unique items.
+2. Regional cargo cannot enter Central Exchange, Bank, personal mail or unrestricted teleport storage.
+3. Buy orders reserve currency; sell orders escrow goods before becoming active.
+4. Matching uses price-time priority and supports partial fills.
+5. A market fill never creates or destroys net item quantity outside explicit tax and fee currency sinks.
 
 ## Scene and UI
 
-1. The slot 9 Scene Hub opens only while not Engaged and while the character is in a stable physical state.
-2. The daily Scene Hub is local: the real player is not teleported.
-3. The preview actor is visible only to its owner and has no collision, AI, damage or world persistence.
-4. Taking damage, entering Engaged state, teleporting, changing world, mounting, falling, plugin disable or disconnect closes the Scene and discards uncommitted preview changes.
-5. Preview state is never committed implicitly by closing a menu.
-6. Resource-pack or presentation failure may degrade visuals but must not corrupt gameplay state.
+1. The daily Scene Hub is local and does not teleport the player.
+2. Scene Preview Actor is visible only to its owner.
+3. The real player remains vulnerable; hostile targeting, damage, knockback, teleport, death or world change closes the Scene.
+4. Preview changes commit only through explicit confirmation and transaction success.
 
-## Economy and rewards
+## Mounts and workers
 
-1. Base HP, mana and stamina recovery cannot be monopolized by the player economy.
-2. Player-crafted consumables focus on cures, prevention, specialization, utility and tradeoffs.
-3. Boss and encounter rewards are personal in V1.
-4. Eligible rewards are persisted before presentation. Inventory overflow enters `PendingRewards`.
-5. A player cannot receive a reward twice for the same reward grant ID.
-6. NPC price ceilings exist for essential recovery and basic remedies.
+1. A mount UUID projects to at most one live world entity.
+2. Mount incapacitation is recoverable; V1 has no permanent mount death.
+3. Worker jobs are database jobs, not hidden always-loaded entities.
+4. Offline worker progress is capped and consumes reserved inputs, wages and food before work begins.
 
-## Persistence and failure
+## Content and migrations
 
-1. Item ownership, wallet-linked transactions, enhancement results, reward grants and death pouches require immediate durable writes.
-2. Mastery evidence and telemetry may be batched, but accepted evidence cannot be applied twice.
-3. Only one server session may hold a character lease.
-4. Every asynchronous result must verify the character session token before mutating live Bukkit state.
-5. Bukkit/entity/inventory mutations run on the correct server or region thread.
-6. Plugin shutdown cancels active actions, closes scenes, freezes new transactions and flushes required journals.
-7. Production never uses Bukkit `/reload` and never edits content files directly on the server.
-
-## Content and integrations
-
-1. Git is the source of truth. Oraxen Studio is an authoring tool.
-2. Gameplay definitions refer to stable `asset_id`, not provider-specific IDs.
-3. Gameplay modules access Oraxen, MythicMobs, PacketEvents, WorldGuard and wallet systems only through provider interfaces.
-4. Content bundles and resource packs are immutable, versioned artifacts.
-5. An encounter uses one content snapshot from start through completion/reset.
-6. A content migration must be idempotent and recorded.
+1. Stable definition IDs are never reused for a different concept.
+2. Runtime uses immutable content snapshots.
+3. Active combat encounters finish on the snapshot with which they began.
+4. Breaking schema or identity changes require idempotent migrations rehearsed in staging.

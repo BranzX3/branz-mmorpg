@@ -1,0 +1,13 @@
+{
+  "contentVersion": "v1.0.0-content.1",
+  "schemaVersion": 1,
+  "pluginCompatibility": ">=1.0.0 <2.0.0",
+  "minecraftVersion": "26.2",
+  "resourcePackSha256": "REPLACE_AT_BUILD",
+  "contentBundleSha256": "REPLACE_AT_BUILD",
+  "gitCommit": "REPLACE_AT_BUILD",
+  "definitions": {
+    "moves": 30,
+    "items": 120
+  }
+}

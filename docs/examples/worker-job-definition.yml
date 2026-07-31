@@ -1,0 +1,15 @@
+definition_id: worker_job.frostpeak.iron_ore
+schema_version: 1
+role: GATHERER
+city: city.frostpeak
+required_node_knowledge: node_region.frostpeak_mines
+duration_seconds: 3600
+costs:
+  wage: 120
+  food_item: food.worker_ration
+  food_quantity: 1
+outputs:
+  - { item: material.iron_ore, min: 18, max: 24 }
+rare_outputs: []
+offline_allowed: true
+queue_cap_hours: 24

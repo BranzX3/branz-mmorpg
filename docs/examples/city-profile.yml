@@ -1,0 +1,16 @@
+definition_id: city.frostpeak
+schema_version: 1
+production_categories: [METAL, STONE, TOOLS, PRESERVED_FOOD]
+import_needs: [TIMBER, HERBS, MEDICINE, TEXTILES, FISH_OIL]
+trade_goods:
+  - trade.frostpeak.steel_crate
+  - trade.frostpeak.mining_tools
+  - trade.frostpeak.cut_stone
+workshop_specialties: [SMITHING, REFINING]
+base_demand:
+  TIMBER: 130
+  MEDICINE: 125
+  FISH_OIL: 115
+  METAL: 55
+accepted_cargo_tags: [STANDARD, INDUSTRIAL, FOOD, MEDICAL]
+rejected_cargo_tags: [CORRUPTED_WASTE]

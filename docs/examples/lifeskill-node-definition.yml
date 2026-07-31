@@ -1,0 +1,18 @@
+definition_id: node.frostpeak.iron_common
+schema_version: 1
+lifeskill: MINING
+node_type: COMMON
+region_tags: [FROSTPEAK_MINE]
+required_tool_tags: [PICKAXE]
+action_ticks: 50
+commit_tick: 36
+recovery_seconds: 180
+personal_state: true
+base_yields:
+  - { item: material.iron_ore, min: 2, max: 4 }
+byproducts:
+  - { item: material.metal_shard, chance: 0.18, quantity: 1 }
+focused_work:
+  focus_cost: 1
+  yield_multiplier: 1.25
+  rare_relative_bonus: 0.15

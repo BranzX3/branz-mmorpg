@@ -1,13 +1,9 @@
-# ADR-0003: Personal encounter rewards
-
-Status: Accepted
+# ADR 0003 — Personal Encounter Rewards
 
 ## Decision
 
-V1 encounter rewards are personal and idempotent. Overflow enters PendingRewards. Direct party need/greed and shared boss drops are excluded.
+Combat encounters grant personal idempotent rewards based on participation. Eligible party members may transfer unique rewards within a short party window.
 
-## Consequences
+## Rationale
 
-- Lower conflict and duplication risk.
-- Contribution must count damage, support and mechanics.
-- Reward presentation occurs after durable grant persistence.
+Avoids loot theft and Need/Greed friction while preserving social redistribution and reliable crash recovery.

@@ -1,0 +1,7 @@
+name: BranzMMO
+version: '${version}'
+main: com.branz.mmorpg.bootstrap.BranzMmoPlugin
+description: Server-authoritative MMO platform
+api-version: '26.2'
+load: STARTUP
+authors: [Branz]

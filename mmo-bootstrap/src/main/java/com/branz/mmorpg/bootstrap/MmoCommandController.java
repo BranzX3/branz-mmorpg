@@ -213,7 +213,13 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                             + status.stamina()
                                                             + " (reserved="
                                                             + status.reservedStamina()
-                                                            + ")",
+                                                            + ")"
+                                                            + status.lastResolution()
+                                                                    .map(
+                                                                            resolution ->
+                                                                                    " | last="
+                                                                                            + resolution)
+                                                                    .orElse(""),
                                                     NamedTextColor.AQUA)),
                             () ->
                                     sender.sendMessage(

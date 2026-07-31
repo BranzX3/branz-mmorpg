@@ -9,10 +9,12 @@ record CombatSessionStatus(
         WeaponState weaponState,
         Optional<ActionPhase> actionPhase,
         int stamina,
-        int reservedStamina) {
+        int reservedStamina,
+        Optional<String> lastResolution) {
     CombatSessionStatus {
         Objects.requireNonNull(weaponState, "weaponState");
         Objects.requireNonNull(actionPhase, "actionPhase");
+        Objects.requireNonNull(lastResolution, "lastResolution");
         if (stamina < 0 || reservedStamina < 0) {
             throw new IllegalArgumentException("combat resources must not be negative");
         }

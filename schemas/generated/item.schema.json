@@ -22,6 +22,21 @@
     "item_class" : {
       "type" : "string",
       "description" : "Unique/durable or stackable-lot item class."
+    },
+    "weapon_profile" : {
+      "type" : "object",
+      "properties" : {
+        "family" : {
+          "type" : "string",
+          "description" : "Weapon-family runtime identity."
+        },
+        "power" : {
+          "type" : "number",
+          "description" : "Base deterministic weapon power.",
+          "x-unit" : "power",
+          "minimum" : 1.0E-6
+        }
+      }
     }
   },
   "required" : [ "definition_id", "schema_version", "asset_id", "item_class" ]

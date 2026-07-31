@@ -98,11 +98,18 @@ with an operator/test account:
     starts only after READY.
 18. Open `/mmo dev` -> `Training Move Tester` to start the same compiled move without relying on
     an arm-swing event.
+19. Spawn a non-player living target about two blocks ahead, for example
+    `/summon minecraft:zombie ~ ~ ~2`, face it and attack. Verify the action bar reports
+    `HIT targets=1 damage=...` and `/mmo health` retains the same last resolution.
+20. Move the target behind the player, outside 2.8 blocks or behind a solid wall; repeat and verify
+    `MISS`. Put several targets in the 95-degree cone and verify no more than four are selected.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
-but world collision and MMO damage are the next combat slice; the client swing never declares a
-hit.
+resolves an authoritative ARC against server bounding boxes/line of sight and calculates the
+canonical physical damage breakdown. It keeps isolated 1,000-HP training accounting rather than
+applying vanilla damage; persistent MMO health/death is a later combat/encounter boundary. The
+client swing never declares a hit.
 
 To test resource-pack admission, set `resource-pack.enabled: true`, configure an HTTP(S) URL and put
 the exact 64-character SHA-256 from the active `content-manifest.json` in

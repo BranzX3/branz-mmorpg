@@ -45,7 +45,19 @@ public final class DefinitionSchemas {
                                         "item_class",
                                         STRING,
                                         "",
-                                        "Unique/durable or stackable-lot item class.")),
+                                        "Unique/durable or stackable-lot item class."),
+                                optional(
+                                        "weapon_profile.family",
+                                        STRING,
+                                        "",
+                                        "Weapon-family runtime identity."),
+                                optionalRanged(
+                                        "weapon_profile.power",
+                                        NUMBER,
+                                        0.000001,
+                                        null,
+                                        "power",
+                                        "Base deterministic weapon power.")),
                         List.of(to(DefinitionType.TRAIT, "traits", "authored_pool", "*"))));
         schemas.put(
                 DefinitionType.MOVE,
@@ -536,6 +548,31 @@ public final class DefinitionSchemas {
                 path,
                 type,
                 true,
+                minimum == null ? null : minimum.doubleValue(),
+                maximum == null ? null : maximum.doubleValue(),
+                null,
+                null,
+                Set.of(),
+                unit,
+                description);
+    }
+
+    private static FieldRule optional(
+            String path, FieldValueType type, String unit, String description) {
+        return rule(path, type, false, null, null, null, null, Set.of(), unit, description);
+    }
+
+    private static FieldRule optionalRanged(
+            String path,
+            FieldValueType type,
+            Number minimum,
+            Number maximum,
+            String unit,
+            String description) {
+        return rule(
+                path,
+                type,
+                false,
                 minimum == null ? null : minimum.doubleValue(),
                 maximum == null ? null : maximum.doubleValue(),
                 null,

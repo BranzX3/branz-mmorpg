@@ -5,8 +5,18 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.action.ActionPhase;
 import com.branz.mmorpg.combat.action.ActionTimeline;
 import com.branz.mmorpg.combat.action.ActionTimelineErrorCode;
+import com.branz.mmorpg.combat.action.ActionTraceEvent;
+import com.branz.mmorpg.combat.action.ActionTraceEventType;
 import com.branz.mmorpg.combat.action.CombatResources;
 import com.branz.mmorpg.combat.action.ResourceCommitState;
+import com.branz.mmorpg.combat.damage.PhysicalDamageBreakdown;
+import com.branz.mmorpg.combat.damage.PhysicalDamageRequest;
+import com.branz.mmorpg.combat.damage.PhysicalDamageResolver;
+import com.branz.mmorpg.combat.hitbox.ArcHitboxQuery;
+import com.branz.mmorpg.combat.hitbox.ArcHitboxResolver;
+import com.branz.mmorpg.combat.hitbox.CombatVector;
+import com.branz.mmorpg.combat.hitbox.ResolvedTarget;
+import com.branz.mmorpg.combat.hitbox.TargetCollider;
 import com.branz.mmorpg.combat.input.ClientAction;
 import com.branz.mmorpg.combat.input.CombatInputPolicy;
 import com.branz.mmorpg.combat.input.CombatInputRequest;
@@ -40,6 +50,9 @@ import java.util.Optional;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -59,15 +72,20 @@ final class CombatSessionController implements Listener {
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
     private final MoveDefinition trainingMove;
+    private final double trainingWeaponPower;
     private final WeaponTransitionMachine weapons;
     private final CombatInputPolicy inputPolicy = new CombatInputPolicy();
+    private final ArcHitboxResolver hitboxes = new ArcHitboxResolver();
+    private final PhysicalDamageResolver damage = new PhysicalDamageResolver();
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
+    private final Map<UUID, Double> trainingTargetHealth = new HashMap<>();
     private int tickTaskId = -1;
 
     CombatSessionController(
             JavaPlugin plugin,
             CharacterSessionController characters,
             MoveEngine moves,
+            double trainingWeaponPower,
             int drawTicks,
             int sheatheTicks) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -79,6 +97,10 @@ final class CombatSessionController implements Listener {
                                 () ->
                                         new IllegalArgumentException(
                                                 "active content is missing " + TRAINING_MOVE));
+        if (!Double.isFinite(trainingWeaponPower) || trainingWeaponPower <= 0) {
+            throw new IllegalArgumentException("trainingWeaponPower must be positive");
+        }
+        this.trainingWeaponPower = trainingWeaponPower;
         weapons = new WeaponTransitionMachine(drawTicks, sheatheTicks);
     }
 
@@ -115,7 +137,8 @@ final class CombatSessionController implements Listener {
                         session.weapon.state(),
                         Optional.ofNullable(session.timeline).map(ActionTimeline::phase),
                         resources.stamina(),
-                        resources.reservedStamina()));
+                        resources.reservedStamina(),
+                        Optional.ofNullable(session.lastResolution)));
     }
 
     void startTrainingMove(Player player) {
@@ -222,6 +245,7 @@ final class CombatSessionController implements Listener {
         }
         ActionPhase prior = session.timeline.phase();
         ResourceCommitState priorResourceState = session.timeline.resourceState();
+        int priorTraceSize = session.timeline.trace().size();
         Result<ActionTimeline, ActionTimelineErrorCode> advanced = session.timeline.advance();
         if (advanced instanceof Result.Failure<ActionTimeline, ActionTimelineErrorCode>) {
             return;
@@ -245,6 +269,12 @@ final class CombatSessionController implements Listener {
                                     + session.timeline.resources().stamina(),
                             NamedTextColor.AQUA));
         }
+        for (ActionTraceEvent event :
+                session.timeline.trace().subList(priorTraceSize, session.timeline.trace().size())) {
+            if (event.type() == ActionTraceEventType.HITBOX_OPENED) {
+                resolveTrainingHitbox(player, session);
+            }
+        }
         if (session.timeline.phase().terminal()) {
             session.resources = session.timeline.resources();
             session.timeline = null;
@@ -252,6 +282,96 @@ final class CombatSessionController implements Listener {
         } else {
             session.action = actionState(session.timeline.phase());
         }
+    }
+
+    private void resolveTrainingHitbox(Player player, LiveSession session) {
+        MoveDefinition.Hitbox hitbox = trainingMove.hitboxes().getFirst();
+        if (hitbox.shape() != MoveDefinition.HitboxShape.ARC) {
+            session.lastResolution = "unsupported " + hitbox.shape();
+            return;
+        }
+        org.bukkit.Location origin = player.getLocation();
+        org.bukkit.util.Vector direction = origin.getDirection();
+        ArcHitboxQuery query =
+                new ArcHitboxQuery(
+                        new CombatVector(origin.getX(), origin.getY(), origin.getZ()),
+                        new CombatVector(direction.getX(), 0, direction.getZ()),
+                        hitbox.range(),
+                        hitbox.angleDegrees(),
+                        -0.5,
+                        hitbox.height(),
+                        hitbox.maxTargets());
+        Map<UUID, LivingEntity> entities = new HashMap<>();
+        List<TargetCollider> candidates =
+                player
+                        .getWorld()
+                        .getNearbyEntities(
+                                origin, hitbox.range() + 1, hitbox.height() + 1, hitbox.range() + 1)
+                        .stream()
+                        .filter(LivingEntity.class::isInstance)
+                        .map(LivingEntity.class::cast)
+                        .filter(entity -> entity != player)
+                        .peek(entity -> entities.put(entity.getUniqueId(), entity))
+                        .map(
+                                entity ->
+                                        new TargetCollider(
+                                                entity.getUniqueId(),
+                                                new CombatVector(
+                                                        entity.getLocation().getX(),
+                                                        entity.getLocation().getY(),
+                                                        entity.getLocation().getZ()),
+                                                Math.max(
+                                                                entity.getBoundingBox().getWidthX(),
+                                                                entity.getBoundingBox().getWidthZ())
+                                                        / 2.0,
+                                                entity.getBoundingBox().getHeight(),
+                                                !(entity instanceof Player)
+                                                        && !(entity instanceof ArmorStand)
+                                                        && !entity.isDead(),
+                                                player.hasLineOfSight(entity),
+                                                false))
+                        .toList();
+        List<ResolvedTarget> resolved = hitboxes.resolve(query, candidates);
+        if (resolved.isEmpty()) {
+            session.lastResolution = "MISS tick=" + session.timeline.tick();
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GRAY));
+            return;
+        }
+        double totalDamage = 0;
+        for (ResolvedTarget target : resolved) {
+            LivingEntity entity = entities.get(target.entityId());
+            double armor =
+                    entity.getAttribute(Attribute.ARMOR) == null
+                            ? 0
+                            : Objects.requireNonNull(entity.getAttribute(Attribute.ARMOR))
+                                    .getValue();
+            PhysicalDamageBreakdown breakdown =
+                    damage.resolve(
+                            new PhysicalDamageRequest(
+                                    trainingWeaponPower,
+                                    trainingMove.outputs().moveCoefficient(),
+                                    0,
+                                    armor,
+                                    0,
+                                    0,
+                                    0,
+                                    java.util.Set.of(),
+                                    trainingMove.profiles().pveMultiplier()));
+            totalDamage += breakdown.finalDamage();
+            trainingTargetHealth.compute(
+                    target.entityId(),
+                    (ignored, current) ->
+                            Math.max(
+                                    0,
+                                    (current == null ? 1000.0 : current)
+                                            - breakdown.finalDamage()));
+        }
+        session.lastResolution =
+                "HIT targets="
+                        + resolved.size()
+                        + " damage="
+                        + Math.round(totalDamage * 10.0) / 10.0;
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
     }
 
     private void regenerateStamina(LiveSession session) {
@@ -395,5 +515,6 @@ final class CombatSessionController implements Listener {
         private ActionTimeline timeline;
         private long lastStaminaSpendTick = Long.MIN_VALUE / 2;
         private double staminaRegenRemainder;
+        private String lastResolution;
     }
 }

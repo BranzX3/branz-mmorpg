@@ -31,7 +31,11 @@ class ItemEngineTest {
                                 {
                                   "asset_id": "weapon.test.blade",
                                   "item_class": "UNIQUE_DURABLE",
-                                  "base_max_durability": 120
+                                  "base_max_durability": 120,
+                                  "weapon_profile": {
+                                    "family": "SWORD",
+                                    "power": 100
+                                  }
                                 }
                                 """),
                         definition(
@@ -51,6 +55,8 @@ class ItemEngineTest {
         ItemDefinition weapon = engine.find(DefinitionId.of("weapon.test.blade")).orElseThrow();
         assertEquals(ItemClass.UNIQUE_DURABLE, weapon.itemClass());
         assertEquals(120, weapon.baseMaxDurability().orElseThrow());
+        assertEquals("SWORD", weapon.weaponProfile().orElseThrow().family());
+        assertEquals(100, weapon.weaponProfile().orElseThrow().power());
         assertFalse(engine.find(DefinitionId.of("material.test.ore")).orElseThrow().cosmetic());
     }
 

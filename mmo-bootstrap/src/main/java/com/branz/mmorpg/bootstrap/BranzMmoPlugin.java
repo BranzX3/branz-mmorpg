@@ -237,6 +237,20 @@ public final class BranzMmoPlugin extends JavaPlugin {
             resourcePackGate = null;
             return "Active content is missing the required training combat move.";
         }
+        com.branz.mmorpg.items.definition.WeaponCombatProfile trainingWeapon =
+                activeItemEngine
+                        .get()
+                        .find(
+                                com.branz.mmorpg.api.identity.DefinitionId.of(
+                                        "weapon.training_blade"))
+                        .flatMap(com.branz.mmorpg.items.definition.ItemDefinition::weaponProfile)
+                        .orElse(null);
+        if (trainingWeapon == null || !trainingWeapon.family().equals("SWORD")) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            resourcePackGate = null;
+            return "Training blade requires a SWORD weapon_profile.";
+        }
         BukkitItemProjectionCodec projectionCodec =
                 new BukkitItemProjectionCodec(this, ProjectionTokenSigner.random());
         testItemProjections = new TestItemProjectionService(projectionCodec);
@@ -262,6 +276,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         this,
                         characterSessionController,
                         activeMoveEngine.get(),
+                        trainingWeapon.power(),
                         weaponDrawTicks,
                         weaponSheatheTicks);
         ChronicleController chronicleController =

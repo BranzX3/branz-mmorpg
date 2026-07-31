@@ -83,7 +83,24 @@ public final class ItemEngine {
                     ItemEngineErrorCode.ITEM_DURABILITY_INVALID,
                     "cosmetic definitions cannot declare durability");
         }
+        Optional<WeaponCombatProfile> weaponProfile = Optional.empty();
+        JsonNode weaponNode = body.get("weapon_profile");
+        if (weaponNode != null && !weaponNode.isNull()) {
+            String family = weaponNode.path("family").asText("");
+            JsonNode power = weaponNode.get("power");
+            if (family.isBlank()
+                    || power == null
+                    || !power.isNumber()
+                    || !Double.isFinite(power.doubleValue())
+                    || power.doubleValue() <= 0) {
+                return Result.failure(
+                        ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID,
+                        "weapon_profile requires non-blank family and positive power");
+            }
+            weaponProfile = Optional.of(new WeaponCombatProfile(family, power.doubleValue()));
+        }
         return Result.success(
-                new ItemDefinition(source.id(), assetId, itemClass, durability, cosmetic));
+                new ItemDefinition(
+                        source.id(), assetId, itemClass, durability, cosmetic, weaponProfile));
     }
 }

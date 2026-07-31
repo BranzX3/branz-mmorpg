@@ -651,8 +651,8 @@ Failure/recovery behavior:
 
 Remaining Milestone 4 work:
 
-- swept world hitbox collision, deterministic target ordering and region/friendly filters;
-- damage/armor/advantage calculation and health application;
+- remaining hitbox primitives, swept motion and region/friendly-provider filters;
+- persistent MMO health application and death/encounter integration;
 - live engagement timers, dodge movement/i-frames, guard/posture/poise/CC;
 - viewer-scoped debug rendering and in-game trace export controls;
 - latency/jitter acceptance fixtures and a complete weapon test kit.
@@ -660,3 +660,54 @@ Remaining Milestone 4 work:
 Schema/config impact: move schema gains the complete runtime fields. Local config adds positive
 `combat.weapon-draw-ticks` and `combat.weapon-sheathe-ticks`. Migration impact: none; combat
 sessions/resources remain transient.
+
+## Milestone 4 — authoritative training ARC and damage-resolution slice
+
+Implemented:
+
+- pure horizontal ARC resolver with authored range, angle, vertical bounds and target cap;
+- eligibility and line-of-sight gates before contact;
+- stable limited-target ordering by weak point, distance, angle and entity UUID;
+- collection-order-independent resolution proven across shuffled candidate inputs;
+- deterministic physical damage resolver using weapon power, move coefficient, flat technique
+  power, armor, capped penetration, flat penetration, resistance, conditional advantage and
+  PvE/PvP profile;
+- canonical 70% armor mitigation, 60% penetration-percent and -30%/60% resistance bounds;
+- non-random conditional advantage combination: strongest full, second strongest half-excess,
+  total capped at 1.60;
+- optional typed item `weapon_profile` compiled by Item Engine; the training blade declares
+  `family: SWORD` and `power: 100`;
+- Paper Active-tick scan of nearby living entities using Bukkit bounding boxes and server
+  line-of-sight;
+- players and armor stands are excluded from the current PvE training profile;
+- server-resolved MISS/HIT target count and damage feedback plus last resolution in `/mmo health`;
+- isolated 1,000-HP training-target accounting without trusting or applying vanilla attack
+  damage.
+
+Tests:
+
+- out-of-range, outside-cone, vertical, ineligible and occluded candidates cannot hit;
+- weak-point/distance/angle/UUID ordering and authored target cap;
+- 100 shuffled input orders produce the same targets;
+- exact armor/resistance/advantage breakdown;
+- penetration, mitigation and resistance caps;
+- 10,000 randomized formula cases prove deterministic repeat, armor monotonicity and penetration
+  monotonicity;
+- Item Engine compiles the training weapon family/power.
+
+Failure/recovery behavior:
+
+- malformed weapon profiles fail Item Engine activation;
+- missing/mismatched training blade profile enters maintenance before sessions;
+- Paper cancels vanilla attack damage and reports server ARC resolution only;
+- no persistent health/reward/value is mutated by this training slice.
+
+Non-goals:
+
+- applying internal MMO HP to persistent player/enemy combatants;
+- PvP/party/region ownership policy and weak-point provider data;
+- capsule, box, sphere, ray, projectile and swept-arc runtime;
+- knockback, posture, guard, status and encounter rewards.
+
+Schema impact: item schema adds optional `weapon_profile.family` and positive
+`weapon_profile.power`. Config/migration impact: none.

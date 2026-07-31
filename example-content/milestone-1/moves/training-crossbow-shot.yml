@@ -1,0 +1,51 @@
+definition_id: move.training_crossbow.shot
+schema_version: 1
+family: CROSSBOW
+input:
+  action: SECONDARY
+  direction: NEUTRAL
+  branch: SECONDARY
+phases:
+  windup_ticks: 0
+  active_ticks: 1
+  recovery_ticks: 10
+commit_tick: 0
+costs:
+  stamina: 0
+  mana: 0
+  health: 0
+  setup_stamina: 0
+movement:
+  curve: ROOTED
+  facing_turn_degrees: 0
+hitboxes:
+  - tick: 0
+    shape: PROJECTILE
+    range: 48
+    angle_degrees: 0
+    height: 1
+    max_targets: 1
+    hit_group: CROSSBOW_PRIMARY
+    projectile:
+      speed: 3.2
+      gravity_per_tick: 0.04
+      drag_per_tick: 0.995
+      collision_radius: 0.15
+      lifetime_ticks: 90
+      pierce_count: 0
+      ammo_category: ammo.training_bolt
+outputs:
+  health:
+    physical_type: PIERCE
+    move_coefficient: 0.82
+  posture: 24
+  guard_pressure: 18
+cancels:
+  dodge_from_tick: 0
+  chain_windows: []
+interrupt_resistance: NONE
+presentation:
+  archetype: CROSSBOW_BOLT
+profiles:
+  pve_multiplier: 1.0
+  pvp_multiplier: 0.65

@@ -1,0 +1,8 @@
+definition_id: ammo.training_bolt
+schema_version: 1
+asset_id: ammo.training_bolt
+item_class: STACKABLE_LOT
+ammo_profile:
+  family: BOLT
+status: approved
+owning_team: combat

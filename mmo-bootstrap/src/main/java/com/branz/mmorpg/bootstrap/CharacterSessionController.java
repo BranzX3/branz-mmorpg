@@ -4,12 +4,14 @@ import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.QuiverProfile;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -194,6 +196,88 @@ final class CharacterSessionController implements Listener {
                                                     completeSnapshotMutation(
                                                             session, result, completion));
                         });
+    }
+
+    void bindCrossbowBolt(
+            Player player,
+            ItemId crossbowItemId,
+            DefinitionId boltDefinitionId,
+            UUID operationId,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        runCrossbowMutation(
+                player,
+                session ->
+                        sessions.bindCrossbowBolt(
+                                session,
+                                crossbowItemId,
+                                boltDefinitionId,
+                                operationId,
+                                contentVersion),
+                completion);
+    }
+
+    void completeCrossbowLoad(
+            Player player,
+            ItemId crossbowItemId,
+            DefinitionId boundBoltDefinitionId,
+            UUID operationId,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        runCrossbowMutation(
+                player,
+                session ->
+                        sessions.completeCrossbowLoad(
+                                session,
+                                crossbowItemId,
+                                boundBoltDefinitionId,
+                                operationId,
+                                contentVersion),
+                completion);
+    }
+
+    void fireCrossbow(
+            Player player,
+            ItemId crossbowItemId,
+            DefinitionId boundBoltDefinitionId,
+            UUID projectileId,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        runCrossbowMutation(
+                player,
+                session ->
+                        sessions.fireCrossbow(
+                                session,
+                                crossbowItemId,
+                                boundBoltDefinitionId,
+                                projectileId,
+                                contentVersion),
+                completion);
+    }
+
+    Optional<ItemId> equippedMainHandItemId(Player player) {
+        return active(player)
+                .flatMap(session -> session.snapshot().equipment().item(EquipmentSlot.MAIN_HAND));
+    }
+
+    Optional<CrossbowPersistentState> equippedCrossbowState(Player player) {
+        return active(player)
+                .flatMap(
+                        session ->
+                                session.snapshot()
+                                        .equipment()
+                                        .item(EquipmentSlot.MAIN_HAND)
+                                        .flatMap(
+                                                itemId ->
+                                                        session.snapshot().itemRecords().stream()
+                                                                .filter(
+                                                                        record ->
+                                                                                record.itemId()
+                                                                                        .equals(
+                                                                                                itemId))
+                                                                .findFirst()))
+                .map(ItemLocationRecord::payloadJson)
+                .map(CrossbowPayloadCodec::decode);
     }
 
     long quiverAmmoQuantity(Player player, DefinitionId definitionId) {
@@ -721,6 +805,45 @@ final class CharacterSessionController implements Listener {
             applyProjectionIfReady(player, false);
         }
         completion.accept(Result.success(updated));
+    }
+
+    private void runCrossbowMutation(
+            Player player,
+            java.util.function.Function<
+                            LoadedCharacterSession,
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode>>
+                    mutation,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(mutation, "mutation");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
+                                    mutation.apply(session);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeSnapshotMutation(
+                                                            session, result, completion));
+                        });
     }
 
     private static Result<LoadedCharacterSession, CharacterSessionErrorCode> valueMutationBusy() {

@@ -107,6 +107,20 @@ public final class DefinitionSchemas {
                                         0.40,
                                         "ratio",
                                         "Full-draw armor penetration."),
+                                optionalRanged(
+                                        "weapon_profile.crossbow.bolt_placement_ticks",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "ticks",
+                                        "Ticks before a selected bolt binds durably to the Crossbow."),
+                                optionalRanged(
+                                        "weapon_profile.crossbow.locking_ticks",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "ticks",
+                                        "Ticks from the BOLT_PLACED checkpoint to LOADED."),
                                 optional(
                                         "ammo_profile.family",
                                         STRING,

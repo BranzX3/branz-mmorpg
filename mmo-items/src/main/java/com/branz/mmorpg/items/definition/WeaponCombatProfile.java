@@ -4,10 +4,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 public record WeaponCombatProfile(
-        String family, double power, Optional<BowWeaponProfile> bowProfile) {
+        String family,
+        double power,
+        Optional<BowWeaponProfile> bowProfile,
+        Optional<CrossbowWeaponProfile> crossbowProfile) {
     public WeaponCombatProfile {
         Objects.requireNonNull(family, "family");
         Objects.requireNonNull(bowProfile, "bowProfile");
+        Objects.requireNonNull(crossbowProfile, "crossbowProfile");
         if (family.isBlank()) {
             throw new IllegalArgumentException("weapon family must not be blank");
         }
@@ -17,9 +21,19 @@ public record WeaponCombatProfile(
         if (family.equals("BOW") != bowProfile.isPresent()) {
             throw new IllegalArgumentException("only BOW family requires bow profile");
         }
+        if (family.equals("CROSSBOW") != crossbowProfile.isPresent()) {
+            throw new IllegalArgumentException("only CROSSBOW family requires crossbow profile");
+        }
+        if (bowProfile.isPresent() && crossbowProfile.isPresent()) {
+            throw new IllegalArgumentException("weapon handling profiles are mutually exclusive");
+        }
+    }
+
+    public WeaponCombatProfile(String family, double power, Optional<BowWeaponProfile> bowProfile) {
+        this(family, power, bowProfile, Optional.empty());
     }
 
     public WeaponCombatProfile(String family, double power) {
-        this(family, power, Optional.empty());
+        this(family, power, Optional.empty(), Optional.empty());
     }
 }

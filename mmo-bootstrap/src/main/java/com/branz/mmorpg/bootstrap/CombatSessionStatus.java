@@ -4,6 +4,7 @@ import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.combat.action.ActionPhase;
 import com.branz.mmorpg.combat.bow.BowDrawPhase;
 import com.branz.mmorpg.combat.cc.CcSeverity;
+import com.branz.mmorpg.combat.crossbow.CrossbowPhase;
 import com.branz.mmorpg.combat.dodge.DodgeLoad;
 import com.branz.mmorpg.combat.dodge.DodgePhase;
 import com.branz.mmorpg.combat.guard.GuardPhase;
@@ -19,10 +20,13 @@ record CombatSessionStatus(
         Optional<ActionPhase> actionPhase,
         Optional<BowDrawPhase> bowDrawPhase,
         int bowRecoveryTicksRemaining,
+        Optional<CrossbowPhase> crossbowPhase,
+        int crossbowRecoveryTicksRemaining,
+        boolean crossbowCheckpointCommitPending,
         int activeProjectiles,
         boolean bowAmmoCommitPending,
         Optional<DefinitionId> selectedAmmo,
-        long bowAmmoQuantity,
+        long selectedAmmoQuantity,
         long quiverUsedCapacity,
         int quiverCapacity,
         int ammoSwitchHandlingTicksRemaining,
@@ -43,6 +47,7 @@ record CombatSessionStatus(
         Objects.requireNonNull(weaponState, "weaponState");
         Objects.requireNonNull(actionPhase, "actionPhase");
         Objects.requireNonNull(bowDrawPhase, "bowDrawPhase");
+        Objects.requireNonNull(crossbowPhase, "crossbowPhase");
         Objects.requireNonNull(selectedAmmo, "selectedAmmo");
         Objects.requireNonNull(dodgeLoad, "dodgeLoad");
         Objects.requireNonNull(dodgePhase, "dodgePhase");
@@ -51,8 +56,9 @@ record CombatSessionStatus(
         Objects.requireNonNull(lastResolution, "lastResolution");
         if (engagementExitTicksRemaining < 0
                 || bowRecoveryTicksRemaining < 0
+                || crossbowRecoveryTicksRemaining < 0
                 || activeProjectiles < 0
-                || bowAmmoQuantity < 0
+                || selectedAmmoQuantity < 0
                 || quiverUsedCapacity < 0
                 || quiverCapacity < 0
                 || ammoSwitchHandlingTicksRemaining < 0

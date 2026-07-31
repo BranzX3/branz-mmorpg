@@ -7,11 +7,14 @@ import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
 import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.AmmoProfile;
+import com.branz.mmorpg.items.definition.CrossbowWeaponProfile;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.QuiverProfile;
+import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import java.nio.file.Path;
@@ -23,6 +26,177 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CharacterSessionServiceIntegrationTest {
+    @Test
+    void crossbowCheckpointsAndBoundBoltSurviveReconnectAndRestart(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(10));
+        UUID playerId = UUID.randomUUID();
+        ItemId crossbowId;
+        ItemId quiverId;
+        DefinitionId boltId = DefinitionId.of("ammo.test.bolt");
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database);
+            LoadedCharacterSession session = success(service.open(playerId));
+            ItemDefinition crossbow =
+                    new ItemDefinition(
+                            DefinitionId.of("weapon.test.crossbow"),
+                            DefinitionId.of("weapon.test.crossbow"),
+                            ItemClass.UNIQUE_DURABLE,
+                            OptionalInt.of(120),
+                            false,
+                            Optional.of(
+                                    new WeaponCombatProfile(
+                                            "CROSSBOW",
+                                            110,
+                                            Optional.empty(),
+                                            Optional.of(new CrossbowWeaponProfile(12, 8)))));
+            ItemDefinition boltQuiver =
+                    new ItemDefinition(
+                            DefinitionId.of("equipment.test.bolt_quiver"),
+                            DefinitionId.of("equipment.test.bolt_quiver"),
+                            ItemClass.UNIQUE_DURABLE,
+                            OptionalInt.empty(),
+                            false,
+                            Optional.empty(),
+                            Optional.empty(),
+                            Optional.of(new QuiverProfile(64, Set.of(AmmoFamily.BOLT), 4, 6)));
+            ItemDefinition bolt =
+                    new ItemDefinition(
+                            boltId,
+                            boltId,
+                            ItemClass.STACKABLE_LOT,
+                            OptionalInt.empty(),
+                            false,
+                            Optional.empty(),
+                            Optional.of(new AmmoProfile(AmmoFamily.BOLT)),
+                            Optional.empty());
+
+            session = success(service.grantTestValue(session, crossbow, 0, "content.test.1"));
+            crossbowId =
+                    new ItemId(
+                            session.snapshot().inventory().stream()
+                                    .filter(value -> value.definitionId().equals(crossbow.id()))
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .valueId());
+            session =
+                    success(
+                            service.commitEquipment(
+                                    session,
+                                    session.snapshot()
+                                            .equipment()
+                                            .with(EquipmentSlot.MAIN_HAND, Optional.of(crossbowId)),
+                                    "content.test.1"));
+            session = success(service.grantTestValue(session, boltQuiver, 1, "content.test.1"));
+            quiverId =
+                    new ItemId(
+                            session.snapshot().inventory().stream()
+                                    .filter(value -> value.definitionId().equals(boltQuiver.id()))
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .valueId());
+            session =
+                    success(
+                            service.commitEquipment(
+                                    session,
+                                    session.snapshot()
+                                            .equipment()
+                                            .with(EquipmentSlot.QUIVER, Optional.of(quiverId)),
+                                    "content.test.1"));
+            session = success(service.grantTestValue(session, bolt, 2, 10, "content.test.1"));
+            LotId boltLot =
+                    new LotId(
+                            session.snapshot().inventory().stream()
+                                    .filter(value -> value.definitionId().equals(bolt.id()))
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .valueId());
+            session =
+                    success(
+                            service.transferQuiverAmmo(
+                                    session,
+                                    boltLot,
+                                    10,
+                                    true,
+                                    64,
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
+            session =
+                    success(
+                            service.updateQuiverPreparation(
+                                    session,
+                                    QuiverPreparation.empty().toggle(boltId, 4),
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
+
+            assertEquals(CrossbowPersistentState.unloaded(), crossbowState(session, crossbowId));
+            session =
+                    success(
+                            service.bindCrossbowBolt(
+                                    session,
+                                    crossbowId,
+                                    boltId,
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
+            assertEquals(
+                    CrossbowPersistentState.boltPlaced(boltId), crossbowState(session, crossbowId));
+            assertEquals(
+                    9, QuiverAmmoLots.quantity(session.snapshot().lotRecords(), quiverId, boltId));
+
+            service.close(session);
+            session = success(service.open(playerId));
+            assertEquals(
+                    CrossbowPersistentState.boltPlaced(boltId), crossbowState(session, crossbowId));
+            session =
+                    success(
+                            service.completeCrossbowLoad(
+                                    session,
+                                    crossbowId,
+                                    boltId,
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
+            assertEquals(
+                    CrossbowPersistentState.loaded(boltId), crossbowState(session, crossbowId));
+
+            service.close(session);
+            session = success(service.open(playerId));
+            assertEquals(
+                    CrossbowPersistentState.loaded(boltId), crossbowState(session, crossbowId));
+            session =
+                    success(
+                            service.fireCrossbow(
+                                    session,
+                                    crossbowId,
+                                    boltId,
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
+            assertEquals(CrossbowPersistentState.unloaded(), crossbowState(session, crossbowId));
+            assertEquals(
+                    9, QuiverAmmoLots.quantity(session.snapshot().lotRecords(), quiverId, boltId));
+            service.close(session);
+        }
+        try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(restarted);
+            LoadedCharacterSession session = success(service.open(playerId));
+            assertEquals(CrossbowPersistentState.unloaded(), crossbowState(session, crossbowId));
+            assertEquals(
+                    9, QuiverAmmoLots.quantity(session.snapshot().lotRecords(), quiverId, boltId));
+            service.close(session);
+        }
+    }
+
     @Test
     void persistedDevGrantSurvivesCleanLeaseReleaseAndReconnect(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
@@ -157,8 +331,7 @@ class CharacterSessionServiceIntegrationTest {
                                     "content.test.1"));
             assertEquals(
                     arrowLot,
-                    QuiverAmmoLots.select(
-                                    arrowStored.snapshot().lotRecords(), quiverId, arrow.id())
+                    QuiverAmmoLots.select(arrowStored.snapshot().lotRecords(), quiverId, arrow.id())
                             .orElseThrow()
                             .lotId());
             ItemDefinition bodkin =
@@ -192,11 +365,13 @@ class CharacterSessionServiceIntegrationTest {
                                     96,
                                     UUID.randomUUID(),
                                     "content.test.1"));
-            assertEquals(32, ammoStored.snapshot().inventory().stream()
-                    .filter(projection -> projection.definitionId().equals(bodkin.id()))
-                    .findFirst()
-                    .orElseThrow()
-                    .quantity());
+            assertEquals(
+                    32,
+                    ammoStored.snapshot().inventory().stream()
+                            .filter(projection -> projection.definitionId().equals(bodkin.id()))
+                            .findFirst()
+                            .orElseThrow()
+                            .quantity());
             QuiverPreparation preparation =
                     QuiverPreparation.empty()
                             .toggle(DefinitionId.of("ammo.test.arrow"), 4)
@@ -289,5 +464,15 @@ class CharacterSessionServiceIntegrationTest {
                     return "";
                 });
         return ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result).value();
+    }
+
+    private static CrossbowPersistentState crossbowState(
+            LoadedCharacterSession session, ItemId crossbowId) {
+        return CrossbowPayloadCodec.decode(
+                session.snapshot().itemRecords().stream()
+                        .filter(item -> item.itemId().equals(crossbowId))
+                        .findFirst()
+                        .orElseThrow()
+                        .payloadJson());
     }
 }

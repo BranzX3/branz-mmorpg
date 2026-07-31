@@ -7,6 +7,7 @@ import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.identity.SessionId;
 import com.branz.mmorpg.api.identity.TransactionId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
@@ -15,6 +16,7 @@ import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.lease.CharacterLease;
 import com.branz.mmorpg.persistence.lease.LeaseAcquireOutcome;
 import com.branz.mmorpg.persistence.lease.LeaseErrorCode;
+import com.branz.mmorpg.persistence.transaction.CrossbowBoltBinding;
 import com.branz.mmorpg.persistence.transaction.ItemLocationMove;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.ItemPayloadUpdate;
@@ -274,6 +276,134 @@ final class CharacterSessionService {
                     failure.error().code() + ": " + failure.detail());
         }
         return reload(session);
+    }
+
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> bindCrossbowBolt(
+            LoadedCharacterSession session,
+            ItemId crossbowItemId,
+            DefinitionId boltDefinitionId,
+            UUID operationId,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(crossbowItemId, "crossbowItemId");
+        Objects.requireNonNull(boltDefinitionId, "boltDefinitionId");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        ItemLocationRecord crossbow = equippedMainHand(session, crossbowItemId);
+        if (crossbow == null) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Crossbow bolt binding requires the same authoritative main-hand item.");
+        }
+        CrossbowPersistentState current;
+        try {
+            current = CrossbowPayloadCodec.decode(crossbow.payloadJson());
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID, exception.getMessage());
+        }
+        if (!current.equals(CrossbowPersistentState.unloaded())) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Crossbow is not at the UNLOADED checkpoint.");
+        }
+        ItemId quiverId = session.snapshot().equipment().item(EquipmentSlot.QUIVER).orElse(null);
+        LotLocationRecord bolt =
+                quiverId == null
+                        ? null
+                        : QuiverAmmoLots.select(
+                                        session.snapshot().lotRecords(), quiverId, boltDefinitionId)
+                                .orElse(null);
+        if (bolt == null) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_AMMO_UNAVAILABLE,
+                    "No bolt lot is stored in the equipped Quiver for " + boltDefinitionId.value());
+        }
+        String replacement;
+        try {
+            replacement =
+                    CrossbowPayloadCodec.encode(
+                            crossbow.payloadJson(),
+                            CrossbowPersistentState.boltPlaced(boltDefinitionId));
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID, exception.getMessage());
+        }
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "crossbow-bolt-bind:" + operationId,
+                        session.characterId(),
+                        session.sessionId(),
+                        JdbcValueTransactionService.CROSSBOW_BOLT_BIND,
+                        "{\"itemId\":\""
+                                + crossbow.itemId().value()
+                                + "\",\"itemVersion\":"
+                                + crossbow.version()
+                                + ",\"lotId\":\""
+                                + bolt.lotId().value()
+                                + "\",\"lotVersion\":"
+                                + bolt.version()
+                                + "}",
+                        "{\"checkpoint\":\"BOLT_PLACED\",\"ammoDefinitionId\":\""
+                                + boltDefinitionId.value()
+                                + "\"}",
+                        contentVersion);
+        Result<TransactionExecution, TransactionErrorCode> bound =
+                database.values()
+                        .bindCrossbowBolt(
+                                request,
+                                new CrossbowBoltBinding(
+                                        new ItemPayloadUpdate(
+                                                crossbow.itemId(),
+                                                crossbow.version(),
+                                                crossbow.ownerCharacterId(),
+                                                crossbow.location(),
+                                                crossbow.payloadJson(),
+                                                replacement),
+                                        new LotQuantityConsumption(
+                                                bolt.lotId(),
+                                                bolt.version(),
+                                                bolt.ownerCharacterId(),
+                                                bolt.location(),
+                                                1),
+                                        boltDefinitionId));
+        if (bound instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+            return transactionFailure(failure);
+        }
+        return reload(session);
+    }
+
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> completeCrossbowLoad(
+            LoadedCharacterSession session,
+            ItemId crossbowItemId,
+            DefinitionId boundBoltDefinitionId,
+            UUID operationId,
+            String contentVersion) {
+        return updateCrossbowCheckpoint(
+                session,
+                crossbowItemId,
+                CrossbowPersistentState.boltPlaced(boundBoltDefinitionId),
+                CrossbowPersistentState.loaded(boundBoltDefinitionId),
+                operationId,
+                "crossbow-loaded:",
+                contentVersion);
+    }
+
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> fireCrossbow(
+            LoadedCharacterSession session,
+            ItemId crossbowItemId,
+            DefinitionId boundBoltDefinitionId,
+            UUID projectileId,
+            String contentVersion) {
+        return updateCrossbowCheckpoint(
+                session,
+                crossbowItemId,
+                CrossbowPersistentState.loaded(boundBoltDefinitionId),
+                CrossbowPersistentState.unloaded(),
+                projectileId,
+                "crossbow-fire:",
+                contentVersion);
     }
 
     Result<LoadedCharacterSession, CharacterSessionErrorCode> transferQuiverAmmo(
@@ -574,6 +704,98 @@ final class CharacterSessionService {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_STATE_INVALID, exception.getMessage());
         }
+    }
+
+    private Result<LoadedCharacterSession, CharacterSessionErrorCode> updateCrossbowCheckpoint(
+            LoadedCharacterSession session,
+            ItemId crossbowItemId,
+            CrossbowPersistentState expected,
+            CrossbowPersistentState replacementState,
+            UUID operationId,
+            String idempotencyPrefix,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(crossbowItemId, "crossbowItemId");
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(replacementState, "replacementState");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(idempotencyPrefix, "idempotencyPrefix");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        ItemLocationRecord crossbow = equippedMainHand(session, crossbowItemId);
+        if (crossbow == null) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Crossbow checkpoint update requires the same authoritative main-hand item.");
+        }
+        String replacement;
+        try {
+            CrossbowPersistentState current = CrossbowPayloadCodec.decode(crossbow.payloadJson());
+            if (!current.equals(expected)) {
+                return Result.failure(
+                        CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                        "Crossbow durable checkpoint changed; expected "
+                                + expected.checkpoint().name()
+                                + " but found "
+                                + current.checkpoint().name()
+                                + ".");
+            }
+            replacement = CrossbowPayloadCodec.encode(crossbow.payloadJson(), replacementState);
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID, exception.getMessage());
+        }
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        idempotencyPrefix + operationId,
+                        session.characterId(),
+                        session.sessionId(),
+                        JdbcValueTransactionService.ITEM_PAYLOAD_UPDATE,
+                        "{\"itemId\":\""
+                                + crossbow.itemId().value()
+                                + "\",\"version\":"
+                                + crossbow.version()
+                                + ",\"checkpoint\":\""
+                                + expected.checkpoint().name()
+                                + "\"}",
+                        "{\"checkpoint\":\"" + replacementState.checkpoint().name() + "\"}",
+                        contentVersion);
+        Result<TransactionExecution, TransactionErrorCode> updated =
+                database.values()
+                        .updateItemPayload(
+                                request,
+                                new ItemPayloadUpdate(
+                                        crossbow.itemId(),
+                                        crossbow.version(),
+                                        crossbow.ownerCharacterId(),
+                                        crossbow.location(),
+                                        crossbow.payloadJson(),
+                                        replacement));
+        if (updated instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+            return transactionFailure(failure);
+        }
+        return reload(session);
+    }
+
+    private static ItemLocationRecord equippedMainHand(
+            LoadedCharacterSession session, ItemId expectedItemId) {
+        ItemId equipped = session.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElse(null);
+        ItemLocationRecord item =
+                equipped == null
+                        ? null
+                        : findItem(session.snapshot().itemRecords(), equipped).orElse(null);
+        return item != null
+                        && item.itemId().equals(expectedItemId)
+                        && item.location().equals(ValueLocation.nativeEquipped("MAIN_HAND"))
+                ? item
+                : null;
+    }
+
+    private static Result<LoadedCharacterSession, CharacterSessionErrorCode> transactionFailure(
+            Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+        return Result.failure(
+                CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                failure.error().code() + ": " + failure.detail());
     }
 
     private static Optional<ItemLocationRecord> findItem(

@@ -235,6 +235,31 @@ with an operator/test account:
 66. Disconnect/reconnect and restart Paper after selecting the Bodkin Arrow. Verify Chronicle and
     `/mmo health` restore that selection from the equipped Quiver item payload. Swap away and back to
     the same Quiver and verify both its item-owned preparation and stored lot load return.
+67. Open `/mmo dev` -> `Persisted Test Item`, grant `weapon.training_crossbow` and
+    `equipment.training_bolt_quiver`, then Shift-click `ammo.training_bolt` for one 64-unit lot.
+    Equip and confirm the Crossbow and Bolt Quiver in separate Scene transactions, store the Bolt lot,
+    prepare it and verify `/mmo health` reports `crossbow=UNLOADED`, `ammo.training_bolt=64` and
+    `quiver=64/64`.
+68. Hold hotbar slot 1, wait for READY and right-click once. Verify `COCKING` lasts 12 authored ticks,
+    then `BOLT COMMITTING` subtracts exactly one stored Bolt and continues through eight `LOCKING`
+    ticks to `crossbow=LOADED`. No projectile may exist during reload.
+69. Swap away and back after `LOADED`, then disconnect/reconnect and restart Paper. Verify the same
+    Crossbow item UUID remains `LOADED` with the same bound Bolt category and quantity 63; changing
+    the selected prepared category must not replace its bound Bolt.
+70. Right-click the loaded Crossbow. Observe `crossbow=FIRED(COMMITTING)` if the local transaction
+    crosses a tick, then verify the projectile appears only after the item payload commits to
+    `UNLOADED`. The hit uses Crossbow move damage/posture, enters ten recovery ticks and does not
+    subtract a second Bolt.
+71. Interrupt during `COCKING` by weapon swap, dodge, hard CC, teleport or death and verify the item
+    returns to `UNLOADED` without spending a Bolt. Repeat after `BOLT_PLACED` while `LOCKING`; verify
+    it returns to the persisted `BOLT_PLACED` checkpoint and the next RMB resumes locking without
+    spending another Bolt.
+72. Stop/restart around the `BOLT_PLACED` commit. Verify database truth is either `UNLOADED` with 64
+    Bolts or `BOLT_PLACED` with 63 Bolts, never a mixed pair. Reconnect/retry must not decrement the
+    same lot version twice.
+73. Remove or empty the equipped Bolt Quiver and attempt to reload. Verify `CROSSBOW NO QUIVER` or
+    `CROSSBOW NO PREPARED BOLT`, no checkpoint mutation and no projectile. Inventory Bolt lots must
+    never satisfy reload.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
@@ -248,8 +273,9 @@ server-simulated projectile; because test projections deliberately block native 
 local Paper adapter uses first-RMB draw and second-RMB release. Confirmed Scene transactions move or
 split compatible lots from inventory into the equipped Quiver UUID under the authored capacity.
 Prepared state is item-owned and selected with stationary sneak+scroll; Bow release commits one unit
-from only the selected stored category before projectile creation. Encounter recovery, lot merging
-and Crossbow binding remain later Milestone 5 slices.
+from only the selected stored category before projectile creation. Crossbow reload binds one selected
+stored Bolt at `BOLT_PLACED`, persists `LOADED` on the item UUID and clears it before projectile
+creation. Encounter recovery and lot merging remain later slices.
 
 Live engagement check:
 

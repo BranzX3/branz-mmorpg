@@ -36,6 +36,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
     public static final String LOT_MOVE = "lot.move";
     public static final String LOT_TRANSFER = "lot.transfer";
     public static final String LOT_CONSUME = "lot.consume";
+    public static final String CROSSBOW_BOLT_BIND = "crossbow.bolt.bind";
 
     private static final String ITEM_COLUMNS =
             """
@@ -180,6 +181,46 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
                 AuditSubjectType.LOT,
                 consumption.lotId().value(),
                 connection -> updateLotQuantity(connection, request.transactionId(), consumption));
+    }
+
+    @Override
+    public Result<TransactionExecution, TransactionErrorCode> bindCrossbowBolt(
+            TransactionRequest request, CrossbowBoltBinding binding) {
+        Objects.requireNonNull(binding, "binding");
+        return execute(
+                request,
+                CROSSBOW_BOLT_BIND,
+                AuditSubjectType.TRANSACTION,
+                request.transactionId().value(),
+                connection -> bindCrossbowBolt(connection, request, binding));
+    }
+
+    private Result<MutationApplied, TransactionErrorCode> bindCrossbowBolt(
+            Connection connection, TransactionRequest request, CrossbowBoltBinding binding) {
+        try {
+            Optional<LotLocationRecord> current =
+                    findLot(connection, binding.boltConsumption().lotId());
+            if (current.isEmpty()) {
+                return Result.failure(
+                        TransactionErrorCode.VALUE_NOT_FOUND, "Crossbow bolt lot does not exist.");
+            }
+            if (!current.orElseThrow().definitionId().equals(binding.expectedBoltDefinitionId())) {
+                return Result.failure(
+                        TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                        "Crossbow bolt definition changed before binding.");
+            }
+            Result<MutationApplied, TransactionErrorCode> itemResult =
+                    updateItemPayload(
+                            connection, request.transactionId(), binding.crossbowUpdate());
+            if (!itemResult.isSuccess()) {
+                return itemResult;
+            }
+            checkpointObserver.reached(Checkpoint.AFTER_CROSSBOW_ITEM_UPDATE);
+            return updateLotQuantity(
+                    connection, request.transactionId(), binding.boltConsumption());
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
     }
 
     @Override
@@ -1046,6 +1087,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
 
     enum Checkpoint {
         AFTER_PREPARE,
+        AFTER_CROSSBOW_ITEM_UPDATE,
         AFTER_MUTATION
     }
 

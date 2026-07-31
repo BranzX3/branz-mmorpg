@@ -1339,3 +1339,59 @@ Non-goals:
 Schema/config impact: no content-schema change; `QUIVER` is an additive persisted location type.
 Migration impact: no SQL migration because locations are text, documented by ADR 0009. Older runtime
 versions must not read databases after `QUIVER` rows exist.
+
+## Milestone 5 — persistent Crossbow reload checkpoint slice
+
+Implemented:
+
+- deterministic Crossbow runtime follows `UNLOADED -> COCKING -> BOLT_PLACED -> LOCKING -> LOADED
+  -> FIRED` with content-authored placement and locking ticks;
+- `UNLOADED`, `BOLT_PLACED` and `LOADED` persist in the unique Crossbow item payload; transient
+  interruption returns to the last completed checkpoint and loaded state survives weapon swap,
+  reconnect and restart;
+- the `BOLT_PLACED` boundary atomically compare-and-sets the equipped main-hand item payload and
+  consumes one exact selected Bolt from the equipped Quiver UUID;
+- the bound ammo definition stays on the Crossbow item and fire never consumes the Quiver lot a
+  second time;
+- `LOADED` and fire-to-`UNLOADED` transitions use journaled item-payload CAS operations; Paper creates
+  no projectile until the fire commit succeeds;
+- the Crossbow projectile reuses authoritative collision, target, damage, HP and posture engines but
+  carries Crossbow-authored weapon power, move outputs and physics rather than Bow charge values;
+- startup validates the Crossbow move, weapon timing profile, Bolt and compatible Bolt Quiver before
+  accepting sessions; `/mmo health` exposes phase, recovery and checkpoint-commit state;
+- example content adds `weapon.training_crossbow`, `ammo.training_bolt`,
+  `equipment.training_bolt_quiver` and `move.training_crossbow.shot`.
+
+Tests:
+
+- state-machine tests cover every authored boundary, early/duplicate rejection, `FIRED` settlement
+  and interruption to the last checkpoint;
+- payload codec tests cover legacy `UNLOADED`, all durable round trips, display-revision advance,
+  unrelated-field preservation and malformed checkpoint rejection;
+- PostgreSQL integration simulates a crash between Crossbow payload update and Bolt consumption,
+  proves full rollback, exactly-once replay, exact versions and one transaction audit;
+- Character Session integration proves `BOLT_PLACED` and `LOADED` across reconnect, then fire and
+  `UNLOADED` across database restart while the Bolt quantity decrements exactly once;
+- Item Engine/content tests compile valid Crossbow timing and reject missing family-specific fields;
+  generated schemas and the 13-definition example content snapshot validate successfully.
+
+Failure/recovery behavior:
+
+- absent/incompatible prepared Bolt, inventory-only ammo, changed item/lot version, ownership or
+  location and concurrent value mutation fail closed without a projectile;
+- item checkpoint, lot decrement, audit and journal share one transaction, so crash outcome is always
+  the matching pair `UNLOADED + unspent` or `BOLT_PLACED + spent`;
+- asynchronous completions reload database truth after slot/death/teleport/disconnect races; a fire
+  commit that outlives its live session remains `UNLOADED` and cannot duplicate a shot on reconnect;
+- corrupt payload or missing content contract blocks activation instead of inventing a local state.
+
+Non-goals:
+
+- Stock Bash, light/heavy/repeating Crossbow variants and additional Bolt payload effects;
+- encounter-end deterministic ammo recovery, Pending Rewards overflow and PvP arena snapshots;
+- native held/release packet edges; the local test adapter uses one RMB to reload/resume and one RMB
+  on `LOADED` to fire.
+
+Schema/config impact: item schema adds `weapon_profile.crossbow.bolt_placement_ticks` and
+`locking_ticks`; the manifest adds three items and one move. Migration impact: no SQL migration;
+existing item JSONB, Quiver lots and value journal are reused, documented by ADR 0010.

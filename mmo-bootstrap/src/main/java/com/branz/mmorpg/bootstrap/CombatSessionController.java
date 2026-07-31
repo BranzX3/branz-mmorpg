@@ -1,6 +1,7 @@
 package com.branz.mmorpg.bootstrap;
 
 import com.branz.mmorpg.api.identity.DefinitionId;
+import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.action.ActionPhase;
 import com.branz.mmorpg.combat.action.ActionTimeline;
@@ -22,6 +23,14 @@ import com.branz.mmorpg.combat.cc.CcEngine;
 import com.branz.mmorpg.combat.cc.CcRequest;
 import com.branz.mmorpg.combat.cc.CcRuntime;
 import com.branz.mmorpg.combat.cc.CcSeverity;
+import com.branz.mmorpg.combat.crossbow.CrossbowEngine;
+import com.branz.mmorpg.combat.crossbow.CrossbowFireResolution;
+import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
+import com.branz.mmorpg.combat.crossbow.CrossbowPhase;
+import com.branz.mmorpg.combat.crossbow.CrossbowReloadProfile;
+import com.branz.mmorpg.combat.crossbow.CrossbowRuntime;
+import com.branz.mmorpg.combat.crossbow.CrossbowTickOutcome;
+import com.branz.mmorpg.combat.crossbow.CrossbowTickResolution;
 import com.branz.mmorpg.combat.damage.ConditionalAdvantage;
 import com.branz.mmorpg.combat.damage.PhysicalDamageBreakdown;
 import com.branz.mmorpg.combat.damage.PhysicalDamageRequest;
@@ -101,6 +110,7 @@ import com.branz.mmorpg.combat.weapon.WeaponTransitionMachine;
 import com.branz.mmorpg.combat.weapon.WeaponTransitionSnapshot;
 import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.BowWeaponProfile;
+import com.branz.mmorpg.items.definition.CrossbowWeaponProfile;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.QuiverProfile;
@@ -152,6 +162,10 @@ final class CombatSessionController implements Listener {
     private static final DefinitionId TRAINING_BOW_MOVE =
             DefinitionId.of("move.training_bow.quick_shot");
     private static final DefinitionId TRAINING_BOW_ITEM = DefinitionId.of("weapon.training_bow");
+    private static final DefinitionId TRAINING_CROSSBOW_MOVE =
+            DefinitionId.of("move.training_crossbow.shot");
+    private static final DefinitionId TRAINING_CROSSBOW_ITEM =
+            DefinitionId.of("weapon.training_crossbow");
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
@@ -160,11 +174,16 @@ final class CombatSessionController implements Listener {
     private final String contentVersion;
     private final MoveDefinition trainingMove;
     private final MoveDefinition trainingBowMove;
+    private final MoveDefinition trainingCrossbowMove;
     private final DefinitionId trainingBowAmmo;
     private final AmmoFamily trainingBowAmmoFamily;
+    private final DefinitionId trainingCrossbowAmmo;
+    private final AmmoFamily trainingCrossbowAmmoFamily;
     private final double trainingWeaponPower;
     private final double trainingBowPower;
+    private final double trainingCrossbowPower;
     private final BowDrawEngine bowDraws;
+    private final CrossbowEngine crossbows;
     private final int maximumActiveProjectilesPerCaster;
     private final WeaponTransitionMachine weapons;
     private final CombatInputPolicy inputPolicy = new CombatInputPolicy();
@@ -256,6 +275,35 @@ final class CombatSessionController implements Listener {
                                         new IllegalArgumentException(
                                                 "training Bow projectile requires an authored ammo profile"))
                         .family();
+        trainingCrossbowMove =
+                moves.find(TRAINING_CROSSBOW_MOVE)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "active content is missing "
+                                                        + TRAINING_CROSSBOW_MOVE));
+        if (!trainingCrossbowMove.family().equals("CROSSBOW")
+                || trainingCrossbowMove.input().action() != SemanticInput.SECONDARY
+                || trainingCrossbowMove.hitboxes().size() != 1
+                || trainingCrossbowMove.hitboxes().getFirst().projectile().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "training Crossbow move requires one SECONDARY PROJECTILE hitbox");
+        }
+        trainingCrossbowAmmo =
+                trainingCrossbowMove
+                        .hitboxes()
+                        .getFirst()
+                        .projectile()
+                        .orElseThrow()
+                        .ammoCategory();
+        trainingCrossbowAmmoFamily =
+                items.find(trainingCrossbowAmmo)
+                        .flatMap(ItemDefinition::ammoProfile)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "training Crossbow projectile requires an authored ammo profile"))
+                        .family();
         if (!Double.isFinite(trainingWeaponPower) || trainingWeaponPower <= 0) {
             throw new IllegalArgumentException("trainingWeaponPower must be positive");
         }
@@ -285,6 +333,25 @@ final class CombatSessionController implements Listener {
                                 bow.minimumVelocityMultiplier(),
                                 bow.minimumPostureMultiplier(),
                                 bow.maximumPenetrationPercentage()));
+        WeaponCombatProfile crossbowWeapon =
+                items.find(TRAINING_CROSSBOW_ITEM)
+                        .flatMap(ItemDefinition::weaponProfile)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "active content is missing Crossbow weapon profile"));
+        CrossbowWeaponProfile crossbow =
+                crossbowWeapon
+                        .crossbowProfile()
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                "training Crossbow requires reload checkpoint timings"));
+        trainingCrossbowPower = crossbowWeapon.power();
+        crossbows =
+                new CrossbowEngine(
+                        new CrossbowReloadProfile(
+                                crossbow.boltPlacementTicks(), crossbow.lockingTicks()));
         if (maximumActiveProjectilesPerCaster < 1 || maximumActiveProjectilesPerCaster > 128) {
             throw new IllegalArgumentException(
                     "maximumActiveProjectilesPerCaster must be between 1 and 128");
@@ -356,6 +423,7 @@ final class CombatSessionController implements Listener {
         sessions.put(player.getUniqueId(), session);
         updateHealthPresentation(player, session);
         select(session, selectedSlot(player, player.getInventory().getHeldItemSlot()));
+        restoreEquippedCrossbow(player, session, tick);
     }
 
     Optional<CombatSessionStatus> status(Player player) {
@@ -379,6 +447,13 @@ final class CombatSessionController implements Listener {
                                         0,
                                         session.bowRecoveryUntilTick
                                                 - plugin.getServer().getCurrentTick()),
+                        Optional.ofNullable(session.crossbow).map(CrossbowRuntime::phase),
+                        (int)
+                                Math.max(
+                                        0,
+                                        session.crossbowRecoveryUntilTick
+                                                - plugin.getServer().getCurrentTick()),
+                        session.pendingCrossbowCommit != null,
                         activeProjectilesFor(player.getUniqueId()),
                         session.pendingBowLaunch != null,
                         selectedAmmo,
@@ -490,6 +565,7 @@ final class CombatSessionController implements Listener {
         }
         cancelAction(session, "WEAPON_SWAP");
         cancelBow(session, "WEAPON_SWAP");
+        cancelCrossbow(session, "WEAPON_SWAP");
         releaseGuard(session);
         session.input.clearBuffer(InputBufferClearReason.WEAPON_SWAP);
         select(session, selectedSlot(event.getPlayer(), event.getNewSlot()));
@@ -508,6 +584,7 @@ final class CombatSessionController implements Listener {
                 || session.timeline != null
                 || session.bowDraw != null
                 || session.pendingBowLaunch != null
+                || session.pendingCrossbowCommit != null
                 || session.pendingAmmoCycleId != null) {
             player.sendActionBar(Component.text("AMMO SWITCH ACTION LOCKED", NamedTextColor.RED));
             return;
@@ -738,6 +815,34 @@ final class CombatSessionController implements Listener {
             }
             return;
         }
+        if (family.equals("CROSSBOW")) {
+            event.setCancelled(true);
+            Result<CombatInputRequest, InputRejectionCode> observed =
+                    session.input.observe(
+                            new InputObservation(
+                                    plugin.getServer().getCurrentTick(),
+                                    SemanticInput.SECONDARY,
+                                    DirectionSnapshot.NEUTRAL,
+                                    trainingCrossbowMove.input().branch(),
+                                    new InputDeduplicationKey("MAIN_HAND", "CROSSBOW_USE")));
+            if (!(observed
+                    instanceof Result.Success<CombatInputRequest, InputRejectionCode> input)) {
+                return;
+            }
+            Result<SemanticInput, InputRejectionCode> semantic =
+                    inputPolicy.resolve(
+                            ClientAction.USE, policyContext(event.getPlayer(), session));
+            if (semantic instanceof Result.Success<SemanticInput, InputRejectionCode> success
+                    && success.value() == SemanticInput.SECONDARY) {
+                Result<InputRouteOutcome, InputRejectionCode> routed =
+                        session.input.routeFrame(
+                                List.of(input.value()), routingContext(event.getPlayer(), session));
+                if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode>) {
+                    handleCrossbowUse(event.getPlayer(), session);
+                }
+            }
+            return;
+        }
         if (!family.equals("SWORD") || session.engagement.state() != EngagementState.ENGAGED) {
             return;
         }
@@ -849,6 +954,7 @@ final class CombatSessionController implements Listener {
         session.health = playerHealth.kill(session.health, tick);
         cancelAction(session, "DEATH");
         cancelBow(session, "DEATH");
+        cancelCrossbow(session, "DEATH");
         removeOwnerProjectiles(player.getUniqueId());
         session.input.clearBuffer(InputBufferClearReason.DEATH);
         releaseGuard(session);
@@ -880,6 +986,7 @@ final class CombatSessionController implements Listener {
         session.health = playerHealth.respawn(session.health, tick);
         session.bowDraw = null;
         session.bowRecoveryUntilTick = -1;
+        restoreEquippedCrossbow(player, session, tick);
         session.engagement = EngagementRuntime.initial(tick);
         session.guard = GuardRuntime.initial(guards.profile(), tick);
         session.poise = PoiseRuntime.initial(tick);
@@ -916,6 +1023,7 @@ final class CombatSessionController implements Listener {
         }
         cancelAction(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         cancelBow(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
+        cancelCrossbow(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         removeOwnerProjectiles(event.getPlayer().getUniqueId());
         session.input.clearBuffer(InputBufferClearReason.WORLD_CHANGE);
         releaseGuard(session);
@@ -952,6 +1060,7 @@ final class CombatSessionController implements Listener {
             }
             tickSneakPress(player, session);
             tickBow(player, session);
+            tickCrossbow(player, session);
             tickDodge(player, session);
             session.guard = guards.tick(session.guard, plugin.getServer().getCurrentTick());
             session.poise = poise.tick(session.poise, plugin.getServer().getCurrentTick());
@@ -1258,7 +1367,7 @@ final class CombatSessionController implements Listener {
                 iterator.remove();
             } else {
                 entry.setValue(
-                        new LiveProjectile(live.worldId(), resolution.runtime(), live.charge()));
+                        new LiveProjectile(live.worldId(), resolution.runtime(), live.context()));
             }
         }
     }
@@ -1335,15 +1444,15 @@ final class CombatSessionController implements Listener {
             PhysicalDamageBreakdown breakdown =
                     damage.resolve(
                             new PhysicalDamageRequest(
-                                    trainingBowPower,
-                                    trainingBowMove.outputs().moveCoefficient(),
+                                    live.context().weaponPower(),
+                                    live.context().move().outputs().moveCoefficient(),
                                     0,
                                     armor,
-                                    live.charge().penetrationPercentage(),
+                                    live.context().penetrationPercentage(),
                                     0,
                                     0,
                                     advantages,
-                                    trainingBowMove.profiles().pveMultiplier()));
+                                    live.context().move().profiles().pveMultiplier()));
             CombatHealthRuntime targetHealth =
                     trainingTargetHealth.computeIfAbsent(
                             hit.entityId(),
@@ -1354,8 +1463,8 @@ final class CombatSessionController implements Listener {
             int postureDamage =
                     (int)
                             Math.round(
-                                    trainingBowMove.outputs().posture()
-                                            * live.charge().postureMultiplier());
+                                    live.context().move().outputs().posture()
+                                            * live.context().postureMultiplier());
             PostureResolution postureResolution = postures.damage(posture, tick, postureDamage);
             trainingTargetPosture.put(hit.entityId(), postureResolution.runtime());
             if (ownerSession != null) {
@@ -1575,6 +1684,7 @@ final class CombatSessionController implements Listener {
         }
         cancelAction(session, "CC_" + severity);
         cancelBow(session, "CC_" + severity);
+        cancelCrossbow(session, "CC_" + severity);
         session.input.clearBuffer(InputBufferClearReason.HARD_CC);
         releaseGuard(session);
         session.dodge = null;
@@ -1715,6 +1825,7 @@ final class CombatSessionController implements Listener {
                 postCancelResources.spendStamina(dodgeProfile.staminaCost()).orElseThrow();
         releaseGuard(session);
         cancelBow(session, "DODGE");
+        cancelCrossbow(session, "DODGE");
         session.timeline = null;
         session.previousActionTransform = null;
         session.action = ActionState.IDLE;
@@ -2026,7 +2137,14 @@ final class CombatSessionController implements Listener {
                         pending.charge().velocityMultiplier());
         activeProjectiles.put(
                 pending.projectileId(),
-                new LiveProjectile(pending.worldId(), runtime, pending.charge()));
+                new LiveProjectile(
+                        pending.worldId(),
+                        runtime,
+                        new ProjectileCombatContext(
+                                trainingBowPower,
+                                trainingBowMove,
+                                pending.charge().postureMultiplier(),
+                                pending.charge().penetrationPercentage())));
         markHostile(player, session);
         session.lastResolution =
                 "BOW FIRED charge="
@@ -2449,11 +2567,419 @@ final class CombatSessionController implements Listener {
         }
     }
 
-    private record LiveProjectile(UUID worldId, ProjectileRuntime runtime, BowShotCharge charge) {
+    private record LiveProjectile(
+            UUID worldId, ProjectileRuntime runtime, ProjectileCombatContext context) {
         private LiveProjectile {
             Objects.requireNonNull(worldId, "worldId");
             Objects.requireNonNull(runtime, "runtime");
-            Objects.requireNonNull(charge, "charge");
+            Objects.requireNonNull(context, "context");
+        }
+    }
+
+    private void handleCrossbowUse(Player player, LiveSession session) {
+        long tick = plugin.getServer().getCurrentTick();
+        restoreEquippedCrossbow(player, session, tick);
+        if (session.crossbow == null) {
+            player.sendActionBar(Component.text("CROSSBOW STATE UNAVAILABLE", NamedTextColor.RED));
+            return;
+        }
+        if (session.pendingCrossbowCommit != null
+                || session.timeline != null
+                || session.dodge != null
+                || session.guard.active()
+                || session.pendingAmmoCycleId != null
+                || session.ammoSwitchHandlingUntilTick > tick
+                || session.crossbowRecoveryUntilTick > tick) {
+            player.sendActionBar(Component.text("CROSSBOW ACTION LOCKED", NamedTextColor.RED));
+            return;
+        }
+        if (session.crossbow.phase() == CrossbowPhase.LOADED) {
+            fireCrossbow(player, session, tick);
+            return;
+        }
+        if (session.crossbow.phase() == CrossbowPhase.UNLOADED
+                && compatibleCrossbowBolt(player).isEmpty()) {
+            session.lastResolution =
+                    characters.equippedQuiverProfile(player).isEmpty()
+                            ? "CROSSBOW NO QUIVER"
+                            : "CROSSBOW NO PREPARED BOLT";
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            return;
+        }
+        Result<CrossbowRuntime, com.branz.mmorpg.combat.crossbow.CrossbowErrorCode> started =
+                crossbows.beginOrResume(session.crossbow, tick);
+        if (!(started
+                instanceof
+                Result.Success<CrossbowRuntime, com.branz.mmorpg.combat.crossbow.CrossbowErrorCode>
+                        success)) {
+            player.sendActionBar(Component.text("CROSSBOW ACTION LOCKED", NamedTextColor.RED));
+            return;
+        }
+        session.crossbow = success.value();
+        session.action = ActionState.CHANNELING;
+        session.input.clearBuffer(InputBufferClearReason.ACTION_STARTED);
+        session.lastResolution = "CROSSBOW " + session.crossbow.phase();
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.AQUA));
+    }
+
+    private void tickCrossbow(Player player, LiveSession session) {
+        long tick = plugin.getServer().getCurrentTick();
+        restoreEquippedCrossbow(player, session, tick);
+        if (session.crossbowRecoveryUntilTick >= 0 && tick >= session.crossbowRecoveryUntilTick) {
+            session.crossbowRecoveryUntilTick = -1;
+            if (!session.action.hardControl()) {
+                session.action = ActionState.IDLE;
+            }
+        }
+        if (session.crossbow == null || session.pendingCrossbowCommit != null) {
+            return;
+        }
+        CrossbowTickResolution resolution = crossbows.tick(session.crossbow, tick);
+        if (resolution.outcome() == CrossbowTickOutcome.BOLT_BIND_REQUIRED) {
+            beginCrossbowBoltCommit(player, session);
+        } else if (resolution.outcome() == CrossbowTickOutcome.LOADED_CHECKPOINT_REQUIRED) {
+            beginCrossbowLoadedCommit(player, session);
+        }
+    }
+
+    private void beginCrossbowBoltCommit(Player player, LiveSession session) {
+        DefinitionId bolt = compatibleCrossbowBolt(player).orElse(null);
+        if (bolt == null || session.crossbowItemId == null) {
+            session.crossbow =
+                    crossbows.interrupt(session.crossbow, plugin.getServer().getCurrentTick());
+            session.action = ActionState.IDLE;
+            session.lastResolution = "CROSSBOW NO BOLT AT CHECKPOINT";
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            return;
+        }
+        PendingCrossbowCommit pending =
+                new PendingCrossbowCommit(
+                        UUID.randomUUID(),
+                        CrossbowCommitKind.BOLT_BIND,
+                        session.crossbowItemId,
+                        bolt,
+                        null);
+        session.pendingCrossbowCommit = pending;
+        session.action = ActionState.ACTIVE;
+        session.lastResolution = "CROSSBOW BOLT COMMITTING";
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        characters.bindCrossbowBolt(
+                player,
+                pending.crossbowItemId(),
+                pending.ammoDefinitionId(),
+                pending.operationId(),
+                contentVersion,
+                result -> completeCrossbowCommit(player.getUniqueId(), session, pending, result));
+    }
+
+    private void beginCrossbowLoadedCommit(Player player, LiveSession session) {
+        DefinitionId boundAmmo = session.crossbow.boundAmmo().orElseThrow();
+        if (session.crossbowItemId == null) {
+            cancelCrossbow(session, "ITEM_MISSING");
+            return;
+        }
+        PendingCrossbowCommit pending =
+                new PendingCrossbowCommit(
+                        UUID.randomUUID(),
+                        CrossbowCommitKind.LOADED,
+                        session.crossbowItemId,
+                        boundAmmo,
+                        null);
+        session.pendingCrossbowCommit = pending;
+        session.action = ActionState.ACTIVE;
+        session.lastResolution = "CROSSBOW LOADED COMMITTING";
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        characters.completeCrossbowLoad(
+                player,
+                pending.crossbowItemId(),
+                pending.ammoDefinitionId(),
+                pending.operationId(),
+                contentVersion,
+                result -> completeCrossbowCommit(player.getUniqueId(), session, pending, result));
+    }
+
+    private void fireCrossbow(Player player, LiveSession session, long tick) {
+        if (activeProjectilesFor(player.getUniqueId()) >= maximumActiveProjectilesPerCaster) {
+            player.sendActionBar(
+                    Component.text(
+                            "Projectile limit reached for this caster.", NamedTextColor.RED));
+            return;
+        }
+        Result<CrossbowFireResolution, com.branz.mmorpg.combat.crossbow.CrossbowErrorCode> fired =
+                crossbows.fire(session.crossbow, tick);
+        if (!(fired
+                        instanceof
+                        Result.Success<
+                                        CrossbowFireResolution,
+                                        com.branz.mmorpg.combat.crossbow.CrossbowErrorCode>
+                                success)
+                || session.crossbowItemId == null) {
+            player.sendActionBar(Component.text("CROSSBOW NOT LOADED", NamedTextColor.RED));
+            return;
+        }
+        CrossbowFireResolution fire = success.value();
+        UUID projectileId = UUID.randomUUID();
+        PendingCrossbowLaunch launch =
+                pendingCrossbowLaunch(player, projectileId, fire.boundAmmoDefinitionId());
+        PendingCrossbowCommit pending =
+                new PendingCrossbowCommit(
+                        projectileId,
+                        CrossbowCommitKind.FIRE,
+                        session.crossbowItemId,
+                        fire.boundAmmoDefinitionId(),
+                        launch);
+        session.crossbow = fire.runtime();
+        session.pendingCrossbowCommit = pending;
+        session.action = ActionState.ACTIVE;
+        session.lastResolution = "CROSSBOW FIRE COMMITTING";
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        characters.fireCrossbow(
+                player,
+                pending.crossbowItemId(),
+                pending.ammoDefinitionId(),
+                pending.operationId(),
+                contentVersion,
+                result -> completeCrossbowCommit(player.getUniqueId(), session, pending, result));
+    }
+
+    private void completeCrossbowCommit(
+            UUID playerId,
+            LiveSession expectedSession,
+            PendingCrossbowCommit pending,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> result) {
+        LiveSession session = sessions.get(playerId);
+        if (session != expectedSession || session.pendingCrossbowCommit != pending) {
+            return;
+        }
+        session.pendingCrossbowCommit = null;
+        Player player = plugin.getServer().getPlayer(playerId);
+        if (result
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            session.crossbow =
+                    crossbows.interrupt(session.crossbow, plugin.getServer().getCurrentTick());
+            restoreEquippedCrossbow(player, session, plugin.getServer().getCurrentTick());
+            session.action = ActionState.IDLE;
+            session.lastResolution =
+                    pending.kind() == CrossbowCommitKind.BOLT_BIND
+                                    && failure.error()
+                                            == CharacterSessionErrorCode.CHARACTER_AMMO_UNAVAILABLE
+                            ? "CROSSBOW NO BOLT"
+                            : "CROSSBOW COMMIT FAILED " + failure.error().code();
+            if (player != null && player.isOnline()) {
+                player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            }
+            return;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        restoreEquippedCrossbow(player, session, tick);
+        if (pending.kind() == CrossbowCommitKind.BOLT_BIND) {
+            Result<CrossbowRuntime, com.branz.mmorpg.combat.crossbow.CrossbowErrorCode> resumed =
+                    crossbows.beginOrResume(session.crossbow, tick);
+            if (resumed
+                    instanceof
+                    Result.Success<
+                                    CrossbowRuntime,
+                                    com.branz.mmorpg.combat.crossbow.CrossbowErrorCode>
+                            success) {
+                session.crossbow = success.value();
+                session.action = ActionState.CHANNELING;
+                session.lastResolution = "CROSSBOW LOCKING";
+            } else {
+                session.action = ActionState.IDLE;
+                session.lastResolution = "CROSSBOW RESUME FAILED";
+            }
+        } else if (pending.kind() == CrossbowCommitKind.LOADED) {
+            session.action = ActionState.IDLE;
+            session.lastResolution = "CROSSBOW LOADED";
+        } else {
+            completeCrossbowFire(player, session, pending.launch());
+        }
+        if (player != null && player.isOnline()) {
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
+        }
+    }
+
+    private void completeCrossbowFire(
+            Player player, LiveSession session, PendingCrossbowLaunch pending) {
+        Result<CrossbowRuntime, com.branz.mmorpg.combat.crossbow.CrossbowErrorCode> settled =
+                crossbows.completeFire(session.crossbow, plugin.getServer().getCurrentTick());
+        if (settled
+                instanceof
+                Result.Success<CrossbowRuntime, com.branz.mmorpg.combat.crossbow.CrossbowErrorCode>
+                        success) {
+            session.crossbow = success.value();
+        } else {
+            session.action = ActionState.IDLE;
+            session.lastResolution = "CROSSBOW FIRE SETTLE FAILED";
+            return;
+        }
+        if (player == null
+                || !player.isOnline()
+                || player.isDead()
+                || !player.getWorld().getUID().equals(pending.worldId())) {
+            session.action = ActionState.IDLE;
+            session.lastResolution = "CROSSBOW COMMITTED WITHOUT LIVE PROJECTILE";
+            return;
+        }
+        if (activeProjectilesFor(player.getUniqueId()) >= maximumActiveProjectilesPerCaster) {
+            session.action = ActionState.IDLE;
+            session.lastResolution = "CROSSBOW COMMITTED PROJECTILE LIMIT";
+            return;
+        }
+        launchCrossbowProjectile(player, session, pending);
+        session.crossbowRecoveryUntilTick =
+                plugin.getServer().getCurrentTick() + trainingCrossbowMove.phases().recoveryTicks();
+        session.action = ActionState.RECOVERY;
+    }
+
+    private PendingCrossbowLaunch pendingCrossbowLaunch(
+            Player player, UUID projectileId, DefinitionId ammoDefinitionId) {
+        Location eye = player.getEyeLocation();
+        org.bukkit.util.Vector look = eye.getDirection().normalize();
+        CombatVector direction = new CombatVector(look.getX(), look.getY(), look.getZ());
+        CombatVector origin =
+                new CombatVector(eye.getX(), eye.getY(), eye.getZ()).add(direction.multiply(0.35));
+        return new PendingCrossbowLaunch(
+                projectileId, player.getWorld().getUID(), origin, direction, ammoDefinitionId);
+    }
+
+    private void launchCrossbowProjectile(
+            Player player, LiveSession session, PendingCrossbowLaunch pending) {
+        MoveDefinition.Hitbox hitbox = trainingCrossbowMove.hitboxes().getFirst();
+        MoveDefinition.ProjectileDefinition authored = hitbox.projectile().orElseThrow();
+        ProjectileProfile profile =
+                new ProjectileProfile(
+                        authored.speed(),
+                        authored.gravityPerTick(),
+                        authored.dragPerTick(),
+                        authored.collisionRadius(),
+                        authored.lifetimeTicks(),
+                        authored.pierceCount());
+        ProjectileIdentity identity =
+                new ProjectileIdentity(
+                        pending.projectileId(),
+                        player.getUniqueId(),
+                        trainingCrossbowMove.id(),
+                        contentVersion,
+                        Optional.of(pending.ammoDefinitionId()),
+                        hitbox.hitGroup());
+        ProjectileRuntime runtime =
+                ProjectileRuntime.launch(
+                        identity, profile, pending.origin(), pending.direction(), 1.0);
+        activeProjectiles.put(
+                pending.projectileId(),
+                new LiveProjectile(
+                        pending.worldId(),
+                        runtime,
+                        new ProjectileCombatContext(
+                                trainingCrossbowPower, trainingCrossbowMove, 1.0, 0.0)));
+        markHostile(player, session);
+        session.lastResolution =
+                "CROSSBOW FIRED projectile="
+                        + pending.projectileId().toString().substring(0, 8)
+                        + " bolts="
+                        + characters.quiverAmmoQuantity(player, pending.ammoDefinitionId());
+    }
+
+    private Optional<DefinitionId> compatibleCrossbowBolt(Player player) {
+        DefinitionId selected = characters.quiverPreparation(player).selectedAmmo().orElse(null);
+        QuiverProfile quiver = characters.equippedQuiverProfile(player).orElse(null);
+        boolean compatible =
+                selected != null
+                        && quiver != null
+                        && characters.quiverAmmoQuantity(player, selected) > 0
+                        && items.find(selected)
+                                .flatMap(ItemDefinition::ammoProfile)
+                                .filter(ammo -> ammo.family() == trainingCrossbowAmmoFamily)
+                                .filter(quiver::supports)
+                                .isPresent();
+        return compatible ? Optional.of(selected) : Optional.empty();
+    }
+
+    private void restoreEquippedCrossbow(Player player, LiveSession session, long tick) {
+        if (player == null
+                || !equippedWeaponFamily(player).filter("CROSSBOW"::equals).isPresent()) {
+            if (session.pendingCrossbowCommit == null) {
+                session.crossbow = null;
+                session.crossbowItemId = null;
+            }
+            return;
+        }
+        ItemId itemId = characters.equippedMainHandItemId(player).orElse(null);
+        CrossbowPersistentState state;
+        try {
+            state = characters.equippedCrossbowState(player).orElse(null);
+        } catch (IllegalArgumentException exception) {
+            session.crossbow = null;
+            session.crossbowItemId = itemId;
+            session.lastResolution = "CROSSBOW PERSISTED STATE INVALID";
+            return;
+        }
+        boolean validBoundAmmo =
+                state == null
+                        || state.boundAmmo().isEmpty()
+                        || state.boundAmmo()
+                                .flatMap(items::find)
+                                .flatMap(ItemDefinition::ammoProfile)
+                                .filter(ammo -> ammo.family() == AmmoFamily.BOLT)
+                                .isPresent();
+        if (!validBoundAmmo) {
+            session.crossbow = null;
+            session.crossbowItemId = itemId;
+            session.lastResolution = "CROSSBOW BOUND AMMO INVALID";
+            return;
+        }
+        if (itemId == null || state == null) {
+            session.crossbow = null;
+            session.crossbowItemId = itemId;
+            return;
+        }
+        boolean changedItem = !itemId.equals(session.crossbowItemId);
+        boolean changedCheckpoint =
+                session.crossbow != null
+                        && session.pendingCrossbowCommit == null
+                        && !session.crossbow.persistentState().equals(state);
+        if (session.crossbow == null || changedItem || changedCheckpoint) {
+            session.crossbow = CrossbowRuntime.restore(state, tick);
+            session.crossbowItemId = itemId;
+        }
+    }
+
+    private void cancelCrossbow(LiveSession session, String reason) {
+        boolean active =
+                session.crossbow != null
+                        && (session.crossbow.phase() == CrossbowPhase.COCKING
+                                || session.crossbow.phase() == CrossbowPhase.LOCKING);
+        if (session.crossbow != null) {
+            session.crossbow =
+                    crossbows.interrupt(session.crossbow, plugin.getServer().getCurrentTick());
+        }
+        if (active || session.pendingCrossbowCommit != null) {
+            session.lastResolution = "CROSSBOW INTERRUPTED " + reason;
+        }
+        session.pendingCrossbowCommit = null;
+        session.crossbowRecoveryUntilTick = -1;
+        if (!session.action.hardControl()) {
+            session.action = ActionState.IDLE;
+        }
+    }
+
+    private record ProjectileCombatContext(
+            double weaponPower,
+            MoveDefinition move,
+            double postureMultiplier,
+            double penetrationPercentage) {
+        private ProjectileCombatContext {
+            if (!Double.isFinite(weaponPower)
+                    || weaponPower <= 0
+                    || !Double.isFinite(postureMultiplier)
+                    || postureMultiplier <= 0
+                    || !Double.isFinite(penetrationPercentage)
+                    || penetrationPercentage < 0) {
+                throw new IllegalArgumentException("invalid projectile combat context");
+            }
+            Objects.requireNonNull(move, "move");
         }
     }
 
@@ -2474,6 +3000,45 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    private enum CrossbowCommitKind {
+        BOLT_BIND,
+        LOADED,
+        FIRE
+    }
+
+    private record PendingCrossbowLaunch(
+            UUID projectileId,
+            UUID worldId,
+            CombatVector origin,
+            CombatVector direction,
+            DefinitionId ammoDefinitionId) {
+        private PendingCrossbowLaunch {
+            Objects.requireNonNull(projectileId, "projectileId");
+            Objects.requireNonNull(worldId, "worldId");
+            Objects.requireNonNull(origin, "origin");
+            direction = Objects.requireNonNull(direction, "direction").normalized();
+            Objects.requireNonNull(ammoDefinitionId, "ammoDefinitionId");
+        }
+    }
+
+    private record PendingCrossbowCommit(
+            UUID operationId,
+            CrossbowCommitKind kind,
+            ItemId crossbowItemId,
+            DefinitionId ammoDefinitionId,
+            PendingCrossbowLaunch launch) {
+        private PendingCrossbowCommit {
+            Objects.requireNonNull(operationId, "operationId");
+            Objects.requireNonNull(kind, "kind");
+            Objects.requireNonNull(crossbowItemId, "crossbowItemId");
+            Objects.requireNonNull(ammoDefinitionId, "ammoDefinitionId");
+            if ((kind == CrossbowCommitKind.FIRE) != (launch != null)) {
+                throw new IllegalArgumentException(
+                        "Only a Crossbow FIRE commit carries a projectile launch snapshot");
+            }
+        }
+    }
+
     private static final class LiveSession {
         private EngagementRuntime engagement;
         private WeaponTransitionSnapshot weapon = WeaponTransitionSnapshot.initial();
@@ -2483,6 +3048,10 @@ final class CombatSessionController implements Listener {
         private ActionTimeline timeline;
         private BowDrawRuntime bowDraw;
         private PendingBowLaunch pendingBowLaunch;
+        private ItemId crossbowItemId;
+        private CrossbowRuntime crossbow;
+        private PendingCrossbowCommit pendingCrossbowCommit;
+        private long crossbowRecoveryUntilTick = -1;
         private UUID pendingAmmoCycleId;
         private long ammoSwitchHandlingUntilTick = -1;
         private long bowRecoveryUntilTick = -1;

@@ -32,6 +32,9 @@ public interface ValueTransactionService {
     Result<TransactionExecution, TransactionErrorCode> consumeLot(
             TransactionRequest request, LotQuantityConsumption consumption);
 
+    Result<TransactionExecution, TransactionErrorCode> bindCrossbowBolt(
+            TransactionRequest request, CrossbowBoltBinding binding);
+
     Result<Optional<ItemLocationRecord>, TransactionErrorCode> findItem(ItemId itemId);
 
     Result<Optional<LotLocationRecord>, TransactionErrorCode> findLot(LotId lotId);

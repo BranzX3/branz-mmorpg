@@ -305,6 +305,58 @@ public final class BranzMmoPlugin extends JavaPlugin {
             resourcePackGate = null;
             return "Training Bow requires compatible ammo and Quiver profiles.";
         }
+        com.branz.mmorpg.combat.move.MoveDefinition trainingCrossbowMove =
+                activeMoveEngine
+                        .get()
+                        .find(
+                                com.branz.mmorpg.api.identity.DefinitionId.of(
+                                        "move.training_crossbow.shot"))
+                        .orElse(null);
+        if (trainingCrossbowMove == null
+                || !trainingCrossbowMove.family().equals("CROSSBOW")
+                || trainingCrossbowMove.input().action()
+                        != com.branz.mmorpg.combat.input.SemanticInput.SECONDARY
+                || trainingCrossbowMove.hitboxes().size() != 1
+                || trainingCrossbowMove.hitboxes().getFirst().projectile().isEmpty()) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            resourcePackGate = null;
+            return "Training Crossbow move requires one SECONDARY PROJECTILE hitbox.";
+        }
+        com.branz.mmorpg.items.definition.WeaponCombatProfile trainingCrossbow =
+                activeItemEngine
+                        .get()
+                        .find(
+                                com.branz.mmorpg.api.identity.DefinitionId.of(
+                                        "weapon.training_crossbow"))
+                        .flatMap(com.branz.mmorpg.items.definition.ItemDefinition::weaponProfile)
+                        .orElse(null);
+        com.branz.mmorpg.items.definition.AmmoProfile trainingBolt =
+                activeItemEngine
+                        .get()
+                        .find(com.branz.mmorpg.api.identity.DefinitionId.of("ammo.training_bolt"))
+                        .flatMap(com.branz.mmorpg.items.definition.ItemDefinition::ammoProfile)
+                        .orElse(null);
+        com.branz.mmorpg.items.definition.QuiverProfile trainingBoltQuiver =
+                activeItemEngine
+                        .get()
+                        .find(
+                                com.branz.mmorpg.api.identity.DefinitionId.of(
+                                        "equipment.training_bolt_quiver"))
+                        .flatMap(com.branz.mmorpg.items.definition.ItemDefinition::quiverProfile)
+                        .orElse(null);
+        if (trainingCrossbow == null
+                || !trainingCrossbow.family().equals("CROSSBOW")
+                || trainingCrossbow.crossbowProfile().isEmpty()
+                || trainingBolt == null
+                || trainingBolt.family() != com.branz.mmorpg.items.definition.AmmoFamily.BOLT
+                || trainingBoltQuiver == null
+                || !trainingBoltQuiver.supports(trainingBolt)) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            resourcePackGate = null;
+            return "Training Crossbow requires checkpoint timing plus compatible Bolt and Quiver profiles.";
+        }
         BukkitItemProjectionCodec projectionCodec =
                 new BukkitItemProjectionCodec(this, ProjectionTokenSigner.random());
         testItemProjections = new TestItemProjectionService(projectionCodec);

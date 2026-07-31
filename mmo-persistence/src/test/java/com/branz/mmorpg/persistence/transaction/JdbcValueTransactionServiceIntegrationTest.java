@@ -17,6 +17,7 @@ import com.branz.mmorpg.persistence.migration.MigrationCatalog;
 import com.branz.mmorpg.persistence.migration.MigrationErrorCode;
 import com.branz.mmorpg.persistence.migration.PostgresMigrationRunner;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.io.TempDir;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class JdbcValueTransactionServiceIntegrationTest {
@@ -49,8 +51,13 @@ class JdbcValueTransactionServiceIntegrationTest {
     private JdbcValueTransactionService service;
 
     @BeforeAll
-    void startPostgresAndMigrate() throws Exception {
-        postgres = EmbeddedPostgres.builder().setPort(0).start();
+    void startPostgresAndMigrate(@TempDir Path postgresDirectory) throws Exception {
+        postgres =
+                EmbeddedPostgres.builder()
+                        .setPort(0)
+                        .setDataDirectory(postgresDirectory)
+                        .setCleanDataDirectory(false)
+                        .start();
         dataSource = postgres.getPostgresDatabase();
         Result<MigrationCatalog, MigrationErrorCode> loaded =
                 ClasspathMigrationCatalog.loadDefault();
@@ -778,6 +785,68 @@ class JdbcValueTransactionServiceIntegrationTest {
         LotLocationRecord destroyed = success(service.findLot(lotId)).orElseThrow();
         assertEquals(0, destroyed.quantity());
         assertEquals(ValueLocationType.DESTROYED, destroyed.location().type());
+    }
+
+    @Test
+    void crossbowBoltBindingCommitsItemCheckpointAndQuiverConsumptionExactlyOnce() {
+        ItemId crossbowId = new ItemId(UUID.randomUUID());
+        ItemId quiverId = new ItemId(UUID.randomUUID());
+        LotId boltLotId = new LotId(UUID.randomUUID());
+        ValueLocation mainHand = ValueLocation.nativeEquipped("MAIN_HAND");
+        ValueLocation quiver = ValueLocation.quiver(quiverId);
+        grantItem(crossbowId, mainHand);
+        grantLot(boltLotId, quiver, 2);
+
+        String placedPayload =
+                "{\"displayRevision\":2,\"crossbow\":{\"checkpoint\":\"BOLT_PLACED\","
+                        + "\"boundAmmo\":\""
+                        + LOT_DEFINITION.value()
+                        + "\"}}";
+        CrossbowBoltBinding binding =
+                new CrossbowBoltBinding(
+                        new ItemPayloadUpdate(
+                                crossbowId,
+                                1,
+                                Optional.of(CHARACTER),
+                                mainHand,
+                                "{}",
+                                placedPayload),
+                        new LotQuantityConsumption(boltLotId, 1, Optional.of(CHARACTER), quiver, 1),
+                        LOT_DEFINITION);
+        TransactionRequest request =
+                request(
+                        "crossbow:bind:" + crossbowId.value(),
+                        JdbcValueTransactionService.CROSSBOW_BOLT_BIND,
+                        "{\"quantity\":1}",
+                        "{\"checkpoint\":\"BOLT_PLACED\"}");
+        JdbcValueTransactionService crashing =
+                new JdbcValueTransactionService(
+                        dataSource,
+                        checkpoint -> {
+                            if (checkpoint
+                                    == JdbcValueTransactionService.Checkpoint
+                                            .AFTER_CROSSBOW_ITEM_UPDATE) {
+                                throw new SimulatedCrash();
+                            }
+                        });
+
+        assertThrows(SimulatedCrash.class, () -> crashing.bindCrossbowBolt(request, binding));
+        assertEquals("{}", success(service.findItem(crossbowId)).orElseThrow().payloadJson());
+        assertEquals(2, success(service.findLot(boltLotId)).orElseThrow().quantity());
+        assertEquals(Optional.empty(), success(journal.find(request.transactionId())));
+
+        assertFalse(success(service.bindCrossbowBolt(request, binding)).replayed());
+        assertTrue(success(service.bindCrossbowBolt(retryRequest(request), binding)).replayed());
+        ItemLocationRecord crossbow = success(service.findItem(crossbowId)).orElseThrow();
+        LotLocationRecord bolt = success(service.findLot(boltLotId)).orElseThrow();
+        assertTrue(crossbow.payloadJson().contains("BOLT_PLACED"));
+        assertEquals(2, crossbow.version());
+        assertEquals(1, bolt.quantity());
+        assertEquals(2, bolt.version());
+        assertEquals(1, success(audit.findByTransaction(request.transactionId())).size());
+        assertEquals(
+                AuditSubjectType.TRANSACTION,
+                success(audit.findByTransaction(request.transactionId())).getFirst().subjectType());
     }
 
     @Test

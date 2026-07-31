@@ -99,14 +99,18 @@ public final class ItemEngine {
                         "weapon_profile requires non-blank family and positive power");
             }
             Optional<BowWeaponProfile> bowProfile;
+            Optional<CrossbowWeaponProfile> crossbowProfile;
             try {
                 bowProfile = compileBowProfile(family, weaponNode.get("bow"));
+                crossbowProfile = compileCrossbowProfile(family, weaponNode.get("crossbow"));
             } catch (IllegalArgumentException exception) {
                 return Result.failure(
                         ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID, exception.getMessage());
             }
             weaponProfile =
-                    Optional.of(new WeaponCombatProfile(family, power.doubleValue(), bowProfile));
+                    Optional.of(
+                            new WeaponCombatProfile(
+                                    family, power.doubleValue(), bowProfile, crossbowProfile));
         }
         Optional<AmmoProfile> ammoProfile;
         try {
@@ -215,6 +219,31 @@ public final class ItemEngine {
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException(
                     "invalid weapon_profile.bow: " + exception.getMessage(), exception);
+        }
+    }
+
+    private static Optional<CrossbowWeaponProfile> compileCrossbowProfile(
+            String family, JsonNode crossbowNode) {
+        boolean declared = crossbowNode != null && !crossbowNode.isNull();
+        if (!family.equals("CROSSBOW")) {
+            if (declared) {
+                throw new IllegalArgumentException(
+                        "weapon_profile.crossbow is valid only for CROSSBOW family");
+            }
+            return Optional.empty();
+        }
+        if (!declared || !crossbowNode.isObject()) {
+            throw new IllegalArgumentException(
+                    "CROSSBOW weapon_profile requires checkpoint timing fields");
+        }
+        try {
+            return Optional.of(
+                    new CrossbowWeaponProfile(
+                            requiredInteger(crossbowNode, "bolt_placement_ticks"),
+                            requiredInteger(crossbowNode, "locking_ticks")));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                    "invalid weapon_profile.crossbow: " + exception.getMessage(), exception);
         }
     }
 

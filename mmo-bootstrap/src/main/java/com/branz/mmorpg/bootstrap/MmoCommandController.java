@@ -348,13 +348,29 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                                                                             .bowRecoveryTicksRemaining()
                                                                                                     + "t)"
                                                                                             : "IDLE")
+                                                            + " | crossbow="
+                                                            + status.crossbowPhase()
+                                                                    .map(Enum::name)
+                                                                    .orElse("IDLE")
+                                                            + (status
+                                                                                    .crossbowRecoveryTicksRemaining()
+                                                                            > 0
+                                                                    ? "(recovery="
+                                                                            + status
+                                                                                    .crossbowRecoveryTicksRemaining()
+                                                                            + "t)"
+                                                                    : "")
+                                                            + (status
+                                                                            .crossbowCheckpointCommitPending()
+                                                                    ? "(COMMITTING)"
+                                                                    : "")
                                                             + " | projectiles="
                                                             + status.activeProjectiles()
                                                             + " | ammo="
                                                             + status.selectedAmmo()
                                                                     .map(ammo -> ammo.value() + "=")
                                                                     .orElse("none=")
-                                                            + status.bowAmmoQuantity()
+                                                            + status.selectedAmmoQuantity()
                                                             + (status.bowAmmoCommitPending()
                                                                     ? "(COMMITTING)"
                                                                     : "")

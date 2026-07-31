@@ -89,6 +89,23 @@
               "maximum" : 0.4
             }
           }
+        },
+        "crossbow" : {
+          "type" : "object",
+          "properties" : {
+            "bolt_placement_ticks" : {
+              "type" : "integer",
+              "description" : "Ticks before a selected bolt binds durably to the Crossbow.",
+              "x-unit" : "ticks",
+              "minimum" : 1.0
+            },
+            "locking_ticks" : {
+              "type" : "integer",
+              "description" : "Ticks from the BOLT_PLACED checkpoint to LOADED.",
+              "x-unit" : "ticks",
+              "minimum" : 1.0
+            }
+          }
         }
       }
     },

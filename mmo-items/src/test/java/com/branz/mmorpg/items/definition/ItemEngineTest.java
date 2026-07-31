@@ -192,6 +192,50 @@ class ItemEngineTest {
                 ((Result.Failure<ItemEngine, ItemEngineErrorCode>) missing).error());
     }
 
+    @Test
+    void compilesCrossbowCheckpointsAndRejectsMissingCrossbowContract() throws Exception {
+        String valid =
+                """
+                {
+                  "asset_id": "weapon.test.crossbow",
+                  "item_class": "UNIQUE_DURABLE",
+                  "base_max_durability": 120,
+                  "weapon_profile": {
+                    "family": "CROSSBOW",
+                    "power": 110,
+                    "crossbow": {
+                      "bolt_placement_ticks": 12,
+                      "locking_ticks": 8
+                    }
+                  }
+                }
+                """;
+
+        Result<ItemEngine, ItemEngineErrorCode> compiled =
+                ItemEngine.compile(snapshot(definition("weapon.test.crossbow", valid)));
+        Result<ItemEngine, ItemEngineErrorCode> rejected =
+                ItemEngine.compile(
+                        snapshot(
+                                definition(
+                                        "weapon.test.crossbow",
+                                        valid.replace("\"crossbow\": {", "\"ignored\": {"))));
+
+        CrossbowWeaponProfile crossbow =
+                ((Result.Success<ItemEngine, ItemEngineErrorCode>) compiled)
+                        .value()
+                        .find(DefinitionId.of("weapon.test.crossbow"))
+                        .orElseThrow()
+                        .weaponProfile()
+                        .orElseThrow()
+                        .crossbowProfile()
+                        .orElseThrow();
+        assertEquals(12, crossbow.boltPlacementTicks());
+        assertEquals(8, crossbow.lockingTicks());
+        assertEquals(
+                ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID,
+                ((Result.Failure<ItemEngine, ItemEngineErrorCode>) rejected).error());
+    }
+
     private static ContentDefinition definition(String id, String body) throws Exception {
         return new ContentDefinition(
                 DefinitionId.of(id),

@@ -1,0 +1,13 @@
+definition_id: weapon.training_crossbow
+schema_version: 1
+asset_id: weapon.training_crossbow
+item_class: UNIQUE_DURABLE
+base_max_durability: 120
+weapon_profile:
+  family: CROSSBOW
+  power: 110
+  crossbow:
+    bolt_placement_ticks: 12
+    locking_ticks: 8
+status: approved
+owning_team: combat

@@ -79,10 +79,12 @@ commit boundary; transient encounter effects are intentionally not reconstructed
 **Done when:** anti-dummy tests, boss retry and qualitative feedback pass.
 
 **Implementation status (`newmmo`): In progress.** The deterministic Mastery/Body Conditioning
-evidence kernel and local Progression Evidence Lab are implemented with bounded factors,
-idempotency input, soft repetition/daily decay, five qualitative readiness bands and explicit
-anti-dummy suppression. Durable batching, live encounter emission, learning/teaching/Renown,
-Flask/consumables/ailments and boss snapshot restore remain before Milestone 6 completion.
+evidence kernel, durable PostgreSQL evidence batches and Player Session reload path are implemented
+with bounded factors, exact idempotent replay, atomic conflict rollback, soft repetition/daily
+decay, five qualitative readiness bands and explicit anti-dummy suppression. The local dev tools
+can simulate without mutation or persist a fixed evidence UUID to verify reconnect/restart behavior.
+Live encounter emission, learning/teaching/Renown, Flask/consumables/ailments and boss snapshot
+restore remain before Milestone 6 completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

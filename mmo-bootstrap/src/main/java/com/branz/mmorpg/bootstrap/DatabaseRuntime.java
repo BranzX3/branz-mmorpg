@@ -8,6 +8,8 @@ import com.branz.mmorpg.persistence.migration.ClasspathMigrationCatalog;
 import com.branz.mmorpg.persistence.migration.MigrationCatalog;
 import com.branz.mmorpg.persistence.migration.MigrationErrorCode;
 import com.branz.mmorpg.persistence.migration.PostgresMigrationRunner;
+import com.branz.mmorpg.persistence.progression.JdbcProgressionEvidenceRepository;
+import com.branz.mmorpg.persistence.progression.ProgressionEvidenceRepository;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcReconciliationScanner;
@@ -30,6 +32,7 @@ final class DatabaseRuntime implements AutoCloseable {
     private final CharacterLeaseRepository leases;
     private final ValueTransactionService values;
     private final CharacterBuildRepository builds;
+    private final ProgressionEvidenceRepository progression;
     private final ReconciliationScanner reconciliation;
     private final ServerInstanceId serverInstanceId;
 
@@ -44,6 +47,7 @@ final class DatabaseRuntime implements AutoCloseable {
         leases = new JdbcCharacterLeaseRepository(dataSource);
         values = new JdbcValueTransactionService(dataSource);
         builds = new JdbcCharacterBuildRepository(dataSource);
+        progression = new JdbcProgressionEvidenceRepository(dataSource);
         reconciliation = new JdbcReconciliationScanner(dataSource);
         serverInstanceId =
                 new ServerInstanceId(
@@ -104,6 +108,10 @@ final class DatabaseRuntime implements AutoCloseable {
 
     CharacterBuildRepository builds() {
         return builds;
+    }
+
+    ProgressionEvidenceRepository progression() {
+        return progression;
     }
 
     ReconciliationScanner reconciliation() {

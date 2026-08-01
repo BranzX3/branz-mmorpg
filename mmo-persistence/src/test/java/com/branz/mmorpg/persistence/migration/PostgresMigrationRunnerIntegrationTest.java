@@ -55,22 +55,23 @@ class PostgresMigrationRunnerIntegrationTest {
         Result<MigrationReport, MigrationErrorCode> second = runner.migrate(catalog);
 
         assertTrue(first.isSuccess());
-        assertEquals(List.of(1, 2, 3, 4), success(first).appliedVersions());
+        assertEquals(List.of(1, 2, 3, 4, 5), success(first).appliedVersions());
         assertTrue(second.isSuccess());
         assertEquals(List.of(), success(second).appliedVersions());
-        assertEquals(4, scalarInt("SELECT COUNT(*) FROM mmo_schema_migrations"));
+        assertEquals(5, scalarInt("SELECT COUNT(*) FROM mmo_schema_migrations"));
         assertEquals(
                 1,
                 scalarInt("SELECT COUNT(*) FROM pg_type WHERE typname = 'mmo_transaction_state'"));
         assertEquals(
-                6,
+                8,
                 scalarInt(
                         "SELECT COUNT(*) FROM information_schema.tables "
                                 + "WHERE table_schema = 'public' "
                                 + "AND table_name IN ("
                                 + "'character_leases', 'transaction_journal', "
                                 + "'item_instance', 'commodity_lot', 'audit_log', "
-                                + "'character_build_state')"));
+                                + "'character_build_state', 'character_progression_track', "
+                                + "'combat_progression_evidence')"));
     }
 
     @Test

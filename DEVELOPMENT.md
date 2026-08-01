@@ -392,9 +392,20 @@ After joining the local Paper server as an operator/test account with an active 
 99. Simulate `repeated`; verify the candidate remains accepted with a small positive award, proving
     repetition/daily decay is soft rather than a hard cap.
 
-The lab is non-authoritative test presentation: it creates no evidence row and cannot alter a
-character. Persistent evidence and live encounter emission are intentionally deferred to the next
-Milestone 6 slice.
+The simulation lab is non-authoritative test presentation: it creates no evidence row and cannot
+alter a character. The following developer-only commands exercise the durable path; live encounter
+emission is still deferred to the next Milestone 6 slice.
+
+100. Run `/mmo progression status`; a new character must report `no meaningful evidence yet`.
+101. Choose a UUID and run `/mmo progression record meaningful <uuid>`. Verify a positive
+     `PERSISTED` award, then run `/mmo progression status` and verify a qualitative
+     `mastery.greatsword` readiness band without an exact value.
+102. Run the exact record command again. Verify `PERSISTED REPLAY`, the same decision and no band or
+     track-version advance. Reusing that UUID for another scenario must report
+     `PROGRESSION_EVIDENCE_ID_CONFLICT` and leave the previous state intact.
+103. Disconnect/reconnect, then stop and restart Paper. `/mmo progression status` must restore the
+     same qualitative band. Record `invulnerable` with a fresh UUID and verify a zero-award
+     suppressed row without track advancement.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

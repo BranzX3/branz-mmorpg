@@ -1634,3 +1634,38 @@ idempotent batching and live encounter evidence emission belong to the next Mile
 Schema/config/migration impact: no content-schema or SQL migration. The authoritative subsystem
 spec and default balance targets now define the previously unspecified V1 evidence curve. The
 authority and follow-up migration boundary are documented by ADR 0015.
+
+## Milestone 6 - durable progression evidence and Player Session slice
+
+Implemented:
+
+- PostgreSQL migration V0005 adds a durable combat progression evidence journal and current
+  per-character Mastery/Conditioning track projection;
+- bounded one-character batches resolve sequentially under a transaction advisory lock and commit
+  accepted/suppressed decisions plus track updates atomically;
+- exact evidence UUID replay returns the stored decision without another award, while mismatched
+  reuse rejects and rolls back the complete batch;
+- 30-minute novelty and per-track UTC-day evidence context are reconstructed from committed
+  database truth;
+- Player Session loads progression tracks on join/reload and serializes successful mutations before
+  publishing the reloaded snapshot;
+- `/mmo progression status` exposes qualitative bands and `/mmo progression record <scenario>
+  [evidence-uuid]` provides an environment-gated persistent test path.
+
+Tests and completion evidence:
+
+- repository integration covers sequential awards, repetition, replay after repository restart,
+  suppressed journaling, mixed-character rejection and atomic UUID-conflict rollback;
+- Player Session integration covers record, reconnect, database restart and exact replay without a
+  track version or evidence increase;
+- migration tests validate five ordered migrations and both new tables.
+
+Failure/recovery behavior: database or validation failure retains the previous active session
+snapshot. Suppressed evidence is auditable, failed batches leave no partial rows, and successful
+writes reload database truth before later session mutations.
+
+Milestone status: **Milestone 6 remains in progress.** Live encounter evidence emission,
+learning/teaching/Renown, Flask/consumables/ailments, Rest Context and boss Flask snapshot remain.
+
+Schema/config/migration impact: forward migration V0005 adds two tables and two indexes. No content
+schema or configuration change is required; ADR 0016 owns the transaction and recovery decision.

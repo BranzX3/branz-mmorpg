@@ -57,7 +57,7 @@ award = base
   `[0.75,0.95]` is `1.25`; unsafe stress above `0.95` is `0.75` only after victory and otherwise
   `0.25`.
 - Accepted daily evidence below `100` uses `1.00`, `[100,250)` uses `0.50`, and `250+` uses
-  `0.25`. This curve never becomes a hard cap.
+  `0.25`. A daily window is the current UTC calendar day. This curve never becomes a hard cap.
 
 Training dummies can advance only introductory familiarity through evidence `25`. Invulnerable
 targets, self-created loops, zero-risk interactions, duplicate evidence UUIDs, abandoned outcomes
@@ -65,6 +65,20 @@ and far-below-capability encounters award exactly zero with a stable suppression
 qualitative bands start at `0`, `100`, `300`, `600` and `850`: Unfamiliar, Developing, Reliable,
 Refined and Exceptional. Crossing evidence readiness does not bypass an authored breakthrough or
 knowledge prerequisite.
+
+### Durable evidence batch contract
+
+Accepted and suppressed candidates are written to the durable evidence journal before the result
+is returned to a live character session. A batch contains between one and 256 candidates for one
+character and resolves in list order inside one PostgreSQL transaction. The repository locks the
+character, rebuilds the current track, 30-minute novelty and current-UTC-day context from database
+truth, then evaluates the same pure resolver used by tests.
+
+The evidence UUID is the idempotency key. Repeating the exact immutable candidate returns the
+stored decision and does not advance a track version; reusing that UUID for different input rejects
+and rolls back the whole batch. Suppressed evidence remains journaled for audit and anti-abuse
+inspection even when no track row exists. A successful Player Session mutation reloads track state
+from the database before publishing its new snapshot.
 
 ## Mastery effects
 

@@ -14,6 +14,7 @@ import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.progression.build.CharacterBuild;
+import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -605,6 +606,47 @@ final class CharacterSessionController implements Listener {
                         });
     }
 
+    void recordProgressionEvidence(
+            Player player,
+            List<EvidenceCandidate> candidates,
+            Consumer<Result<ProgressionEvidenceCommitResult, CharacterSessionErrorCode>>
+                    completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(candidates, "candidates");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                            "Another durable character mutation is in progress."));
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<ProgressionEvidenceCommitResult, CharacterSessionErrorCode>
+                                    result =
+                                            sessions.recordProgressionEvidence(session, candidates);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeProgressionMutation(
+                                                            session, result, completion));
+                        });
+    }
+
     void shutdown() {
         if (heartbeatTaskId >= 0) {
             plugin.getServer().getScheduler().cancelTask(heartbeatTaskId);
@@ -892,6 +934,38 @@ final class CharacterSessionController implements Listener {
             applyProjectionIfReady(player, false);
         }
         completion.accept(Result.success(updated));
+    }
+
+    private void completeProgressionMutation(
+            LoadedCharacterSession previous,
+            Result<ProgressionEvidenceCommitResult, CharacterSessionErrorCode> result,
+            Consumer<Result<ProgressionEvidenceCommitResult, CharacterSessionErrorCode>>
+                    completion) {
+        UUID playerId = previous.characterId().value();
+        valueMutationInFlight.remove(playerId);
+        LoadedCharacterSession current = active.get(playerId);
+        if (current == null || !current.sessionId().equals(previous.sessionId())) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session changed before progression commit completed."));
+            return;
+        }
+        if (result
+                instanceof
+                Result.Failure<ProgressionEvidenceCommitResult, CharacterSessionErrorCode>) {
+            completion.accept(result);
+            return;
+        }
+        ProgressionEvidenceCommitResult committed =
+                ((Result.Success<ProgressionEvidenceCommitResult, CharacterSessionErrorCode>)
+                                result)
+                        .value();
+        LoadedCharacterSession updated = current.withSnapshot(committed.session().snapshot());
+        active.put(playerId, updated);
+        completion.accept(
+                Result.success(
+                        new ProgressionEvidenceCommitResult(updated, committed.executions())));
     }
 
     private void runCrossbowMutation(

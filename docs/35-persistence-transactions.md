@@ -27,6 +27,18 @@ On login, the server acquires a lease keyed by character ID with server instance
 - lifeskill evidence;
 - telemetry and non-critical presentation preferences.
 
+Combat progression uses `combat_progression_evidence` as its durable, append-only decision journal
+and `character_progression_track` as the current per-character projection. The repository accepts
+one to 256 candidates for one character, obtains a transaction-scoped PostgreSQL advisory lock for
+that character and resolves candidates sequentially against database truth. Track updates and all
+accepted or suppressed journal rows commit atomically.
+
+An exact retry of an existing evidence UUID returns the stored decision without another track
+update. Reusing an evidence UUID with different immutable input is an idempotency conflict and
+rolls back the batch. Repetition context is reconstructed from accepted matching fingerprints in
+the preceding 30 minutes; per-track daily context is reconstructed from accepted awards since
+00:00 UTC.
+
 ### Derived/cache
 
 - calculated stats;

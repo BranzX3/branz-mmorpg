@@ -11,6 +11,8 @@ import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.persistence.progression.ProgressionEvidenceExecution;
+import com.branz.mmorpg.persistence.progression.ProgressionTrackRecord;
 import com.branz.mmorpg.progression.evidence.EncounterOutcome;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import com.branz.mmorpg.progression.evidence.EvidenceContext;
@@ -18,6 +20,7 @@ import com.branz.mmorpg.progression.evidence.EvidenceDecision;
 import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
 import com.branz.mmorpg.progression.evidence.ProgressionEvidenceEngine;
 import com.branz.mmorpg.progression.evidence.ProgressionTrack;
+import com.branz.mmorpg.progression.evidence.ReadinessBand;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -132,7 +135,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
             return true;
         }
         sender.sendMessage(
-                "Usage: /mmo <health|dev|combat debug|combat trace export|progression simulate>");
+                "Usage: /mmo <health|dev|combat debug|combat trace export|progression status|progression simulate|progression record>");
         return true;
     }
 
@@ -148,11 +151,31 @@ final class MmoCommandController implements CommandExecutor, Listener {
                             NamedTextColor.RED));
             return;
         }
-        if (args.length < 3 || !"simulate".equalsIgnoreCase(args[1])) {
+        if (args.length >= 2 && "status".equalsIgnoreCase(args[1])) {
+            showProgressionStatus(player);
+            return;
+        }
+        if (args.length < 3) {
             progressionUsage(player);
             return;
         }
-        simulateProgressionEvidence(player, args[2].toLowerCase(Locale.ROOT));
+        String scenario = args[2].toLowerCase(Locale.ROOT);
+        if ("simulate".equalsIgnoreCase(args[1])) {
+            simulateProgressionEvidence(player, scenario);
+            return;
+        }
+        if ("record".equalsIgnoreCase(args[1])) {
+            UUID evidenceId;
+            try {
+                evidenceId = args.length >= 4 ? UUID.fromString(args[3]) : UUID.randomUUID();
+            } catch (IllegalArgumentException exception) {
+                player.sendMessage(Component.text("Evidence UUID is invalid.", NamedTextColor.RED));
+                return;
+            }
+            recordProgressionEvidence(player, scenario, evidenceId);
+            return;
+        }
+        progressionUsage(player);
     }
 
     private void handleCombatTool(CommandSender sender, String[] args) {
@@ -364,6 +387,15 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                             Component.text(
                                                     "Character DB session: LOADING",
                                                     NamedTextColor.YELLOW)));
+            characterSessions
+                    .active(player)
+                    .ifPresent(
+                            session ->
+                                    sender.sendMessage(
+                                            Component.text(
+                                                    progressionSummary(
+                                                            session.snapshot().progressionTracks()),
+                                                    NamedTextColor.LIGHT_PURPLE)));
             combatSessions
                     .status(player)
                     .ifPresentOrElse(
@@ -527,21 +559,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
             return;
         }
         EvidenceCandidate candidate =
-                new EvidenceCandidate(
-                        UUID.randomUUID(),
-                        new CharacterId(player.getUniqueId()),
-                        new EncounterId(UUID.randomUUID()),
-                        ProgressionTrack.mastery("greatsword"),
-                        "dev-lab-move-set-a",
-                        snapshot.manifest().contentVersion(),
-                        selected.targetKind(),
-                        selected.outcome(),
-                        10.0,
-                        selected.challengeRating(),
-                        100.0,
-                        0.8,
-                        0.8,
-                        0.8);
+                progressionCandidate(player, scenario, selected, snapshot, UUID.randomUUID());
         EvidenceDecision decision = progressionEvidence.evaluate(candidate, selected.context());
         NamedTextColor color = decision.accepted() ? NamedTextColor.GREEN : NamedTextColor.YELLOW;
         player.sendMessage(
@@ -565,10 +583,132 @@ final class MmoCommandController implements CommandExecutor, Listener {
                         NamedTextColor.GRAY));
     }
 
+    private void recordProgressionEvidence(Player player, String scenario, UUID evidenceId) {
+        if (!characterSessions.ready(player)) {
+            player.sendMessage(
+                    Component.text("Character session is not ready.", NamedTextColor.RED));
+            return;
+        }
+        ProgressionScenario selected = ProgressionScenario.resolve(scenario);
+        ContentSnapshot snapshot = snapshotSource.get();
+        if (selected == null || snapshot == null) {
+            progressionUsage(player);
+            return;
+        }
+        EvidenceCandidate candidate =
+                progressionCandidate(player, scenario, selected, snapshot, evidenceId);
+        player.sendMessage(
+                Component.text("Recording progression evidence…", NamedTextColor.YELLOW));
+        characterSessions.recordProgressionEvidence(
+                player,
+                List.of(candidate),
+                result -> {
+                    if (result
+                            instanceof
+                            Result.Failure<
+                                            ProgressionEvidenceCommitResult,
+                                            CharacterSessionErrorCode>
+                                    failure) {
+                        player.sendMessage(
+                                Component.text(
+                                        "Progression record failed: "
+                                                + failure.error().code()
+                                                + " "
+                                                + failure.detail(),
+                                        NamedTextColor.RED));
+                        return;
+                    }
+                    ProgressionEvidenceExecution execution =
+                            ((Result.Success<
+                                                    ProgressionEvidenceCommitResult,
+                                                    CharacterSessionErrorCode>)
+                                            result)
+                                    .value()
+                                    .executions()
+                                    .getFirst();
+                    EvidenceDecision decision = execution.evidence().decision();
+                    player.sendMessage(
+                            Component.text(
+                                    "Progression Evidence Lab ["
+                                            + scenario
+                                            + "]: PERSISTED"
+                                            + (execution.replayed() ? " REPLAY" : "")
+                                            + " | award="
+                                            + String.format(
+                                                    Locale.ROOT, "%.5f", decision.awardedEvidence())
+                                            + " | band="
+                                            + decision.previousBand()
+                                            + "->"
+                                            + decision.resultingBand()
+                                            + " | reason="
+                                            + decision.suppressionReason()
+                                            + " | evidence-id="
+                                            + evidenceId,
+                                    decision.accepted()
+                                            ? NamedTextColor.GREEN
+                                            : NamedTextColor.YELLOW));
+                });
+    }
+
+    private static EvidenceCandidate progressionCandidate(
+            Player player,
+            String scenario,
+            ProgressionScenario selected,
+            ContentSnapshot snapshot,
+            UUID evidenceId) {
+        return new EvidenceCandidate(
+                evidenceId,
+                new CharacterId(player.getUniqueId()),
+                new EncounterId(evidenceId),
+                ProgressionTrack.mastery("greatsword"),
+                "dev-lab-" + scenario,
+                snapshot.manifest().contentVersion(),
+                selected.targetKind(),
+                selected.outcome(),
+                10.0,
+                selected.challengeRating(),
+                100.0,
+                0.8,
+                0.8,
+                0.8);
+    }
+
+    private void showProgressionStatus(Player player) {
+        characterSessions
+                .active(player)
+                .ifPresentOrElse(
+                        session ->
+                                player.sendMessage(
+                                        Component.text(
+                                                progressionSummary(
+                                                        session.snapshot().progressionTracks()),
+                                                NamedTextColor.LIGHT_PURPLE)),
+                        () ->
+                                player.sendMessage(
+                                        Component.text(
+                                                "Character session is not ready.",
+                                                NamedTextColor.RED)));
+    }
+
+    private static String progressionSummary(List<ProgressionTrackRecord> tracks) {
+        if (tracks.isEmpty()) {
+            return "Progression readiness: no meaningful evidence yet";
+        }
+        return "Progression readiness: "
+                + tracks.stream()
+                        .map(
+                                track ->
+                                        track.track().id().value()
+                                                + "="
+                                                + ReadinessBand.fromEvidence(track.evidence()))
+                        .collect(java.util.stream.Collectors.joining(", "));
+    }
+
     private static void progressionUsage(Player player) {
         player.sendMessage(
-                "Usage: /mmo progression simulate "
-                        + "<meaningful|dummy-intro|dummy-capped|invulnerable|loop|zero-risk|low-challenge|repeated>");
+                "Usage: /mmo progression <status|simulate|record> "
+                        + "<meaningful|dummy-intro|dummy-capped|invulnerable|loop|zero-risk|low-challenge|repeated> "
+                        + "[evidence-uuid]");
     }
 
     private void openDevHub(Player player) {

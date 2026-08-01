@@ -16,6 +16,9 @@ import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.lease.CharacterLease;
 import com.branz.mmorpg.persistence.lease.LeaseAcquireOutcome;
 import com.branz.mmorpg.persistence.lease.LeaseErrorCode;
+import com.branz.mmorpg.persistence.progression.ProgressionEvidenceExecution;
+import com.branz.mmorpg.persistence.progression.ProgressionPersistenceErrorCode;
+import com.branz.mmorpg.persistence.progression.ProgressionTrackRecord;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildCommit;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildCommitExecution;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRecord;
@@ -39,6 +42,7 @@ import com.branz.mmorpg.progression.build.BuildErrorCode;
 import com.branz.mmorpg.progression.build.BuildResolution;
 import com.branz.mmorpg.progression.build.CharacterBuild;
 import com.branz.mmorpg.progression.build.CharacterBuildJsonCodec;
+import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -125,6 +129,15 @@ final class CharacterSessionService {
             releaseQuietly(characterId, sessionId, lease);
             return persistenceFailure(failure.error(), failure.detail());
         }
+        Result<List<ProgressionTrackRecord>, ProgressionPersistenceErrorCode> progressionRows =
+                database.progression().findTracks(characterId);
+        if (progressionRows
+                instanceof
+                Result.Failure<List<ProgressionTrackRecord>, ProgressionPersistenceErrorCode>
+                        failure) {
+            releaseQuietly(characterId, sessionId, lease);
+            return persistenceFailure(failure.error(), failure.detail());
+        }
         try {
             PersistentCharacterSnapshot snapshot =
                     PersistentCharacterSnapshotMapper.map(
@@ -136,6 +149,11 @@ final class CharacterSessionService {
                                     .value(),
                             ((Result.Success<Optional<CharacterBuildRecord>, TransactionErrorCode>)
                                             buildRow)
+                                    .value(),
+                            ((Result.Success<
+                                                    List<ProgressionTrackRecord>,
+                                                    ProgressionPersistenceErrorCode>)
+                                            progressionRows)
                                     .value());
             Result<BuildResolution, BuildErrorCode> buildResolution =
                     buildEngine.resolve(snapshot.build());
@@ -842,6 +860,48 @@ final class CharacterSessionService {
         return reload(session);
     }
 
+    Result<ProgressionEvidenceCommitResult, CharacterSessionErrorCode> recordProgressionEvidence(
+            LoadedCharacterSession session, List<EvidenceCandidate> candidates) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(candidates, "candidates");
+        if (candidates.stream()
+                .anyMatch(candidate -> !candidate.characterId().equals(session.characterId()))) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Progression evidence character does not own this session.");
+        }
+        Result<List<ProgressionEvidenceExecution>, ProgressionPersistenceErrorCode> recorded =
+                database.progression().recordBatch(candidates);
+        if (recorded
+                instanceof
+                Result.Failure<List<ProgressionEvidenceExecution>, ProgressionPersistenceErrorCode>
+                        failure) {
+            CharacterSessionErrorCode error =
+                    failure.error()
+                                    == ProgressionPersistenceErrorCode
+                                            .PROGRESSION_DATABASE_UNAVAILABLE
+                            ? CharacterSessionErrorCode.CHARACTER_PERSISTENCE_UNAVAILABLE
+                            : CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED;
+            return Result.failure(error, failure.error().code() + ": " + failure.detail());
+        }
+        Result<LoadedCharacterSession, CharacterSessionErrorCode> reloaded = reload(session);
+        if (reloaded
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            return Result.failure(failure.error(), failure.detail());
+        }
+        return Result.success(
+                new ProgressionEvidenceCommitResult(
+                        ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                        reloaded)
+                                .value(),
+                        ((Result.Success<
+                                                List<ProgressionEvidenceExecution>,
+                                                ProgressionPersistenceErrorCode>)
+                                        recorded)
+                                .value()));
+    }
+
     void close(LoadedCharacterSession session) {
         Objects.requireNonNull(session, "session");
         releaseQuietly(session.characterId(), session.sessionId(), session.lease());
@@ -868,6 +928,14 @@ final class CharacterSessionService {
                 Result.Failure<Optional<CharacterBuildRecord>, TransactionErrorCode> failure) {
             return persistenceFailure(failure.error(), failure.detail());
         }
+        Result<List<ProgressionTrackRecord>, ProgressionPersistenceErrorCode> progressionRows =
+                database.progression().findTracks(session.characterId());
+        if (progressionRows
+                instanceof
+                Result.Failure<List<ProgressionTrackRecord>, ProgressionPersistenceErrorCode>
+                        failure) {
+            return persistenceFailure(failure.error(), failure.detail());
+        }
         try {
             PersistentCharacterSnapshot snapshot =
                     PersistentCharacterSnapshotMapper.map(
@@ -879,6 +947,11 @@ final class CharacterSessionService {
                                     .value(),
                             ((Result.Success<Optional<CharacterBuildRecord>, TransactionErrorCode>)
                                             buildRow)
+                                    .value(),
+                            ((Result.Success<
+                                                    List<ProgressionTrackRecord>,
+                                                    ProgressionPersistenceErrorCode>)
+                                            progressionRows)
                                     .value());
             return Result.success(
                     new LoadedCharacterSession(

@@ -45,6 +45,6 @@ or cancellation cannot create partial progression.
 
 ## Migration impact
 
-None in this slice. No database row is written. The follow-up durable batching slice must add an
-idempotent forward migration for per-track state and evidence UUID history; old runtimes must not
-write that schema after activation.
+The resolver slice itself writes no database row. The follow-up durable batching decision is now
+implemented by forward migration V0005 and ADR 0016; old runtimes must not write the new schema
+after activation.

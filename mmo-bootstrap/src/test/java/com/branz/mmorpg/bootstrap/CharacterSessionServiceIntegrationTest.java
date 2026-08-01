@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.branz.mmorpg.api.identity.DefinitionId;
+import com.branz.mmorpg.api.identity.EncounterId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
@@ -27,8 +28,13 @@ import com.branz.mmorpg.progression.build.BuildEngine;
 import com.branz.mmorpg.progression.build.BuildErrorCode;
 import com.branz.mmorpg.progression.build.CharacterBuild;
 import com.branz.mmorpg.progression.build.MovesetBranch;
+import com.branz.mmorpg.progression.evidence.EncounterOutcome;
+import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
+import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
+import com.branz.mmorpg.progression.evidence.ProgressionTrack;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -37,6 +43,94 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CharacterSessionServiceIntegrationTest {
+    @Test
+    void progressionEvidenceSurvivesReconnectAndDatabaseRestart(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(10));
+        UUID playerId = UUID.randomUUID();
+        UUID evidenceId = UUID.randomUUID();
+        ProgressionTrack track = ProgressionTrack.mastery("greatsword");
+        EvidenceCandidate candidate;
+        double persistedEvidence;
+        long persistedVersion;
+
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database);
+            LoadedCharacterSession session = success(service.open(playerId));
+            candidate =
+                    new EvidenceCandidate(
+                            evidenceId,
+                            session.characterId(),
+                            new EncounterId(UUID.randomUUID()),
+                            track,
+                            "integration-meaningful-greatsword",
+                            "content.test.1",
+                            EvidenceTargetKind.MEANINGFUL_ENCOUNTER,
+                            EncounterOutcome.VICTORY,
+                            10.0,
+                            120.0,
+                            100.0,
+                            0.8,
+                            0.9,
+                            0.7);
+            ProgressionEvidenceCommitResult committed =
+                    progressionSuccess(
+                            service.recordProgressionEvidence(session, List.of(candidate)));
+            assertEquals(1, committed.executions().size());
+            assertTrue(!committed.executions().getFirst().replayed());
+            assertEquals(1, committed.session().snapshot().progressionTracks().size());
+            var persistedTrack = committed.session().snapshot().progressionTracks().getFirst();
+            assertEquals(track, persistedTrack.track());
+            assertTrue(persistedTrack.evidence() > 0.0);
+            persistedEvidence = persistedTrack.evidence();
+            persistedVersion = persistedTrack.version();
+            service.close(committed.session());
+
+            LoadedCharacterSession reconnected = success(service.open(playerId));
+            assertEquals(
+                    persistedEvidence,
+                    reconnected.snapshot().progressionTracks().getFirst().evidence());
+            assertEquals(
+                    persistedVersion,
+                    reconnected.snapshot().progressionTracks().getFirst().version());
+            service.close(reconnected);
+        }
+
+        try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(restarted);
+            LoadedCharacterSession restored = success(service.open(playerId));
+            assertEquals(
+                    persistedEvidence,
+                    restored.snapshot().progressionTracks().getFirst().evidence());
+            assertEquals(
+                    persistedVersion, restored.snapshot().progressionTracks().getFirst().version());
+
+            ProgressionEvidenceCommitResult replayed =
+                    progressionSuccess(
+                            service.recordProgressionEvidence(restored, List.of(candidate)));
+            assertTrue(replayed.executions().getFirst().replayed());
+            assertEquals(
+                    persistedEvidence,
+                    replayed.session().snapshot().progressionTracks().getFirst().evidence());
+            assertEquals(
+                    persistedVersion,
+                    replayed.session().snapshot().progressionTracks().getFirst().version());
+            service.close(replayed.session());
+        }
+    }
+
     @Test
     void committedBuildSurvivesDatabaseRestart(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
@@ -736,6 +830,25 @@ class CharacterSessionServiceIntegrationTest {
                     return "";
                 });
         return ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result).value();
+    }
+
+    private static ProgressionEvidenceCommitResult progressionSuccess(
+            Result<ProgressionEvidenceCommitResult, CharacterSessionErrorCode> result) {
+        assertTrue(
+                result.isSuccess(),
+                () -> {
+                    if (result
+                            instanceof
+                            Result.Failure<
+                                            ProgressionEvidenceCommitResult,
+                                            CharacterSessionErrorCode>
+                                    failure) {
+                        return failure.error() + ": " + failure.detail();
+                    }
+                    return "";
+                });
+        return ((Result.Success<ProgressionEvidenceCommitResult, CharacterSessionErrorCode>) result)
+                .value();
     }
 
     private static CrossbowPersistentState crossbowState(

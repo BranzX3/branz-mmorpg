@@ -1,0 +1,13 @@
+definition_id: food.training_meal
+schema_version: 1
+asset_id: food.training_meal
+item_class: STACKABLE_LOT
+consumable_profile:
+  category: MEAL
+  windup_ticks: 40
+  commit_tick: 30
+  recovery_ticks: 20
+  effect_duration_ticks: 2400
+  rare: false
+status: approved
+owning_team: progression

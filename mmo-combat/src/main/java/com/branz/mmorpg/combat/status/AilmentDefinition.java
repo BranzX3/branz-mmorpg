@@ -14,7 +14,11 @@ public record AilmentDefinition(
         int maximumTier,
         String resistanceChannel,
         Set<String> cleanseTags,
-        AilmentPersistence persistence) {
+        AilmentPersistence persistence,
+        double pveMultiplier,
+        double pvpMultiplier,
+        String visualCue,
+        String audioCue) {
     public AilmentDefinition {
         Objects.requireNonNull(type, "type");
         if (!Double.isFinite(buildupMaximum)
@@ -37,6 +41,42 @@ public record AilmentDefinition(
             throw new IllegalArgumentException("cleanseTags must contain non-blank entries");
         }
         Objects.requireNonNull(persistence, "persistence");
+        if (!Double.isFinite(pveMultiplier)
+                || pveMultiplier <= 0
+                || !Double.isFinite(pvpMultiplier)
+                || pvpMultiplier <= 0) {
+            throw new IllegalArgumentException("ailment profile multipliers must be positive");
+        }
+        visualCue = requireText(visualCue, "visualCue");
+        audioCue = requireText(audioCue, "audioCue");
+    }
+
+    public AilmentDefinition(
+            AilmentType type,
+            double buildupMaximum,
+            int buildupDecayDelayTicks,
+            double buildupDecayPerTick,
+            int activeDurationTicks,
+            AilmentReapplication reapplication,
+            int maximumTier,
+            String resistanceChannel,
+            Set<String> cleanseTags,
+            AilmentPersistence persistence) {
+        this(
+                type,
+                buildupMaximum,
+                buildupDecayDelayTicks,
+                buildupDecayPerTick,
+                activeDurationTicks,
+                reapplication,
+                maximumTier,
+                resistanceChannel,
+                cleanseTags,
+                persistence,
+                1,
+                1,
+                "status.generic",
+                "status.generic");
     }
 
     private static String requireText(String value, String name) {

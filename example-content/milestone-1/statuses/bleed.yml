@@ -1,0 +1,14 @@
+definition_id: status.bleed
+schema_version: 1
+ailment_type: BLEED
+buildup_max: 100
+buildup_decay_delay_ticks: 80
+buildup_decay_per_tick: 0.5
+active_duration_ticks: 200
+reapplication: INTENSIFY
+maximum_tier: 3
+resistance_channel: PHYSICAL
+cleanse_tags: [BANDAGE, BLEED_REMEDY]
+persistence: CLEAR_ON_DEATH
+profiles: {pve_multiplier: 1.0, pvp_multiplier: 0.65}
+presentation: {visual_cue: status.bleed.wound, audio_cue: status.bleed.pulse}

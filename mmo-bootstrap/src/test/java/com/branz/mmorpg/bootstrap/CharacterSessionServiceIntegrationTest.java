@@ -764,7 +764,7 @@ class CharacterSessionServiceIntegrationTest {
                         4,
                         Duration.ofSeconds(5),
                         true,
-                        Duration.ofSeconds(30),
+                        Duration.ofMinutes(5),
                         Duration.ofSeconds(10));
         UUID playerId = UUID.randomUUID();
         try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {

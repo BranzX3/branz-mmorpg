@@ -304,7 +304,51 @@ public final class DefinitionSchemas {
                                         0,
                                         null,
                                         "stability",
-                                        "Shield stability restored after Guard Break.")),
+                                        "Shield stability restored after Guard Break."),
+                                optionalAllowed(
+                                        "consumable_profile.category",
+                                        STRING,
+                                        Set.of(
+                                                "BODY_TONIC",
+                                                "ELEMENTAL_WARD",
+                                                "WEAPON_COATING",
+                                                "UTILITY_PREPARATION",
+                                                "MEAL"),
+                                        "",
+                                        "Exclusive active-effect category."),
+                                optionalRanged(
+                                        "consumable_profile.windup_ticks",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "ticks",
+                                        "Use windup duration."),
+                                optionalRanged(
+                                        "consumable_profile.commit_tick",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "ticks",
+                                        "Consumption commit offset."),
+                                optionalRanged(
+                                        "consumable_profile.recovery_ticks",
+                                        INTEGER,
+                                        0,
+                                        null,
+                                        "ticks",
+                                        "Post-use recovery duration."),
+                                optionalRanged(
+                                        "consumable_profile.effect_duration_ticks",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "ticks",
+                                        "Active effect duration."),
+                                optional(
+                                        "consumable_profile.rare",
+                                        BOOLEAN,
+                                        "",
+                                        "Whether replacement requires confirmation.")),
                         List.of(to(DefinitionType.TRAIT, "traits", "authored_pool", "*"))));
         schemas.put(
                 DefinitionType.MOVE,
@@ -1129,6 +1173,18 @@ public final class DefinitionSchemas {
                 definition(
                         DefinitionType.STATUS,
                         List.of(
+                                allowed(
+                                        "ailment_type",
+                                        STRING,
+                                        Set.of(
+                                                "BURN",
+                                                "BLEED",
+                                                "POISON",
+                                                "FROST",
+                                                "SHOCK",
+                                                "CORRUPTION"),
+                                        "",
+                                        "Core ailment identity."),
                                 ranged(
                                         "buildup_max",
                                         NUMBER,
@@ -1144,19 +1200,69 @@ public final class DefinitionSchemas {
                                         "ticks",
                                         "Delay before buildup decay."),
                                 ranged(
+                                        "buildup_decay_per_tick",
+                                        NUMBER,
+                                        0,
+                                        null,
+                                        "buildup_per_tick",
+                                        "Buildup lost after the decay delay."),
+                                ranged(
                                         "active_duration_ticks",
                                         INTEGER,
                                         1,
                                         null,
                                         "ticks",
                                         "Active-effect duration."),
+                                allowed(
+                                        "reapplication",
+                                        STRING,
+                                        Set.of("REFRESH", "INTENSIFY", "REJECT"),
+                                        "",
+                                        "Active threshold reapplication behavior."),
+                                ranged(
+                                        "maximum_tier",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "tier",
+                                        "Maximum active tier."),
                                 required("resistance_channel", STRING, "", "Resistance channel."),
                                 array(
                                         "cleanse_tags",
                                         true,
                                         1,
                                         null,
-                                        "At least one authored cleanse tag.")),
+                                        "At least one authored cleanse tag."),
+                                allowed(
+                                        "persistence",
+                                        STRING,
+                                        Set.of("CLEAR_ON_DEATH", "PERSIST_THROUGH_DEATH"),
+                                        "",
+                                        "Death/reset persistence rule."),
+                                ranged(
+                                        "profiles.pve_multiplier",
+                                        NUMBER,
+                                        0.000001,
+                                        null,
+                                        "multiplier",
+                                        "PvE active-effect profile."),
+                                ranged(
+                                        "profiles.pvp_multiplier",
+                                        NUMBER,
+                                        0.000001,
+                                        null,
+                                        "multiplier",
+                                        "PvP active-effect profile."),
+                                required(
+                                        "presentation.visual_cue",
+                                        STRING,
+                                        "",
+                                        "Stable visual cue identity."),
+                                required(
+                                        "presentation.audio_cue",
+                                        STRING,
+                                        "",
+                                        "Stable audio cue identity.")),
                         List.of()));
         schemas.put(
                 DefinitionType.SCENE,

@@ -12,6 +12,7 @@ import com.branz.mmorpg.content.manifest.ContentManifest;
 import com.branz.mmorpg.content.reference.ReferenceIndex;
 import com.branz.mmorpg.content.schema.DefinitionType;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
+import com.branz.mmorpg.items.consumable.ConsumableCategory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.List;
@@ -360,6 +361,49 @@ class ItemEngineTest {
         assertEquals(
                 ItemEngineErrorCode.ITEM_WEAPON_PROFILE_INVALID,
                 ((Result.Failure<ItemEngine, ItemEngineErrorCode>) rejected).error());
+    }
+
+    @Test
+    void compilesConsumableCategoryTimelineAndRareReplacementPolicy() throws Exception {
+        String valid =
+                """
+                {
+                  "asset_id": "consumable.test.tonic",
+                  "item_class": "STACKABLE_LOT",
+                  "consumable_profile": {
+                    "category": "BODY_TONIC",
+                    "windup_ticks": 24,
+                    "commit_tick": 14,
+                    "recovery_ticks": 16,
+                    "effect_duration_ticks": 1200,
+                    "rare": true
+                  }
+                }
+                """;
+
+        ItemDefinition tonic =
+                ((Result.Success<ItemEngine, ItemEngineErrorCode>)
+                                ItemEngine.compile(
+                                        snapshot(definition("consumable.test.tonic", valid))))
+                        .value()
+                        .find(DefinitionId.of("consumable.test.tonic"))
+                        .orElseThrow();
+        var profile = tonic.consumableProfile().orElseThrow();
+        assertEquals(ConsumableCategory.BODY_TONIC, profile.category());
+        assertEquals(14, profile.useProfile().commitTick());
+        assertEquals(1200, profile.effectDurationTicks());
+        assertTrue(profile.rare());
+
+        Result<ItemEngine, ItemEngineErrorCode> invalidTimeline =
+                ItemEngine.compile(
+                        snapshot(
+                                definition(
+                                        "consumable.test.tonic",
+                                        valid.replace(
+                                                "\"commit_tick\": 14", "\"commit_tick\": 25"))));
+        assertEquals(
+                ItemEngineErrorCode.ITEM_CONSUMABLE_PROFILE_INVALID,
+                ((Result.Failure<ItemEngine, ItemEngineErrorCode>) invalidTimeline).error());
     }
 
     private static ContentDefinition definition(String id, String body) throws Exception {

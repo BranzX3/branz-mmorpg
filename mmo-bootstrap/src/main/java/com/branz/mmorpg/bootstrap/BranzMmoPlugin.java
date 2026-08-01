@@ -5,6 +5,8 @@ import com.branz.mmorpg.api.provider.ProviderRequirement;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.move.MoveEngine;
 import com.branz.mmorpg.combat.move.MoveEngineErrorCode;
+import com.branz.mmorpg.combat.status.AilmentDefinitionEngine;
+import com.branz.mmorpg.combat.status.AilmentDefinitionEngineErrorCode;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.branz.mmorpg.integrations.PluginCapabilityProbe;
 import com.branz.mmorpg.items.definition.ItemEngine;
@@ -33,6 +35,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private final AtomicReference<MoveEngine> activeMoveEngine = new AtomicReference<>();
     private final AtomicReference<SpellEngine> activeSpellEngine = new AtomicReference<>();
     private final AtomicReference<BuildEngine> activeBuildEngine = new AtomicReference<>();
+    private final AtomicReference<AilmentDefinitionEngine> activeAilmentEngine =
+            new AtomicReference<>();
     private ResourcePackGate resourcePackGate;
     private SceneHubController sceneHubController;
     private MmoCommandController commandController;
@@ -146,6 +150,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         activeMoveEngine.set(null);
         activeSpellEngine.set(null);
         activeBuildEngine.set(null);
+        activeAilmentEngine.set(null);
         activeSnapshot.set(null);
         lifecycle.disable();
         getLogger().info("Branz MMO platform disabled cleanly.");
@@ -255,6 +260,32 @@ public final class BranzMmoPlugin extends JavaPlugin {
         }
         activeBuildEngine.set(
                 ((Result.Success<BuildEngine, BuildErrorCode>) compiledBuilds).value());
+        Result<AilmentDefinitionEngine, AilmentDefinitionEngineErrorCode> compiledAilments =
+                AilmentDefinitionEngine.compile(snapshot);
+        if (compiledAilments
+                instanceof
+                Result.Failure<AilmentDefinitionEngine, AilmentDefinitionEngineErrorCode> failure) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            activeSpellEngine.set(null);
+            activeBuildEngine.set(null);
+            return "Ailment Engine rejected active content: "
+                    + failure.error().code()
+                    + " "
+                    + failure.detail();
+        }
+        AilmentDefinitionEngine ailments =
+                ((Result.Success<AilmentDefinitionEngine, AilmentDefinitionEngineErrorCode>)
+                                compiledAilments)
+                        .value();
+        if (ailments.all().size() != com.branz.mmorpg.combat.status.AilmentType.values().length) {
+            activeItemEngine.set(null);
+            activeMoveEngine.set(null);
+            activeSpellEngine.set(null);
+            activeBuildEngine.set(null);
+            return "Active content must define all six core ailments exactly once.";
+        }
+        activeAilmentEngine.set(ailments);
         ChronicleService chronicle = new ChronicleService(this);
         resourcePackGate = new ResourcePackGate(this, snapshot);
         if (!resourcePackGate.configurationValid()) {
@@ -582,6 +613,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         activeSnapshot::get,
                         activeItemEngine::get,
                         activeMoveEngine::get,
+                        activeAilmentEngine::get,
                         sceneHubController,
                         characterSessionController,
                         combatSessionController,
@@ -615,6 +647,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                                 + activeBuildEngine.get().techniques().size()
                                 + ", form definitions="
                                 + activeBuildEngine.get().forms().size()
+                                + ", ailment definitions="
+                                + activeAilmentEngine.get().all().size()
                                 + ", Scene preview=COMPACT_2D");
     }
 

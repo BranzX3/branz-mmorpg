@@ -1,0 +1,14 @@
+definition_id: status.burn
+schema_version: 1
+ailment_type: BURN
+buildup_max: 100
+buildup_decay_delay_ticks: 40
+buildup_decay_per_tick: 1.0
+active_duration_ticks: 160
+reapplication: REFRESH
+maximum_tier: 1
+resistance_channel: FIRE
+cleanse_tags: [WATER, ROLL, BURN_REMEDY]
+persistence: CLEAR_ON_DEATH
+profiles: {pve_multiplier: 1.0, pvp_multiplier: 0.7}
+presentation: {visual_cue: status.burn.flame, audio_cue: status.burn.ignite}

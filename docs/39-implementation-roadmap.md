@@ -93,8 +93,10 @@ authored learning/teaching Mastery bands and atomically commits the completed ch
 acquisition policies now gate preview/commit/combat and V0007 persists their idempotent source
 completion. The deterministic Flask allocation/refill/mercy/consumption kernel, consumable
 commit/category state machines and six-ailment buildup/decay/reapplication kernel are implemented
-with an in-game simulation lab. Content compilation, PostgreSQL state, live hotbar/Rest behavior and
-boss snapshot restore remain before Milestone 6 completion.
+with an in-game simulation lab. The `.4` content bundle now authors all five consumable categories,
+Infusion Stock and all six core ailments; startup compiles and requires the complete ailment set.
+PostgreSQL state, live hotbar/Rest behavior and boss snapshot restore remain before Milestone 6
+completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

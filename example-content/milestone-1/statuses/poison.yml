@@ -1,0 +1,14 @@
+definition_id: status.poison
+schema_version: 1
+ailment_type: POISON
+buildup_max: 100
+buildup_decay_delay_ticks: 60
+buildup_decay_per_tick: 0.4
+active_duration_ticks: 240
+reapplication: REFRESH
+maximum_tier: 1
+resistance_channel: TOXIN
+cleanse_tags: [ANTIDOTE, POISON_REMEDY]
+persistence: CLEAR_ON_DEATH
+profiles: {pve_multiplier: 1.0, pvp_multiplier: 0.7}
+presentation: {visual_cue: status.poison.spores, audio_cue: status.poison.cough}

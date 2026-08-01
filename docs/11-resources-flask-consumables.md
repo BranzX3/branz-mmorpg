@@ -92,6 +92,18 @@ Only one unexpired effect exists per consumable category. Applying a new effect 
 category and preserves the other four. Replacing an active rare effect requires an explicit
 confirmation result before the incoming value can commit.
 
+### V1 consumable authoring contract
+
+Stackable item definitions opt into use behavior with `consumable_profile`. The profile declares
+one of the five category IDs, positive windup/commit/effect-duration ticks, non-negative recovery
+ticks and whether destroying the active effect requires rare-replacement confirmation. Runtime
+compilation rejects commit offsets after windup and rejects consumable profiles on unique items.
+
+The example content bundle authors one inspectable item in every category plus
+`material.infusion_stock`. Infusion Stock is an inventory lot consumed by Rest preparation, not an
+active category effect. The character-owned reusable Flask is durable character state and is never
+represented as a duplicable inventory item.
+
 ## Item freshness
 
 Finished potions and normal ingredients do not expire in real time. `Fresh`, `Pristine`, `Corrupted` and `Infused` are material states. Special Unstable Concoctions may expire at rest, death or expedition end and are always labeled.

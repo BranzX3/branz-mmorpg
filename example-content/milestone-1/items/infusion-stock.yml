@@ -1,0 +1,6 @@
+definition_id: material.infusion_stock
+schema_version: 1
+asset_id: material.infusion_stock
+item_class: STACKABLE_LOT
+status: approved
+owning_team: progression

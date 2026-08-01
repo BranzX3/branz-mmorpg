@@ -1,0 +1,13 @@
+definition_id: consumable.training_utility_preparation
+schema_version: 1
+asset_id: consumable.training_utility_preparation
+item_class: STACKABLE_LOT
+consumable_profile:
+  category: UTILITY_PREPARATION
+  windup_ticks: 20
+  commit_tick: 12
+  recovery_ticks: 12
+  effect_duration_ticks: 600
+  rare: true
+status: approved
+owning_team: progression

@@ -70,3 +70,15 @@ effects such as some Corruption profiles survive.
 ## Death and rest
 
 Ordinary ailments clear on death. Corruption may persist according to content but must provide an accessible cleanse. Sanctuary rest clears normal buildup; active effects follow their definitions.
+
+## V1 status authoring and runtime compilation
+
+Every `status.*` definition must declare its exact core `ailment_type`, buildup maximum, decay
+delay/rate, active duration, reapplication mode, compatible tier cap, resistance channel, cleanse
+tags, death persistence, PvE/PvP multipliers and stable visual/audio cue IDs. The identity is strict:
+for example, `BURN` compiles only from `status.burn`.
+
+Startup compiles the immutable content snapshot into an ailment runtime registry and rejects the
+server unless all six core types exist exactly once. The shipped bundle authors Burn, Bleed,
+Poison, Frost, Shock and Corruption; `/mmo health` exposes the compiled count and the Ailment Lab
+uses the authored Burn definition rather than a command-local fixture.

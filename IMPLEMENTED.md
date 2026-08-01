@@ -1893,3 +1893,32 @@ state, live hotbar/Rest Context behavior and boss Flask snapshot recovery remain
 
 Schema/config/migration impact: none in this slice. All new state is deterministic in-memory domain
 state; durable ownership and content authoring arrive in the next slice.
+
+## Milestone 6 - consumable and ailment content slice
+
+Implemented:
+
+- `consumable_profile` compiles category, windup/commit/recovery, effect duration and rare
+  replacement policy into immutable `ItemEngine` definitions and rejects unique-item or invalid
+  timing declarations;
+- the example `.4` bundle includes one inspectable item for every consumable category and a
+  separate stackable `material.infusion_stock` definition;
+- all six `status.*` definitions author resistance, decay, duration, reapplication/tier,
+  cleanse/death, PvE/PvP and visual/audio contracts;
+- `AilmentDefinitionEngine` enforces exact type-to-ID identity and compiles the authored content;
+- Paper startup requires all six core ailments, `/mmo health` exposes the compiled count and the
+  Ailment Lab resolves its Burn definition from active content.
+
+Tests cover consumable profile compilation/rejection, exact status identity and full runtime field
+compilation. The `.4` bundle validates with 46 definitions, and the full build passes 552 tests with
+zero failures/errors (16 skipped). A long inventory/quiver integration fixture now uses a five-minute
+test-only lease so its intended lease-conflict assertion remains deterministic on slow hosts;
+production lease configuration is unchanged. Paper 26.2 boots `.4`, compiles 19 items and all six
+ailments, reaches the embedded PostgreSQL-ready runtime and shuts down cleanly.
+
+Milestone status: **Milestone 6 remains in progress.** PostgreSQL Flask/status state, live
+hotbar/Rest Context behavior and boss Flask snapshot recovery remain.
+
+Schema/config/migration impact: item/status schema V1 gains the documented authoring fields. The
+content version advances to `v1.milestone-1.example.4`; no SQL or configuration changes occur in
+this slice.

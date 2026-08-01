@@ -5,6 +5,9 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.content.definition.ContentDefinition;
 import com.branz.mmorpg.content.schema.DefinitionType;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
+import com.branz.mmorpg.items.consumable.ConsumableCategory;
+import com.branz.mmorpg.items.consumable.ConsumableDefinitionProfile;
+import com.branz.mmorpg.items.consumable.ConsumableUseProfile;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collection;
 import java.util.Collections;
@@ -151,6 +154,13 @@ public final class ItemEngine {
             return Result.failure(
                     ItemEngineErrorCode.ITEM_SHIELD_PROFILE_INVALID, exception.getMessage());
         }
+        Optional<ConsumableDefinitionProfile> consumableProfile;
+        try {
+            consumableProfile = compileConsumableProfile(itemClass, body.get("consumable_profile"));
+        } catch (IllegalArgumentException exception) {
+            return Result.failure(
+                    ItemEngineErrorCode.ITEM_CONSUMABLE_PROFILE_INVALID, exception.getMessage());
+        }
         try {
             return Result.success(
                     new ItemDefinition(
@@ -163,7 +173,8 @@ public final class ItemEngine {
                             ammoProfile,
                             quiverProfile,
                             catalystProfile,
-                            shieldProfile));
+                            shieldProfile,
+                            consumableProfile));
         } catch (IllegalArgumentException exception) {
             return Result.failure(ItemEngineErrorCode.ITEM_CLASS_INVALID, exception.getMessage());
         }
@@ -269,6 +280,30 @@ public final class ItemEngine {
         return Optional.of(new ShieldProfile(guard.orElseThrow()));
     }
 
+    private static Optional<ConsumableDefinitionProfile> compileConsumableProfile(
+            ItemClass itemClass, JsonNode consumableNode) {
+        if (consumableNode == null || consumableNode.isNull()) {
+            return Optional.empty();
+        }
+        if (itemClass != ItemClass.STACKABLE_LOT || !consumableNode.isObject()) {
+            throw new IllegalArgumentException("consumable_profile requires a STACKABLE_LOT item");
+        }
+        try {
+            return Optional.of(
+                    new ConsumableDefinitionProfile(
+                            ConsumableCategory.valueOf(consumableNode.path("category").asText("")),
+                            new ConsumableUseProfile(
+                                    requiredInteger(consumableNode, "windup_ticks"),
+                                    requiredInteger(consumableNode, "commit_tick"),
+                                    requiredInteger(consumableNode, "recovery_ticks")),
+                            requiredInteger(consumableNode, "effect_duration_ticks"),
+                            requiredBoolean(consumableNode, "rare")));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                    "invalid consumable_profile: " + exception.getMessage(), exception);
+        }
+    }
+
     private static Optional<GuardCombatProfile> compileGuardProfile(JsonNode guardNode) {
         if (guardNode == null || guardNode.isNull()) {
             return Optional.empty();
@@ -356,5 +391,13 @@ public final class ItemEngine {
             throw new IllegalArgumentException(field + " must be a finite number");
         }
         return node.doubleValue();
+    }
+
+    private static boolean requiredBoolean(JsonNode root, String field) {
+        JsonNode node = root.get(field);
+        if (node == null || !node.isBoolean()) {
+            throw new IllegalArgumentException(field + " must be a boolean");
+        }
+        return node.booleanValue();
     }
 }

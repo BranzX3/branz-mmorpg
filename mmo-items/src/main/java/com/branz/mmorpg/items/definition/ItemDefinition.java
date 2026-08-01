@@ -1,6 +1,7 @@
 package com.branz.mmorpg.items.definition;
 
 import com.branz.mmorpg.api.identity.DefinitionId;
+import com.branz.mmorpg.items.consumable.ConsumableDefinitionProfile;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -15,7 +16,8 @@ public record ItemDefinition(
         Optional<AmmoProfile> ammoProfile,
         Optional<QuiverProfile> quiverProfile,
         Optional<CatalystProfile> catalystProfile,
-        Optional<ShieldProfile> shieldProfile) {
+        Optional<ShieldProfile> shieldProfile,
+        Optional<ConsumableDefinitionProfile> consumableProfile) {
     public ItemDefinition {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(assetId, "assetId");
@@ -26,6 +28,7 @@ public record ItemDefinition(
         Objects.requireNonNull(quiverProfile, "quiverProfile");
         Objects.requireNonNull(catalystProfile, "catalystProfile");
         Objects.requireNonNull(shieldProfile, "shieldProfile");
+        Objects.requireNonNull(consumableProfile, "consumableProfile");
         if (baseMaxDurability.isPresent() && baseMaxDurability.getAsInt() < 1) {
             throw new IllegalArgumentException("baseMaxDurability must be positive");
         }
@@ -37,11 +40,17 @@ public record ItemDefinition(
                         || ammoProfile.isPresent()
                         || quiverProfile.isPresent()
                         || catalystProfile.isPresent()
-                        || shieldProfile.isPresent())) {
+                        || shieldProfile.isPresent()
+                        || consumableProfile.isPresent())) {
             throw new IllegalArgumentException(
                     "cosmetic definitions cannot have gameplay profiles");
         }
-        if (java.util.stream.Stream.of(weaponProfile, ammoProfile, quiverProfile, shieldProfile)
+        if (java.util.stream.Stream.of(
+                                weaponProfile,
+                                ammoProfile,
+                                quiverProfile,
+                                shieldProfile,
+                                consumableProfile)
                         .filter(Optional::isPresent)
                         .count()
                 > 1) {
@@ -69,6 +78,34 @@ public record ItemDefinition(
             throw new IllegalArgumentException(
                     "Shield profiles require a durable UNIQUE_DURABLE item");
         }
+        if (consumableProfile.isPresent() && itemClass != ItemClass.STACKABLE_LOT) {
+            throw new IllegalArgumentException("Consumable profiles require STACKABLE_LOT");
+        }
+    }
+
+    public ItemDefinition(
+            DefinitionId id,
+            DefinitionId assetId,
+            ItemClass itemClass,
+            OptionalInt baseMaxDurability,
+            boolean cosmetic,
+            Optional<WeaponCombatProfile> weaponProfile,
+            Optional<AmmoProfile> ammoProfile,
+            Optional<QuiverProfile> quiverProfile,
+            Optional<CatalystProfile> catalystProfile,
+            Optional<ShieldProfile> shieldProfile) {
+        this(
+                id,
+                assetId,
+                itemClass,
+                baseMaxDurability,
+                cosmetic,
+                weaponProfile,
+                ammoProfile,
+                quiverProfile,
+                catalystProfile,
+                shieldProfile,
+                Optional.empty());
     }
 
     public ItemDefinition(
@@ -91,6 +128,7 @@ public record ItemDefinition(
                 ammoProfile,
                 quiverProfile,
                 catalystProfile,
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -113,6 +151,7 @@ public record ItemDefinition(
                 ammoProfile,
                 quiverProfile,
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -133,6 +172,7 @@ public record ItemDefinition(
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -148,6 +188,7 @@ public record ItemDefinition(
                 itemClass,
                 baseMaxDurability,
                 cosmetic,
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),

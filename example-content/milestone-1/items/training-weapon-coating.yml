@@ -1,0 +1,13 @@
+definition_id: consumable.training_weapon_coating
+schema_version: 1
+asset_id: consumable.training_weapon_coating
+item_class: STACKABLE_LOT
+consumable_profile:
+  category: WEAPON_COATING
+  windup_ticks: 30
+  commit_tick: 20
+  recovery_ticks: 18
+  effect_duration_ticks: 900
+  rare: false
+status: approved
+owning_team: progression

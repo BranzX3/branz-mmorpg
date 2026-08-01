@@ -1,0 +1,13 @@
+definition_id: consumable.training_body_tonic
+schema_version: 1
+asset_id: consumable.training_body_tonic
+item_class: STACKABLE_LOT
+consumable_profile:
+  category: BODY_TONIC
+  windup_ticks: 24
+  commit_tick: 14
+  recovery_ticks: 16
+  effect_duration_ticks: 1200
+  rare: false
+status: approved
+owning_team: progression

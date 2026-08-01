@@ -1,0 +1,14 @@
+definition_id: status.corruption
+schema_version: 1
+ailment_type: CORRUPTION
+buildup_max: 100
+buildup_decay_delay_ticks: 100
+buildup_decay_per_tick: 0.2
+active_duration_ticks: 600
+reapplication: INTENSIFY
+maximum_tier: 3
+resistance_channel: CORRUPTION
+cleanse_tags: [SANCTUARY, CORRUPTION_REMEDY, RITUAL]
+persistence: PERSIST_THROUGH_DEATH
+profiles: {pve_multiplier: 1.0, pvp_multiplier: 0.6}
+presentation: {visual_cue: status.corruption.haze, audio_cue: status.corruption.whisper}

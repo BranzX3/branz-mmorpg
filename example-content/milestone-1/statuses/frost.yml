@@ -1,0 +1,14 @@
+definition_id: status.frost
+schema_version: 1
+ailment_type: FROST
+buildup_max: 100
+buildup_decay_delay_ticks: 40
+buildup_decay_per_tick: 0.7
+active_duration_ticks: 120
+reapplication: INTENSIFY
+maximum_tier: 2
+resistance_channel: COLD
+cleanse_tags: [HEAT, FROST_REMEDY]
+persistence: CLEAR_ON_DEATH
+profiles: {pve_multiplier: 1.0, pvp_multiplier: 0.7}
+presentation: {visual_cue: status.frost.rime, audio_cue: status.frost.crack}

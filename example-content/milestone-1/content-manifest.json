@@ -1,5 +1,5 @@
 {
-  "contentVersion": "v1.milestone-1.example.3",
+  "contentVersion": "v1.milestone-1.example.4",
   "schemaVersion": 1,
   "pluginCompatibility": ">=1.0.0 <2.0.0",
   "minecraftVersion": "26.2",
@@ -14,11 +14,12 @@
     "wallet": "3.4.5"
   },
   "definitions": {
-    "items": 13,
+    "items": 19,
     "moves": 6,
     "techniques": 5,
     "forms": 4,
     "spells": 5,
+    "statuses": 6,
     "nodes": 1
   }
 }

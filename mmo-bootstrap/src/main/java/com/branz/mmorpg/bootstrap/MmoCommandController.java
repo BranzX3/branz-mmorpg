@@ -12,9 +12,8 @@ import com.branz.mmorpg.combat.resource.FlaskDose;
 import com.branz.mmorpg.combat.resource.FlaskErrorCode;
 import com.branz.mmorpg.combat.resource.FlaskState;
 import com.branz.mmorpg.combat.status.AilmentDefinition;
+import com.branz.mmorpg.combat.status.AilmentDefinitionEngine;
 import com.branz.mmorpg.combat.status.AilmentEngine;
-import com.branz.mmorpg.combat.status.AilmentPersistence;
-import com.branz.mmorpg.combat.status.AilmentReapplication;
 import com.branz.mmorpg.combat.status.AilmentState;
 import com.branz.mmorpg.combat.status.AilmentType;
 import com.branz.mmorpg.combat.trace.CombatSimulationErrorCode;
@@ -113,6 +112,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final Supplier<ContentSnapshot> snapshotSource;
     private final Supplier<ItemEngine> itemEngineSource;
     private final Supplier<MoveEngine> moveEngineSource;
+    private final Supplier<AilmentDefinitionEngine> ailmentEngineSource;
     private final SceneHubController sceneHub;
     private final CharacterSessionController characterSessions;
     private final CombatSessionController combatSessions;
@@ -131,6 +131,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
             Supplier<ContentSnapshot> snapshotSource,
             Supplier<ItemEngine> itemEngineSource,
             Supplier<MoveEngine> moveEngineSource,
+            Supplier<AilmentDefinitionEngine> ailmentEngineSource,
             SceneHubController sceneHub,
             CharacterSessionController characterSessions,
             CombatSessionController combatSessions,
@@ -142,6 +143,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
         this.snapshotSource = Objects.requireNonNull(snapshotSource, "snapshotSource");
         this.itemEngineSource = Objects.requireNonNull(itemEngineSource, "itemEngineSource");
         this.moveEngineSource = Objects.requireNonNull(moveEngineSource, "moveEngineSource");
+        this.ailmentEngineSource =
+                Objects.requireNonNull(ailmentEngineSource, "ailmentEngineSource");
         this.sceneHub = Objects.requireNonNull(sceneHub, "sceneHub");
         this.characterSessions = Objects.requireNonNull(characterSessions, "characterSessions");
         this.combatSessions = Objects.requireNonNull(combatSessions, "combatSessions");
@@ -260,19 +263,17 @@ final class MmoCommandController implements CommandExecutor, Listener {
                         NamedTextColor.GREEN));
     }
 
-    private static void simulateAilment(Player player) {
+    private void simulateAilment(Player player) {
+        AilmentDefinitionEngine definitions = ailmentEngineSource.get();
         AilmentDefinition burn =
-                new AilmentDefinition(
-                        AilmentType.BURN,
-                        100,
-                        20,
-                        1,
-                        100,
-                        AilmentReapplication.REFRESH,
-                        1,
-                        "FIRE",
-                        Set.of("WATER", "BURN_REMEDY"),
-                        AilmentPersistence.CLEAR_ON_DEATH);
+                definitions == null ? null : definitions.find(AilmentType.BURN).orElse(null);
+        if (burn == null) {
+            player.sendMessage(
+                    Component.text(
+                            "Ailment Lab: authored Burn definition is unavailable.",
+                            NamedTextColor.RED));
+            return;
+        }
         AilmentState active =
                 new AilmentEngine()
                         .applyBuildup(burn, AilmentState.empty(100), 100, 0, 100)
@@ -648,6 +649,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
         ContentSnapshot snapshot = snapshotSource.get();
         ItemEngine items = itemEngineSource.get();
         MoveEngine moves = moveEngineSource.get();
+        AilmentDefinitionEngine ailments = ailmentEngineSource.get();
         sender.sendMessage(
                 Component.text("Branz MMO: ", NamedTextColor.GOLD)
                         .append(
@@ -672,7 +674,9 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                             .byType(
                                                     com.branz.mmorpg.content.schema.DefinitionType
                                                             .SPELL)
-                                            .size(),
+                                            .size()
+                                    + " | ailments="
+                                    + (ailments == null ? 0 : ailments.all().size()),
                             NamedTextColor.GRAY));
         }
         if (sender instanceof Player player) {

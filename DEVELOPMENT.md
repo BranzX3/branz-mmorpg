@@ -509,6 +509,13 @@ live inventory, change Bukkit resources or write PostgreSQL.
      to zero.
 134. Run `/mmo consumable simulate category`. Verify
      `RARE_REPLACEMENT_CONFIRMATION_REQUIRED` without replacing the rare Body Tonic.
+135. Run `/mmo health`. Verify content `v1.milestone-1.example.4`, `definitions=46`, `items=19`
+     and `ailments=6`.
+136. Run `/mmo consumable simulate ailment`. Verify the authored `status.burn` reaches active tier
+     1; startup must enter maintenance if any one of the six status files is missing or invalid.
+137. Offline, run
+     `.\gradlew.bat :mmo-content:run --args="validate $((Resolve-Path example-content\milestone-1).Path)"`.
+     Verify the immutable `.4` snapshot reports 46 definitions and no diagnostics.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

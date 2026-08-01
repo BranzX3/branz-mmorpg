@@ -91,8 +91,10 @@ selected Techniques on learned state; environment-gated simulation and durable t
 expose the path in game. Live teaching now consumes successful server combat actions, enforces
 authored learning/teaching Mastery bands and atomically commits the completed challenge. Form/Spell
 acquisition policies now gate preview/commit/combat and V0007 persists their idempotent source
-completion. Flask/consumables/ailments and boss snapshot restore remain before Milestone 6
-completion.
+completion. The deterministic Flask allocation/refill/mercy/consumption kernel, consumable
+commit/category state machines and six-ailment buildup/decay/reapplication kernel are implemented
+with an in-game simulation lab. Content compilation, PostgreSQL state, live hotbar/Rest behavior and
+boss snapshot restore remain before Milestone 6 completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

@@ -54,6 +54,19 @@ appliedBuildup = baseBuildup × clamp(0.40, 1 - resistance, 1.30)
 
 Every status must have at least one non-potion counterplay through positioning, equipment, environment or encounter mechanics.
 
+## V1 deterministic ailment kernel
+
+The server advances each ailment from monotonic ticks. Buildup waits its authored decay delay, then
+loses `decay_per_tick × elapsed_ticks` without becoming negative. Applied buildup uses the shared
+resistance clamp exactly once. Reaching the maximum consumes buildup and activates tier 1 for the
+authored duration.
+
+Reapplication is one of `REFRESH`, `INTENSIFY` or `REJECT`. Refresh resets duration at the same tier;
+Intensify raises tier only to its authored cap and refreshes duration; Reject consumes the new
+threshold but leaves the current active projection unchanged. Cleanse tags clear both buildup and
+active state. Death clears definitions marked `CLEAR_ON_DEATH`; only explicitly authored persistent
+effects such as some Corruption profiles survive.
+
 ## Death and rest
 
 Ordinary ailments clear on death. Corruption may persist according to content but must provide an accessible cleanse. Sanctuary rest clears normal buildup; active effects follow their definitions.

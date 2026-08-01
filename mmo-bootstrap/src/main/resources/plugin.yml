@@ -9,7 +9,7 @@ softdepend: [Oraxen, MythicMobs, packetevents, WorldGuard]
 commands:
   mmo:
     description: Branz MMO status and local development tools
-    usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge>
+    usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable>
 permissions:
   branzmmo.dev:
     description: Opens environment-gated MMO development tools

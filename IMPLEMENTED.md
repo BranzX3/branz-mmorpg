@@ -1866,3 +1866,30 @@ Rest Context allocation and boss Flask snapshot restore remain.
 Schema/config/migration impact: Form/Spell schema V1 adds required acquisition fields. Forward-only
 V0007 adds one journal table/index and extends the Knowledge source check. ADR 0021 owns the source,
 idempotency and build-gate boundary.
+
+## Milestone 6 - Flask, consumable and ailment kernel slice
+
+Implemented:
+
+- a five-charge Expedition Flask allocation model with exact dose consumption, compatible-charge
+  carryover, deterministic stock refill and bounded two-charge Mercy preparation;
+- authored Healing/Mana/Stamina restoration intents with Stamina clearing Exhausted;
+- a monotonic consumable use state machine for windup, offset-18 commit, recovery, pre-commit
+  cancellation and post-commit non-refund;
+- one active effect per Body Tonic, Elemental Ward, Weapon Coating, Utility Preparation and Meal
+  category, including rare-replacement confirmation;
+- a six-type ailment model with resistance clamp, delayed buildup decay, threshold activation,
+  Refresh/Intensify/Reject reapplication, cleanse tags and death persistence policy;
+- environment-gated `/mmo consumable simulate` fixtures for all four pure boundaries.
+
+Tests cover Flask depletion/refill/mercy, exact commit-tick interruption priority, one-time commit,
+category isolation/rare replacement, resistance bounds, decay, tier caps, reapplication, cleansing
+and death behavior. The full build passes 549 tests with zero failures/errors (16 skipped), and
+Paper 26.2 boots content `v1.milestone-1.example.3`, registers the Consumable Lab command path and
+shuts down cleanly.
+
+Milestone status: **Milestone 6 remains in progress.** Content definitions, PostgreSQL Flask/status
+state, live hotbar/Rest Context behavior and boss Flask snapshot recovery remain.
+
+Schema/config/migration impact: none in this slice. All new state is deterministic in-memory domain
+state; durable ownership and content authoring arrive in the next slice.

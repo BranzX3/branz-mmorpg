@@ -498,6 +498,18 @@ not accept a caller-selected source identity.
 130. In a PostgreSQL integration fixture, reuse the Form acquisition UUID for a different Spell or
      character. Verify `ACQUISITION_ID_CONFLICT` and atomic rollback.
 
+The following Consumable Lab commands are environment-gated pure simulations. They do not consume
+live inventory, change Bukkit resources or write PostgreSQL.
+
+131. Run `/mmo consumable simulate flask`. Verify `COMMITTED`, `charges=4/5` and
+     `maximum-health=0.35`.
+132. Run `/mmo consumable simulate timeline`. Verify `INTERRUPTED_AFTER_COMMIT`,
+     `commit-now=true` and `consumed=true`, demonstrating exact commit-tick priority.
+133. Run `/mmo consumable simulate ailment`. Verify Burn is active at tier 1 with buildup consumed
+     to zero.
+134. Run `/mmo consumable simulate category`. Verify
+     `RARE_REPLACEMENT_CONFIRMATION_REQUIRED` without replacing the rare Body Tonic.
+
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded
 mode is rejected outside `LOCAL` and `INTEGRATION`.

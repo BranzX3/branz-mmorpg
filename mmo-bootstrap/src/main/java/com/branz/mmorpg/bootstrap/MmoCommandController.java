@@ -5,9 +5,30 @@ import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.EncounterId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.move.MoveEngine;
+import com.branz.mmorpg.combat.resource.ExpeditionFlaskEngine;
+import com.branz.mmorpg.combat.resource.FlaskAllocation;
+import com.branz.mmorpg.combat.resource.FlaskConsumption;
+import com.branz.mmorpg.combat.resource.FlaskDose;
+import com.branz.mmorpg.combat.resource.FlaskErrorCode;
+import com.branz.mmorpg.combat.resource.FlaskState;
+import com.branz.mmorpg.combat.status.AilmentDefinition;
+import com.branz.mmorpg.combat.status.AilmentEngine;
+import com.branz.mmorpg.combat.status.AilmentPersistence;
+import com.branz.mmorpg.combat.status.AilmentReapplication;
+import com.branz.mmorpg.combat.status.AilmentState;
+import com.branz.mmorpg.combat.status.AilmentType;
 import com.branz.mmorpg.combat.trace.CombatSimulationErrorCode;
 import com.branz.mmorpg.combat.trace.CombatTrace;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
+import com.branz.mmorpg.items.consumable.ActiveConsumableEffect;
+import com.branz.mmorpg.items.consumable.ConsumableCategory;
+import com.branz.mmorpg.items.consumable.ConsumableEffectEngine;
+import com.branz.mmorpg.items.consumable.ConsumableEffectErrorCode;
+import com.branz.mmorpg.items.consumable.ConsumableEffectState;
+import com.branz.mmorpg.items.consumable.ConsumableUseEngine;
+import com.branz.mmorpg.items.consumable.ConsumableUseProfile;
+import com.branz.mmorpg.items.consumable.ConsumableUseState;
+import com.branz.mmorpg.items.consumable.ConsumableUseTransition;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
@@ -171,8 +192,132 @@ final class MmoCommandController implements CommandExecutor, Listener {
             handleKnowledgeTool(sender, args);
             return true;
         }
-        sender.sendMessage("Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge>");
+        if ("consumable".equalsIgnoreCase(args[0])) {
+            handleConsumableTool(sender, args);
+            return true;
+        }
+        sender.sendMessage(
+                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable>");
         return true;
+    }
+
+    private void handleConsumableTool(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Consumable Lab requires an in-game player.");
+            return;
+        }
+        if (!devToolsAllowed(player)) {
+            player.sendMessage(
+                    Component.text(
+                            "Consumable Lab is disabled for this environment/account.",
+                            NamedTextColor.RED));
+            return;
+        }
+        if (args.length != 3 || !"simulate".equalsIgnoreCase(args[1])) {
+            consumableUsage(player);
+            return;
+        }
+        switch (args[2].toLowerCase(Locale.ROOT)) {
+            case "flask" -> simulateFlask(player);
+            case "timeline" -> simulateConsumableTimeline(player);
+            case "ailment" -> simulateAilment(player);
+            case "category" -> simulateConsumableCategory(player);
+            default -> consumableUsage(player);
+        }
+    }
+
+    private static void simulateFlask(Player player) {
+        Result<FlaskConsumption, FlaskErrorCode> result =
+                new ExpeditionFlaskEngine()
+                        .consume(FlaskState.full(FlaskAllocation.balanced()), FlaskDose.HEALING);
+        FlaskConsumption consumption =
+                ((Result.Success<FlaskConsumption, FlaskErrorCode>) result).value();
+        player.sendMessage(
+                Component.text(
+                        "Flask Lab: COMMITTED | charges="
+                                + consumption.state().totalCharges()
+                                + "/5 | maximum-health="
+                                + consumption.restoration().maximumHealthRatio(),
+                        NamedTextColor.GREEN));
+    }
+
+    private static void simulateConsumableTimeline(Player player) {
+        ConsumableUseState started =
+                ConsumableUseState.start(
+                        UUID.randomUUID(),
+                        DefinitionId.of("consumable.expedition_flask"),
+                        ConsumableUseProfile.expeditionFlask(),
+                        100);
+        ConsumableUseTransition transition = new ConsumableUseEngine().advance(started, 118, true);
+        player.sendMessage(
+                Component.text(
+                        "Consumable Timeline Lab: phase="
+                                + transition.state().phase()
+                                + " | commit-now="
+                                + transition.commitNow()
+                                + " | consumed="
+                                + transition.state().consumed(),
+                        NamedTextColor.GREEN));
+    }
+
+    private static void simulateAilment(Player player) {
+        AilmentDefinition burn =
+                new AilmentDefinition(
+                        AilmentType.BURN,
+                        100,
+                        20,
+                        1,
+                        100,
+                        AilmentReapplication.REFRESH,
+                        1,
+                        "FIRE",
+                        Set.of("WATER", "BURN_REMEDY"),
+                        AilmentPersistence.CLEAR_ON_DEATH);
+        AilmentState active =
+                new AilmentEngine()
+                        .applyBuildup(burn, AilmentState.empty(100), 100, 0, 100)
+                        .state();
+        player.sendMessage(
+                Component.text(
+                        "Ailment Lab: BURN active="
+                                + active.activeAt(100)
+                                + " | tier="
+                                + active.tier()
+                                + " | buildup="
+                                + active.buildup(),
+                        NamedTextColor.GREEN));
+    }
+
+    private static void simulateConsumableCategory(Player player) {
+        ConsumableEffectEngine engine = new ConsumableEffectEngine();
+        ConsumableEffectState rare =
+                ((Result.Success<ConsumableEffectState, ConsumableEffectErrorCode>)
+                                engine.apply(
+                                        ConsumableEffectState.empty(),
+                                        new ActiveConsumableEffect(
+                                                DefinitionId.of("effect.tonic.rare"),
+                                                ConsumableCategory.BODY_TONIC,
+                                                500,
+                                                true),
+                                        100,
+                                        false))
+                        .value();
+        Result<ConsumableEffectState, ConsumableEffectErrorCode> replacement =
+                engine.apply(
+                        rare,
+                        new ActiveConsumableEffect(
+                                DefinitionId.of("effect.tonic.common"),
+                                ConsumableCategory.BODY_TONIC,
+                                500,
+                                false),
+                        100,
+                        false);
+        Result.Failure<ConsumableEffectState, ConsumableEffectErrorCode> failure =
+                (Result.Failure<ConsumableEffectState, ConsumableEffectErrorCode>) replacement;
+        player.sendMessage(
+                Component.text(
+                        "Consumable Category Lab: " + failure.error().code(),
+                        NamedTextColor.YELLOW));
     }
 
     private void handleKnowledgeTool(CommandSender sender, String[] args) {
@@ -1088,6 +1233,10 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private static void knowledgeUsage(Player player) {
         player.sendMessage(
                 "Usage: /mmo knowledge acquire <FORM|SPELL> <definition-id> [acquisition-uuid]");
+    }
+
+    private static void consumableUsage(Player player) {
+        player.sendMessage("Usage: /mmo consumable simulate <flask|timeline|ailment|category>");
     }
 
     private void recordProgressionEvidence(Player player, String scenario, UUID evidenceId) {

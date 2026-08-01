@@ -845,6 +845,18 @@ final class BossEncounterController implements Listener {
     Optional<PartyEncounterContext> partyEncounter(Player player) {
         BossEncounterRuntime runtime =
                 runtimeFor(characterId(Objects.requireNonNull(player, "player")));
+        return partyEncounter(runtime);
+    }
+
+    Optional<PartyEncounterContext> partyEncounter(EncounterId encounterId) {
+        return partyEncounter(active.get(Objects.requireNonNull(encounterId, "encounterId")));
+    }
+
+    boolean recoveryReady() {
+        return recoveryReady;
+    }
+
+    private static Optional<PartyEncounterContext> partyEncounter(BossEncounterRuntime runtime) {
         if (runtime == null
                 || runtime.phase() != BossEncounterPhase.ACTIVE
                 || runtime.participants().size() < 2) {

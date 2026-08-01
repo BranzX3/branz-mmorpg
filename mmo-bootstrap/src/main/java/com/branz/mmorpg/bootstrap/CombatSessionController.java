@@ -312,7 +312,7 @@ final class CombatSessionController implements Listener {
     private SuccessfulCombatActionObserver successfulActionObserver =
             SuccessfulCombatActionObserver.NONE;
     private BiConsumer<Player, String> consumableInterruptObserver = (player, reason) -> {};
-    private Predicate<Player> lethalDamageObserver = player -> false;
+    private LethalDamageObserver lethalDamageObserver = LethalDamageObserver.NONE;
     private Predicate<Player> damageImmunityObserver = player -> false;
     private BiConsumer<Player, String> hostileActionObserver = (player, reason) -> {};
     private int tickTaskId = -1;
@@ -730,7 +730,7 @@ final class CombatSessionController implements Listener {
         consumableInterruptObserver = Objects.requireNonNull(observer, "observer");
     }
 
-    void setLethalDamageObserver(Predicate<Player> observer) {
+    void setLethalDamageObserver(LethalDamageObserver observer) {
         lethalDamageObserver = Objects.requireNonNull(observer, "observer");
     }
 
@@ -754,6 +754,18 @@ final class CombatSessionController implements Listener {
         return true;
     }
 
+    boolean holdLethalDamage(Player player) {
+        Objects.requireNonNull(player, "player");
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session == null || session.health.dead()) {
+            return false;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        session.health = playerHealth.kill(session.health, tick);
+        enterDowned(player, session, tick);
+        return true;
+    }
+
     boolean reviveFromDowned(Player player, double healthRatio) {
         Objects.requireNonNull(player, "player");
         if (!Double.isFinite(healthRatio) || healthRatio <= 0 || healthRatio > 1) {
@@ -770,6 +782,24 @@ final class CombatSessionController implements Listener {
         session.action = ActionState.IDLE;
         session.crowdControl = CcRuntime.initial(tick);
         session.poise = PoiseRuntime.initial(tick);
+        updateHealthPresentation(player, session);
+        return true;
+    }
+
+    boolean restoreRevived(Player player, double healthRatio) {
+        Objects.requireNonNull(player, "player");
+        if (!Double.isFinite(healthRatio) || healthRatio <= 0 || healthRatio > 1) {
+            throw new IllegalArgumentException("healthRatio must be in (0, 1]");
+        }
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session == null || session.health.dead() || session.action == ActionState.DEAD) {
+            return false;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        session.health =
+                new CombatHealthRuntime(playerHealth.profile().maximum() * healthRatio, tick, tick);
+        session.weapon = weapons.resetTransient();
+        session.action = ActionState.IDLE;
         updateHealthPresentation(player, session);
         return true;
     }
@@ -1373,11 +1403,19 @@ final class CombatSessionController implements Listener {
     }
 
     private void completePlayerLethalDamage(Player player, LiveSession session) {
-        if (!lethalDamageObserver.test(player)) {
+        LethalDamageDisposition disposition = lethalDamageObserver.observe(player);
+        if (disposition == LethalDamageDisposition.DEATH) {
             player.setHealth(0);
             return;
         }
         long tick = plugin.getServer().getCurrentTick();
+        enterDowned(player, session, tick);
+        if (disposition == LethalDamageDisposition.PENDING_COMMIT) {
+            player.sendActionBar(Component.text("DOWNED STATE COMMITTING", NamedTextColor.YELLOW));
+        }
+    }
+
+    private void enterDowned(Player player, LiveSession session, long tick) {
         cancelAction(session, "DOWNED");
         cancelBow(session, "DOWNED");
         cancelCrossbow(session, "DOWNED");

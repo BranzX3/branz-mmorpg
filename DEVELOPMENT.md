@@ -668,6 +668,22 @@ live inventory, change Bukkit resources or write PostgreSQL.
      eligible on the first kernel advance; offline wall-clock time must not count down state.
 183. Change the schema version, duplicate a participant/channel identity or violate a reconstructed
      domain invariant. Verify decode fails closed and no partial runtime is returned for recovery.
+184. Start a two-player boss encounter and run `/mmo downed down <player>`. Verify the player enters
+     the pending action lock immediately, but DOWNED broadcast appears only after V0010 version 1 is
+     committed. `/mmo downed status` must report that durable version.
+185. Begin revive and move or take damage near the four-second boundary. Verify FIFO persistence
+     resolves the start/interruption/clock order once, no heal occurs before its committed state and
+     interruption still leaves `reviveConsumed=false`.
+186. Stop Paper while a player is DOWNED, restart against the same embedded PostgreSQL directory and
+     reconnect. Verify V0009 recovers first, V0010 logs one recovered encounter, the participant is
+     action-locked again and the remaining online countdown resumes without counting offline time.
+187. Stop after revive commit but before observing its live heal, then restart. Verify the recovered
+     participant returns at 25% with the revive consumed and a second lethal result becomes real
+     death. Repeat after an Execute/dead commit and verify recovery completes the real death path.
+188. Allow boss reset to advance the attempt, then trigger the first lethal event of the new attempt.
+     Verify V0010 replaces the old attempt using its next optimistic version and grants a fresh
+     one-revive allowance. Complete the boss encounter, restart and verify its stale downed row is
+     marked non-recoverable rather than installed.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

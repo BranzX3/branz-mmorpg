@@ -138,8 +138,9 @@ window, four-second interruptible channel, 25% revive and Execute/solo/second-de
 The Paper adapter now binds those rules to real lethal damage in multi-player boss attempts and
 provides `/mmo downed` acceptance controls. V0010 now supplies a journaled optimistic downed-state
 repository and recovery index. Its canonical codec/store now preserves remaining tick durations and
-operation identities across restart. Activating persist-before-effect recovery in the live adapter,
-then general party membership, are the next social slices.
+operation identities across restart. The live adapter now serializes V0010 before gameplay effects,
+checkpoints active timers and restores matching attempts after V0009 recovery. The boss-party
+downed path is ready for restart acceptance; general party membership is the next social slice.
 
 ## Milestone 8 — Lifeskill kernel
 

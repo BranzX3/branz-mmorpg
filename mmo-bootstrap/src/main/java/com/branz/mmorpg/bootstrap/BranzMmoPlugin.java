@@ -634,7 +634,12 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         databaseRuntime.bossEncounters(),
                         snapshot.manifest().contentVersion());
         downedController =
-                new DownedController(this, combatSessionController, bossEncounterController);
+                new DownedController(
+                        this,
+                        combatSessionController,
+                        bossEncounterController,
+                        databaseRuntime.downedEncounters(),
+                        snapshot.manifest().contentVersion());
         combatSessionController.setLethalDamageObserver(downedController::interceptLethal);
         combatSessionController.setDamageImmunityObserver(downedController::protectedFromDamage);
         combatSessionController.setHostileActionObserver(downedController::observeHostileAction);
@@ -647,6 +652,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         characterSessionController.addReadyHandler(flaskHotbarController::onCharacterReady);
         characterSessionController.addReadyHandler(consumableHotbarController::onCharacterReady);
         characterSessionController.addReadyHandler(bossEncounterController::onCharacterReady);
+        characterSessionController.addReadyHandler(downedController::onCharacterReady);
         resourcePackGate.setReadyHandler(characterSessionController::onPackReady);
         sceneHubController =
                 new SceneHubController(

@@ -2349,3 +2349,34 @@ Milestone status: **Milestone 7 remains in progress.** The live controller must 
 transitions through this store before applying gameplay effects.
 
 Schema/config/migration impact: none beyond V0010. ADR 0033 owns payload and clock semantics.
+
+## Milestone 7 - restart-safe live downed/revive slice
+
+Implemented:
+
+- one FIFO per boss attempt recomputes lethal, Execute, revive, interruption, hostile action and
+  clock transitions from the latest acknowledged downed runtime;
+- stable operation/tick identity makes database retry and callback-loss replay byte-identical;
+- lethal combat first enters a hard-locked pending sentinel, then publishes DOWNED or real death
+  only after V0010 acknowledgement;
+- revive start, interruption, expiry, 25% heal and protection cancellation likewise apply their live
+  effects only after state persistence;
+- active timers checkpoint every 20 ticks when no semantic mutation is queued;
+- startup waits for V0009 recovery, validates V0010 attempt/participant identity, rebases remaining
+  time, restores online DOWNED/DEAD/protected participants and closes stale recovery rows.
+
+Tests and completion evidence:
+
+- the social kernel, V0010 repository and codec suites cover the transition, optimistic durability
+  and restart-rebase layers used by the controller;
+- full repository build and Paper startup/shutdown smoke cover migration 10, controller recovery
+  ordering and clean lifecycle shutdown at the end of this slice.
+
+Failure/recovery behavior: DB failure retains the queue head and publishes no death/heal/message.
+Kernel rejection discards only that input. Invalid JSON blocks recovery, while mismatched old-attempt
+rows are marked non-recoverable.
+
+Milestone status: **Milestone 7 remains in progress.** The boss-party downed path is ready for
+in-game restart acceptance; general party/LFG, personal rewards, Death Pouch and PvP remain.
+
+Schema/config/migration impact: none beyond V0010. ADR 0034 owns live durable ordering.

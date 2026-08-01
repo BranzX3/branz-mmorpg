@@ -56,15 +56,16 @@ class PostgresMigrationRunnerIntegrationTest {
 
         assertTrue(first.isSuccess());
         assertEquals(
-                List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), success(first).appliedVersions());
+                List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13),
+                success(first).appliedVersions());
         assertTrue(second.isSuccess());
         assertEquals(List.of(), success(second).appliedVersions());
-        assertEquals(12, scalarInt("SELECT COUNT(*) FROM mmo_schema_migrations"));
+        assertEquals(13, scalarInt("SELECT COUNT(*) FROM mmo_schema_migrations"));
         assertEquals(
                 1,
                 scalarInt("SELECT COUNT(*) FROM pg_type WHERE typname = 'mmo_transaction_state'"));
         assertEquals(
-                18,
+                20,
                 scalarInt(
                         "SELECT COUNT(*) FROM information_schema.tables "
                                 + "WHERE table_schema = 'public' "
@@ -80,7 +81,9 @@ class PostgresMigrationRunnerIntegrationTest {
                                 + "'boss_encounter_state', "
                                 + "'downed_encounter_state', "
                                 + "'personal_reward_grant', "
-                                + "'death_pouch')"));
+                                + "'death_pouch', "
+                                + "'carried_wallet_account', "
+                                + "'carried_wallet_operation')"));
     }
 
     @Test
@@ -151,7 +154,7 @@ class PostgresMigrationRunnerIntegrationTest {
 
         MigrationReport report = success(runner.migrate(full));
 
-        assertEquals(List.of(6, 7, 8, 9, 10, 11, 12), report.appliedVersions());
+        assertEquals(List.of(6, 7, 8, 9, 10, 11, 12, 13), report.appliedVersions());
         assertEquals(3, scalarInt("SELECT COUNT(*) FROM character_knowledge"));
         assertEquals(
                 1,

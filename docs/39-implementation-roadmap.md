@@ -171,6 +171,10 @@ wallet-provider reconciliation and live owner-only recovery remain the next Deat
 V0012 now stores the non-spendable debit intention, active pouch, recovery credit and terminal expiry
 as journaled optimistic transitions with stable recovery/expiry queries. The wallet capability and
 live owner-only world adapter are next.
+V0013 now supplies a durable local carried-wallet authority with atomic journal/audit operations,
+exact debit/credit replay, insufficient-funds rejection and serialized concurrent first writes. It
+is the local acceptance boundary while the external wallet capability remains deferred; live death,
+owner-only rendering, recovery and expiry are next.
 
 ## Milestone 8 — Lifeskill kernel
 

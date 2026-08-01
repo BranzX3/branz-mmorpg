@@ -10,7 +10,9 @@ import com.branz.mmorpg.combat.resource.FlaskState;
 import com.branz.mmorpg.combat.resource.PreparedFlaskSnapshot;
 import com.branz.mmorpg.persistence.transaction.BossEncounterStateRecord;
 import com.branz.mmorpg.persistence.transaction.BossEncounterStateRepository;
+import com.branz.mmorpg.persistence.transaction.PersonalRewardGrantRepository;
 import com.branz.mmorpg.persistence.transaction.TransactionErrorCode;
+import com.branz.mmorpg.persistence.transaction.ValueTransactionService;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterEngine;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterErrorCode;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterPhase;
@@ -18,6 +20,10 @@ import com.branz.mmorpg.worldloop.encounter.BossEncounterRuntime;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterTransition;
 import com.branz.mmorpg.worldloop.encounter.EncounterParticipant;
 import com.branz.mmorpg.worldloop.encounter.EncounterParticipantStatus;
+import com.branz.mmorpg.worldloop.reward.EncounterRewardTable;
+import com.branz.mmorpg.worldloop.reward.RewardContribution;
+import com.branz.mmorpg.worldloop.reward.RewardParticipantEvidence;
+import com.branz.mmorpg.worldloop.reward.RolledPersonalReward;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -53,6 +59,7 @@ final class BossEncounterController implements Listener {
     private final FlaskHotbarController flaskHotbar;
     private final String contentVersion;
     private final DurableBossEncounterStore durableStore;
+    private final PersonalRewardReconciliationService rewards;
     private final BossEncounterEngine encounters = new BossEncounterEngine();
     private final BossFlaskCheckpointEngine flaskCheckpoints = new BossFlaskCheckpointEngine();
     private final Map<EncounterId, BossEncounterRuntime> active = new HashMap<>();
@@ -63,6 +70,7 @@ final class BossEncounterController implements Listener {
     private final Map<CharacterId, EncounterId> recentEncounterByParticipant = new HashMap<>();
     private final Map<EncounterId, ResetProgress> resets = new HashMap<>();
     private final Set<EncounterId> preparing = new HashSet<>();
+    private final Set<EncounterId> rewardReconciliationInFlight = new HashSet<>();
     private Function<Player, List<Player>> partyParticipantResolver = player -> List.of(player);
     private int graceTaskId = -1;
     private boolean recoveryReady;
@@ -72,12 +80,18 @@ final class BossEncounterController implements Listener {
             CharacterSessionController characterSessions,
             FlaskHotbarController flaskHotbar,
             BossEncounterStateRepository encounterStates,
+            PersonalRewardGrantRepository personalRewards,
+            ValueTransactionService values,
+            Map<DefinitionId, EncounterRewardTable> rewardTables,
             String contentVersion) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characterSessions = Objects.requireNonNull(characterSessions, "characterSessions");
         this.flaskHotbar = Objects.requireNonNull(flaskHotbar, "flaskHotbar");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
         durableStore = new DurableBossEncounterStore(encounterStates, contentVersion);
+        rewards =
+                new PersonalRewardReconciliationService(
+                        personalRewards, values, contentVersion, rewardTables);
     }
 
     void start() {
@@ -102,6 +116,7 @@ final class BossEncounterController implements Listener {
             graceTaskId = -1;
         }
         preparing.clear();
+        rewardReconciliationInFlight.clear();
         mutationInFlight.clear();
         mutationQueues.clear();
         durableRecords.clear();
@@ -128,8 +143,9 @@ final class BossEncounterController implements Listener {
             case "defeat" -> changeAvailability(actor, args, AvailabilityCommand.DEFEAT);
             case "boundary" -> changeAvailability(actor, args, AvailabilityCommand.BOUNDARY);
             case "rejoin" -> rejoin(actor);
+            case "contribute" -> recordContribution(actor, args);
             case "victory" -> confirmVictory(actor);
-            case "rewards" -> reconcileRewards(actor, args);
+            case "rewards" -> reconcileRewards(actor);
             default -> usage(actor);
         }
     }
@@ -443,8 +459,72 @@ final class BossEncounterController implements Listener {
         mutate(
                 runtime.encounterId(),
                 operationId,
-                current -> encounters.confirmVictory(current, operationId),
+                current ->
+                        encounters.confirmVictory(
+                                current, operationId, plugin.getServer().getCurrentTick()),
                 "victory frozen; reward reconciliation pending");
+    }
+
+    private void recordContribution(Player actor, String[] args) {
+        if (args.length < 4) {
+            usage(actor);
+            return;
+        }
+        Player target = actor;
+        if (args.length >= 5) {
+            target = plugin.getServer().getPlayerExact(args[4]);
+            if (target == null || !target.isOnline()) {
+                actor.sendMessage(Component.text("Player is not online.", NamedTextColor.RED));
+                return;
+            }
+        }
+        long amount;
+        try {
+            amount = Long.parseLong(args[3]);
+            if (amount < 1) {
+                throw new NumberFormatException("non-positive");
+            }
+        } catch (NumberFormatException exception) {
+            actor.sendMessage(
+                    Component.text("Contribution amount must be positive.", NamedTextColor.RED));
+            return;
+        }
+        RewardContribution contribution;
+        String category = args[2].toLowerCase(java.util.Locale.ROOT);
+        contribution =
+                switch (category) {
+                    case "damage" -> new RewardContribution(amount, 0, 0, 0);
+                    case "guard" -> new RewardContribution(0, amount, 0, 0);
+                    case "support" -> new RewardContribution(0, 0, amount, 0);
+                    case "objective" -> new RewardContribution(0, 0, 0, amount);
+                    default -> null;
+                };
+        if (contribution == null) {
+            actor.sendMessage(
+                    Component.text(
+                            "Contribution category must be damage, guard, support or objective.",
+                            NamedTextColor.RED));
+            return;
+        }
+        CharacterId targetId = characterId(target);
+        BossEncounterRuntime runtime = runtimeFor(targetId);
+        if (runtime == null) {
+            actor.sendMessage(
+                    Component.text("Player is not in an active encounter.", NamedTextColor.RED));
+            return;
+        }
+        UUID operationId = UUID.randomUUID();
+        mutate(
+                runtime.encounterId(),
+                operationId,
+                current ->
+                        encounters.recordRewardContribution(
+                                current,
+                                targetId,
+                                contribution,
+                                operationId,
+                                plugin.getServer().getCurrentTick()),
+                target.getName() + " added " + amount + " " + category + " reward evidence");
     }
 
     private void rejoin(Player actor) {
@@ -464,26 +544,21 @@ final class BossEncounterController implements Listener {
                 actor.getName() + " rejoined the encounter");
     }
 
-    private void reconcileRewards(Player actor, String[] args) {
+    private void reconcileRewards(Player actor) {
         BossEncounterRuntime runtime = runtimeFor(characterId(actor));
         if (runtime == null) {
             actor.sendMessage(Component.text("No active encounter.", NamedTextColor.RED));
             return;
         }
-        UUID grantId;
-        try {
-            grantId = args.length >= 3 ? UUID.fromString(args[2]) : UUID.randomUUID();
-        } catch (IllegalArgumentException exception) {
+        if (runtime.phase() != BossEncounterPhase.VICTORY_PENDING) {
             actor.sendMessage(
-                    Component.text("Reward grant ID must be a UUID.", NamedTextColor.RED));
+                    Component.text(
+                            "Rewards can retry only from VICTORY_PENDING.", NamedTextColor.RED));
             return;
         }
-        UUID operationId = UUID.randomUUID();
-        mutate(
-                runtime.encounterId(),
-                operationId,
-                current -> encounters.reconcileRewards(current, operationId, grantId),
-                "empty lab reward grant committed=" + grantId);
+        beginRewardReconciliation(runtime);
+        actor.sendMessage(
+                Component.text("Durable reward reconciliation requested.", NamedTextColor.YELLOW));
     }
 
     private void showStatus(Player actor) {
@@ -525,8 +600,29 @@ final class BossEncounterController implements Listener {
                                                                 ? ""
                                                                 : " | deadline="
                                                                         + participant
-                                                                                .graceDeadlineTick()),
+                                                                                .graceDeadlineTick())
+                                                        + rewardEvidenceSummary(
+                                                                runtime.rewardEvidence()
+                                                                        .get(
+                                                                                participant
+                                                                                        .characterId())),
                                                 NamedTextColor.AQUA)));
+    }
+
+    private static String rewardEvidenceSummary(RewardParticipantEvidence evidence) {
+        RewardContribution contribution = evidence.contribution();
+        return " | reward damage="
+                + contribution.damageAndPosture()
+                + " guard="
+                + contribution.guardAndControl()
+                + " support="
+                + contribution.healingAndSupport()
+                + " objective="
+                + contribution.objectiveActions()
+                + " lastActive="
+                + evidence.lastActiveTick()
+                + " membership="
+                + evidence.validEncounterMembershipOrRecovery();
     }
 
     private void advanceGrace() {
@@ -685,8 +781,120 @@ final class BossEncounterController implements Listener {
         } else if (runtime.phase() == BossEncounterPhase.ACTIVE
                 && resets.containsKey(runtime.encounterId())) {
             finishResetEffects(runtime);
+        } else if (runtime.phase() == BossEncounterPhase.VICTORY_PENDING) {
+            beginRewardReconciliation(runtime);
         } else if (runtime.phase() == BossEncounterPhase.COMPLETED) {
             runtime.participants().keySet().forEach(encounterByParticipant::remove);
+        }
+    }
+
+    private void beginRewardReconciliation(BossEncounterRuntime runtime) {
+        if (runtime.phase() != BossEncounterPhase.VICTORY_PENDING) {
+            return;
+        }
+        BossEncounterStateRecord record = durableRecords.get(runtime.encounterId());
+        if (record != null && !record.contentVersion().equals(contentVersion)) {
+            broadcast(
+                    runtime,
+                    Component.text(
+                            "Reward reconciliation blocked: victory is pinned to content "
+                                    + record.contentVersion()
+                                    + " but this server loaded "
+                                    + contentVersion,
+                            NamedTextColor.RED));
+            return;
+        }
+        if (!rewardReconciliationInFlight.add(runtime.encounterId())) {
+            return;
+        }
+        broadcast(
+                runtime,
+                Component.text(
+                        "Freezing eligibility and reconciling personal rewards...",
+                        NamedTextColor.YELLOW));
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<PersonalRewardReconciliation, TransactionErrorCode> result =
+                                    rewards.reconcile(runtime);
+                            runSyncIfEnabled(() -> completeRewardReconciliation(runtime, result));
+                        });
+    }
+
+    private void completeRewardReconciliation(
+            BossEncounterRuntime requested,
+            Result<PersonalRewardReconciliation, TransactionErrorCode> result) {
+        rewardReconciliationInFlight.remove(requested.encounterId());
+        BossEncounterRuntime current = active.get(requested.encounterId());
+        if (current == null
+                || current.phase() != BossEncounterPhase.VICTORY_PENDING
+                || current.attempt() != requested.attempt()) {
+            return;
+        }
+        if (result
+                instanceof
+                Result.Failure<PersonalRewardReconciliation, TransactionErrorCode> failure) {
+            broadcast(
+                    current,
+                    Component.text(
+                            "Reward reconciliation retry pending: "
+                                    + failure.error().code()
+                                    + " "
+                                    + failure.detail(),
+                            NamedTextColor.RED));
+            plugin.getServer()
+                    .getScheduler()
+                    .runTaskLater(
+                            plugin,
+                            () -> {
+                                BossEncounterRuntime retry = active.get(requested.encounterId());
+                                if (retry != null) {
+                                    beginRewardReconciliation(retry);
+                                }
+                            },
+                            20L);
+            return;
+        }
+        PersonalRewardReconciliation reconciled =
+                ((Result.Success<PersonalRewardReconciliation, TransactionErrorCode>) result)
+                        .value();
+        reconciled.delivered().forEach(this::notifyDeliveredReward);
+        reconciled.rejected().forEach(this::notifyRejectedReward);
+        UUID operationId =
+                operation(current.encounterId(), "rewards-reconciled", null, current.attempt());
+        mutate(
+                current.encounterId(),
+                operationId,
+                runtime -> encounters.reconcileRewards(runtime, operationId, reconciled.batchId()),
+                "personal rewards delivered="
+                        + reconciled.delivered().size()
+                        + " rejected="
+                        + reconciled.rejected().size()
+                        + " batch="
+                        + reconciled.batchId());
+    }
+
+    private void notifyDeliveredReward(CharacterId characterId, RolledPersonalReward reward) {
+        Player player = plugin.getServer().getPlayer(characterId.value());
+        if (player != null && player.isOnline()) {
+            player.sendMessage(
+                    Component.text(
+                            "Personal reward delivered to Pending Rewards: "
+                                    + reward.itemDefinitionId().value()
+                                    + " x"
+                                    + reward.quantity(),
+                            NamedTextColor.GREEN));
+        }
+    }
+
+    private void notifyRejectedReward(
+            CharacterId characterId,
+            com.branz.mmorpg.worldloop.reward.RewardIneligibilityReason reason) {
+        Player player = plugin.getServer().getPlayer(characterId.value());
+        if (player != null && player.isOnline()) {
+            player.sendMessage(Component.text("No personal reward: " + reason, NamedTextColor.RED));
         }
     }
 
@@ -821,7 +1029,10 @@ final class BossEncounterController implements Listener {
                 progress.completionOperation(),
                 current ->
                         encounters.completeReset(
-                                current, progress.resetOperation(), progress.completionOperation()),
+                                current,
+                                progress.resetOperation(),
+                                progress.completionOperation(),
+                                plugin.getServer().getCurrentTick()),
                 "all Flask restores acknowledged");
     }
 
@@ -943,12 +1154,7 @@ final class BossEncounterController implements Listener {
                 }
                 case WIPE_PENDING -> beginReset(runtime);
                 case RESETTING -> startResetEffects(runtime, runtime.participants().keySet());
-                case VICTORY_PENDING ->
-                        broadcast(
-                                runtime,
-                                Component.text(
-                                        "Recovered victory; reward reconciliation remains pending.",
-                                        NamedTextColor.YELLOW));
+                case VICTORY_PENDING -> beginRewardReconciliation(runtime);
                 case COMPLETED -> {
                     // Completed rows are excluded by the recovery query.
                 }
@@ -1008,7 +1214,7 @@ final class BossEncounterController implements Listener {
         player.sendMessage(
                 "Usage: /mmo encounter start <encounter-uuid> [player ...] | status | "
                         + "defeat [player] | boundary [player] | rejoin | victory | "
-                        + "rewards [grant-uuid]");
+                        + "contribute <damage|guard|support|objective> <amount> [player] | rewards");
     }
 
     private enum AvailabilityCommand {

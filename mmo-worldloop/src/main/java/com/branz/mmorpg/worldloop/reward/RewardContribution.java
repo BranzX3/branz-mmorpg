@@ -14,4 +14,19 @@ public record RewardContribution(
             throw new IllegalArgumentException("reward contributions must not be negative");
         }
     }
+
+    public RewardContribution plus(RewardContribution other) {
+        return new RewardContribution(
+                Math.addExact(damageAndPosture, other.damageAndPosture),
+                Math.addExact(guardAndControl, other.guardAndControl),
+                Math.addExact(healingAndSupport, other.healingAndSupport),
+                Math.addExact(objectiveActions, other.objectiveActions));
+    }
+
+    public boolean empty() {
+        return damageAndPosture == 0
+                && guardAndControl == 0
+                && healingAndSupport == 0
+                && objectiveActions == 0;
+    }
 }

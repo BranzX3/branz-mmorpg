@@ -8,6 +8,8 @@ import com.branz.mmorpg.worldloop.encounter.BossEncounterRuntime;
 import com.branz.mmorpg.worldloop.encounter.EncounterOperationKind;
 import com.branz.mmorpg.worldloop.encounter.EncounterParticipant;
 import com.branz.mmorpg.worldloop.encounter.EncounterParticipantStatus;
+import com.branz.mmorpg.worldloop.reward.RewardContribution;
+import com.branz.mmorpg.worldloop.reward.RewardParticipantEvidence;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,9 +21,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Canonical V1 JSON codec for restart-safe boss encounter runtime. */
+/** Canonical V2 JSON codec for restart-safe boss encounter runtime and reward evidence. */
 final class BossEncounterJsonCodec {
-    private static final int SCHEMA_VERSION = 1;
+    private static final int SCHEMA_VERSION = 2;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -44,6 +46,35 @@ final class BossEncounterJsonCodec {
                             node.put("status", participant.status().name());
                             node.put("graceDeadlineTick", participant.graceDeadlineTick());
                         });
+        ArrayNode rewardEvidence = root.putArray("rewardEvidence");
+        runtime.rewardEvidence().values().stream()
+                .sorted(Comparator.comparing(value -> value.characterId().value()))
+                .forEach(
+                        evidence -> {
+                            ObjectNode node = rewardEvidence.addObject();
+                            node.put("characterId", evidence.characterId().value().toString());
+                            node.put("joinedTick", evidence.joinedTick());
+                            node.put("lastActiveTick", evidence.lastActiveTick());
+                            node.put(
+                                    "joinedBeforeEligibilityCutoff",
+                                    evidence.joinedBeforeEligibilityCutoff());
+                            node.put(
+                                    "validEncounterMembershipOrRecovery",
+                                    evidence.validEncounterMembershipOrRecovery());
+                            node.put(
+                                    "completionGrantAlreadyCommitted",
+                                    evidence.completionGrantAlreadyCommitted());
+                            ObjectNode contribution = node.putObject("contribution");
+                            contribution.put(
+                                    "damageAndPosture", evidence.contribution().damageAndPosture());
+                            contribution.put(
+                                    "guardAndControl", evidence.contribution().guardAndControl());
+                            contribution.put(
+                                    "healingAndSupport",
+                                    evidence.contribution().healingAndSupport());
+                            contribution.put(
+                                    "objectiveActions", evidence.contribution().objectiveActions());
+                        });
         ArrayNode operations = root.putArray("processedOperations");
         runtime.processedOperations().entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
@@ -54,6 +85,7 @@ final class BossEncounterJsonCodec {
                             node.put("kind", entry.getValue().name());
                         });
         putNullableUuid(root, "activeResetOperationId", runtime.activeResetOperationId());
+        putNullableLong(root, "victoryTick", runtime.victoryTick());
         putNullableUuid(root, "rewardGrantId", runtime.rewardGrantId());
         try {
             return mapper.writeValueAsString(root);
@@ -66,9 +98,14 @@ final class BossEncounterJsonCodec {
     BossEncounterRuntime decode(String json) {
         try {
             JsonNode root = mapper.readTree(json);
-            if (!root.isObject() || requiredInt(root, "schemaVersion") != SCHEMA_VERSION) {
+            if (root == null || !root.isObject()) {
+                throw new IllegalArgumentException("Boss encounter payload must be an object");
+            }
+            int schemaVersion = requiredInt(root, "schemaVersion");
+            if (schemaVersion != 1 && schemaVersion != SCHEMA_VERSION) {
                 throw new IllegalArgumentException("Unsupported boss encounter schema version");
             }
+            long startedTick = requiredLong(root, "startedTick");
             HashMap<CharacterId, EncounterParticipant> participants = new HashMap<>();
             JsonNode participantNodes = requiredArray(root, "participants");
             for (JsonNode node : participantNodes) {
@@ -82,6 +119,10 @@ final class BossEncounterJsonCodec {
                     throw new IllegalArgumentException("Duplicate encounter participant");
                 }
             }
+            Map<CharacterId, RewardParticipantEvidence> rewardEvidence =
+                    schemaVersion == 1
+                            ? legacyRewardEvidence(participants, startedTick)
+                            : rewardEvidence(root);
             HashMap<UUID, EncounterOperationKind> operations = new HashMap<>();
             JsonNode operationNodes = requiredArray(root, "processedOperations");
             for (JsonNode node : operationNodes) {
@@ -92,16 +133,23 @@ final class BossEncounterJsonCodec {
                     throw new IllegalArgumentException("Duplicate encounter operation");
                 }
             }
+            BossEncounterPhase phase = requiredEnum(root, "phase", BossEncounterPhase.class);
+            Optional<Long> victoryTick =
+                    schemaVersion == 1
+                            ? legacyVictoryTick(phase, startedTick)
+                            : optionalLong(root, "victoryTick");
             return new BossEncounterRuntime(
                     new EncounterId(requiredUuid(root, "encounterId")),
                     DefinitionId.of(requiredText(root, "definitionId")),
                     requiredUuid(root, "checkpointInstanceId"),
-                    requiredEnum(root, "phase", BossEncounterPhase.class),
+                    phase,
                     requiredInt(root, "attempt"),
-                    requiredLong(root, "startedTick"),
+                    startedTick,
                     participants,
+                    rewardEvidence,
                     operations,
                     optionalUuid(root, "activeResetOperationId"),
+                    victoryTick,
                     optionalUuid(root, "rewardGrantId"));
         } catch (JsonProcessingException | IllegalArgumentException exception) {
             throw new IllegalArgumentException("Invalid boss encounter state JSON", exception);
@@ -117,12 +165,88 @@ final class BossEncounterJsonCodec {
         }
     }
 
+    private static void putNullableLong(
+            ObjectNode root, String field, Optional<Long> optionalValue) {
+        if (optionalValue.isPresent()) {
+            root.put(field, optionalValue.orElseThrow());
+        } else {
+            root.putNull(field);
+        }
+    }
+
+    private static Map<CharacterId, RewardParticipantEvidence> rewardEvidence(JsonNode root) {
+        HashMap<CharacterId, RewardParticipantEvidence> evidenceByCharacter = new HashMap<>();
+        for (JsonNode node : requiredArray(root, "rewardEvidence")) {
+            CharacterId characterId = new CharacterId(requiredUuid(node, "characterId"));
+            JsonNode contribution = requiredObject(node, "contribution");
+            RewardParticipantEvidence evidence =
+                    new RewardParticipantEvidence(
+                            characterId,
+                            requiredLong(node, "joinedTick"),
+                            requiredLong(node, "lastActiveTick"),
+                            requiredBoolean(node, "joinedBeforeEligibilityCutoff"),
+                            requiredBoolean(node, "validEncounterMembershipOrRecovery"),
+                            requiredBoolean(node, "completionGrantAlreadyCommitted"),
+                            new RewardContribution(
+                                    requiredLong(contribution, "damageAndPosture"),
+                                    requiredLong(contribution, "guardAndControl"),
+                                    requiredLong(contribution, "healingAndSupport"),
+                                    requiredLong(contribution, "objectiveActions")));
+            if (evidenceByCharacter.put(characterId, evidence) != null) {
+                throw new IllegalArgumentException("Duplicate encounter reward evidence");
+            }
+        }
+        return evidenceByCharacter;
+    }
+
+    private static Map<CharacterId, RewardParticipantEvidence> legacyRewardEvidence(
+            Map<CharacterId, EncounterParticipant> participants, long startedTick) {
+        HashMap<CharacterId, RewardParticipantEvidence> evidence = new HashMap<>();
+        participants
+                .keySet()
+                .forEach(
+                        characterId ->
+                                evidence.put(
+                                        characterId,
+                                        new RewardParticipantEvidence(
+                                                characterId,
+                                                startedTick,
+                                                startedTick,
+                                                true,
+                                                true,
+                                                false,
+                                                new RewardContribution(0, 0, 0, 0))));
+        return evidence;
+    }
+
+    private static Optional<Long> legacyVictoryTick(BossEncounterPhase phase, long startedTick) {
+        return phase == BossEncounterPhase.VICTORY_PENDING || phase == BossEncounterPhase.COMPLETED
+                ? Optional.of(startedTick)
+                : Optional.empty();
+    }
+
     private static JsonNode requiredArray(JsonNode root, String field) {
         JsonNode value = root.get(field);
         if (value == null || !value.isArray()) {
             throw new IllegalArgumentException(field + " must be an array");
         }
         return value;
+    }
+
+    private static JsonNode requiredObject(JsonNode root, String field) {
+        JsonNode value = root.get(field);
+        if (value == null || !value.isObject()) {
+            throw new IllegalArgumentException(field + " must be an object");
+        }
+        return value;
+    }
+
+    private static boolean requiredBoolean(JsonNode root, String field) {
+        JsonNode value = root.get(field);
+        if (value == null || !value.isBoolean()) {
+            throw new IllegalArgumentException(field + " must be a boolean");
+        }
+        return value.booleanValue();
     }
 
     private static String requiredText(JsonNode root, String field) {
@@ -143,6 +267,14 @@ final class BossEncounterJsonCodec {
             return Optional.empty();
         }
         return Optional.of(UUID.fromString(requiredText(root, field)));
+    }
+
+    private static Optional<Long> optionalLong(JsonNode root, String field) {
+        JsonNode value = root.get(field);
+        if (value == null || value.isNull()) {
+            return Optional.empty();
+        }
+        return Optional.of(requiredLong(root, field));
     }
 
     private static int requiredInt(JsonNode root, String field) {

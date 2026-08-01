@@ -8,6 +8,7 @@ import com.branz.mmorpg.api.identity.CharacterId;
 import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.EncounterId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.worldloop.reward.RewardContribution;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,11 @@ class BossEncounterEngineTest {
         UUID completionOperation = operation();
         BossEncounterTransition completed =
                 successful(
-                        engine.completeReset(reset.runtime(), resetOperation, completionOperation));
+                        engine.completeReset(
+                                reset.runtime(),
+                                resetOperation,
+                                completionOperation,
+                                START_TICK + 10));
         assertEquals(BossEncounterPhase.ACTIVE, completed.runtime().phase());
         assertEquals(2, completed.runtime().attempt());
         assertTrue(
@@ -45,6 +50,10 @@ class BossEncounterEngineTest {
                         .allMatch(
                                 participant ->
                                         participant.status() == EncounterParticipantStatus.ACTIVE));
+        assertEquals(START_TICK + 10, completed.runtime().startedTick());
+        assertTrue(
+                completed.runtime().rewardEvidence().values().stream()
+                        .allMatch(evidence -> evidence.contribution().empty()));
     }
 
     @Test
@@ -127,9 +136,10 @@ class BossEncounterEngineTest {
                         .runtime();
         UUID victoryOperation = operation();
         BossEncounterTransition victory =
-                successful(engine.confirmVictory(wiped, victoryOperation));
+                successful(engine.confirmVictory(wiped, victoryOperation, START_TICK + 2));
         assertEquals(BossEncounterPhase.VICTORY_PENDING, victory.runtime().phase());
         assertTrue(victory.rewardReconciliationRequested());
+        assertEquals(START_TICK + 2, victory.runtime().victoryTick().orElseThrow());
 
         Result<BossEncounterTransition, BossEncounterErrorCode> reset =
                 engine.beginReset(victory.runtime(), operation());
@@ -150,9 +160,11 @@ class BossEncounterEngineTest {
         BossEncounterRuntime active = start(first);
         UUID victoryOperation = operation();
         BossEncounterTransition victory =
-                successful(engine.confirmVictory(active, victoryOperation));
+                successful(engine.confirmVictory(active, victoryOperation, START_TICK + 1));
         BossEncounterTransition duplicateVictory =
-                successful(engine.confirmVictory(victory.runtime(), victoryOperation));
+                successful(
+                        engine.confirmVictory(
+                                victory.runtime(), victoryOperation, START_TICK + 100));
         assertFalse(duplicateVictory.changed());
         assertFalse(duplicateVictory.rewardReconciliationRequested());
 
@@ -181,6 +193,44 @@ class BossEncounterEngineTest {
     }
 
     @Test
+    void contributionIsDurableStateAndExpiredGraceInvalidatesMembership() {
+        BossEncounterRuntime runtime = start(first, second);
+        UUID contributionOperation = operation();
+        runtime =
+                successful(
+                                engine.recordRewardContribution(
+                                        runtime,
+                                        first,
+                                        new RewardContribution(125, 0, 0, 0),
+                                        contributionOperation,
+                                        START_TICK + 4))
+                        .runtime();
+        assertEquals(125, runtime.rewardEvidence().get(first).contribution().damageAndPosture());
+        assertEquals(START_TICK + 4, runtime.rewardEvidence().get(first).lastActiveTick());
+        assertFalse(
+                successful(
+                                engine.recordRewardContribution(
+                                        runtime,
+                                        first,
+                                        new RewardContribution(125, 0, 0, 0),
+                                        contributionOperation,
+                                        START_TICK + 5))
+                        .changed());
+
+        runtime =
+                successful(engine.disconnect(runtime, first, operation(), START_TICK + 5))
+                        .runtime();
+        runtime =
+                successful(
+                                engine.advanceGrace(
+                                        runtime,
+                                        operation(),
+                                        START_TICK + BossEncounterEngine.REJOIN_GRACE_TICKS + 6))
+                        .runtime();
+        assertFalse(runtime.rewardEvidence().get(first).validEncounterMembershipOrRecovery());
+    }
+
+    @Test
     void restartRecoveryRebasesAvailabilityGraceOnTheNewServerClock() {
         BossEncounterRuntime runtime = start(first, second);
         runtime = successful(engine.defeat(runtime, first, operation(), START_TICK + 1)).runtime();
@@ -198,6 +248,13 @@ class BossEncounterEngineTest {
         assertEquals(
                 5 + BossEncounterEngine.REJOIN_GRACE_TICKS,
                 recovered.runtime().participants().get(second).graceDeadlineTick());
+        assertEquals(5, recovered.runtime().startedTick());
+        assertTrue(
+                recovered.runtime().rewardEvidence().values().stream()
+                        .allMatch(
+                                evidence ->
+                                        evidence.joinedTick() == 5
+                                                && evidence.lastActiveTick() == 5));
         BossEncounterTransition replay =
                 successful(engine.recoverAfterRestart(recovered.runtime(), recoveryOperation, 500));
         assertFalse(replay.changed());

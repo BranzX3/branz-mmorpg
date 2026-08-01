@@ -159,8 +159,11 @@ V0011 now stores one journaled grant per encounter/attempt/character and advance
 through frozen, rolled and delivered recovery states. Encounter content now supplies validated
 eligibility and weighted stackable-lot reward tables; deterministic rolling derives item quantity
 and lot identity without mutable RNG. A canonical fail-closed payload codec preserves frozen
-evidence, rolled outcome and delivery receipt. Live boss evidence/roll/delivery is the next reward
-slice.
+evidence, rolled outcome and delivery receipt. The live boss adapter now checkpoints category
+evidence in V0009 schema V2, freezes a stable victory tick, persists V0011 before each roll/value
+effect and delivers independent lots to Pending Rewards before marking the encounter complete.
+Restart and exact reconciliation replay cannot duplicate a grant or lot. Milestone 7's remaining
+work is Death Pouch and duel/arena profile hooks.
 
 ## Milestone 8 — Lifeskill kernel
 

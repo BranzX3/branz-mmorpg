@@ -4,6 +4,8 @@ import com.branz.mmorpg.api.identity.CharacterId;
 import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.EncounterId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.worldloop.reward.RewardContribution;
+import com.branz.mmorpg.worldloop.reward.RewardParticipantEvidence;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,9 +40,12 @@ public final class BossEncounterEngine {
                     "Boss encounter requires one to five unique participants.");
         }
         HashMap<CharacterId, EncounterParticipant> participants = new HashMap<>();
+        HashMap<CharacterId, RewardParticipantEvidence> rewardEvidence = new HashMap<>();
         uniqueParticipants.forEach(
-                characterId ->
-                        participants.put(characterId, EncounterParticipant.active(characterId)));
+                characterId -> {
+                    participants.put(characterId, EncounterParticipant.active(characterId));
+                    rewardEvidence.put(characterId, initialEvidence(characterId, currentTick));
+                });
         return Result.success(
                 new BossEncounterRuntime(
                         encounterId,
@@ -50,9 +55,79 @@ public final class BossEncounterEngine {
                         1,
                         currentTick,
                         participants,
+                        rewardEvidence,
                         Map.of(),
                         Optional.empty(),
+                        Optional.empty(),
                         Optional.empty()));
+    }
+
+    public Result<BossEncounterTransition, BossEncounterErrorCode> recordRewardContribution(
+            BossEncounterRuntime runtime,
+            CharacterId characterId,
+            RewardContribution contribution,
+            UUID operationId,
+            long currentTick) {
+        Objects.requireNonNull(runtime, "runtime");
+        Objects.requireNonNull(characterId, "characterId");
+        Objects.requireNonNull(contribution, "contribution");
+        Objects.requireNonNull(operationId, "operationId");
+        requireTick(currentTick);
+        Result<BossEncounterTransition, BossEncounterErrorCode> duplicate =
+                duplicate(
+                        runtime, operationId, EncounterOperationKind.REWARD_CONTRIBUTION_RECORDED);
+        if (duplicate != null) {
+            return duplicate;
+        }
+        if (contribution.empty()) {
+            return Result.failure(
+                    BossEncounterErrorCode.INVALID_PARTICIPANT_STATE,
+                    "Reward contribution must add at least one category point.");
+        }
+        Result<EncounterParticipant, BossEncounterErrorCode> participantResult =
+                requireActiveParticipant(runtime, characterId);
+        if (participantResult
+                instanceof Result.Failure<EncounterParticipant, BossEncounterErrorCode> failure) {
+            return Result.failure(failure.error(), failure.detail());
+        }
+        EncounterParticipant participant =
+                ((Result.Success<EncounterParticipant, BossEncounterErrorCode>) participantResult)
+                        .value();
+        if (participant.status() != EncounterParticipantStatus.ACTIVE) {
+            return Result.failure(
+                    BossEncounterErrorCode.INVALID_PARTICIPANT_STATE,
+                    "Only an active participant can record reward contribution.");
+        }
+        RewardParticipantEvidence previous = runtime.rewardEvidence().get(characterId);
+        HashMap<CharacterId, RewardParticipantEvidence> evidence =
+                new HashMap<>(runtime.rewardEvidence());
+        evidence.put(
+                characterId,
+                new RewardParticipantEvidence(
+                        characterId,
+                        previous.joinedTick(),
+                        currentTick,
+                        previous.joinedBeforeEligibilityCutoff(),
+                        previous.validEncounterMembershipOrRecovery(),
+                        previous.completionGrantAlreadyCommitted(),
+                        previous.contribution().plus(contribution)));
+        return Result.success(
+                transition(
+                        runtime,
+                        runtime.phase(),
+                        runtime.attempt(),
+                        runtime.startedTick(),
+                        runtime.participants(),
+                        evidence,
+                        withOperation(
+                                runtime,
+                                operationId,
+                                EncounterOperationKind.REWARD_CONTRIBUTION_RECORDED),
+                        runtime.activeResetOperationId(),
+                        runtime.victoryTick(),
+                        runtime.rewardGrantId(),
+                        Set.of(),
+                        false));
     }
 
     public Result<BossEncounterTransition, BossEncounterErrorCode> defeat(
@@ -161,6 +236,8 @@ public final class BossEncounterEngine {
         }
         HashMap<CharacterId, EncounterParticipant> participants =
                 new HashMap<>(runtime.participants());
+        HashMap<CharacterId, RewardParticipantEvidence> rewardEvidence =
+                new HashMap<>(runtime.rewardEvidence());
         boolean expired = false;
         for (EncounterParticipant participant : runtime.participants().values()) {
             if ((participant.status() == EncounterParticipantStatus.DISCONNECTED_GRACE
@@ -171,6 +248,17 @@ public final class BossEncounterEngine {
                         participant.withStatus(
                                 EncounterParticipantStatus.DEFEATED,
                                 EncounterParticipant.NO_GRACE_DEADLINE));
+                RewardParticipantEvidence previous = rewardEvidence.get(participant.characterId());
+                rewardEvidence.put(
+                        participant.characterId(),
+                        new RewardParticipantEvidence(
+                                previous.characterId(),
+                                previous.joinedTick(),
+                                previous.lastActiveTick(),
+                                previous.joinedBeforeEligibilityCutoff(),
+                                false,
+                                previous.completionGrantAlreadyCommitted(),
+                                previous.contribution()));
                 expired = true;
             }
         }
@@ -182,8 +270,11 @@ public final class BossEncounterEngine {
                         runtime,
                         phaseFor(participants),
                         runtime.attempt(),
+                        runtime.startedTick(),
                         participants,
+                        rewardEvidence,
                         withOperation(runtime, operationId, EncounterOperationKind.GRACE_ADVANCED),
+                        Optional.empty(),
                         Optional.empty(),
                         runtime.rewardGrantId(),
                         Set.of(),
@@ -214,14 +305,31 @@ public final class BossEncounterEngine {
                                 ? participant
                                 : participant.withStatus(
                                         EncounterParticipantStatus.DISCONNECTED_GRACE, deadline));
+        HashMap<CharacterId, RewardParticipantEvidence> rewardEvidence = new HashMap<>();
+        runtime.rewardEvidence()
+                .forEach(
+                        (characterId, previous) ->
+                                rewardEvidence.put(
+                                        characterId,
+                                        new RewardParticipantEvidence(
+                                                characterId,
+                                                currentTick,
+                                                currentTick,
+                                                previous.joinedBeforeEligibilityCutoff(),
+                                                previous.validEncounterMembershipOrRecovery(),
+                                                previous.completionGrantAlreadyCommitted(),
+                                                previous.contribution())));
         return Result.success(
                 transition(
                         runtime,
                         phaseFor(participants),
                         runtime.attempt(),
+                        currentTick,
                         participants,
+                        rewardEvidence,
                         withOperation(
                                 runtime, operationId, EncounterOperationKind.RESTART_RECOVERED),
+                        Optional.empty(),
                         Optional.empty(),
                         runtime.rewardGrantId(),
                         Set.of(),
@@ -247,19 +355,26 @@ public final class BossEncounterEngine {
                         runtime,
                         BossEncounterPhase.RESETTING,
                         runtime.attempt(),
+                        runtime.startedTick(),
                         runtime.participants(),
+                        runtime.rewardEvidence(),
                         withOperation(runtime, operationId, EncounterOperationKind.RESET_BEGUN),
                         Optional.of(operationId),
+                        Optional.empty(),
                         Optional.empty(),
                         runtime.participants().keySet(),
                         false));
     }
 
     public Result<BossEncounterTransition, BossEncounterErrorCode> completeReset(
-            BossEncounterRuntime runtime, UUID resetOperationId, UUID completionOperationId) {
+            BossEncounterRuntime runtime,
+            UUID resetOperationId,
+            UUID completionOperationId,
+            long currentTick) {
         Objects.requireNonNull(runtime, "runtime");
         Objects.requireNonNull(resetOperationId, "resetOperationId");
         Objects.requireNonNull(completionOperationId, "completionOperationId");
+        requireTick(currentTick);
         Result<BossEncounterTransition, BossEncounterErrorCode> duplicate =
                 duplicate(runtime, completionOperationId, EncounterOperationKind.RESET_COMPLETED);
         if (duplicate != null) {
@@ -276,22 +391,28 @@ public final class BossEncounterEngine {
                     "Reset completion does not match the active reset operation.");
         }
         HashMap<CharacterId, EncounterParticipant> participants = new HashMap<>();
+        HashMap<CharacterId, RewardParticipantEvidence> rewardEvidence = new HashMap<>();
         runtime.participants()
                 .keySet()
                 .forEach(
-                        characterId ->
-                                participants.put(
-                                        characterId, EncounterParticipant.active(characterId)));
+                        characterId -> {
+                            participants.put(characterId, EncounterParticipant.active(characterId));
+                            rewardEvidence.put(
+                                    characterId, initialEvidence(characterId, currentTick));
+                        });
         return Result.success(
                 transition(
                         runtime,
                         BossEncounterPhase.ACTIVE,
                         Math.addExact(runtime.attempt(), 1),
+                        currentTick,
                         participants,
+                        rewardEvidence,
                         withOperation(
                                 runtime,
                                 completionOperationId,
                                 EncounterOperationKind.RESET_COMPLETED),
+                        Optional.empty(),
                         Optional.empty(),
                         Optional.empty(),
                         Set.of(),
@@ -299,9 +420,10 @@ public final class BossEncounterEngine {
     }
 
     public Result<BossEncounterTransition, BossEncounterErrorCode> confirmVictory(
-            BossEncounterRuntime runtime, UUID operationId) {
+            BossEncounterRuntime runtime, UUID operationId, long currentTick) {
         Objects.requireNonNull(runtime, "runtime");
         Objects.requireNonNull(operationId, "operationId");
+        requireTick(currentTick);
         Result<BossEncounterTransition, BossEncounterErrorCode> duplicate =
                 duplicate(runtime, operationId, EncounterOperationKind.VICTORY_CONFIRMED);
         if (duplicate != null) {
@@ -318,10 +440,13 @@ public final class BossEncounterEngine {
                         runtime,
                         BossEncounterPhase.VICTORY_PENDING,
                         runtime.attempt(),
+                        runtime.startedTick(),
                         runtime.participants(),
+                        runtime.rewardEvidence(),
                         withOperation(
                                 runtime, operationId, EncounterOperationKind.VICTORY_CONFIRMED),
                         Optional.empty(),
+                        Optional.of(currentTick),
                         Optional.empty(),
                         Set.of(),
                         true));
@@ -347,10 +472,13 @@ public final class BossEncounterEngine {
                         runtime,
                         BossEncounterPhase.COMPLETED,
                         runtime.attempt(),
+                        runtime.startedTick(),
                         runtime.participants(),
+                        runtime.rewardEvidence(),
                         withOperation(
                                 runtime, operationId, EncounterOperationKind.REWARDS_RECONCILED),
                         Optional.empty(),
+                        runtime.victoryTick(),
                         Optional.of(rewardGrantId),
                         Set.of(),
                         false));
@@ -423,8 +551,11 @@ public final class BossEncounterEngine {
                 runtime,
                 phaseFor(participants),
                 runtime.attempt(),
+                runtime.startedTick(),
                 participants,
+                runtime.rewardEvidence(),
                 withOperation(runtime, operationId, operationKind),
+                Optional.empty(),
                 Optional.empty(),
                 runtime.rewardGrantId(),
                 Set.of(),
@@ -468,9 +599,12 @@ public final class BossEncounterEngine {
             BossEncounterRuntime source,
             BossEncounterPhase phase,
             int attempt,
+            long startedTick,
             Map<CharacterId, EncounterParticipant> participants,
+            Map<CharacterId, RewardParticipantEvidence> rewardEvidence,
             Map<UUID, EncounterOperationKind> operations,
             Optional<UUID> activeResetOperationId,
+            Optional<Long> victoryTick,
             Optional<UUID> rewardGrantId,
             Set<CharacterId> flaskRestoreParticipants,
             boolean rewardReconciliationRequested) {
@@ -481,10 +615,12 @@ public final class BossEncounterEngine {
                         source.checkpointInstanceId(),
                         phase,
                         attempt,
-                        source.startedTick(),
+                        startedTick,
                         participants,
+                        rewardEvidence,
                         operations,
                         activeResetOperationId,
+                        victoryTick,
                         rewardGrantId);
         return new BossEncounterTransition(
                 runtime,
@@ -497,5 +633,17 @@ public final class BossEncounterEngine {
         if (currentTick < 0) {
             throw new IllegalArgumentException("currentTick must not be negative");
         }
+    }
+
+    private static RewardParticipantEvidence initialEvidence(
+            CharacterId characterId, long currentTick) {
+        return new RewardParticipantEvidence(
+                characterId,
+                currentTick,
+                currentTick,
+                true,
+                true,
+                false,
+                new RewardContribution(0, 0, 0, 0));
     }
 }

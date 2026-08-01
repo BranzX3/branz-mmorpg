@@ -24,6 +24,12 @@ This matrix defines end-to-end scenarios that must pass before V1 release. Unit 
 - Encounter resets once, Flask snapshot restores once, ordinary potion/ammo/durability do not restore.
 - Disconnect/reconnect during wipe cannot duplicate restore or rewards.
 - Victory creates one reward grant per eligible player and disables further checkpoint restore for that completed encounter.
+- In a development environment, start the encounter lab, record independent category evidence with
+  `/mmo encounter contribute <damage|guard|support|objective> <amount> [player]`, then run
+  `/mmo encounter victory`; eligible players receive one lot in Pending Rewards while rejected
+  players receive the stable eligibility reason.
+- Restart once before victory and once during `VICTORY_PENDING`; contribution totals, frozen roll,
+  lot UUID and delivered quantity remain identical, and V0011 has no pending row after completion.
 
 ## Lifeskill harvest
 

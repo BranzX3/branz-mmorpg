@@ -11,6 +11,7 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterEngine;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterErrorCode;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterRuntime;
+import com.branz.mmorpg.worldloop.reward.RewardContribution;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -46,8 +47,45 @@ class BossEncounterJsonCodecTest {
     }
 
     @Test
+    void roundTripsContributionEvidenceAndReadsLegacyV1() {
+        CharacterId characterId = new CharacterId(UUID.randomUUID());
+        BossEncounterRuntime runtime =
+                successful(
+                        engine.start(
+                                new EncounterId(UUID.randomUUID()),
+                                DefinitionId.of("encounter.boss.training_golem"),
+                                UUID.randomUUID(),
+                                List.of(characterId),
+                                100));
+        runtime =
+                successful(
+                                engine.recordRewardContribution(
+                                        runtime,
+                                        characterId,
+                                        new RewardContribution(100, 2, 3, 1),
+                                        UUID.randomUUID(),
+                                        120))
+                        .runtime();
+        runtime = successful(engine.confirmVictory(runtime, UUID.randomUUID(), 140)).runtime();
+        assertEquals(runtime, codec.decode(codec.encode(runtime)));
+
+        String legacy =
+                codec.encode(runtime)
+                        .replace("\"schemaVersion\":2", "\"schemaVersion\":1")
+                        .replaceFirst(
+                                ",\"rewardEvidence\":\\[.*?],\"processedOperations\"",
+                                ",\"processedOperations\"")
+                        .replace(",\"victoryTick\":140", "");
+        BossEncounterRuntime decodedLegacy = codec.decode(legacy);
+        assertEquals(
+                0,
+                decodedLegacy.rewardEvidence().get(characterId).contribution().damageAndPosture());
+        assertEquals(100, decodedLegacy.victoryTick().orElseThrow());
+    }
+
+    @Test
     void rejectsUnknownSchemaAndInvariantViolations() {
-        assertThrows(IllegalArgumentException.class, () -> codec.decode("{\"schemaVersion\":2}"));
+        assertThrows(IllegalArgumentException.class, () -> codec.decode("{\"schemaVersion\":3}"));
         assertThrows(
                 IllegalArgumentException.class,
                 () ->

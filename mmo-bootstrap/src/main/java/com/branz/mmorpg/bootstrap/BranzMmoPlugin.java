@@ -16,6 +16,7 @@ import com.branz.mmorpg.magic.definition.SpellEngine;
 import com.branz.mmorpg.magic.definition.SpellEngineErrorCode;
 import com.branz.mmorpg.progression.build.BuildEngine;
 import com.branz.mmorpg.progression.build.BuildErrorCode;
+import com.branz.mmorpg.worldloop.reward.EncounterRewardTable;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
@@ -37,6 +38,9 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private final AtomicReference<BuildEngine> activeBuildEngine = new AtomicReference<>();
     private final AtomicReference<AilmentDefinitionEngine> activeAilmentEngine =
             new AtomicReference<>();
+    private final AtomicReference<
+                    Map<com.branz.mmorpg.api.identity.DefinitionId, EncounterRewardTable>>
+            activeEncounterRewardTables = new AtomicReference<>(Map.of());
     private ResourcePackGate resourcePackGate;
     private SceneHubController sceneHubController;
     private MmoCommandController commandController;
@@ -181,6 +185,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         activeSpellEngine.set(null);
         activeBuildEngine.set(null);
         activeAilmentEngine.set(null);
+        activeEncounterRewardTables.set(Map.of());
         activeSnapshot.set(null);
         lifecycle.disable();
         getLogger().info("Branz MMO platform disabled cleanly.");
@@ -257,6 +262,14 @@ public final class BranzMmoPlugin extends JavaPlugin {
                     + failure.detail();
         }
         activeItemEngine.set(((Result.Success<ItemEngine, ItemEngineErrorCode>) compiled).value());
+        try {
+            activeEncounterRewardTables.set(
+                    EncounterRewardTableCompiler.compile(snapshot, activeItemEngine.get()));
+        } catch (IllegalArgumentException exception) {
+            activeItemEngine.set(null);
+            activeEncounterRewardTables.set(Map.of());
+            return "Encounter Reward compiler rejected active content: " + exception.getMessage();
+        }
         Result<MoveEngine, MoveEngineErrorCode> compiledMoves = MoveEngine.compile(snapshot);
         if (compiledMoves instanceof Result.Failure<MoveEngine, MoveEngineErrorCode> failure) {
             activeItemEngine.set(null);
@@ -642,6 +655,9 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         characterSessionController,
                         flaskHotbarController,
                         databaseRuntime.bossEncounters(),
+                        databaseRuntime.personalRewards(),
+                        databaseRuntime.values(),
+                        activeEncounterRewardTables.get(),
                         snapshot.manifest().contentVersion());
         partyController =
                 new PartyController(this, characterSessionController, bossEncounterController);
@@ -738,6 +754,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                                 + activeBuildEngine.get().forms().size()
                                 + ", ailment definitions="
                                 + activeAilmentEngine.get().all().size()
+                                + ", encounter reward definitions="
+                                + activeEncounterRewardTables.get().size()
                                 + ", Scene preview=COMPACT_2D");
     }
 

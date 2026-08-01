@@ -39,6 +39,7 @@ public final class DeathPouchEngine {
         }
         UUID pouchId = named("death-pouch:" + deathId + ":pouch");
         UUID debitId = named("death-pouch:" + deathId + ":wallet-debit");
+        UUID creditId = named("death-pouch:" + deathId + ":wallet-credit");
         return new DeathPouchDecision(
                 DeathPouchDecisionReason.POUCH_PLANNED,
                 Optional.of(
@@ -48,6 +49,7 @@ public final class DeathPouchEngine {
                                 ownerCharacterId,
                                 amount,
                                 debitId,
+                                creditId,
                                 location,
                                 createdAt,
                                 createdAt.plus(RETENTION))));

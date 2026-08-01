@@ -168,6 +168,9 @@ work is Death Pouch and duel/arena profile hooks.
 The pure Death Pouch planner now freezes the open-world 10% carried-wallet loss, seven-day expiry,
 stable pouch/debit saga identities and explicit boss/PvP/zero-loss suppression. Durable pouch state,
 wallet-provider reconciliation and live owner-only recovery remain the next Death Pouch slices.
+V0012 now stores the non-spendable debit intention, active pouch, recovery credit and terminal expiry
+as journaled optimistic transitions with stable recovery/expiry queries. The wallet capability and
+live owner-only world adapter are next.
 
 ## Milestone 8 — Lifeskill kernel
 

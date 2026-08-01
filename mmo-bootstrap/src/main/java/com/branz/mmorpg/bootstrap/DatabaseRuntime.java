@@ -15,10 +15,12 @@ import com.branz.mmorpg.persistence.progression.ProgressionEvidenceRepository;
 import com.branz.mmorpg.persistence.transaction.BossEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRepository;
+import com.branz.mmorpg.persistence.transaction.DeathPouchRepository;
 import com.branz.mmorpg.persistence.transaction.DownedEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcBossEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterExpeditionStateRepository;
+import com.branz.mmorpg.persistence.transaction.JdbcDeathPouchRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcDownedEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcPersonalRewardGrantRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcReconciliationScanner;
@@ -46,6 +48,7 @@ final class DatabaseRuntime implements AutoCloseable {
     private final BossEncounterStateRepository bossEncounters;
     private final DownedEncounterStateRepository downedEncounters;
     private final PersonalRewardGrantRepository personalRewards;
+    private final DeathPouchRepository deathPouches;
     private final ProgressionEvidenceRepository progression;
     private final KnowledgeProgressionRepository knowledge;
     private final ReconciliationScanner reconciliation;
@@ -66,6 +69,7 @@ final class DatabaseRuntime implements AutoCloseable {
         bossEncounters = new JdbcBossEncounterStateRepository(dataSource);
         downedEncounters = new JdbcDownedEncounterStateRepository(dataSource);
         personalRewards = new JdbcPersonalRewardGrantRepository(dataSource);
+        deathPouches = new JdbcDeathPouchRepository(dataSource);
         progression = new JdbcProgressionEvidenceRepository(dataSource);
         knowledge = new JdbcKnowledgeProgressionRepository(dataSource);
         reconciliation = new JdbcReconciliationScanner(dataSource);
@@ -144,6 +148,10 @@ final class DatabaseRuntime implements AutoCloseable {
 
     PersonalRewardGrantRepository personalRewards() {
         return personalRewards;
+    }
+
+    DeathPouchRepository deathPouches() {
+        return deathPouches;
     }
 
     ProgressionEvidenceRepository progression() {

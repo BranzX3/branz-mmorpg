@@ -12,6 +12,7 @@ public record DeathPouchDraft(
         CharacterId ownerCharacterId,
         long amount,
         UUID walletDebitOperationId,
+        UUID walletCreditOperationId,
         DeathPouchLocation location,
         Instant createdAt,
         Instant expiresAt) {
@@ -20,6 +21,7 @@ public record DeathPouchDraft(
         Objects.requireNonNull(deathId, "deathId");
         Objects.requireNonNull(ownerCharacterId, "ownerCharacterId");
         Objects.requireNonNull(walletDebitOperationId, "walletDebitOperationId");
+        Objects.requireNonNull(walletCreditOperationId, "walletCreditOperationId");
         Objects.requireNonNull(location, "location");
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(expiresAt, "expiresAt");

@@ -1,0 +1,13 @@
+package com.branz.mmorpg.worldloop.encounter;
+
+public enum EncounterOperationKind {
+    PARTICIPANT_DEFEATED,
+    PARTICIPANT_DISCONNECTED,
+    PARTICIPANT_RECONNECTED,
+    PARTICIPANT_LEFT_BOUNDARY,
+    GRACE_ADVANCED,
+    RESET_BEGUN,
+    RESET_COMPLETED,
+    VICTORY_CONFIRMED,
+    REWARDS_RECONCILED
+}

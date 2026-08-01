@@ -117,6 +117,11 @@ the live party-wipe trigger remains owned by the Milestone 7 encounter controlle
 
 **Done when:** party boss wipe/victory/reconnect/reward flows are idempotent.
 
+Implementation status: the pure boss lifecycle kernel now owns locked participant availability,
+1,200-tick reconnect/boundary grace, confirmed wipe, reset-attempt and victory/reward operation
+boundaries. Durable encounter storage and the live wipe-to-Flask bridge are the next slices; rewards,
+Death Pouch, party/LFG, downed/revive and PvP hooks remain.
+
 ## Milestone 8 — Lifeskill kernel
 
 - Rank/Mastery/Focus;

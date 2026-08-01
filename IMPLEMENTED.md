@@ -2105,3 +2105,33 @@ party-wipe trigger against the completed boss Flask snapshot boundary remains Mi
 
 Schema/config/migration impact: none. ADR 0025 composes existing signed projections, lots, V0008
 expedition state and transaction journal.
+
+## Milestone 7 - deterministic boss encounter lifecycle kernel slice
+
+Implemented:
+
+- immutable boss runtime phases cover active attempts, confirmed wipe, reset reconciliation,
+  victory freeze and completed rewards;
+- one to five stable character IDs are locked as participants, with explicit defeated,
+  disconnect-grace and boundary-grace availability;
+- a wipe becomes pending only when every locked participant is defeated, including grace expiry;
+- reset begin emits the exact participant set whose prepared Flask must be restored, while reset
+  completion must cite the active reset and starts exactly one next attempt;
+- victory can freeze a still-pending wipe, requests reward reconciliation once and prevents all
+  later reset/restore transitions;
+- operation UUIDs are recorded with their command kind, making exact replay effect-free and
+  rejecting cross-command UUID reuse.
+
+Tests and completion evidence:
+
+- world-loop tests cover survivor protection, solo/party wipe, reconnect and expiry grace, reset
+  effect deduplication, attempt advance, victory/wipe race, reward replay and invalid membership;
+- module test and formatting checks pass for the new encounter kernel.
+
+Failure/recovery behavior: invalid transitions never mutate runtime or request effects. Recovered
+pending/resetting/victory state retains the operation boundary required by a later durable adapter.
+
+Milestone status: **Milestone 7 remains in progress.** Durable encounter persistence, the live
+confirmed-wipe bridge, personal rewards, Death Pouch, party/LFG, downed/revive and PvP hooks remain.
+
+Schema/config/migration impact: none. ADR 0026 owns the lifecycle and replay invariants.

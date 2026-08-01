@@ -582,6 +582,15 @@ live inventory, change Bukkit resources or write PostgreSQL.
      remaining ticks resume from the latest bounded checkpoint, offline wall-clock time does not
      reduce them and expired effects are durably removed. Tamper with or duplicate a signed client
      projection and verify PostgreSQL version checks prevent a second effect/item consumption.
+157. Run `./gradlew :mmo-worldloop:test` and inspect the boss lifecycle cases. Verify a connected
+     survivor prevents wipe, reconnect before the 1,200-tick deadline preserves the attempt and
+     expiry contributes to wipe only after every locked participant is unavailable.
+158. Verify the reset case emits every locked participant exactly once, exact reset-operation replay
+     emits no restore participants and completion advances the attempt once. Verify cross-command
+     operation UUID reuse fails closed.
+159. Verify victory can freeze a pending wipe, requests reward reconciliation once and makes every
+     later reset invalid. Replaying the victory or reward operation must produce no second effect or
+     reward grant.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

@@ -52,6 +52,17 @@ recovery_ticks: 20
 mercy_minimum_charges: 2
 ```
 
+## Combat progression evidence
+
+```yaml
+mastery_evidence_max_v1: 1000
+mastery_evidence_per_candidate_cap: 100
+mastery_dummy_familiarity_limit: 25
+mastery_repetition_window_minutes: 30
+mastery_daily_curve: { full_until: 100, half_until: 250, late_factor: 0.25 }
+mastery_readiness_thresholds: [0, 100, 300, 600, 850]
+```
+
 ## Lifeskill
 
 ```yaml

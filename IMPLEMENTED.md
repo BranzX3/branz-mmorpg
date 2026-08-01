@@ -1604,3 +1604,33 @@ database-restart coverage.
 Schema/config/migration impact: spell schema adds bounded `direct`, `channel`, `zone` and
 `imbuement` profiles; the manifest adds four spell definitions. No config or SQL migration is
 required, documented by ADR 0014.
+
+## Milestone 6 - deterministic progression evidence kernel slice
+
+Implemented:
+
+- `mmo-progression` owns stable `mastery.*` and `conditioning.*` tracks, the five Body Conditioning
+  axes and the hidden 0–1000 evidence/readiness model;
+- one server-authored candidate resolves challenge, encounter outcome, move diversity, execution,
+  novelty, 30-minute repetition decay, productive stress and a soft daily curve deterministically;
+- training dummies stop at 25 introductory evidence, while invulnerable targets, self-created
+  loops, zero-risk interactions, far-below-capability encounters, abandoned outcomes and duplicate
+  evidence UUIDs resolve exactly zero with a stable suppression reason;
+- `/mmo progression simulate <scenario>` and the local `/mmo dev` Progression Evidence Lab expose
+  exact diagnostic factors only to permitted non-production dev accounts and never persist the
+  simulated result.
+
+Tests:
+
+- meaningful evidence and qualitative band transition;
+- diminishing repeated/daily evidence remains positive rather than becoming a hard cap;
+- exact dummy familiarity boundary and all zero-evidence anti-farm classifications;
+- duplicate/abandoned rejection, stable track namespaces and all five readiness thresholds.
+
+Failure/recovery behavior: this slice is a pure deterministic resolver. It performs no database or
+Bukkit mutation, trusts no client value and cannot grant progression from the dev lab. Durable
+idempotent batching and live encounter evidence emission belong to the next Milestone 6 slice.
+
+Schema/config/migration impact: no content-schema or SQL migration. The authoritative subsystem
+spec and default balance targets now define the previously unspecified V1 evidence curve. The
+authority and follow-up migration boundary are documented by ADR 0015.

@@ -1,6 +1,8 @@
 package com.branz.mmorpg.bootstrap;
 
+import com.branz.mmorpg.api.identity.CharacterId;
 import com.branz.mmorpg.api.identity.DefinitionId;
+import com.branz.mmorpg.api.identity.EncounterId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.move.MoveEngine;
 import com.branz.mmorpg.combat.trace.CombatSimulationErrorCode;
@@ -9,11 +11,19 @@ import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.progression.evidence.EncounterOutcome;
+import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
+import com.branz.mmorpg.progression.evidence.EvidenceContext;
+import com.branz.mmorpg.progression.evidence.EvidenceDecision;
+import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
+import com.branz.mmorpg.progression.evidence.ProgressionEvidenceEngine;
+import com.branz.mmorpg.progression.evidence.ProgressionTrack;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Supplier;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -42,6 +52,11 @@ final class MmoCommandController implements CommandExecutor, Listener {
                     new DevModule(12, Material.BARRIER, "Persisted Test Item", "spawner"),
                     new DevModule(14, Material.PLAYER_HEAD, "Character Profile (locked)", "locked"),
                     new DevModule(16, Material.IRON_SWORD, "Training Move Tester", "combat"),
+                    new DevModule(
+                            22,
+                            Material.EXPERIENCE_BOTTLE,
+                            "Progression Evidence Lab",
+                            "progression"),
                     new DevModule(28, Material.ZOMBIE_HEAD, "Encounter Spawner (locked)", "locked"),
                     new DevModule(30, Material.PAINTING, "Scene/UI Tester", "scene"),
                     new DevModule(
@@ -62,6 +77,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final CharacterSessionController characterSessions;
     private final CombatSessionController combatSessions;
     private final CombatTraceFileExporter traceExporter;
+    private final ProgressionEvidenceEngine progressionEvidence = new ProgressionEvidenceEngine();
     private final NamespacedKey actionKey;
 
     MmoCommandController(
@@ -111,8 +127,32 @@ final class MmoCommandController implements CommandExecutor, Listener {
             handleCombatTool(sender, args);
             return true;
         }
-        sender.sendMessage("Usage: /mmo <health|dev|combat debug|combat trace export>");
+        if ("progression".equalsIgnoreCase(args[0])) {
+            handleProgressionTool(sender, args);
+            return true;
+        }
+        sender.sendMessage(
+                "Usage: /mmo <health|dev|combat debug|combat trace export|progression simulate>");
         return true;
+    }
+
+    private void handleProgressionTool(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Progression inspection requires an in-game player.");
+            return;
+        }
+        if (!devToolsAllowed(player)) {
+            player.sendMessage(
+                    Component.text(
+                            "Progression inspection is disabled for this environment/account.",
+                            NamedTextColor.RED));
+            return;
+        }
+        if (args.length < 3 || !"simulate".equalsIgnoreCase(args[1])) {
+            progressionUsage(player);
+            return;
+        }
+        simulateProgressionEvidence(player, args[2].toLowerCase(Locale.ROOT));
     }
 
     private void handleCombatTool(CommandSender sender, String[] args) {
@@ -240,6 +280,10 @@ final class MmoCommandController implements CommandExecutor, Listener {
                 plugin.getServer()
                         .getScheduler()
                         .runTask(plugin, () -> combatSessions.startTrainingMove(player));
+            }
+            case "progression" -> {
+                player.closeInventory();
+                simulateProgressionEvidence(player, "meaningful");
             }
             case "locked" ->
                     player.sendActionBar(
@@ -465,6 +509,68 @@ final class MmoCommandController implements CommandExecutor, Listener {
         }
     }
 
+    private void simulateProgressionEvidence(Player player, String scenario) {
+        if (!characterSessions.ready(player)) {
+            player.sendMessage(
+                    Component.text("Character session is not ready.", NamedTextColor.RED));
+            return;
+        }
+        ProgressionScenario selected = ProgressionScenario.resolve(scenario);
+        if (selected == null) {
+            progressionUsage(player);
+            return;
+        }
+        ContentSnapshot snapshot = snapshotSource.get();
+        if (snapshot == null) {
+            player.sendMessage(
+                    Component.text("Content snapshot is not ready.", NamedTextColor.RED));
+            return;
+        }
+        EvidenceCandidate candidate =
+                new EvidenceCandidate(
+                        UUID.randomUUID(),
+                        new CharacterId(player.getUniqueId()),
+                        new EncounterId(UUID.randomUUID()),
+                        ProgressionTrack.mastery("greatsword"),
+                        "dev-lab-move-set-a",
+                        snapshot.manifest().contentVersion(),
+                        selected.targetKind(),
+                        selected.outcome(),
+                        10.0,
+                        selected.challengeRating(),
+                        100.0,
+                        0.8,
+                        0.8,
+                        0.8);
+        EvidenceDecision decision = progressionEvidence.evaluate(candidate, selected.context());
+        NamedTextColor color = decision.accepted() ? NamedTextColor.GREEN : NamedTextColor.YELLOW;
+        player.sendMessage(
+                Component.text(
+                        "Progression Evidence Lab ["
+                                + scenario
+                                + "]: "
+                                + (decision.accepted() ? "ACCEPTED" : "SUPPRESSED")
+                                + " | award="
+                                + String.format(Locale.ROOT, "%.5f", decision.awardedEvidence())
+                                + " | band="
+                                + decision.previousBand()
+                                + "->"
+                                + decision.resultingBand()
+                                + " | reason="
+                                + decision.suppressionReason(),
+                        color));
+        player.sendMessage(
+                Component.text(
+                        "Simulation only: no character progression was persisted.",
+                        NamedTextColor.GRAY));
+    }
+
+    private static void progressionUsage(Player player) {
+        player.sendMessage(
+                "Usage: /mmo progression simulate "
+                        + "<meaningful|dummy-intro|dummy-capped|invulnerable|loop|zero-risk|low-challenge|repeated>");
+    }
+
     private void openDevHub(Player player) {
         if (!devToolsAllowed(player)) {
             player.sendMessage(
@@ -623,6 +729,64 @@ final class MmoCommandController implements CommandExecutor, Listener {
         return environmentAllowed
                 && plugin.getConfig().getBoolean("dev-tools.enabled", false)
                 && player.hasPermission("branzmmo.dev");
+    }
+
+    private record ProgressionScenario(
+            EvidenceTargetKind targetKind,
+            EncounterOutcome outcome,
+            double challengeRating,
+            EvidenceContext context) {
+        private static ProgressionScenario resolve(String scenario) {
+            return switch (scenario) {
+                case "meaningful" ->
+                        scenario(
+                                EvidenceTargetKind.MEANINGFUL_ENCOUNTER,
+                                100.0,
+                                new EvidenceContext(90.0, 0, 0.0, false));
+                case "dummy-intro" ->
+                        scenario(
+                                EvidenceTargetKind.TRAINING_DUMMY,
+                                100.0,
+                                new EvidenceContext(24.0, 0, 0.0, false));
+                case "dummy-capped" ->
+                        scenario(
+                                EvidenceTargetKind.TRAINING_DUMMY,
+                                100.0,
+                                new EvidenceContext(25.0, 0, 0.0, false));
+                case "invulnerable" ->
+                        scenario(
+                                EvidenceTargetKind.INVULNERABLE_TARGET,
+                                100.0,
+                                new EvidenceContext(0.0, 0, 0.0, false));
+                case "loop" ->
+                        scenario(
+                                EvidenceTargetKind.SELF_CREATED_LOOP,
+                                100.0,
+                                new EvidenceContext(0.0, 0, 0.0, false));
+                case "zero-risk" ->
+                        scenario(
+                                EvidenceTargetKind.ZERO_RISK_INTERACTION,
+                                100.0,
+                                new EvidenceContext(0.0, 0, 0.0, false));
+                case "low-challenge" ->
+                        scenario(
+                                EvidenceTargetKind.MEANINGFUL_ENCOUNTER,
+                                29.0,
+                                new EvidenceContext(0.0, 0, 0.0, false));
+                case "repeated" ->
+                        scenario(
+                                EvidenceTargetKind.MEANINGFUL_ENCOUNTER,
+                                100.0,
+                                new EvidenceContext(400.0, 8, 300.0, false));
+                default -> null;
+            };
+        }
+
+        private static ProgressionScenario scenario(
+                EvidenceTargetKind targetKind, double challengeRating, EvidenceContext context) {
+            return new ProgressionScenario(
+                    targetKind, EncounterOutcome.VICTORY, challengeRating, context);
+        }
     }
 
     private record DevModule(int slot, Material material, String label, String action) {}

@@ -377,6 +377,25 @@ Paper uses the verified Minecraft player UUID as `CharacterId` for V1. Proxy aut
 therefore expected to complete before the backend connection; this repository does not duplicate
 the login credential system.
 
+## Milestone 6 progression evidence lab
+
+After joining the local Paper server as an operator/test account with an active character session:
+
+96. Open `/mmo dev` and click `Progression Evidence Lab`. Verify the default `meaningful` scenario
+    reports `ACCEPTED`, a positive award and `UNFAMILIAR->DEVELOPING`, followed by the explicit
+    `Simulation only` notice.
+97. Run `/mmo progression simulate dummy-intro`; verify it awards only the final point up to the
+    introductory limit. Run the same command with `dummy-capped`; verify award `0` and reason
+    `TRAINING_DUMMY_FAMILIARITY_COMPLETE`.
+98. Simulate `invulnerable`, `loop`, `zero-risk` and `low-challenge`; every scenario must report
+    `SUPPRESSED`, award `0` and its exact reason code.
+99. Simulate `repeated`; verify the candidate remains accepted with a small positive award, proving
+    repetition/daily decay is soft rather than a hard cap.
+
+The lab is non-authoritative test presentation: it creates no evidence row and cannot alter a
+character. Persistent evidence and live encounter emission are intentionally deferred to the next
+Milestone 6 slice.
+
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded
 mode is rejected outside `LOCAL` and `INTEGRATION`.

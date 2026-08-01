@@ -1922,3 +1922,39 @@ hotbar/Rest Context behavior and boss Flask snapshot recovery remain.
 Schema/config/migration impact: item/status schema V1 gains the documented authoring fields. The
 content version advances to `v1.milestone-1.example.4`; no SQL or configuration changes occur in
 this slice.
+
+## Milestone 6 - durable expedition state and Player Session slice
+
+Implemented:
+
+- PostgreSQL migration V0008 adds one versioned `character_expedition_state` document for Flask
+  allocation/charges, active consumable categories and all present ailments;
+- the canonical schema stores remaining effect/decay/active ticks instead of process-local absolute
+  tick deadlines, so reconnect and database restart are deterministic;
+- commits use the shared transaction journal, immutable operation UUID, optimistic state version,
+  content version and audit log, with exact-request replay and changed-request rejection;
+- Player Session initializes missing state safely, decodes existing state on open/reload and
+  publishes only database-reloaded truth after a successful asynchronous mutation;
+- `/mmo consumable status` and the environment-gated `/mmo consumable persist [operation-uuid]`
+  fixture expose the durable route for reconnect/restart acceptance testing.
+
+Tests and completion evidence:
+
+- migration tests validate eight ordered migrations and the V0008 table/index;
+- repository integration covers initial commit, optimistic update, exact replay, UUID conflict and
+  database-restart restoration;
+- codec tests cover canonical round-trip plus schema/charge rejection;
+- Player Session integration covers commit, replay/conflict safety, disconnect and embedded
+  PostgreSQL restart restoration.
+
+Failure/recovery behavior: malformed durable state rejects loading rather than silently granting or
+cleansing value. A database/stale-version failure retains the previous live snapshot. Successful
+commit followed by a replaced live session cannot patch stale memory; reconnect reloads PostgreSQL
+truth. Offline wall-clock time does not consume effect or ailment duration in V1.
+
+Milestone status: **Milestone 6 remains in progress.** Live hotbar consumable use, Rest Context
+allocation/refill and boss Flask snapshot restore remain.
+
+Schema/config/migration impact: forward-only V0008 adds one table and one time index. The canonical
+JSON payload is schema version 1. No content-schema or configuration change is required; ADR 0022
+owns the persistence and restart-time boundary.

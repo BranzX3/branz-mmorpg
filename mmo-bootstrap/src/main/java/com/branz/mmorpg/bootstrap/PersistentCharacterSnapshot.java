@@ -7,6 +7,7 @@ import com.branz.mmorpg.persistence.progression.KnowledgeRecord;
 import com.branz.mmorpg.persistence.progression.ProgressionTrackRecord;
 import com.branz.mmorpg.persistence.progression.RenownRecord;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRecord;
+import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRecord;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.progression.build.CharacterBuild;
@@ -23,6 +24,8 @@ record PersistentCharacterSnapshot(
         List<ProgressionTrackRecord> progressionTracks,
         List<KnowledgeRecord> learnedKnowledge,
         Optional<RenownRecord> renown,
+        PersistentExpeditionState expeditionState,
+        Optional<CharacterExpeditionStateRecord> expeditionStateRecord,
         List<ItemLocationRecord> itemRecords,
         List<LotLocationRecord> lotRecords) {
     PersistentCharacterSnapshot {
@@ -36,6 +39,8 @@ record PersistentCharacterSnapshot(
         learnedKnowledge =
                 List.copyOf(Objects.requireNonNull(learnedKnowledge, "learnedKnowledge"));
         Objects.requireNonNull(renown, "renown");
+        Objects.requireNonNull(expeditionState, "expeditionState");
+        Objects.requireNonNull(expeditionStateRecord, "expeditionStateRecord");
         itemRecords = List.copyOf(Objects.requireNonNull(itemRecords, "itemRecords"));
         lotRecords = List.copyOf(Objects.requireNonNull(lotRecords, "lotRecords"));
     }

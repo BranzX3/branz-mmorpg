@@ -209,7 +209,7 @@ final class CharacterSessionController implements Listener {
             UUID operationId,
             String contentVersion,
             Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
-        runCrossbowMutation(
+        runDurableSnapshotMutation(
                 player,
                 session ->
                         sessions.bindCrossbowBolt(
@@ -228,7 +228,7 @@ final class CharacterSessionController implements Listener {
             UUID operationId,
             String contentVersion,
             Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
-        runCrossbowMutation(
+        runDurableSnapshotMutation(
                 player,
                 session ->
                         sessions.completeCrossbowLoad(
@@ -247,7 +247,7 @@ final class CharacterSessionController implements Listener {
             UUID projectileId,
             String contentVersion,
             Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
-        runCrossbowMutation(
+        runDurableSnapshotMutation(
                 player,
                 session ->
                         sessions.fireCrossbow(
@@ -269,7 +269,7 @@ final class CharacterSessionController implements Listener {
             UUID operationId,
             String contentVersion,
             Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
-        runCrossbowMutation(
+        runDurableSnapshotMutation(
                 player,
                 session ->
                         sessions.commitCatalystUse(
@@ -606,6 +606,23 @@ final class CharacterSessionController implements Listener {
                                                     completeSnapshotMutation(
                                                             session, result, completion));
                         });
+    }
+
+    void commitExpeditionState(
+            Player player,
+            PersistentExpeditionState desired,
+            UUID operationId,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(desired, "desired");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        runDurableSnapshotMutation(
+                player,
+                session ->
+                        sessions.commitExpeditionState(
+                                session, desired, operationId, contentVersion),
+                completion);
     }
 
     void recordProgressionEvidence(
@@ -1144,7 +1161,7 @@ final class CharacterSessionController implements Listener {
                                 updatedTeacher, updatedStudent, committed.execution())));
     }
 
-    private void runCrossbowMutation(
+    private void runDurableSnapshotMutation(
             Player player,
             java.util.function.Function<
                             LoadedCharacterSession,

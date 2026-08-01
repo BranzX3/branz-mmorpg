@@ -104,6 +104,24 @@ The example content bundle authors one inspectable item in every category plus
 active category effect. The character-owned reusable Flask is durable character state and is never
 represented as a duplicable inventory item.
 
+## V1 durable expedition state
+
+The authoritative Player Session owns one versioned expedition-state document containing the
+current Flask allocation/charges, active category effects and ailment state. PostgreSQL stores this
+document through the shared transaction journal with an immutable operation UUID, optimistic
+version check, audit row and active content version. A successful write reloads database truth
+before the live snapshot is published; a failed or stale write leaves the previous snapshot active.
+
+Consumable effect durations are persisted as remaining ticks, not server-global tick deadlines.
+This makes reconnect and process restart deterministic: offline wall-clock time does not consume a
+duration in V1. The later live adapter is responsible for periodically checkpointing elapsed
+remaining time at value-changing boundaries and for removing expired effects.
+
+The environment-gated `/mmo consumable persist [operation-uuid]` command writes an inspectable
+Flask/effect/ailment fixture through this exact Player Session path. `/mmo consumable status` reads
+the active reloaded snapshot and exposes its durable version and remaining values for restart
+acceptance testing. These commands are diagnostics, not production item-use sources.
+
 ## Item freshness
 
 Finished potions and normal ingredients do not expire in real time. `Fresh`, `Pristine`, `Corrupted` and `Infused` are material states. Special Unstable Concoctions may expire at rest, death or expedition end and are always labeled.

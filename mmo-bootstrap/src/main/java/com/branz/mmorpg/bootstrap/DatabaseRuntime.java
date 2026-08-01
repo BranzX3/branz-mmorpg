@@ -13,7 +13,9 @@ import com.branz.mmorpg.persistence.progression.JdbcProgressionEvidenceRepositor
 import com.branz.mmorpg.persistence.progression.KnowledgeProgressionRepository;
 import com.branz.mmorpg.persistence.progression.ProgressionEvidenceRepository;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRepository;
+import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterBuildRepository;
+import com.branz.mmorpg.persistence.transaction.JdbcCharacterExpeditionStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcReconciliationScanner;
 import com.branz.mmorpg.persistence.transaction.JdbcValueTransactionService;
 import com.branz.mmorpg.persistence.transaction.ReconciliationScanner;
@@ -34,6 +36,7 @@ final class DatabaseRuntime implements AutoCloseable {
     private final CharacterLeaseRepository leases;
     private final ValueTransactionService values;
     private final CharacterBuildRepository builds;
+    private final CharacterExpeditionStateRepository expeditionStates;
     private final ProgressionEvidenceRepository progression;
     private final KnowledgeProgressionRepository knowledge;
     private final ReconciliationScanner reconciliation;
@@ -50,6 +53,7 @@ final class DatabaseRuntime implements AutoCloseable {
         leases = new JdbcCharacterLeaseRepository(dataSource);
         values = new JdbcValueTransactionService(dataSource);
         builds = new JdbcCharacterBuildRepository(dataSource);
+        expeditionStates = new JdbcCharacterExpeditionStateRepository(dataSource);
         progression = new JdbcProgressionEvidenceRepository(dataSource);
         knowledge = new JdbcKnowledgeProgressionRepository(dataSource);
         reconciliation = new JdbcReconciliationScanner(dataSource);
@@ -112,6 +116,10 @@ final class DatabaseRuntime implements AutoCloseable {
 
     CharacterBuildRepository builds() {
         return builds;
+    }
+
+    CharacterExpeditionStateRepository expeditionStates() {
+        return expeditionStates;
     }
 
     ProgressionEvidenceRepository progression() {

@@ -82,3 +82,15 @@ Startup compiles the immutable content snapshot into an ailment runtime registry
 server unless all six core types exist exactly once. The shipped bundle authors Burn, Bleed,
 Poison, Frost, Shock and Corruption; `/mmo health` exposes the compiled count and the Ailment Lab
 uses the authored Burn definition rather than a command-local fixture.
+
+## V1 persistence representation
+
+A Player Session persists buildup, remaining decay delay, remaining active duration and current
+tier for each present ailment. Absolute Bukkit/server tick values are never stored. On reconnect or
+server restart, the runtime reconstructs deadlines relative to the new monotonic clock, so offline
+wall-clock time does not advance ailments. Entries with no buildup, delay or active duration may be
+omitted from the canonical document.
+
+The complete Flask, category-effect and ailment document commits atomically. It cannot expose a
+new Flask charge alongside an old ailment projection, and invalid JSON/state fails Player Session
+loading rather than silently granting or cleansing value.

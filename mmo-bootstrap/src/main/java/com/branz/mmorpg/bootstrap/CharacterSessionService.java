@@ -29,6 +29,9 @@ import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildCommit;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildCommitExecution;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRecord;
+import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateCommit;
+import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateCommitExecution;
+import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRecord;
 import com.branz.mmorpg.persistence.transaction.CrossbowBoltBinding;
 import com.branz.mmorpg.persistence.transaction.ItemLocationMove;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
@@ -163,6 +166,15 @@ final class CharacterSessionService {
             releaseQuietly(characterId, sessionId, lease);
             return persistenceFailure(failure.error(), failure.detail());
         }
+        Result<Optional<CharacterExpeditionStateRecord>, TransactionErrorCode> expeditionRow =
+                database.expeditionStates().find(characterId);
+        if (expeditionRow
+                instanceof
+                Result.Failure<Optional<CharacterExpeditionStateRecord>, TransactionErrorCode>
+                        failure) {
+            releaseQuietly(characterId, sessionId, lease);
+            return persistenceFailure(failure.error(), failure.detail());
+        }
         try {
             PersistentCharacterSnapshot snapshot =
                     PersistentCharacterSnapshotMapper.map(
@@ -185,6 +197,11 @@ final class CharacterSessionService {
                                     .value(),
                             ((Result.Success<Optional<RenownRecord>, KnowledgePersistenceErrorCode>)
                                             renownRow)
+                                    .value(),
+                            ((Result.Success<
+                                                    Optional<CharacterExpeditionStateRecord>,
+                                                    TransactionErrorCode>)
+                                            expeditionRow)
                                     .value());
             Result<BuildResolution, BuildErrorCode> buildResolution =
                     buildEngine.resolve(snapshot.build(), learnedKnowledge(snapshot));
@@ -892,6 +909,48 @@ final class CharacterSessionService {
         return reload(session);
     }
 
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> commitExpeditionState(
+            LoadedCharacterSession session,
+            PersistentExpeditionState desired,
+            UUID operationId,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(desired, "desired");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        long expectedVersion =
+                session.snapshot()
+                        .expeditionStateRecord()
+                        .map(CharacterExpeditionStateRecord::version)
+                        .orElse(0L);
+        String payload = ExpeditionStateJsonCodec.encode(desired);
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "expedition-state:" + operationId,
+                        session.characterId(),
+                        session.sessionId(),
+                        com.branz.mmorpg.persistence.transaction
+                                .JdbcCharacterExpeditionStateRepository
+                                .CHARACTER_EXPEDITION_STATE_COMMIT,
+                        "{\"expectedVersion\":" + expectedVersion + "}",
+                        payload,
+                        contentVersion);
+        Result<CharacterExpeditionStateCommitExecution, TransactionErrorCode> committed =
+                database.expeditionStates()
+                        .commit(
+                                request,
+                                new CharacterExpeditionStateCommit(
+                                        session.characterId(), expectedVersion, payload));
+        if (committed
+                instanceof
+                Result.Failure<CharacterExpeditionStateCommitExecution, TransactionErrorCode>
+                        failure) {
+            return transactionFailure(failure);
+        }
+        return reload(session);
+    }
+
     Result<ProgressionEvidenceCommitResult, CharacterSessionErrorCode> recordProgressionEvidence(
             LoadedCharacterSession session, List<EvidenceCandidate> candidates) {
         Objects.requireNonNull(session, "session");
@@ -1072,6 +1131,14 @@ final class CharacterSessionService {
                 Result.Failure<Optional<RenownRecord>, KnowledgePersistenceErrorCode> failure) {
             return persistenceFailure(failure.error(), failure.detail());
         }
+        Result<Optional<CharacterExpeditionStateRecord>, TransactionErrorCode> expeditionRow =
+                database.expeditionStates().find(session.characterId());
+        if (expeditionRow
+                instanceof
+                Result.Failure<Optional<CharacterExpeditionStateRecord>, TransactionErrorCode>
+                        failure) {
+            return persistenceFailure(failure.error(), failure.detail());
+        }
         try {
             PersistentCharacterSnapshot snapshot =
                     PersistentCharacterSnapshotMapper.map(
@@ -1094,6 +1161,11 @@ final class CharacterSessionService {
                                     .value(),
                             ((Result.Success<Optional<RenownRecord>, KnowledgePersistenceErrorCode>)
                                             renownRow)
+                                    .value(),
+                            ((Result.Success<
+                                                    Optional<CharacterExpeditionStateRecord>,
+                                                    TransactionErrorCode>)
+                                            expeditionRow)
                                     .value());
             return Result.success(
                     new LoadedCharacterSession(
@@ -1195,8 +1267,8 @@ final class CharacterSessionService {
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
-    private static Result<LoadedCharacterSession, CharacterSessionErrorCode> transactionFailure(
-            Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+    private static <T> Result<LoadedCharacterSession, CharacterSessionErrorCode> transactionFailure(
+            Result.Failure<T, TransactionErrorCode> failure) {
         return Result.failure(
                 CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
                 failure.error().code() + ": " + failure.detail());

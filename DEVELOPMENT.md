@@ -516,6 +516,15 @@ live inventory, change Bukkit resources or write PostgreSQL.
 137. Offline, run
      `.\gradlew.bat :mmo-content:run --args="validate $((Resolve-Path example-content\milestone-1).Path)"`.
      Verify the immutable `.4` snapshot reports 46 definitions and no diagnostics.
+138. Run `/mmo consumable status`; on a new character verify durable version `0`, Flask `0/5`, no
+     category effects and no ailments.
+139. Run `/mmo consumable persist <new-uuid>`, wait for the green PostgreSQL confirmation, then run
+     `/mmo consumable status`. Verify version `1`, Flask `3/5`, one Body Tonic effect and Burn plus
+     Corruption state.
+140. Disconnect/reconnect and verify the same status. Stop Paper cleanly, run it again against the
+     same embedded PostgreSQL directory, reconnect and verify the values and version remain. Use a
+     new operation UUID for a deliberate later mutation; UUID reuse is reserved for retrying the
+     same in-flight request.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

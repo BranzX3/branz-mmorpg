@@ -95,8 +95,10 @@ completion. The deterministic Flask allocation/refill/mercy/consumption kernel, 
 commit/category state machines and six-ailment buildup/decay/reapplication kernel are implemented
 with an in-game simulation lab. The `.4` content bundle now authors all five consumable categories,
 Infusion Stock and all six core ailments; startup compiles and requires the complete ailment set.
-PostgreSQL state, live hotbar/Rest behavior and boss snapshot restore remain before Milestone 6
-completion.
+V0008 persists one canonical restart-safe Flask/effect/ailment document through the shared
+transaction journal and reloads it with the Player Session; the environment-gated Consumable Lab
+can write and inspect the durable fixture. Live hotbar/Rest behavior and boss Flask snapshot restore
+remain before Milestone 6 completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

@@ -9,9 +9,14 @@ import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
+import com.branz.mmorpg.combat.resource.FlaskAllocation;
+import com.branz.mmorpg.combat.resource.FlaskDose;
+import com.branz.mmorpg.combat.resource.FlaskState;
+import com.branz.mmorpg.combat.status.AilmentType;
 import com.branz.mmorpg.content.snapshot.ContentLoadFailure;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.branz.mmorpg.content.snapshot.ContentSnapshotLoader;
+import com.branz.mmorpg.items.consumable.ConsumableCategory;
 import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.AmmoProfile;
 import com.branz.mmorpg.items.definition.CatalystProfile;
@@ -1000,6 +1005,89 @@ class CharacterSessionServiceIntegrationTest {
                     QuiverAmmoLots.usedCapacity(
                             afterServerRestart.snapshot().lotRecords(), restartedQuiverId));
             service.close(afterServerRestart);
+        }
+    }
+
+    @Test
+    void expeditionStateReplaysAndSurvivesPlayerSessionAndDatabaseRestart(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofMinutes(5),
+                        Duration.ofSeconds(10));
+        UUID playerId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        PersistentExpeditionState desired =
+                new PersistentExpeditionState(
+                        new FlaskState(
+                                FlaskAllocation.balanced(),
+                                Map.of(
+                                        FlaskDose.HEALING,
+                                        2,
+                                        FlaskDose.MANA,
+                                        1,
+                                        FlaskDose.STAMINA,
+                                        0)),
+                        List.of(
+                                new PersistentConsumableEffect(
+                                        DefinitionId.of("consumable.training_body_tonic"),
+                                        ConsumableCategory.BODY_TONIC,
+                                        800,
+                                        false)),
+                        Map.of(
+                                AilmentType.CORRUPTION,
+                                new PersistentAilmentState(AilmentType.CORRUPTION, 0, 0, 360, 2)));
+
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database);
+            LoadedCharacterSession opened = success(service.open(playerId));
+            assertEquals(PersistentExpeditionState.initial(), opened.snapshot().expeditionState());
+            assertTrue(opened.snapshot().expeditionStateRecord().isEmpty());
+
+            LoadedCharacterSession committed =
+                    success(
+                            service.commitExpeditionState(
+                                    opened, desired, operationId, "content.test.1"));
+            assertEquals(desired, committed.snapshot().expeditionState());
+            assertEquals(1, committed.snapshot().expeditionStateRecord().orElseThrow().version());
+
+            LoadedCharacterSession replayed =
+                    success(
+                            service.commitExpeditionState(
+                                    opened, desired, operationId, "content.test.1"));
+            assertEquals(desired, replayed.snapshot().expeditionState());
+            assertEquals(1, replayed.snapshot().expeditionStateRecord().orElseThrow().version());
+
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> changedReplay =
+                    service.commitExpeditionState(
+                            opened,
+                            PersistentExpeditionState.initial(),
+                            operationId,
+                            "content.test.1");
+            assertTrue(changedReplay instanceof Result.Failure<?, ?>);
+            assertEquals(
+                    CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                    ((Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                    changedReplay)
+                            .error());
+            service.close(replayed);
+        }
+
+        try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(restarted);
+            LoadedCharacterSession restored = success(service.open(playerId));
+            assertEquals(desired, restored.snapshot().expeditionState());
+            assertEquals(1, restored.snapshot().expeditionStateRecord().orElseThrow().version());
+            service.close(restored);
         }
     }
 

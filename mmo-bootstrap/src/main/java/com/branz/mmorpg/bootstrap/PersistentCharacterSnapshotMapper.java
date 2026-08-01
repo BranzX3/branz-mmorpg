@@ -10,6 +10,7 @@ import com.branz.mmorpg.persistence.progression.KnowledgeRecord;
 import com.branz.mmorpg.persistence.progression.ProgressionTrackRecord;
 import com.branz.mmorpg.persistence.progression.RenownRecord;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRecord;
+import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRecord;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.persistence.transaction.ValueLocation;
@@ -35,13 +36,15 @@ final class PersistentCharacterSnapshotMapper {
             Optional<CharacterBuildRecord> buildRecord,
             List<ProgressionTrackRecord> progressionTracks,
             List<KnowledgeRecord> learnedKnowledge,
-            Optional<RenownRecord> renown) {
+            Optional<RenownRecord> renown,
+            Optional<CharacterExpeditionStateRecord> expeditionStateRecord) {
         Objects.requireNonNull(items, "items");
         Objects.requireNonNull(lots, "lots");
         Objects.requireNonNull(buildRecord, "buildRecord");
         Objects.requireNonNull(progressionTracks, "progressionTracks");
         Objects.requireNonNull(learnedKnowledge, "learnedKnowledge");
         Objects.requireNonNull(renown, "renown");
+        Objects.requireNonNull(expeditionStateRecord, "expeditionStateRecord");
         List<ExpectedProjection> inventory = new ArrayList<>();
         EquipmentLoadout equipment = EquipmentLoadout.empty();
         QuiverPreparation quiverPreparation = QuiverPreparation.empty();
@@ -90,6 +93,10 @@ final class PersistentCharacterSnapshotMapper {
                 progressionTracks,
                 learnedKnowledge,
                 renown,
+                expeditionStateRecord
+                        .map(record -> ExpeditionStateJsonCodec.decode(record.payloadJson()))
+                        .orElseGet(PersistentExpeditionState::initial),
+                expeditionStateRecord,
                 items,
                 lots);
     }
@@ -99,7 +106,14 @@ final class PersistentCharacterSnapshotMapper {
             List<LotLocationRecord> lots,
             Optional<CharacterBuildRecord> buildRecord,
             List<ProgressionTrackRecord> progressionTracks) {
-        return map(items, lots, buildRecord, progressionTracks, List.of(), Optional.empty());
+        return map(
+                items,
+                lots,
+                buildRecord,
+                progressionTracks,
+                List.of(),
+                Optional.empty(),
+                Optional.empty());
     }
 
     static PersistentCharacterSnapshot map(

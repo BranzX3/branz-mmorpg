@@ -216,6 +216,17 @@ final class MmoCommandController implements CommandExecutor, Listener {
                             NamedTextColor.RED));
             return;
         }
+        if (args.length == 2 && "status".equalsIgnoreCase(args[1])) {
+            showConsumableStatus(player);
+            return;
+        }
+        if (args.length >= 2 && "persist".equalsIgnoreCase(args[1])) {
+            UUID operationId = parseUuid(player, args, 2, "Expedition operation");
+            if (operationId != null) {
+                persistConsumableFixture(player, operationId);
+            }
+            return;
+        }
         if (args.length != 3 || !"simulate".equalsIgnoreCase(args[1])) {
             consumableUsage(player);
             return;
@@ -319,6 +330,127 @@ final class MmoCommandController implements CommandExecutor, Listener {
                 Component.text(
                         "Consumable Category Lab: " + failure.error().code(),
                         NamedTextColor.YELLOW));
+    }
+
+    private void showConsumableStatus(Player player) {
+        LoadedCharacterSession session = characterSessions.active(player).orElse(null);
+        if (session == null || !characterSessions.ready(player)) {
+            player.sendMessage(
+                    Component.text("Character session is not ready.", NamedTextColor.RED));
+            return;
+        }
+        PersistentCharacterSnapshot snapshot = session.snapshot();
+        PersistentExpeditionState state = snapshot.expeditionState();
+        long version = snapshot.expeditionStateRecord().map(record -> record.version()).orElse(0L);
+        player.sendMessage(
+                Component.text(
+                        "Expedition State: version="
+                                + version
+                                + " | Flask="
+                                + state.flaskState().totalCharges()
+                                + "/"
+                                + state.flaskState().allocation().capacity()
+                                + " | effects="
+                                + state.consumableEffects().size()
+                                + " | ailments="
+                                + state.ailments().size(),
+                        NamedTextColor.GOLD));
+        state.consumableEffects()
+                .forEach(
+                        effect ->
+                                player.sendMessage(
+                                        Component.text(
+                                                "Effect "
+                                                        + effect.category()
+                                                        + " "
+                                                        + effect.definitionId().value()
+                                                        + " | remaining="
+                                                        + effect.remainingTicks()
+                                                        + "t",
+                                                NamedTextColor.AQUA)));
+        state.ailments()
+                .values()
+                .forEach(
+                        ailment ->
+                                player.sendMessage(
+                                        Component.text(
+                                                "Ailment "
+                                                        + ailment.type()
+                                                        + " | buildup="
+                                                        + ailment.buildup()
+                                                        + " | active="
+                                                        + ailment.activeRemainingTicks()
+                                                        + "t | tier="
+                                                        + ailment.tier(),
+                                                NamedTextColor.LIGHT_PURPLE)));
+    }
+
+    private void persistConsumableFixture(Player player, UUID operationId) {
+        ContentSnapshot snapshot = snapshotSource.get();
+        if (snapshot == null) {
+            player.sendMessage(
+                    Component.text("Content snapshot is not ready.", NamedTextColor.RED));
+            return;
+        }
+        PersistentExpeditionState desired =
+                new PersistentExpeditionState(
+                        new FlaskState(
+                                FlaskAllocation.balanced(),
+                                Map.of(
+                                        FlaskDose.HEALING,
+                                        2,
+                                        FlaskDose.MANA,
+                                        1,
+                                        FlaskDose.STAMINA,
+                                        0)),
+                        List.of(
+                                new PersistentConsumableEffect(
+                                        DefinitionId.of("consumable.training_body_tonic"),
+                                        ConsumableCategory.BODY_TONIC,
+                                        900,
+                                        true)),
+                        Map.of(
+                                AilmentType.BURN,
+                                new PersistentAilmentState(AilmentType.BURN, 45.5, 20, 0, 0),
+                                AilmentType.CORRUPTION,
+                                new PersistentAilmentState(AilmentType.CORRUPTION, 0, 0, 400, 2)));
+        player.sendMessage(
+                Component.text(
+                        "Persisting expedition fixture through PostgreSQL…",
+                        NamedTextColor.YELLOW));
+        characterSessions.commitExpeditionState(
+                player,
+                desired,
+                operationId,
+                snapshot.manifest().contentVersion(),
+                result -> {
+                    if (result
+                            instanceof
+                            Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
+                                    failure) {
+                        player.sendMessage(
+                                Component.text(
+                                        "Expedition state failed: "
+                                                + failure.error().code()
+                                                + " "
+                                                + failure.detail(),
+                                        NamedTextColor.RED));
+                        return;
+                    }
+                    LoadedCharacterSession committed =
+                            ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                            result)
+                                    .value();
+                    long version =
+                            committed.snapshot().expeditionStateRecord().orElseThrow().version();
+                    player.sendMessage(
+                            Component.text(
+                                    "Expedition state persisted at version "
+                                            + version
+                                            + " | operation="
+                                            + operationId,
+                                    NamedTextColor.GREEN));
+                });
     }
 
     private void handleKnowledgeTool(CommandSender sender, String[] args) {
@@ -1240,7 +1372,9 @@ final class MmoCommandController implements CommandExecutor, Listener {
     }
 
     private static void consumableUsage(Player player) {
-        player.sendMessage("Usage: /mmo consumable simulate <flask|timeline|ailment|category>");
+        player.sendMessage(
+                "Usage: /mmo consumable status | /mmo consumable persist [operation-uuid] | "
+                        + "/mmo consumable simulate <flask|timeline|ailment|category>");
     }
 
     private void recordProgressionEvidence(Player player, String scenario, UUID evidenceId) {

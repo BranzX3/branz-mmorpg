@@ -455,6 +455,29 @@ environments and is not the live challenge-input path.
 118. Disconnect/reconnect both players and restart Paper. Verify the student's learned Technique and
      teacher's Renown return. Repeating the exact record after restart must remain a replay.
 
+The following checks exercise the normal live action bridge. On fresh profiles, use the student
+from step 115 as the live teacher (that character now owns Greatsword Cleave) and the original
+teacher as the live student (that character does not own it).
+
+119. Grant and equip `weapon.training_greatsword` for both players through `/mmo dev` and Chronicle.
+     Let both combat sessions return to `EXPLORATION`, finish active actions and stand within 16
+     blocks in the same world.
+120. As the live teacher run
+     `/mmo teaching start <student> technique.greatsword.cleave`. Verify both receive the
+     demonstration prompt; `/mmo teaching session` must report `DEMONSTRATION`, progress `0/3` and
+     the immutable teaching-session UUID.
+121. Have the teacher land one LMB Greatsword Cleave on a living target. Verify the session changes
+     to `STUDENT_CHALLENGE`. A miss or another move must not change the phase.
+122. Have the student land one cleave across two nearby targets. Verify progress is only `1/3`
+     because both contacts share one server action UUID. Land two more separate cleaves and verify
+     progress reaches `3/3`, prints `COMMITTING`, then `Teaching persisted`.
+123. Run `/mmo teaching status` for both characters. Verify the student permanently owns
+     `technique.greatsword.cleave`, the teacher received the resolved mentorship Renown and the live
+     session is gone. Reconnect/restart and verify both results remain.
+124. With two otherwise eligible fresh participants, start another session and test
+     `/mmo teaching cancel`, separation beyond 16 blocks, disconnect and ten-minute expiry. Each
+     must remove the session without Knowledge or Renown.
+
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded
 mode is rejected outside `LOCAL` and `INTEGRATION`.

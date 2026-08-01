@@ -41,6 +41,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private DatabaseRuntime databaseRuntime;
     private CharacterSessionController characterSessionController;
     private CombatSessionController combatSessionController;
+    private LiveTeachingSessionController liveTeachingSessionController;
 
     @Override
     public void onEnable() {
@@ -123,6 +124,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
         }
         if (testItemProjections != null) {
             getServer().getOnlinePlayers().forEach(testItemProjections::removeAll);
+        }
+        if (liveTeachingSessionController != null) {
+            liveTeachingSessionController.shutdown();
+            liveTeachingSessionController = null;
         }
         if (combatSessionController != null) {
             combatSessionController.shutdown();
@@ -538,6 +543,15 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         trainingIncomingCcSeverity,
                         trainingIncomingCcTicks,
                         trainingPerfectGuardPostureDamage);
+        liveTeachingSessionController =
+                new LiveTeachingSessionController(
+                        this,
+                        characterSessionController,
+                        combatSessionController,
+                        activeBuildEngine.get(),
+                        snapshot.manifest().contentVersion());
+        combatSessionController.setSuccessfulActionObserver(
+                liveTeachingSessionController::observeSuccessfulAction);
         ChronicleController chronicleController =
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         characterSessionController.addReadyHandler(chronicleController::reconcile);
@@ -564,7 +578,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         activeMoveEngine::get,
                         sceneHubController,
                         characterSessionController,
-                        combatSessionController);
+                        combatSessionController,
+                        liveTeachingSessionController);
         getServer().getPluginManager().registerEvents(chronicleController, this);
         return null;
     }
@@ -574,11 +589,13 @@ public final class BranzMmoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(resourcePackGate, this);
         getServer().getPluginManager().registerEvents(characterSessionController, this);
         getServer().getPluginManager().registerEvents(combatSessionController, this);
+        getServer().getPluginManager().registerEvents(liveTeachingSessionController, this);
         getServer().getPluginManager().registerEvents(sceneHubController, this);
         getServer().getPluginManager().registerEvents(commandController, this);
         Objects.requireNonNull(getCommand("mmo"), "mmo command").setExecutor(commandController);
         characterSessionController.start();
         combatSessionController.start();
+        liveTeachingSessionController.start();
         getLogger()
                 .info(
                         "Milestone 3 runtime ready; item definitions="

@@ -88,8 +88,10 @@ per-hit awards. The permanent-learning prerequisite resolver, synchronous player
 machine and non-combat Renown resolver are implemented. V0006 atomically persists student Technique
 Knowledge, teacher Renown/deed and exact teaching completion, reloads both Player Sessions and gates
 selected Techniques on learned state; environment-gated simulation and durable two-player fixtures
-expose the path in game. Live combat-action teaching-session wiring, Form/Spell acquisition gating,
-Flask/consumables/ailments and boss snapshot restore remain before Milestone 6 completion.
+expose the path in game. Live teaching now consumes successful server combat actions, enforces
+authored learning/teaching Mastery bands and atomically commits the completed challenge. Form/Spell
+acquisition gating, Flask/consumables/ailments and boss snapshot restore remain before Milestone 6
+completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

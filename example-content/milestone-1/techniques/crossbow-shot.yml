@@ -4,6 +4,9 @@ family: CROSSBOW
 branch: SECONDARY
 move: move.training_crossbow.shot
 mode: REPLACE
+mastery_discipline: crossbow
 supernatural: false
 attunement_cost: 0
+learning_readiness: UNFAMILIAR
+teaching_readiness: UNFAMILIAR
 tags: [LOADED_SHOT]

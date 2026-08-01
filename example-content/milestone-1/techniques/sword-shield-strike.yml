@@ -4,6 +4,9 @@ family: SWORD_SHIELD
 branch: PRIMARY_1
 move: move.training_sword_shield.primary_1
 mode: REPLACE
+mastery_discipline: sword_shield
 supernatural: false
 attunement_cost: 0
+learning_readiness: UNFAMILIAR
+teaching_readiness: UNFAMILIAR
 tags: [GUARD_COUNTER]

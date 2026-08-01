@@ -4,6 +4,9 @@ family: GREATSWORD
 branch: PRIMARY_1
 move: move.training_greatsword.committed_cleave
 mode: REPLACE
+mastery_discipline: greatsword
 supernatural: false
 attunement_cost: 0
+learning_readiness: UNFAMILIAR
+teaching_readiness: UNFAMILIAR
 tags: [HEAVY_ARC]

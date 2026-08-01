@@ -5,6 +5,7 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.content.definition.ContentDefinition;
 import com.branz.mmorpg.content.schema.DefinitionType;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
+import com.branz.mmorpg.progression.evidence.ReadinessBand;
 import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import com.branz.mmorpg.progression.knowledge.KnowledgeType;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -253,8 +254,11 @@ public final class BuildEngine {
                 MovesetBranch.valueOf(text(body, "branch")),
                 definitionId(body, "move"),
                 TechniqueMode.valueOf(text(body, "mode")),
+                text(body, "mastery_discipline"),
                 bool(body, "supernatural"),
                 integer(body, "attunement_cost"),
+                ReadinessBand.valueOf(text(body, "learning_readiness")),
+                ReadinessBand.valueOf(text(body, "teaching_readiness")),
                 optionalTextSet(body, "tags"),
                 optionalTextSet(body, "conflicts_with_tags"));
     }

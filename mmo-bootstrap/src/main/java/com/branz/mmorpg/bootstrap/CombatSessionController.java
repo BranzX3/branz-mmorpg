@@ -306,6 +306,8 @@ final class CombatSessionController implements Listener {
     private final Map<UUID, LiveProjectile> activeProjectiles = new HashMap<>();
     private final Map<UUID, LiveSpellZone> activeZones = new HashMap<>();
     private final Map<UUID, java.util.Set<UUID>> debugViewers = new HashMap<>();
+    private SuccessfulCombatActionObserver successfulActionObserver =
+            SuccessfulCombatActionObserver.NONE;
     private int tickTaskId = -1;
 
     CombatSessionController(
@@ -562,6 +564,13 @@ final class CombatSessionController implements Listener {
                     "trainingPerfectGuardPostureDamage must be positive");
         }
         this.trainingPerfectGuardPostureDamage = trainingPerfectGuardPostureDamage;
+    }
+
+    void setSuccessfulActionObserver(SuccessfulCombatActionObserver observer) {
+        if (successfulActionObserver != SuccessfulCombatActionObserver.NONE) {
+            throw new IllegalStateException("successful combat action observer is already set");
+        }
+        successfulActionObserver = Objects.requireNonNull(observer, "observer");
     }
 
     private MoveDefinition requirePrimaryMove(DefinitionId id, String family) {
@@ -2784,6 +2793,11 @@ final class CombatSessionController implements Listener {
                         moveOrSpellId,
                         demonstratedCapability,
                         combatStress(session, family));
+        successfulActionObserver.observe(
+                new CharacterId(player.getUniqueId()),
+                actionId,
+                moveOrSpellId,
+                plugin.getServer().getCurrentTick());
         if (!observed) {
             plugin.getLogger()
                     .warning(

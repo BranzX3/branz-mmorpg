@@ -624,6 +624,11 @@ public final class DefinitionSchemas {
                                         "",
                                         "Whether the technique replaces or augments its branch."),
                                 required(
+                                        "mastery_discipline",
+                                        STRING,
+                                        "",
+                                        "Mastery discipline used by learning and teaching readiness."),
+                                required(
                                         "supernatural",
                                         BOOLEAN,
                                         "",
@@ -635,6 +640,28 @@ public final class DefinitionSchemas {
                                         32,
                                         "capacity",
                                         "Active supernatural load; mundane techniques use zero."),
+                                allowed(
+                                        "learning_readiness",
+                                        STRING,
+                                        Set.of(
+                                                "UNFAMILIAR",
+                                                "DEVELOPING",
+                                                "RELIABLE",
+                                                "REFINED",
+                                                "EXCEPTIONAL"),
+                                        "",
+                                        "Minimum family Mastery band required by the student."),
+                                allowed(
+                                        "teaching_readiness",
+                                        STRING,
+                                        Set.of(
+                                                "UNFAMILIAR",
+                                                "DEVELOPING",
+                                                "RELIABLE",
+                                                "REFINED",
+                                                "EXCEPTIONAL"),
+                                        "",
+                                        "Minimum family Mastery band required to teach."),
                                 array("tags", false, 1, null, "Attunement/resonance tags."),
                                 array(
                                         "conflicts_with_tags",

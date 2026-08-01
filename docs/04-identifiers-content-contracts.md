@@ -46,6 +46,18 @@ A character action stores the snapshot version it used when the action can outli
 
 Definitions declare minimum plugin schema. Startup fails before players load when content is incompatible. Removed IDs require aliases and migration windows. Unknown persisted items become quarantined placeholders retaining UUID, ownership and serialized payload.
 
+## Technique progression authoring
+
+A Technique definition owns its stable `move` reference plus three progression fields:
+
+- `mastery_discipline` selects the `mastery.<discipline>` readiness track;
+- `learning_readiness` is the minimum qualitative band for the student;
+- `teaching_readiness` is the minimum qualitative band for a player teacher and cannot be below the
+  learning band.
+
+Readiness uses `UNFAMILIAR`, `DEVELOPING`, `RELIABLE`, `REFINED` or `EXCEPTIONAL`. Exact hidden
+evidence is never authored into a Technique or shown in a teaching rejection.
+
 ## Validation classes
 
 - Syntax: type, range and required fields.

@@ -4,6 +4,9 @@ family: BOW
 branch: SECONDARY
 move: move.training_bow.quick_shot
 mode: REPLACE
+mastery_discipline: bow
 supernatural: false
 attunement_cost: 0
+learning_readiness: UNFAMILIAR
+teaching_readiness: UNFAMILIAR
 tags: [RANGED_DRAW]

@@ -1790,3 +1790,44 @@ remain.
 
 Schema/config/migration impact: forward migration V0006 adds four tables and three query indexes plus
 one-time legacy build Knowledge import. ADR 0019 owns atomicity, replay and learned-Technique gating.
+
+## Milestone 6 - live player-teaching action bridge slice
+
+Implemented:
+
+- Technique content authors a stable Mastery discipline plus qualitative student-learning and
+  teacher-readiness bands, with validation that teaching readiness is not below learning readiness;
+- live start resolves both Player Session Knowledge/readiness profiles, requires two nearby online
+  characters outside combat and prevents overlapping participant sessions;
+- the Combat adapter emits actor/move/action UUID only after an authoritative successful hit;
+- a deterministic action router accepts one authored-move teacher demonstration and three unique
+  student actions, so swept/piercing multi-contact does not inflate challenge progress;
+- separation, disconnect, explicit cancellation and ten-minute expiry before durable submission
+  remove the transient session without a Knowledge or Renown grant;
+- a ready challenge commits through V0006 immediately and retries transient failure with the same
+  pre-created teaching-session/deed UUIDs;
+- `/mmo teaching start`, `session` and `cancel` expose the normal live path independently from the
+  environment-gated simulation and direct-record fixture.
+
+Tests and completion evidence:
+
+- action-routing tests cover wrong participant/move suppression, demonstration transition, unique
+  UUID deduplication and ready completion;
+- content/build tests compile all five authored V1 Techniques and expose their progression policy;
+- bootstrap integration and checkstyle pass with the live controller registered beside combat and
+  Player Session lifecycle.
+- the full build passes 533 tests with zero failures/errors (16 skipped), and Paper 26.2 admits
+  content `v1.milestone-1.example.2`, reaches the V0006 PostgreSQL-ready runtime and shuts down
+  cleanly.
+
+Failure/recovery behavior: no live session is durable before challenge commit. A transient commit
+failure retains the ready session only until expiry and retries immutable IDs; permanent rejection
+removes it. Once submitted, a commit is not locally cancelled. A database commit followed by
+session replacement is reported as uncertain live state, recovered from PostgreSQL on reconnect and
+cannot duplicate its reward.
+
+Milestone status: **Milestone 6 remains in progress.** Form/Spell acquisition gating,
+Flask/consumables/ailments, Rest Context and boss Flask snapshot remain.
+
+Schema/config/migration impact: no SQL or configuration change. Technique schema V1 adds three
+required progression-authoring fields. ADR 0020 owns the successful-action and live-session boundary.

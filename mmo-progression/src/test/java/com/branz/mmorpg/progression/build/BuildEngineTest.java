@@ -2,6 +2,7 @@ package com.branz.mmorpg.progression.build;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.branz.mmorpg.api.identity.DefinitionId;
@@ -9,6 +10,7 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.content.snapshot.ContentLoadFailure;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.branz.mmorpg.content.snapshot.ContentSnapshotLoader;
+import com.branz.mmorpg.progression.evidence.ReadinessBand;
 import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import com.branz.mmorpg.progression.knowledge.KnowledgeType;
 import java.nio.file.Path;
@@ -82,6 +84,26 @@ class BuildEngineTest {
     }
 
     @Test
+    void rejectsAnInvalidAuthoredMasteryDiscipline() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        new TechniqueDefinition(
+                                DefinitionId.of("technique.test.invalid"),
+                                "ANY",
+                                MovesetBranch.PRIMARY_1,
+                                DefinitionId.of("move.test.invalid"),
+                                TechniqueMode.REPLACE,
+                                "Invalid Discipline",
+                                false,
+                                0,
+                                ReadinessBand.UNFAMILIAR,
+                                ReadinessBand.UNFAMILIAR,
+                                Set.of(),
+                                Set.of()));
+    }
+
+    @Test
     void persistedJsonRoundTripsDeterministically() {
         CharacterBuild build =
                 new CharacterBuild(
@@ -115,6 +137,10 @@ class BuildEngineTest {
         assertTrue(compiled.isSuccess());
         BuildEngine engine = ((Result.Success<BuildEngine, BuildErrorCode>) compiled).value();
         assertEquals(5, engine.techniques().size());
+        TechniqueDefinition staff = engine.technique(STAFF_TECHNIQUE).orElseThrow();
+        assertEquals("staff", staff.masteryDiscipline());
+        assertEquals(ReadinessBand.UNFAMILIAR, staff.learningReadiness());
+        assertEquals(ReadinessBand.UNFAMILIAR, staff.teachingReadiness());
         assertEquals(4, engine.forms().size());
         assertEquals(5, engine.attunableEffects().size());
         return engine;

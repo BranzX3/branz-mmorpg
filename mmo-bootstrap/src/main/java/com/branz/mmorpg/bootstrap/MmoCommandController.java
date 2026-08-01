@@ -95,6 +95,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final SceneHubController sceneHub;
     private final CharacterSessionController characterSessions;
     private final CombatSessionController combatSessions;
+    private final LiveTeachingSessionController liveTeaching;
     private final CombatTraceFileExporter traceExporter;
     private final ProgressionEvidenceEngine progressionEvidence = new ProgressionEvidenceEngine();
     private final TeachingSessionEngine teachingEngine = new TeachingSessionEngine();
@@ -110,7 +111,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
             Supplier<MoveEngine> moveEngineSource,
             SceneHubController sceneHub,
             CharacterSessionController characterSessions,
-            CombatSessionController combatSessions) {
+            CombatSessionController combatSessions,
+            LiveTeachingSessionController liveTeaching) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.packGate = Objects.requireNonNull(packGate, "packGate");
@@ -120,6 +122,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
         this.sceneHub = Objects.requireNonNull(sceneHub, "sceneHub");
         this.characterSessions = Objects.requireNonNull(characterSessions, "characterSessions");
         this.combatSessions = Objects.requireNonNull(combatSessions, "combatSessions");
+        this.liveTeaching = Objects.requireNonNull(liveTeaching, "liveTeaching");
         traceExporter =
                 new CombatTraceFileExporter(
                         plugin.getDataFolder().toPath().resolve("combat-traces"));
@@ -166,7 +169,28 @@ final class MmoCommandController implements CommandExecutor, Listener {
 
     private void handleTeachingTool(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Teaching Lab requires an in-game player.");
+            sender.sendMessage("Teaching requires an in-game player.");
+            return;
+        }
+        if (args.length == 2 && "session".equalsIgnoreCase(args[1])) {
+            liveTeaching.showStatus(player);
+            return;
+        }
+        if (args.length == 2 && "cancel".equalsIgnoreCase(args[1])) {
+            liveTeaching.cancel(player);
+            return;
+        }
+        if (args.length == 4 && "start".equalsIgnoreCase(args[1])) {
+            Player student = Bukkit.getPlayerExact(args[2]);
+            if (student == null) {
+                player.sendMessage(Component.text("Student is not online.", NamedTextColor.RED));
+                return;
+            }
+            try {
+                liveTeaching.begin(player, student, DefinitionId.of(args[3]));
+            } catch (IllegalArgumentException exception) {
+                player.sendMessage(Component.text("Technique ID is invalid.", NamedTextColor.RED));
+            }
             return;
         }
         if (!devToolsAllowed(player)) {
@@ -1002,7 +1026,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
 
     private static void teachingUsage(Player player) {
         player.sendMessage(
-                "Usage: /mmo teaching status [player] | /mmo teaching simulate "
+                "Usage: /mmo teaching start <student> <technique-id> | /mmo teaching session | "
+                        + "/mmo teaching cancel | /mmo teaching status [player] | /mmo teaching simulate "
                         + "<success|missing-teacher|unready-teacher|student-prerequisite|duplicate-action|expired|disconnect> "
                         + "| /mmo teaching record <student> [teaching-session-uuid] [deed-uuid]");
     }

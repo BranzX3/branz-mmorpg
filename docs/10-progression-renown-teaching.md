@@ -203,6 +203,28 @@ grandfathers Technique/Form/Spell selections already committed before the migrat
 their stable IDs as `LEGACY_BUILD_BACKFILL`; it never infers knowledge from post-migration GUI state.
 Form and Spell learned-state gating remains with their authored acquisition-source slice.
 
+### Live teaching action bridge
+
+Each Technique definition authors `mastery_discipline`, `learning_readiness` and
+`teaching_readiness`. Session start resolves those fields against the permanent Knowledge and
+qualitative Mastery bands in both current Player Sessions. The two online players must be within 16
+blocks in the same world, outside combat and between actions; one character can participate in only
+one teaching session at a time.
+
+After start, only a successful action emitted by the authoritative combat resolver can advance the
+session. The teacher must land the Technique's authored move once, then the student must land the
+same move with three distinct server action UUIDs. Multiple contacts from one swept or piercing
+action remain one execution. Misses, other moves and the other participant's action do not advance
+the current phase.
+
+Separation, disconnect or ten-minute expiry before durable submission removes the transient
+challenge without a grant. A ready challenge immediately submits its pre-created teaching-session
+and mentorship-deed UUIDs to the V0006 transaction. Once submitted it cannot be cancelled locally;
+participant/session change reports an uncertain live outcome and reconnect reloads PostgreSQL
+truth. Temporary database or competing-mutation failure retries those exact IDs; permanent
+rejection removes the session. `/mmo teaching start <student> <technique-id>`, `session` and
+`cancel` expose this live path without enabling the developer simulation or direct-record fixture.
+
 ## Renown
 
 Renown is visible world recognition with no combat stats. It records notable deeds and unlocks:

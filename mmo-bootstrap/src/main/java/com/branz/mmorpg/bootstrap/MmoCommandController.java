@@ -123,6 +123,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final KnowledgeAcquisitionController knowledgeAcquisition;
     private final BossEncounterController bossEncounters;
     private final PartyController parties;
+    private final LfgController lfg;
     private final DownedController downed;
     private final CombatTraceFileExporter traceExporter;
     private final ProgressionEvidenceEngine progressionEvidence = new ProgressionEvidenceEngine();
@@ -145,6 +146,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
             KnowledgeAcquisitionController knowledgeAcquisition,
             BossEncounterController bossEncounters,
             PartyController parties,
+            LfgController lfg,
             DownedController downed) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
@@ -162,6 +164,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
                 Objects.requireNonNull(knowledgeAcquisition, "knowledgeAcquisition");
         this.bossEncounters = Objects.requireNonNull(bossEncounters, "bossEncounters");
         this.parties = Objects.requireNonNull(parties, "parties");
+        this.lfg = Objects.requireNonNull(lfg, "lfg");
         this.downed = Objects.requireNonNull(downed, "downed");
         traceExporter =
                 new CombatTraceFileExporter(
@@ -232,6 +235,14 @@ final class MmoCommandController implements CommandExecutor, Listener {
             }
             return true;
         }
+        if ("lfg".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("LFG commands require an in-game player.");
+            } else {
+                lfg.handleCommand(player, args);
+            }
+            return true;
+        }
         if ("downed".equalsIgnoreCase(args[0])) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("Downed Lab requires an in-game player.");
@@ -246,7 +257,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
             return true;
         }
         sender.sendMessage(
-                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|party|encounter|downed>");
+                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|party|lfg|encounter|downed>");
         return true;
     }
 

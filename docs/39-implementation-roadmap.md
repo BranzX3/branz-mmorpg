@@ -148,8 +148,10 @@ The live Paper adapter now exposes those transitions through `/mmo party`, binds
 members to boss admission and reconstructs membership only for active durable checkpoint encounters.
 The pure LFG kernel now owns stable party listings, public activity/region/language/role matching,
 bounded experience notes, leader approval by default, optional automatic joining and admission-time
-capacity. Hidden Mastery cannot enter its public requirement tags. Live directory commands and
-party composition are the next social slice.
+capacity. Hidden Mastery cannot enter its public requirement tags. The live process-local directory
+now exposes those flows through `/mmo lfg` and installs acceptance only after PartyEngine admission.
+Party/LFG/boss/downed flows are ready for in-game acceptance; personal rewards are the next
+Milestone 7 slice.
 
 ## Milestone 8 — Lifeskill kernel
 

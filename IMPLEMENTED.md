@@ -2467,3 +2467,31 @@ Milestone status: **Milestone 7 remains in progress.** The LFG kernel is ready; 
 party composition, personal rewards, Death Pouch and PvP remain.
 
 Schema/config/migration impact: none. ADR 0037 owns LFG kernel semantics.
+
+## Milestone 7 - live LFG directory slice
+
+Implemented:
+
+- `/mmo lfg` exposes publish, browse, request, request inspection, accept/decline, cancel, status and
+  close commands gated by Player Session readiness;
+- listings present stable activity/region IDs, normalized language, descriptive role, bounded note,
+  public requirements, remaining slots and leader approval/automatic policy;
+- publishing creates a solo party when required and only the current party leader owns a listing;
+- accepted LFG transitions install only after the live PartyEngine invite/accept pair succeeds;
+- directory reconciliation closes stale listings after party leader, size or accepted-member drift;
+- offline/unready leaders are hidden, offline requests can be declined by UUID and all listings clear
+  with ordinary process-local party state on restart.
+
+Tests and completion evidence:
+
+- 331 repository tests cover the LFG and party kernels composed by the controller;
+- full repository build and Paper startup/shutdown smoke cover command wiring and clean lifecycle.
+
+Failure/recovery behavior: invalid profiles, filters, authority, readiness and party admission leave
+the listing/request unchanged. LFG never claims membership before PartyEngine success and is never
+recovered from an unrelated active checkpoint.
+
+Milestone status: **Milestone 7 remains in progress.** Party, LFG and durable downed/boss flows are
+ready for in-game acceptance; personal rewards, Death Pouch and PvP remain.
+
+Schema/config/migration impact: none. ADR 0038 owns live LFG/party composition.

@@ -119,6 +119,64 @@ final class PartyController implements Listener {
                 .toList();
     }
 
+    PartyRuntime partyFor(Player player) {
+        return runtimeFor(player);
+    }
+
+    PartyRuntime party(PartyId partyId) {
+        return parties.get(Objects.requireNonNull(partyId, "partyId"));
+    }
+
+    PartyRuntime ensureLeaderParty(Player actor) {
+        PartyRuntime runtime = runtimeFor(actor);
+        if (runtime == null) {
+            create(actor);
+            runtime = runtimeFor(actor);
+        }
+        if (!runtime.leaderId().orElseThrow().equals(characterId(actor))) {
+            actor.sendMessage(
+                    Component.text("Only the party leader may list LFG.", NamedTextColor.RED));
+            return null;
+        }
+        return runtime;
+    }
+
+    boolean admitFromLfg(Player leader, Player applicant) {
+        PartyRuntime runtime = runtimeFor(leader);
+        if (runtime == null
+                || !runtime.leaderId().orElseThrow().equals(characterId(leader))
+                || runtimeFor(applicant) != null
+                || !characterSessions.ready(applicant)) {
+            leader.sendMessage(
+                    Component.text(
+                            "LFG applicant is no longer eligible to join.", NamedTextColor.RED));
+            return false;
+        }
+        Result<PartyTransition, PartyErrorCode> invited =
+                engine.invite(
+                        runtime,
+                        characterId(leader),
+                        characterId(applicant),
+                        UUID.randomUUID(),
+                        currentTick());
+        if (!(invited instanceof Result.Success<PartyTransition, PartyErrorCode> inviteSuccess)) {
+            reportFailure(leader, invited);
+            return false;
+        }
+        Result<PartyTransition, PartyErrorCode> accepted =
+                engine.accept(
+                        inviteSuccess.value().runtime(),
+                        characterId(applicant),
+                        UUID.randomUUID(),
+                        currentTick());
+        if (!(accepted instanceof Result.Success<PartyTransition, PartyErrorCode>)) {
+            reportFailure(leader, accepted);
+            return false;
+        }
+        apply(runtime, accepted, applicant.getName() + " joined through LFG", leader);
+        return true;
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         PartyRuntime runtime = runtimeFor(event.getPlayer());
@@ -499,6 +557,15 @@ final class PartyController implements Listener {
                 .filter(Objects::nonNull)
                 .filter(Player::isOnline)
                 .findFirst();
+    }
+
+    private static void reportFailure(
+            Player player, Result<PartyTransition, PartyErrorCode> result) {
+        Result.Failure<PartyTransition, PartyErrorCode> failure =
+                (Result.Failure<PartyTransition, PartyErrorCode>) result;
+        player.sendMessage(
+                Component.text(
+                        failure.error().code() + ": " + failure.detail(), NamedTextColor.RED));
     }
 
     private String name(CharacterId characterId) {

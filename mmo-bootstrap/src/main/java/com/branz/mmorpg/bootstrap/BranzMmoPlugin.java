@@ -51,6 +51,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private KnowledgeAcquisitionController knowledgeAcquisitionController;
     private BossEncounterController bossEncounterController;
     private PartyController partyController;
+    private LfgController lfgController;
     private DownedController downedController;
 
     @Override
@@ -142,6 +143,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
         if (downedController != null) {
             downedController.shutdown();
             downedController = null;
+        }
+        if (lfgController != null) {
+            lfgController.shutdown();
+            lfgController = null;
         }
         if (partyController != null) {
             partyController.shutdown();
@@ -640,6 +645,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         snapshot.manifest().contentVersion());
         partyController =
                 new PartyController(this, characterSessionController, bossEncounterController);
+        lfgController = new LfgController(this, characterSessionController, partyController);
         bossEncounterController.setPartyParticipantResolver(partyController::onlineMembers);
         downedController =
                 new DownedController(
@@ -690,6 +696,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         knowledgeAcquisitionController,
                         bossEncounterController,
                         partyController,
+                        lfgController,
                         downedController);
         getServer().getPluginManager().registerEvents(chronicleController, this);
         return null;

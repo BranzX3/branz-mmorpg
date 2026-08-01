@@ -730,6 +730,25 @@ live inventory, change Bukkit resources or write PostgreSQL.
 204. Cancel a pending request, reject another as a non-leader and close as leader. Replay one exact
      operation UUID and verify no duplicate accepted effect; reuse it for a different command kind
      and verify failure without mutation.
+205. As a ready solo player run `/mmo lfg list activity.elite_hunt region.ember_coast en-us SUPPORT
+     learning_mechanics quest.elite`. Verify a party is created, the listing UUID is shown and
+     `/mmo lfg status` reports leader approval with the correct remaining slots.
+206. As a second ready player run `/mmo lfg browse activity.elite_hunt region.ember_coast en-us
+     SUPPORT quest.elite`. Verify the listing displays its public note/role and slot count. Browse
+     without `quest.elite` and verify the requirement excludes it without showing Mastery.
+207. Request the listing with `/mmo lfg request <listing-uuid> FLEXIBLE experienced quest.elite`.
+     Verify the leader sees one pending request, then accepts by player name. Confirm both LFG and
+     `/mmo party status` show one admission and no intermediate invitation remains.
+208. Fill the party near capacity, submit two qualifying requests and accept them in sequence. Verify
+     the final available slot admits once and the next acceptance leaves its request pending with a
+     visible party-full error.
+209. Publish a fresh listing with the final `auto` argument and request it from an eligible player.
+     Verify PartyEngine membership succeeds before the join message and no pending request remains.
+     Use `auto` as the note on a non-auto listing and verify it does not change the policy.
+210. Decline an offline applicant using the UUID shown by `/mmo lfg requests`. Transfer party
+     leadership or change membership outside LFG, then issue another directory command and verify
+     the stale listing closes. Restart Paper and verify ordinary listings do not recover, including
+     when an unrelated boss checkpoint party does recover.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

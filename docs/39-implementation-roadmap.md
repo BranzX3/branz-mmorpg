@@ -165,6 +165,10 @@ effect and delivers independent lots to Pending Rewards before marking the encou
 Restart and exact reconciliation replay cannot duplicate a grant or lot. Milestone 7's remaining
 work is Death Pouch and duel/arena profile hooks.
 
+The pure Death Pouch planner now freezes the open-world 10% carried-wallet loss, seven-day expiry,
+stable pouch/debit saga identities and explicit boss/PvP/zero-loss suppression. Durable pouch state,
+wallet-provider reconciliation and live owner-only recovery remain the next Death Pouch slices.
+
 ## Milestone 8 — Lifeskill kernel
 
 - Rank/Mastery/Focus;

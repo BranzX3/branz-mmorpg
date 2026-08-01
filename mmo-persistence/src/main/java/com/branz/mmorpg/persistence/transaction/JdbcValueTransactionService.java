@@ -441,7 +441,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
         }
     }
 
-    private static Result<MutationApplied, TransactionErrorCode> insertLot(
+    static Result<MutationApplied, TransactionErrorCode> insertLot(
             Connection connection, TransactionRequest request, NewLotLocation lot) {
         try (PreparedStatement statement =
                 connection.prepareStatement(
@@ -511,7 +511,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
         }
     }
 
-    private static Result<MutationApplied, TransactionErrorCode> updateItemPayload(
+    static Result<MutationApplied, TransactionErrorCode> updateItemPayload(
             Connection connection, TransactionId transactionId, ItemPayloadUpdate update) {
         try (PreparedStatement statement =
                 connection.prepareStatement(
@@ -984,7 +984,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
                 "Lot could not be consumed under the declared expectations.");
     }
 
-    private static Optional<ItemLocationRecord> findItem(Connection connection, ItemId itemId)
+    static Optional<ItemLocationRecord> findItem(Connection connection, ItemId itemId)
             throws SQLException {
         try (PreparedStatement statement =
                 connection.prepareStatement(

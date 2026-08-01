@@ -214,7 +214,11 @@ The pure resource-node kernel now separates personal Common slots from first-act
 slots, freezes exact tool/durability/Focus/yield inputs at reservation, enforces authored work and
 timeout boundaries, emits one harvest intent at commit and recovers charges from wall-clock state.
 Restart releases pre-commit reservations while committed depletion survives; exact operation replay
-cannot emit a second harvest. The PostgreSQL node/tool/output transaction is the next slice.
+cannot emit a second harvest. V0014 now journals the exact node document, actor Lifeskill/Focus
+document, durable tool payload and Pending Rewards output lots in one PostgreSQL transaction.
+Committed replay is read-only, partial node/tool/output crash checkpoints roll back and retry once,
+and startup can query every non-available node for wall-clock reconciliation. The live Paper Node
+Lab is the next Milestone 8 slice.
 
 ## Milestone 9 — Production, farming and workers
 

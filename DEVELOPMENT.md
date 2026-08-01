@@ -829,6 +829,14 @@ live inventory, change Bukkit resources or write PostgreSQL.
      restart release pre-commit reservations, early/expired commits fail, committed depletion
      survives restart, wall-clock recovery restores authored charges and exact replay emits no
      second harvest intent.
+236. Run `./gradlew :mmo-persistence:test --tests
+     com.branz.mmorpg.persistence.transaction.JdbcResourceNodeStateRepositoryIntegrationTest
+     --tests com.branz.mmorpg.persistence.migration.MigrationCatalogTest --tests
+     com.branz.mmorpg.persistence.migration.PostgresMigrationRunnerIntegrationTest`. Verify reserve,
+     harvest and system recovery atomically compare and replace the node, exact tool and
+     Lifeskill/Focus documents, place frozen output lots in Pending Rewards, return exact committed
+     replay without duplicates and roll back every write when stale versions or injected
+     node/tool/output crash checkpoints fail before retry.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

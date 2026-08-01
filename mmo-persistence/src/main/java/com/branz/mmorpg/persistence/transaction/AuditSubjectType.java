@@ -5,5 +5,6 @@ public enum AuditSubjectType {
     ENCOUNTER,
     ITEM,
     LOT,
+    RESOURCE_NODE,
     TRANSACTION
 }

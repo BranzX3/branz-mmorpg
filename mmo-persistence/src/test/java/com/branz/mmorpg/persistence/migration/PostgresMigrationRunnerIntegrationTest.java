@@ -56,11 +56,11 @@ class PostgresMigrationRunnerIntegrationTest {
 
         assertTrue(first.isSuccess());
         assertEquals(
-                List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13),
+                List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
                 success(first).appliedVersions());
         assertTrue(second.isSuccess());
         assertEquals(List.of(), success(second).appliedVersions());
-        assertEquals(13, scalarInt("SELECT COUNT(*) FROM mmo_schema_migrations"));
+        assertEquals(14, scalarInt("SELECT COUNT(*) FROM mmo_schema_migrations"));
         assertEquals(
                 1,
                 scalarInt("SELECT COUNT(*) FROM pg_type WHERE typname = 'mmo_transaction_state'"));
@@ -154,7 +154,7 @@ class PostgresMigrationRunnerIntegrationTest {
 
         MigrationReport report = success(runner.migrate(full));
 
-        assertEquals(List.of(6, 7, 8, 9, 10, 11, 12, 13), report.appliedVersions());
+        assertEquals(List.of(6, 7, 8, 9, 10, 11, 12, 13, 14), report.appliedVersions());
         assertEquals(3, scalarInt("SELECT COUNT(*) FROM character_knowledge"));
         assertEquals(
                 1,

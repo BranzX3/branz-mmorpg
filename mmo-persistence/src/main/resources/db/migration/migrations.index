@@ -12,3 +12,4 @@ V0010__downed_encounter_state.sql
 V0011__personal_reward_grants.sql
 V0012__death_pouch_sagas.sql
 V0013__carried_wallet_transactions.sql
+V0014__resource_node_and_lifeskill_state.sql

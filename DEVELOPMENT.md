@@ -684,6 +684,19 @@ live inventory, change Bukkit resources or write PostgreSQL.
      Verify V0010 replaces the old attempt using its next optimistic version and grants a fresh
      one-revive allowance. Complete the boss encounter, restart and verify its stale downed row is
      marked non-recoverable rather than installed.
+189. Run `./gradlew :mmo-social:test` and verify only the leader can invite, transfer leadership or
+     kick. Accept four invitations and verify a sixth member is rejected at accept time without
+     mutating membership.
+190. Decline an invitation, then expire another at exactly 1,200 ticks. Verify neither target joins
+     and a clock advance removes the expired invitation deterministically.
+191. Transfer leadership explicitly, kick one member and let the leader leave. Verify leadership
+     falls to the earliest remaining join order; when the last member leaves, verify the runtime is
+     terminal and disbanded.
+192. Disconnect a leader and reconnect before 6,000 ticks; verify membership and leadership remain.
+     Repeat and advance exactly to the deadline; verify removal and deterministic leader transfer.
+193. Start a ready check, collect mixed responses and verify the final result is false only after all
+     members answer. Start another and expire it at 600 ticks. Replay operation UUIDs and verify no
+     duplicate membership/ready effect; reuse one UUID across command kinds and verify failure.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

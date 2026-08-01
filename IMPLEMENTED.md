@@ -2380,3 +2380,32 @@ Milestone status: **Milestone 7 remains in progress.** The boss-party downed pat
 in-game restart acceptance; general party/LFG, personal rewards, Death Pouch and PvP remain.
 
 Schema/config/migration impact: none beyond V0010. ADR 0034 owns live durable ordering.
+
+## Milestone 7 - party membership kernel slice
+
+Implemented:
+
+- stable `PartyId` joins the sealed persistent identity model;
+- immutable parties hold one leader and up to five members with deterministic join order;
+- leader-authorized invite, transfer and kick plus target accept/decline and member leave/disband
+  transitions are explicit and replay safe;
+- invitations expire after 1,200 ticks and capacity is enforced at acceptance;
+- disconnect retains membership for 6,000 ticks, reconnect clears grace and timeout removes the
+  member with deterministic automatic leader transfer;
+- one 600-tick ready check collects ready/not-ready responses, completes only when all answer and
+  fails on timeout; membership/disconnect changes cancel stale checks;
+- operation UUIDs make exact command replay a no-op and cross-command reuse fail closed.
+
+Tests and completion evidence:
+
+- social tests cover invitation acceptance/decline/expiry/capacity, leader authority and transfer,
+  kick/leave/disband, reconnect/timeout transfer, ready completion/timeout and operation replay;
+- module formatting, compilation and tests pass.
+
+Failure/recovery behavior: invalid authority, membership, invitation and ready-check inputs mutate
+nothing. Disband remains an explicit terminal state for durable replay.
+
+Milestone status: **Milestone 7 remains in progress.** Live party commands, durable party recovery,
+boss binding, LFG, personal rewards, Death Pouch and PvP remain.
+
+Schema/config/migration impact: none. ADR 0035 owns party kernel semantics.

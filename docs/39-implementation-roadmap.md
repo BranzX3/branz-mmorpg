@@ -142,6 +142,10 @@ operation identities across restart. The live adapter now serializes V0010 befor
 checkpoints active timers and restores matching attempts after V0009 recovery. The boss-party
 downed path is ready for restart acceptance; general party membership is the next social slice.
 
+The pure party kernel now owns five-member capacity, invitation lifecycle, leader transfer,
+five-minute reconnect grace, leave/kick/disband and bounded ready checks with operation replay.
+Live commands, durable recovery and boss encounter binding are the next party slices.
+
 ## Milestone 8 — Lifeskill kernel
 
 - Rank/Mastery/Focus;

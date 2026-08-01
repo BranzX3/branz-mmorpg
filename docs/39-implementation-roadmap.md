@@ -156,8 +156,11 @@ Milestone 7 slice.
 The pure personal-reward freeze now owns category-based participation floors, cutoff/membership/AFK
 checks, stable rejection reasons and deterministic per-character grant identity/roll seeds. Durable
 V0011 now stores one journaled grant per encounter/attempt/character and advances it monotonically
-through frozen, rolled and delivered recovery states. Payload codec and live boss evidence/roll/
-delivery are the next reward slices.
+through frozen, rolled and delivered recovery states. Encounter content now supplies validated
+eligibility and weighted stackable-lot reward tables; deterministic rolling derives item quantity
+and lot identity without mutable RNG. A canonical fail-closed payload codec preserves frozen
+evidence, rolled outcome and delivery receipt. Live boss evidence/roll/delivery is the next reward
+slice.
 
 ## Milestone 8 — Lifeskill kernel
 

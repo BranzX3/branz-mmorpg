@@ -1,0 +1,19 @@
+definition_id: encounter.boss.training_golem
+schema_version: 1
+reward_pool:
+  entries:
+    - item: material.infusion_stock
+      weight: 3
+      min_quantity: 1
+      max_quantity: 2
+    - item: material.iron_ore
+      weight: 1
+      min_quantity: 2
+      max_quantity: 4
+eligibility:
+  damage_and_posture_floor: 100
+  guard_and_control_floor: 50
+  healing_and_support_floor: 75
+  objective_action_floor: 1
+  maximum_idle_ticks: 600
+  late_join_hp_ratio: 0.20

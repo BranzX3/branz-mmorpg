@@ -20,6 +20,7 @@
     "forms": 4,
     "spells": 5,
     "statuses": 6,
+    "encounters": 1,
     "nodes": 1
   }
 }

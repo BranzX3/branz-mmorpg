@@ -1357,6 +1357,81 @@ public final class DefinitionSchemas {
                                 to(DefinitionType.ITEM, "base_yields", "*", "item"),
                                 to(DefinitionType.ITEM, "byproducts", "*", "item"))));
         schemas.put(
+                DefinitionType.ENCOUNTER,
+                definition(
+                        DefinitionType.ENCOUNTER,
+                        List.of(
+                                array(
+                                        "reward_pool.entries",
+                                        true,
+                                        1,
+                                        16,
+                                        "Weighted personal reward entries."),
+                                ranged(
+                                        "reward_pool.entries.*.weight",
+                                        INTEGER,
+                                        1,
+                                        1_000_000,
+                                        "weight",
+                                        "Relative reward roll weight."),
+                                ranged(
+                                        "reward_pool.entries.*.min_quantity",
+                                        INTEGER,
+                                        1,
+                                        4096,
+                                        "items",
+                                        "Minimum stackable reward quantity."),
+                                ranged(
+                                        "reward_pool.entries.*.max_quantity",
+                                        INTEGER,
+                                        1,
+                                        4096,
+                                        "items",
+                                        "Maximum stackable reward quantity."),
+                                ranged(
+                                        "eligibility.damage_and_posture_floor",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "points",
+                                        "Meaningful damage/posture contribution floor."),
+                                ranged(
+                                        "eligibility.guard_and_control_floor",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "points",
+                                        "Meaningful guard/control contribution floor."),
+                                ranged(
+                                        "eligibility.healing_and_support_floor",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "points",
+                                        "Meaningful healing/support contribution floor."),
+                                ranged(
+                                        "eligibility.objective_action_floor",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "actions",
+                                        "Meaningful objective contribution floor."),
+                                ranged(
+                                        "eligibility.maximum_idle_ticks",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "ticks",
+                                        "Maximum inactivity before victory."),
+                                ranged(
+                                        "eligibility.late_join_hp_ratio",
+                                        NUMBER,
+                                        0,
+                                        1,
+                                        "ratio",
+                                        "Boss HP cutoff for late join eligibility.")),
+                        List.of(to(DefinitionType.ITEM, "reward_pool", "entries", "*", "item"))));
+        schemas.put(
                 DefinitionType.WORKER_JOB,
                 definition(
                         DefinitionType.WORKER_JOB,

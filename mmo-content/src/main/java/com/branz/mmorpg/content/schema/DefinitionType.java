@@ -13,6 +13,7 @@ public enum DefinitionType {
     FORM(Set.of("form")),
     SPELL(Set.of("spell")),
     STATUS(Set.of("status")),
+    ENCOUNTER(Set.of("encounter")),
     SCENE(Set.of("scene")),
     CITY(Set.of("city")),
     TRADE_GOOD(Set.of("trade")),

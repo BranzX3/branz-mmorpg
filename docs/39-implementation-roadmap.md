@@ -180,6 +180,11 @@ renders markers only to their owner, requires proximity for recovery and reconci
 and expiry ambiguity across restart. Boss and player-killer deaths are suppressed, and local durable
 fund/simulate/status/recover commands make the complete Death Pouch slice ready for in-game
 acceptance. Milestone 7's remaining work is explicit duel/arena profile integration.
+The pure PvP match kernel now owns duel consent/expiry, countdown-gated hostile permission,
+two-team arena elimination, surrender, boundary forfeits, disconnect grace and exact operation
+replay. Its canonical profile freezes separate damage/healing/guard/CC values and forbids durability
+or Death Pouch loss. Live Paper combat, command and safe-defeat wiring is the final Milestone 7
+slice.
 
 ## Milestone 8 — Lifeskill kernel
 

@@ -792,6 +792,10 @@ live inventory, change Bukkit resources or write PostgreSQL.
 225. Fund the wallet again and die outside a boss encounter; verify exactly 10% becomes one pouch at
      the death site. Die while bound to the Boss Encounter Lab and from another player's killing
      blow; verify neither path changes the wallet or creates a pouch.
+226. Run `./gradlew :mmo-social:test --tests
+     com.branz.mmorpg.social.pvp.PvpMatchEngineTest`. Verify duel consent/countdown, hostile
+     permission, arena team elimination, surrender, boundary forfeits, reconnect/timeout and exact
+     operation replay all pass.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

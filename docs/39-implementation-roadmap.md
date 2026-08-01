@@ -63,6 +63,12 @@ The coding order prioritizes identity and recovery before gameplay breadth.
 
 **Done when:** each family completes a full encounter and save/reload cycle.
 
+**Implementation status (`newmmo`): Complete.** Greatsword, Sword and Shield, Bow, Crossbow and
+Staff have integrated executable-action coverage. Linked equipment, Quiver/ammo, Crossbow
+checkpoint, catalyst durability and character build/attunement have PostgreSQL reconnect/restart
+coverage. Ember Direct/Projectile/Zone/Channel and Runic Imbuement share the authoritative spell
+commit boundary; transient encounter effects are intentionally not reconstructed after restart.
+
 ## Milestone 6 — Progression and consumables
 
 - Mastery/conditioning evidence;

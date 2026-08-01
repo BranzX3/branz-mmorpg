@@ -95,7 +95,7 @@ class BuildEngineTest {
         BuildEngine engine = ((Result.Success<BuildEngine, BuildErrorCode>) compiled).value();
         assertEquals(5, engine.techniques().size());
         assertEquals(4, engine.forms().size());
-        assertEquals(1, engine.attunableEffects().size());
+        assertEquals(5, engine.attunableEffects().size());
         return engine;
     }
 

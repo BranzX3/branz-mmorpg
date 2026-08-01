@@ -36,4 +36,14 @@ class CombatResourcesTest {
         assertEquals(0, released.reservedMana());
         assertEquals(100, committed.restoreMana(50).mana());
     }
+
+    @Test
+    void directManaSpendCannotConsumeReservedMana() {
+        CombatResources resources = new CombatResources(1000, 1000, 100, 100, 100, 30, 0, 0, 18);
+
+        assertTrue(resources.spendMana(13).isEmpty());
+        CombatResources spent = resources.spendMana(12).orElseThrow();
+        assertEquals(18, spent.mana());
+        assertEquals(18, spent.reservedMana());
+    }
 }

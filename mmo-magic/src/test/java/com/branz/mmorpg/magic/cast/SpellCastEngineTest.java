@@ -62,18 +62,71 @@ class SpellCastEngineTest {
                 failure(engine.start(spell(), lowMana, Set.of("STAFF"), 2, 0)));
     }
 
+    @Test
+    void instantCommitsFromReadyAndChannelPaysEachBoundedPulse() {
+        SpellDefinition instant = spell(SpellCastType.INSTANT, Optional.empty());
+        SpellCastRuntime ready = success(engine.start(instant, resources(), Set.of("STAFF"), 2, 0));
+        assertEquals(SpellCastPhase.READY, ready.phase());
+        SpellCastRuntime committed = success(engine.release(ready, 0));
+        assertEquals(82, committed.resources().mana());
+        assertEquals(SpellCastPhase.RECOVERY, committed.phase());
+
+        SpellDefinition.Channel profile = new SpellDefinition.Channel(4, 3, 5, 9, 1);
+        SpellDefinition channel = spell(SpellCastType.CHANNEL, Optional.of(profile));
+        SpellCastRuntime channelReady =
+                success(engine.start(channel, resources(), Set.of("STAFF"), 2, 20));
+        SpellCastRuntime active = success(engine.release(channelReady, 20));
+        assertEquals(SpellCastPhase.CHANNELING, active.phase());
+        ChannelPulseResolution first = engine.pulse(active, 20);
+        assertTrue(first.pulseEmitted());
+        assertEquals(77, first.runtime().resources().mana());
+        assertEquals(1, first.runtime().pulsesCompleted());
+        assertEquals(
+                SpellCastPhase.CHANNELING, engine.pulse(first.runtime(), 23).runtime().phase());
+        ChannelPulseResolution second = engine.pulse(first.runtime(), 24);
+        ChannelPulseResolution third = engine.pulse(second.runtime(), 28);
+        assertTrue(third.pulseEmitted());
+        assertEquals(SpellCastPhase.RECOVERY, third.runtime().phase());
+        assertEquals(67, third.runtime().resources().mana());
+    }
+
     private static SpellDefinition spell() {
+        return spell(SpellCastType.CHARGE, Optional.empty());
+    }
+
+    private static SpellDefinition spell(
+            SpellCastType castType, Optional<SpellDefinition.Channel> channel) {
         return new SpellDefinition(
                 DefinitionId.of("spell.ember.fire_lance"),
                 DefinitionId.of("magic.ember"),
-                SpellCastType.CHARGE,
-                SpellTargetType.CROSSHAIR_POINT,
-                SpellDeliveryType.PROJECTILE,
+                castType,
+                castType == SpellCastType.INSTANT
+                        ? SpellTargetType.CROSSHAIR_ENTITY
+                        : SpellTargetType.CROSSHAIR_POINT,
+                castType == SpellCastType.CHARGE
+                        ? SpellDeliveryType.PROJECTILE
+                        : castType == SpellCastType.CHANNEL
+                                ? SpellDeliveryType.BEAM
+                                : SpellDeliveryType.DIRECT,
                 new SpellDefinition.Requirements(Set.of("STAFF"), 2),
                 18,
-                new SpellDefinition.Phases(8, 8, 30, 12),
+                new SpellDefinition.Phases(
+                        castType == SpellCastType.CHARGE ? 8 : 0,
+                        castType == SpellCastType.CHARGE ? 8 : 0,
+                        castType == SpellCastType.CHARGE ? 30 : 0,
+                        12),
                 new SpellDefinition.Interruption(false, false, true, true, true, true),
-                Optional.of(new SpellDefinition.Projectile(2.2, 0.01, 0.995, 0.22, 70, 0, "FIRE")),
+                castType == SpellCastType.CHARGE
+                        ? Optional.of(
+                                new SpellDefinition.Projectile(
+                                        2.2, 0.01, 0.995, 0.22, 70, 0, "FIRE"))
+                        : Optional.empty(),
+                castType == SpellCastType.INSTANT
+                        ? Optional.of(new SpellDefinition.Direct(6, 1))
+                        : Optional.empty(),
+                channel,
+                Optional.empty(),
+                Optional.empty(),
                 new SpellDefinition.Output(ArcaneSchool.FIRE, 0.9, 16, 14),
                 "EMBER_FIRE_LANCE",
                 new SpellDefinition.CombatProfiles(1, 0.65));

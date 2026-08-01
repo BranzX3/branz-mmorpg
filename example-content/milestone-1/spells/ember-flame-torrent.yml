@@ -1,0 +1,17 @@
+definition_id: spell.ember.flame_torrent
+schema_version: 1
+art: magic.ember
+cast_type: CHANNEL
+target_type: CROSSHAIR_ENTITY
+delivery: BEAM
+requirements:
+  catalyst_tags: [STAFF, EMBER]
+  attunement: 2
+  attunement_tags: [EMBER]
+cost: {mana: 10}
+phases: {windup_ticks: 6, minimum_charge_ticks: 0, maximum_charge_ticks: 0, recovery_ticks: 8}
+interruption: {movement: false, damage: false, flinch: true, stagger: true, silence: true, weapon_swap: true}
+channel: {pulse_interval_ticks: 4, maximum_pulses: 10, mana_per_pulse: 2, range: 9.0, maximum_targets_per_pulse: 1}
+output: {arcane_school: FIRE, power_coefficient: 0.22, posture: 3, guard_pressure: 2}
+presentation: {archetype: EMBER_FLAME_TORRENT}
+profiles: {pve_multiplier: 1.0, pvp_multiplier: 0.65}

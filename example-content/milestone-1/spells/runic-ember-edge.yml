@@ -1,0 +1,17 @@
+definition_id: spell.runic.ember_edge
+schema_version: 1
+art: magic.runic
+cast_type: INSTANT
+target_type: SELF
+delivery: IMBUE
+requirements:
+  catalyst_tags: [STAFF, EMBER]
+  attunement: 1
+  attunement_tags: [RUNIC, EMBER]
+cost: {mana: 14}
+phases: {windup_ticks: 0, minimum_charge_ticks: 0, maximum_charge_ticks: 0, recovery_ticks: 8}
+interruption: {movement: false, damage: false, flinch: true, stagger: true, silence: true, weapon_swap: true}
+imbuement: {duration_ticks: 240, maximum_charges: 4, power_coefficient: 0.35}
+output: {arcane_school: FIRE, power_coefficient: 0.35, posture: 4, guard_pressure: 3}
+presentation: {archetype: RUNIC_EMBER_EDGE}
+profiles: {pve_multiplier: 1.0, pvp_multiplier: 0.65}

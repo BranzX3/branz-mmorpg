@@ -26,6 +26,9 @@ record CombatSessionStatus(
         boolean crossbowCheckpointCommitPending,
         Optional<SpellCastPhase> spellCastPhase,
         boolean spellCommitPending,
+        Optional<DefinitionId> selectedSpell,
+        int activeZones,
+        int imbuementCharges,
         int activeProjectiles,
         boolean bowAmmoCommitPending,
         Optional<DefinitionId> selectedAmmo,
@@ -54,6 +57,7 @@ record CombatSessionStatus(
         Objects.requireNonNull(bowDrawPhase, "bowDrawPhase");
         Objects.requireNonNull(crossbowPhase, "crossbowPhase");
         Objects.requireNonNull(spellCastPhase, "spellCastPhase");
+        Objects.requireNonNull(selectedSpell, "selectedSpell");
         Objects.requireNonNull(selectedAmmo, "selectedAmmo");
         Objects.requireNonNull(dodgeLoad, "dodgeLoad");
         Objects.requireNonNull(dodgePhase, "dodgePhase");
@@ -63,6 +67,8 @@ record CombatSessionStatus(
         if (engagementExitTicksRemaining < 0
                 || bowRecoveryTicksRemaining < 0
                 || crossbowRecoveryTicksRemaining < 0
+                || activeZones < 0
+                || imbuementCharges < 0
                 || activeProjectiles < 0
                 || selectedAmmoQuantity < 0
                 || quiverUsedCapacity < 0

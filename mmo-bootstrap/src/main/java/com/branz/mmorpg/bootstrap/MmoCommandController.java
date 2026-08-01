@@ -377,6 +377,14 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                             + (status.spellCommitPending()
                                                                     ? "(COMMITTING)"
                                                                     : "")
+                                                            + " selected="
+                                                            + status.selectedSpell()
+                                                                    .map(DefinitionId::value)
+                                                                    .orElse("none")
+                                                            + " zones="
+                                                            + status.activeZones()
+                                                            + " imbue="
+                                                            + status.imbuementCharges()
                                                             + " | projectiles="
                                                             + status.activeProjectiles()
                                                             + " | ammo="

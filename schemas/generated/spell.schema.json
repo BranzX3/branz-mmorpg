@@ -188,6 +188,130 @@
         }
       }
     },
+    "direct" : {
+      "type" : "object",
+      "properties" : {
+        "range" : {
+          "type" : "number",
+          "description" : "Maximum direct-delivery target range.",
+          "x-unit" : "blocks",
+          "minimum" : 1.0E-6,
+          "maximum" : 32.0
+        },
+        "maximum_targets" : {
+          "type" : "integer",
+          "description" : "Maximum direct targets per commit.",
+          "x-unit" : "targets",
+          "minimum" : 1.0,
+          "maximum" : 1.0
+        }
+      }
+    },
+    "channel" : {
+      "type" : "object",
+      "properties" : {
+        "pulse_interval_ticks" : {
+          "type" : "integer",
+          "description" : "Channel interval between committed pulses.",
+          "x-unit" : "ticks",
+          "minimum" : 1.0,
+          "maximum" : 100.0
+        },
+        "maximum_pulses" : {
+          "type" : "integer",
+          "description" : "Maximum pulses before a channel ends.",
+          "x-unit" : "pulses",
+          "minimum" : 1.0,
+          "maximum" : 100.0
+        },
+        "mana_per_pulse" : {
+          "type" : "integer",
+          "description" : "Mana paid by each emitted channel pulse.",
+          "x-unit" : "mana",
+          "minimum" : 0.0
+        },
+        "range" : {
+          "type" : "number",
+          "description" : "Maximum server-owned channel target range.",
+          "x-unit" : "blocks",
+          "minimum" : 1.0E-6,
+          "maximum" : 32.0
+        },
+        "maximum_targets_per_pulse" : {
+          "type" : "integer",
+          "description" : "Maximum targets hit by one channel pulse.",
+          "x-unit" : "targets",
+          "minimum" : 1.0,
+          "maximum" : 1.0
+        }
+      }
+    },
+    "zone" : {
+      "type" : "object",
+      "properties" : {
+        "placement_range" : {
+          "type" : "number",
+          "description" : "Maximum crosshair placement range.",
+          "x-unit" : "blocks",
+          "minimum" : 1.0E-6,
+          "maximum" : 32.0
+        },
+        "radius" : {
+          "type" : "number",
+          "description" : "Zone target radius.",
+          "x-unit" : "blocks",
+          "minimum" : 1.0E-6,
+          "maximum" : 12.0
+        },
+        "duration_ticks" : {
+          "type" : "integer",
+          "description" : "Bounded committed zone lifetime.",
+          "x-unit" : "ticks",
+          "minimum" : 1.0,
+          "maximum" : 400.0
+        },
+        "pulse_interval_ticks" : {
+          "type" : "integer",
+          "description" : "Zone interval between target pulses.",
+          "x-unit" : "ticks",
+          "minimum" : 1.0,
+          "maximum" : 400.0
+        },
+        "maximum_targets_per_pulse" : {
+          "type" : "integer",
+          "description" : "Maximum zone targets per pulse.",
+          "x-unit" : "targets",
+          "minimum" : 1.0,
+          "maximum" : 16.0
+        }
+      }
+    },
+    "imbuement" : {
+      "type" : "object",
+      "properties" : {
+        "duration_ticks" : {
+          "type" : "integer",
+          "description" : "Encounter-scoped weapon Imbuement lifetime.",
+          "x-unit" : "ticks",
+          "minimum" : 1.0,
+          "maximum" : 1200.0
+        },
+        "maximum_charges" : {
+          "type" : "integer",
+          "description" : "Maximum physical hits empowered by the Imbuement.",
+          "x-unit" : "hits",
+          "minimum" : 1.0,
+          "maximum" : 32.0
+        },
+        "power_coefficient" : {
+          "type" : "number",
+          "description" : "Weapon-power coefficient for each empowered hit.",
+          "x-unit" : "coefficient",
+          "minimum" : 1.0E-6,
+          "maximum" : 2.0
+        }
+      }
+    },
     "output" : {
       "type" : "object",
       "properties" : {

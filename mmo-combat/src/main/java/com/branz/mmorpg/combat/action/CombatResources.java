@@ -147,6 +147,26 @@ public record CombatResources(
                         reservedMana));
     }
 
+    public Optional<CombatResources> spendMana(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("mana spend must not be negative");
+        }
+        if (amount > mana - reservedMana) {
+            return Optional.empty();
+        }
+        return Optional.of(
+                new CombatResources(
+                        maximumHealth,
+                        health,
+                        maximumStamina,
+                        stamina,
+                        maximumMana,
+                        mana - amount,
+                        reservedHealth,
+                        reservedStamina,
+                        reservedMana));
+    }
+
     Result<CombatResources, ActionTimelineErrorCode> reserve(MoveDefinition.ResourceCost cost) {
         if (stamina - reservedStamina < cost.stamina()) {
             return Result.failure(

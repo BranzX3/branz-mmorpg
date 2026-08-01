@@ -307,6 +307,28 @@ with an operator/test account:
 89. Enter `ENGAGED` or leave the configured spawn radius and attempt to open/commit build editing.
     Verify Chronicle reports that a Rest Context is required. Disconnect/reconnect and restart Paper
     after a valid build commit; the Technique, Form, attunement set and build version must return.
+90. At the Rest Context, attune Cinder Snap, Fire Lance, Scorching Ground, Flame Torrent and/or
+    Runic Ember Edge within the six-point capacity, then equip the Staff. Press F and verify only the
+    committed attuned spells cycle; `/mmo health` must show the exact selected stable ID.
+91. Select Cinder Snap and RMB while aiming at a training mob within six blocks. Verify eight mana
+    and one catalyst durability commit before one Direct Fire hit. Aim at empty space and verify a
+    visible MISS with no client-declared target.
+92. Select Scorching Ground and RMB. Move more than 0.2 blocks during its ten-tick windup and verify
+    cancellation refunds mana and does not create a zone. Cast while rooted and verify the zone
+    appears only after catalyst commit, pulses every 20 ticks for 120 ticks, targets at most six per
+    pulse and a fifth active zone is rejected.
+93. Select Flame Torrent and RMB. Verify ten initial mana commits, then two Form-scaled mana per
+    four-tick pulse, at most ten pulses and one crosshair target per pulse. RMB again to end early;
+    insufficient upkeep, hard CC, dodge, swap, teleport or death must end it without a leaked mana
+    reservation.
+94. Select Runic Ember Edge and RMB. Verify 14 mana and one catalyst durability commit before
+    `/mmo health` shows four Imbuement charges. LMB hits must consume exactly one charge per target
+    and add a separate Fire packet without multiplying physical damage. Swap, die, teleport, logout
+    or wait 240 ticks and verify the encounter-scoped coating clears.
+95. Complete one hostile encounter with each of Greatsword, Sword and Shield, Bow, Crossbow and
+    Staff, then reconnect and restart Paper. Verify exact equipment UUIDs, Quiver quantities and
+    selected category, Crossbow checkpoint, Staff catalyst durability and character build return;
+    transient projectiles, zones, channels and Runic coatings must not be reconstructed.
 
 The current training adapter intentionally cancels vanilla entity damage while a combat weapon is
 Ready or an MMO action is active. It emits the authored hitbox tick into the deterministic trace,
@@ -323,11 +345,12 @@ Prepared state is item-owned and selected with stationary sneak+scroll; Bow rele
 from only the selected stored category before projectile creation. Crossbow reload binds one selected
 stored Bolt at `BOLT_PLACED`, persists `LOADED` on the item UUID and clears it before projectile
 creation. Staff casting reserves mana before release, commits one item-owned catalyst durability
-through PostgreSQL before Fire Lance creation and uses the same authoritative projectile/HP/posture
-engines with a separate arcane damage channel. Technique, Form and Magic Attunement selections are
+through PostgreSQL before any Direct, Projectile, Zone, Beam or Imbuement effect and uses the same
+authoritative HP/posture engines with a separate arcane damage channel. F cycles committed attuned
+Staff spells; Runic coatings and live spell effects remain encounter-scoped. Technique, Form and
+Magic Attunement selections are
 character-owned versioned state edited only from a Rest Context; learned-content gating belongs to
-Milestone 6. The rest of the Ember art, Runic Imbuement, encounter recovery and lot merging remain
-later slices. Greatsword
+Milestone 6. Encounter recovery and lot merging remain later slices. Greatsword
 and Sword & Shield use the same move/damage authority, while one shared item loadout policy validates
 their empty-off-hand or Shield requirement before Scene commit and combat readiness.
 

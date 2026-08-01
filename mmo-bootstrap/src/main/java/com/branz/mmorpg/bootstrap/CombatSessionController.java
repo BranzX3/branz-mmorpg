@@ -122,6 +122,7 @@ import com.branz.mmorpg.items.definition.WeaponLoadoutErrorCode;
 import com.branz.mmorpg.items.definition.WeaponLoadoutPolicy;
 import com.branz.mmorpg.items.definition.WeaponLoadoutResolution;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
+import com.branz.mmorpg.magic.cast.ChannelPulseResolution;
 import com.branz.mmorpg.magic.cast.SpellCastEngine;
 import com.branz.mmorpg.magic.cast.SpellCastErrorCode;
 import com.branz.mmorpg.magic.cast.SpellCastPhase;
@@ -133,11 +134,18 @@ import com.branz.mmorpg.magic.definition.ArcaneSchool;
 import com.branz.mmorpg.magic.definition.SpellDefinition;
 import com.branz.mmorpg.magic.definition.SpellDeliveryType;
 import com.branz.mmorpg.magic.definition.SpellEngine;
+import com.branz.mmorpg.magic.effect.ImbuementHitResolution;
+import com.branz.mmorpg.magic.effect.RunicImbuementEngine;
+import com.branz.mmorpg.magic.effect.RunicImbuementRuntime;
+import com.branz.mmorpg.magic.effect.ZoneEngine;
+import com.branz.mmorpg.magic.effect.ZoneRuntime;
+import com.branz.mmorpg.magic.effect.ZoneTickResolution;
 import com.branz.mmorpg.progression.build.BuildEngine;
 import com.branz.mmorpg.progression.build.BuildErrorCode;
 import com.branz.mmorpg.progression.build.BuildResolution;
 import com.branz.mmorpg.progression.build.MovesetBranch;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -171,6 +179,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -200,6 +209,21 @@ final class CombatSessionController implements Listener {
     private static final DefinitionId TRAINING_STAFF_ITEM =
             DefinitionId.of("weapon.training_staff");
     private static final DefinitionId EMBER_FIRE_LANCE = DefinitionId.of("spell.ember.fire_lance");
+    private static final DefinitionId EMBER_CINDER_SNAP =
+            DefinitionId.of("spell.ember.cinder_snap");
+    private static final DefinitionId EMBER_SCORCHING_GROUND =
+            DefinitionId.of("spell.ember.scorching_ground");
+    private static final DefinitionId EMBER_FLAME_TORRENT =
+            DefinitionId.of("spell.ember.flame_torrent");
+    private static final DefinitionId RUNIC_EMBER_EDGE = DefinitionId.of("spell.runic.ember_edge");
+    private static final List<DefinitionId> TRAINING_STAFF_SPELL_ORDER =
+            List.of(
+                    EMBER_CINDER_SNAP,
+                    EMBER_FIRE_LANCE,
+                    EMBER_SCORCHING_GROUND,
+                    EMBER_FLAME_TORRENT,
+                    RUNIC_EMBER_EDGE);
+    private static final int MAXIMUM_ACTIVE_ZONES_PER_CASTER = 4;
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
@@ -215,6 +239,7 @@ final class CombatSessionController implements Listener {
     private final MoveDefinition trainingCrossbowMove;
     private final MoveDefinition trainingStaffMove;
     private final SpellDefinition emberFireLance;
+    private final Map<DefinitionId, SpellDefinition> trainingStaffSpells;
     private final CatalystProfile trainingStaffCatalyst;
     private final int trainingStaffMaximumDurability;
     private final DefinitionId trainingBowAmmo;
@@ -230,6 +255,8 @@ final class CombatSessionController implements Listener {
     private final BowDrawEngine bowDraws;
     private final CrossbowEngine crossbows;
     private final SpellCastEngine spellCasts = new SpellCastEngine();
+    private final ZoneEngine zones = new ZoneEngine();
+    private final RunicImbuementEngine imbuements = new RunicImbuementEngine();
     private final ArcaneDamageResolver arcaneDamage = new ArcaneDamageResolver();
     private final int maximumActiveProjectilesPerCaster;
     private final WeaponTransitionMachine weapons;
@@ -261,6 +288,7 @@ final class CombatSessionController implements Listener {
     private final Map<UUID, CombatHealthRuntime> trainingTargetHealth = new HashMap<>();
     private final Map<UUID, PostureRuntime> trainingTargetPosture = new HashMap<>();
     private final Map<UUID, LiveProjectile> activeProjectiles = new HashMap<>();
+    private final Map<UUID, LiveSpellZone> activeZones = new HashMap<>();
     private final Map<UUID, java.util.Set<UUID>> debugViewers = new HashMap<>();
     private int tickTaskId = -1;
 
@@ -466,6 +494,21 @@ final class CombatSessionController implements Listener {
             throw new IllegalArgumentException(
                     "Ember Fire Lance requires a compatible Staff projectile catalyst");
         }
+        LinkedHashMap<DefinitionId, SpellDefinition> staffSpells = new LinkedHashMap<>();
+        for (DefinitionId spellId : TRAINING_STAFF_SPELL_ORDER) {
+            SpellDefinition spell =
+                    spells.find(spellId)
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalArgumentException(
+                                                    "active content is missing " + spellId));
+            if (!trainingStaffCatalyst.tags().containsAll(spell.requirements().catalystTags())) {
+                throw new IllegalArgumentException(
+                        spellId + " requires an incompatible Staff catalyst");
+            }
+            staffSpells.put(spellId, spell);
+        }
+        trainingStaffSpells = Map.copyOf(staffSpells);
         if (maximumActiveProjectilesPerCaster < 1 || maximumActiveProjectilesPerCaster > 128) {
             throw new IllegalArgumentException(
                     "maximumActiveProjectilesPerCaster must be between 1 and 128");
@@ -546,6 +589,7 @@ final class CombatSessionController implements Listener {
         }
         sessions.clear();
         activeProjectiles.clear();
+        activeZones.clear();
         trainingTargetHealth.clear();
         trainingTargetPosture.clear();
         debugViewers.clear();
@@ -599,6 +643,9 @@ final class CombatSessionController implements Listener {
                         session.pendingCrossbowCommit != null,
                         Optional.ofNullable(session.spellCast).map(SpellCastRuntime::phase),
                         session.pendingSpellCommit != null,
+                        Optional.ofNullable(session.selectedSpell),
+                        activeZonesFor(player.getUniqueId()),
+                        session.imbuement == null ? 0 : session.imbuement.remainingCharges(),
                         activeProjectilesFor(player.getUniqueId()),
                         session.pendingBowLaunch != null,
                         selectedAmmo,
@@ -715,6 +762,7 @@ final class CombatSessionController implements Listener {
         cancelBow(session, "WEAPON_SWAP");
         cancelCrossbow(session, "WEAPON_SWAP");
         cancelSpell(session, "WEAPON_SWAP");
+        session.imbuement = null;
         releaseGuard(session);
         session.input.clearBuffer(InputBufferClearReason.WEAPON_SWAP);
         select(session, selectedSlot(event.getPlayer(), event.getNewSlot()));
@@ -1018,6 +1066,45 @@ final class CombatSessionController implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
+    public void onStaffSpellCycle(PlayerSwapHandItemsEvent event) {
+        Player player = event.getPlayer();
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session == null
+                || !characters.ready(player)
+                || !equippedWeaponFamily(player).orElse("").equals("STAFF")) {
+            return;
+        }
+        event.setCancelled(true);
+        if (session.spellCast != null || session.pendingSpellCommit != null) {
+            player.sendActionBar(Component.text("SPELL SELECTION LOCKED", NamedTextColor.RED));
+            return;
+        }
+        List<SpellDefinition> available = attunedStaffSpells(player);
+        if (available.isEmpty()) {
+            session.selectedSpell = null;
+            player.sendActionBar(
+                    Component.text("ATTUNE A STAFF SPELL AT REST", NamedTextColor.RED));
+            return;
+        }
+        int current =
+                session.selectedSpell == null
+                        ? -1
+                        : java.util.stream.IntStream.range(0, available.size())
+                                .filter(
+                                        index ->
+                                                available
+                                                        .get(index)
+                                                        .id()
+                                                        .equals(session.selectedSpell))
+                                .findFirst()
+                                .orElse(-1);
+        SpellDefinition selected = available.get((current + 1) % available.size());
+        session.selectedSpell = selected.id();
+        session.lastResolution = "SELECTED " + spellLabel(selected);
+        player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.LIGHT_PURPLE));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onSneak(PlayerToggleSneakEvent event) {
         LiveSession session = sessions.get(event.getPlayer().getUniqueId());
         if (session == null || !characters.ready(event.getPlayer())) {
@@ -1118,6 +1205,8 @@ final class CombatSessionController implements Listener {
         cancelCrossbow(session, "DEATH");
         cancelSpell(session, "DEATH");
         removeOwnerProjectiles(player.getUniqueId());
+        removeOwnerSpellEffects(player.getUniqueId());
+        session.imbuement = null;
         session.input.clearBuffer(InputBufferClearReason.DEATH);
         releaseGuard(session);
         session.dodge = null;
@@ -1169,6 +1258,7 @@ final class CombatSessionController implements Listener {
         UUID playerId = event.getPlayer().getUniqueId();
         sessions.remove(playerId);
         removeOwnerProjectiles(playerId);
+        removeOwnerSpellEffects(playerId);
         debugViewers.remove(playerId);
         debugViewers.values().forEach(viewers -> viewers.remove(playerId));
         debugViewers.entrySet().removeIf(entry -> entry.getValue().isEmpty());
@@ -1190,6 +1280,8 @@ final class CombatSessionController implements Listener {
         cancelCrossbow(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         cancelSpell(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         removeOwnerProjectiles(event.getPlayer().getUniqueId());
+        removeOwnerSpellEffects(event.getPlayer().getUniqueId());
+        session.imbuement = null;
         session.input.clearBuffer(InputBufferClearReason.WORLD_CHANGE);
         releaseGuard(session);
         session.dodge = null;
@@ -1207,6 +1299,7 @@ final class CombatSessionController implements Listener {
     private void tickAll() {
         tickTrainingPosture();
         tickProjectiles();
+        tickSpellZones();
         for (Map.Entry<UUID, LiveSession> entry : sessions.entrySet()) {
             Player player = plugin.getServer().getPlayer(entry.getKey());
             if (player == null || !player.isOnline()) {
@@ -1234,6 +1327,10 @@ final class CombatSessionController implements Listener {
             tickBow(player, session);
             tickCrossbow(player, session);
             tickSpell(player, session);
+            if (session.imbuement != null
+                    && !session.imbuement.activeAt(plugin.getServer().getCurrentTick())) {
+                session.imbuement = null;
+            }
             tickDodge(player, session);
             refreshGuardEngine(player, session, plugin.getServer().getCurrentTick());
             session.guard =
@@ -1423,17 +1520,41 @@ final class CombatSessionController implements Listener {
                                             ? java.util.Set.of(ConditionalAdvantage.POSTURE_BREAK)
                                             : java.util.Set.of(),
                                     activeMove.profiles().pveMultiplier()));
+            double resolvedDamage = breakdown.finalDamage();
+            int resolvedPosture = activeMove.outputs().posture();
+            if (session.imbuement != null) {
+                RunicImbuementRuntime imbued = session.imbuement;
+                ImbuementHitResolution consumed = imbuements.consume(imbued, currentTick);
+                session.imbuement = consumed.remainingRuntime().orElse(null);
+                if (consumed.applied()) {
+                    SpellDefinition rune = imbued.spell();
+                    ArcaneDamageBreakdown bonus =
+                            arcaneDamage.resolve(
+                                    new ArcaneDamageRequest(
+                                            rune.output().arcaneSchool(),
+                                            meleePower(activeMove.family()),
+                                            rune.imbuement().orElseThrow().powerCoefficient(),
+                                            0,
+                                            postureBroken
+                                                    ? java.util.Set.of(
+                                                            ConditionalAdvantage.POSTURE_BREAK)
+                                                    : java.util.Set.of(),
+                                            rune.profiles().pveMultiplier()));
+                    resolvedDamage += bonus.finalDamage();
+                    resolvedPosture += rune.output().posture();
+                }
+            }
             CombatHealthRuntime targetHealth =
                     trainingTargetHealth.computeIfAbsent(
                             target.entityId(),
                             ignored ->
                                     CombatHealthRuntime.full(enemyHealth.profile(), currentTick));
             CombatHealthResolution healthResolution =
-                    enemyHealth.damage(targetHealth, currentTick, breakdown.finalDamage());
+                    enemyHealth.damage(targetHealth, currentTick, resolvedDamage);
             trainingTargetHealth.put(target.entityId(), healthResolution.runtime());
             totalDamage += healthResolution.appliedAmount();
             PostureResolution postureResolution =
-                    postures.damage(posture, currentTick, activeMove.outputs().posture());
+                    postures.damage(posture, currentTick, resolvedPosture);
             trainingTargetPosture.put(target.entityId(), postureResolution.runtime());
             if (postureResolution.justBroke()) {
                 postureBreaks++;
@@ -2952,7 +3073,17 @@ final class CombatSessionController implements Listener {
     private static SpellDefinition spellWithBuildCosts(
             SpellDefinition spell, BuildResolution build) {
         int manaCost = build.scaleManaCost(spell.manaCost());
-        if (manaCost == spell.manaCost()) {
+        Optional<SpellDefinition.Channel> channel =
+                spell.channel()
+                        .map(
+                                value ->
+                                        new SpellDefinition.Channel(
+                                                value.pulseIntervalTicks(),
+                                                value.maximumPulses(),
+                                                build.scaleManaCost(value.manaPerPulse()),
+                                                value.range(),
+                                                value.maximumTargetsPerPulse()));
+        if (manaCost == spell.manaCost() && channel.equals(spell.channel())) {
             return spell;
         }
         return new SpellDefinition(
@@ -2966,6 +3097,10 @@ final class CombatSessionController implements Listener {
                 spell.phases(),
                 spell.interruption(),
                 spell.projectile(),
+                spell.direct(),
+                channel,
+                spell.zone(),
+                spell.imbuement(),
                 spell.output(),
                 spell.presentationArchetype(),
                 spell.profiles());
@@ -3007,6 +3142,20 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    private void removeOwnerSpellEffects(UUID ownerId) {
+        activeZones.values().removeIf(zone -> zone.ownerId().equals(ownerId));
+    }
+
+    private record LiveSpellZone(
+            UUID ownerId, UUID worldId, CombatVector origin, ZoneRuntime runtime) {
+        private LiveSpellZone {
+            Objects.requireNonNull(ownerId, "ownerId");
+            Objects.requireNonNull(worldId, "worldId");
+            Objects.requireNonNull(origin, "origin");
+            Objects.requireNonNull(runtime, "runtime");
+        }
+    }
+
     private void handleStaffUse(Player player, LiveSession session) {
         long tick = plugin.getServer().getCurrentTick();
         if (session.pendingSpellCommit != null) {
@@ -3015,6 +3164,14 @@ final class CombatSessionController implements Listener {
         }
         if (session.spellCast == null) {
             startStaffCast(player, session, tick);
+            return;
+        }
+        if (session.spellCast.phase() == SpellCastPhase.CHANNELING) {
+            session.spellCast = spellCasts.stopChannel(session.spellCast, tick);
+            session.resources = session.spellCast.resources();
+            session.action = ActionState.RECOVERY;
+            session.lastResolution = spellLabel(session.spellCast.spell()) + " CHANNEL ENDED";
+            player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GOLD));
             return;
         }
         beginStaffSpellCommit(player, session, tick);
@@ -3049,10 +3206,10 @@ final class CombatSessionController implements Listener {
             return;
         }
         LoadedCharacterSession character = characters.active(player).orElse(null);
-        if (character == null
-                || !character.snapshot().build().attunedEffects().contains(EMBER_FIRE_LANCE)) {
+        SpellDefinition selected = selectedStaffSpell(player, session).orElse(null);
+        if (character == null || selected == null) {
             player.sendActionBar(
-                    Component.text("ATTUNE EMBER FIRE LANCE AT REST", NamedTextColor.RED));
+                    Component.text("ATTUNE A STAFF SPELL AT REST", NamedTextColor.RED));
             return;
         }
         BuildResolution build = buildResolution(player, "STAFF").orElse(null);
@@ -3060,7 +3217,7 @@ final class CombatSessionController implements Listener {
             player.sendActionBar(Component.text("BUILD NOT READY", NamedTextColor.RED));
             return;
         }
-        SpellDefinition activeSpell = spellWithBuildCosts(emberFireLance, build);
+        SpellDefinition activeSpell = spellWithBuildCosts(selected, build);
         Result<SpellCastRuntime, SpellCastErrorCode> started =
                 spellCasts.start(
                         activeSpell,
@@ -3076,28 +3233,78 @@ final class CombatSessionController implements Listener {
             return;
         }
         session.spellCast = success.value();
+        session.spellOrigin =
+                new CombatVector(
+                        player.getLocation().getX(),
+                        player.getLocation().getY(),
+                        player.getLocation().getZ());
         session.resources = session.spellCast.resources();
-        session.action = ActionState.WINDUP;
-        session.lastResolution = "FIRE LANCE WINDUP mana-reserved=" + activeSpell.manaCost();
+        session.action =
+                session.spellCast.phase() == SpellCastPhase.READY
+                        ? ActionState.ACTIVE
+                        : ActionState.WINDUP;
+        session.lastResolution =
+                spellLabel(activeSpell)
+                        + " "
+                        + session.spellCast.phase()
+                        + " mana-reserved="
+                        + activeSpell.manaCost();
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GOLD));
+        if (session.spellCast.phase() == SpellCastPhase.READY) {
+            beginStaffSpellCommit(player, session, tick);
+        }
     }
 
     private void tickSpell(Player player, LiveSession session) {
         if (session.spellCast == null || session.pendingSpellCommit != null) {
             return;
         }
+        if (session.spellCast.spell().interruption().movement() && session.spellOrigin != null) {
+            Location current = player.getLocation();
+            CombatVector delta =
+                    new CombatVector(current.getX(), current.getY(), current.getZ())
+                            .subtract(session.spellOrigin);
+            if (delta.length() > 0.2) {
+                cancelSpell(session, "MOVEMENT");
+                player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+                return;
+            }
+        }
         long tick = plugin.getServer().getCurrentTick();
         SpellCastPhase prior = session.spellCast.phase();
         session.spellCast = spellCasts.advance(session.spellCast, tick);
         session.resources = session.spellCast.resources();
+        SpellDefinition spell = session.spellCast.spell();
+        if (session.spellCast.phase() == SpellCastPhase.READY) {
+            beginStaffSpellCommit(player, session, tick);
+            return;
+        }
         if (session.spellCast.phase() == SpellCastPhase.CHARGING) {
             session.action = ActionState.CHANNELING;
             if (prior != SpellCastPhase.CHARGING) {
-                session.lastResolution = "FIRE LANCE CHARGING";
+                session.lastResolution = spellLabel(spell) + " CHARGING";
                 player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GOLD));
             }
             if (spellCasts.maximumChargeReached(session.spellCast, tick)) {
                 beginStaffSpellCommit(player, session, tick);
+            }
+            return;
+        }
+        if (session.spellCast.phase() == SpellCastPhase.CHANNELING) {
+            session.action = ActionState.CHANNELING;
+            ChannelPulseResolution pulse = spellCasts.pulse(session.spellCast, tick);
+            session.spellCast = pulse.runtime();
+            session.resources = session.spellCast.resources();
+            if (pulse.pulseEmitted()) {
+                applyChannelPulse(player, session, spell);
+                session.lastManaCommitTick = tick;
+            }
+            if (pulse.endedForInsufficientMana()) {
+                session.lastResolution = spellLabel(spell) + " ENDED: NO MANA";
+                player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
+            }
+            if (session.spellCast.phase() == SpellCastPhase.RECOVERY) {
+                session.action = ActionState.RECOVERY;
             }
             return;
         }
@@ -3106,19 +3313,29 @@ final class CombatSessionController implements Listener {
         } else if (session.spellCast.phase() == SpellCastPhase.COMPLETE) {
             session.resources = session.spellCast.resources();
             session.spellCast = null;
+            session.spellOrigin = null;
             session.action = ActionState.IDLE;
         }
     }
 
     private void beginStaffSpellCommit(Player player, LiveSession session, long tick) {
         if (session.spellCast == null || !spellCasts.canRelease(session.spellCast, tick)) {
-            player.sendActionBar(Component.text("FIRE LANCE NOT READY", NamedTextColor.RED));
+            player.sendActionBar(Component.text("SPELL NOT READY", NamedTextColor.RED));
             return;
         }
-        if (activeProjectilesFor(player.getUniqueId()) >= maximumActiveProjectilesPerCaster) {
+        SpellDefinition spell = session.spellCast.spell();
+        if (spell.deliveryType() == SpellDeliveryType.PROJECTILE
+                && activeProjectilesFor(player.getUniqueId())
+                        >= maximumActiveProjectilesPerCaster) {
             player.sendActionBar(
                     Component.text(
                             "Projectile limit reached for this caster.", NamedTextColor.RED));
+            return;
+        }
+        if (spell.deliveryType() == SpellDeliveryType.ZONE
+                && activeZonesFor(player.getUniqueId()) >= MAXIMUM_ACTIVE_ZONES_PER_CASTER) {
+            player.sendActionBar(
+                    Component.text("Zone limit reached for this caster.", NamedTextColor.RED));
             return;
         }
         ItemId catalystItemId = characters.equippedMainHandItemId(player).orElse(null);
@@ -3126,14 +3343,14 @@ final class CombatSessionController implements Listener {
             cancelSpell(session, "CATALYST_MISSING");
             return;
         }
-        UUID projectileId = UUID.randomUUID();
+        UUID effectId = UUID.randomUUID();
         PendingSpellCommit pending =
                 new PendingSpellCommit(
-                        projectileId, catalystItemId, pendingSpellLaunch(player, projectileId));
+                        effectId, catalystItemId, pendingSpellLaunch(player, effectId));
         session.pendingSpellCommit = pending;
         session.spellCommitInterrupted = false;
         session.action = ActionState.ACTIVE;
-        session.lastResolution = "FIRE LANCE COMMITTING";
+        session.lastResolution = spellLabel(spell) + " COMMITTING";
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
         characters.commitCatalystUse(
                 player,
@@ -3141,8 +3358,8 @@ final class CombatSessionController implements Listener {
                 TRAINING_STAFF_ITEM,
                 trainingStaffMaximumDurability,
                 trainingStaffCatalyst.durabilityCostPerCommit(),
-                emberFireLance.id(),
-                projectileId,
+                spell.id(),
+                effectId,
                 contentVersion,
                 result -> completeStaffSpellCommit(player.getUniqueId(), session, pending, result));
     }
@@ -3172,8 +3389,9 @@ final class CombatSessionController implements Listener {
                 spellCasts.release(session.spellCast, tick);
         if (!(released instanceof Result.Success<SpellCastRuntime, SpellCastErrorCode> success)) {
             session.spellCast = null;
+            session.spellOrigin = null;
             session.action = ActionState.IDLE;
-            session.lastResolution = "FIRE LANCE RELEASE FAILED AFTER COMMIT";
+            session.lastResolution = "SPELL RELEASE FAILED AFTER COMMIT";
             return;
         }
         session.spellCast = success.value();
@@ -3186,29 +3404,34 @@ final class CombatSessionController implements Listener {
                 || player.isDead()
                 || !player.getWorld().getUID().equals(pending.launch().worldId())) {
             session.spellCast = null;
+            session.spellOrigin = null;
             if (!session.action.hardControl()) {
                 session.action = ActionState.IDLE;
             }
-            session.lastResolution = "FIRE LANCE COMMITTED WITHOUT LIVE PROJECTILE";
+            session.lastResolution = "SPELL COMMITTED WITHOUT LIVE EFFECT";
             return;
         }
-        launchStaffSpellProjectile(player, session, pending.launch());
-        session.action = ActionState.RECOVERY;
+        commitStaffSpellEffect(player, session, pending.launch());
+        session.action =
+                session.spellCast.phase() == SpellCastPhase.CHANNELING
+                        ? ActionState.CHANNELING
+                        : ActionState.RECOVERY;
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GOLD));
     }
 
-    private PendingSpellLaunch pendingSpellLaunch(Player player, UUID projectileId) {
+    private PendingSpellLaunch pendingSpellLaunch(Player player, UUID effectId) {
         Location eye = player.getEyeLocation();
         org.bukkit.util.Vector look = eye.getDirection().normalize();
         CombatVector direction = new CombatVector(look.getX(), look.getY(), look.getZ());
         CombatVector origin =
                 new CombatVector(eye.getX(), eye.getY(), eye.getZ()).add(direction.multiply(0.35));
-        return new PendingSpellLaunch(projectileId, player.getWorld().getUID(), origin, direction);
+        return new PendingSpellLaunch(effectId, player.getWorld().getUID(), origin, direction);
     }
 
     private void launchStaffSpellProjectile(
             Player player, LiveSession session, PendingSpellLaunch pending) {
-        SpellDefinition.Projectile authored = emberFireLance.projectile().orElseThrow();
+        SpellDefinition spell = session.spellCast.spell();
+        SpellDefinition.Projectile authored = spell.projectile().orElseThrow();
         ProjectileProfile profile =
                 new ProjectileProfile(
                         authored.speed(),
@@ -3219,9 +3442,9 @@ final class CombatSessionController implements Listener {
                         authored.pierceCount());
         ProjectileIdentity identity =
                 new ProjectileIdentity(
-                        pending.projectileId(),
+                        pending.effectId(),
                         player.getUniqueId(),
-                        emberFireLance.id(),
+                        spell.id(),
                         contentVersion,
                         Optional.empty(),
                         authored.hitGroup());
@@ -3229,23 +3452,285 @@ final class CombatSessionController implements Listener {
                 ProjectileRuntime.launch(
                         identity, profile, pending.origin(), pending.direction(), 1.0);
         activeProjectiles.put(
-                pending.projectileId(),
+                pending.effectId(),
                 new LiveProjectile(
                         pending.worldId(),
                         runtime,
-                        ProjectileCombatContext.arcane(trainingStaffPower, emberFireLance)));
+                        ProjectileCombatContext.arcane(trainingStaffPower, spell)));
         markHostile(player, session);
         CatalystDurability durability =
                 characters
                         .equippedCatalystDurability(player, trainingStaffMaximumDurability)
                         .orElseThrow();
         session.lastResolution =
-                "FIRE LANCE RELEASED mana="
+                spellLabel(spell)
+                        + " RELEASED mana="
                         + session.resources.mana()
                         + " catalyst="
                         + durability.current()
                         + "/"
                         + durability.maximum();
+    }
+
+    private void commitStaffSpellEffect(
+            Player player, LiveSession session, PendingSpellLaunch pending) {
+        SpellDefinition spell = session.spellCast.spell();
+        switch (spell.deliveryType()) {
+            case PROJECTILE -> launchStaffSpellProjectile(player, session, pending);
+            case DIRECT -> applyDirectSpell(player, session, spell);
+            case ZONE -> launchSpellZone(player, session, pending, spell);
+            case BEAM -> {
+                session.lastResolution =
+                        spellLabel(spell) + " CHANNEL STARTED mana=" + session.resources.mana();
+                markHostile(player, session);
+            }
+            case IMBUE -> {
+                session.imbuement = imbuements.start(spell, plugin.getServer().getCurrentTick());
+                session.lastResolution =
+                        spellLabel(spell)
+                                + " APPLIED charges="
+                                + session.imbuement.remainingCharges();
+            }
+            case SUMMON -> throw new IllegalStateException("Training Staff has no SUMMON spell");
+            default ->
+                    throw new IllegalStateException(
+                            "Training Staff has unsupported delivery " + spell.deliveryType());
+        }
+    }
+
+    private void applyDirectSpell(Player player, LiveSession session, SpellDefinition spell) {
+        SpellDefinition.Direct direct = spell.direct().orElseThrow();
+        Location eye = player.getEyeLocation();
+        RayTraceResult trace =
+                player.getWorld()
+                        .rayTraceEntities(
+                                eye,
+                                eye.getDirection(),
+                                direct.range(),
+                                0.35,
+                                entity ->
+                                        entity instanceof LivingEntity
+                                                && entity != player
+                                                && !(entity instanceof ArmorStand)
+                                                && !entity.isDead());
+        if (trace == null || !(trace.getHitEntity() instanceof LivingEntity target)) {
+            session.lastResolution = spellLabel(spell) + " MISS";
+            return;
+        }
+        applyArcaneSpellHit(player, target, spell, spell.output().powerCoefficient());
+        markHostile(player, session);
+    }
+
+    private void launchSpellZone(
+            Player player, LiveSession session, PendingSpellLaunch pending, SpellDefinition spell) {
+        SpellDefinition.Zone profile = spell.zone().orElseThrow();
+        Location eye = player.getEyeLocation();
+        RayTraceResult trace =
+                player.getWorld()
+                        .rayTraceBlocks(
+                                eye,
+                                eye.getDirection(),
+                                profile.placementRange(),
+                                FluidCollisionMode.NEVER,
+                                true);
+        org.bukkit.util.Vector position =
+                trace == null
+                        ? eye.toVector()
+                                .add(
+                                        eye.getDirection()
+                                                .normalize()
+                                                .multiply(profile.placementRange()))
+                        : trace.getHitPosition();
+        CombatVector origin = new CombatVector(position.getX(), position.getY(), position.getZ());
+        ZoneRuntime runtime = zones.start(spell, plugin.getServer().getCurrentTick());
+        activeZones.put(
+                pending.effectId(),
+                new LiveSpellZone(player.getUniqueId(), pending.worldId(), origin, runtime));
+        session.lastResolution =
+                spellLabel(spell) + " ZONE ACTIVE duration=" + profile.durationTicks() + "t";
+        markHostile(player, session);
+    }
+
+    private void applyChannelPulse(Player player, LiveSession session, SpellDefinition spell) {
+        SpellDefinition.Channel channel = spell.channel().orElseThrow();
+        Location eye = player.getEyeLocation();
+        org.bukkit.util.Vector direction = eye.getDirection().normalize();
+        player.getWorld()
+                .spawnParticle(
+                        Particle.FLAME,
+                        eye.clone().add(direction.clone().multiply(channel.range() / 2)),
+                        10,
+                        0.25,
+                        0.25,
+                        0.25,
+                        0.02);
+        RayTraceResult trace =
+                player.getWorld()
+                        .rayTraceEntities(
+                                eye,
+                                direction,
+                                channel.range(),
+                                0.4,
+                                entity ->
+                                        entity instanceof LivingEntity
+                                                && entity != player
+                                                && !(entity instanceof ArmorStand)
+                                                && !entity.isDead());
+        if (trace != null && trace.getHitEntity() instanceof LivingEntity target) {
+            applyArcaneSpellHit(player, target, spell, spell.output().powerCoefficient());
+            markHostile(player, session);
+        } else {
+            session.lastResolution =
+                    spellLabel(spell) + " PULSE " + session.spellCast.pulsesCompleted() + " MISS";
+        }
+    }
+
+    private void tickSpellZones() {
+        long tick = plugin.getServer().getCurrentTick();
+        java.util.Iterator<Map.Entry<UUID, LiveSpellZone>> iterator =
+                activeZones.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, LiveSpellZone> entry = iterator.next();
+            LiveSpellZone live = entry.getValue();
+            Player owner = plugin.getServer().getPlayer(live.ownerId());
+            org.bukkit.World world = plugin.getServer().getWorld(live.worldId());
+            if (owner == null || !owner.isOnline() || world == null) {
+                iterator.remove();
+                continue;
+            }
+            ZoneTickResolution advanced = zones.advance(live.runtime(), tick);
+            if (advanced.runtime().expired()) {
+                iterator.remove();
+                continue;
+            }
+            entry.setValue(
+                    new LiveSpellZone(
+                            live.ownerId(), live.worldId(), live.origin(), advanced.runtime()));
+            if (!advanced.pulseEmitted()) {
+                continue;
+            }
+            SpellDefinition spell = advanced.runtime().spell();
+            SpellDefinition.Zone profile = spell.zone().orElseThrow();
+            Location center =
+                    new Location(world, live.origin().x(), live.origin().y(), live.origin().z());
+            world.spawnParticle(
+                    Particle.FLAME,
+                    center,
+                    18,
+                    profile.radius() / 2,
+                    0.2,
+                    profile.radius() / 2,
+                    0.02);
+            world.getNearbyEntities(center, profile.radius(), 2.5, profile.radius()).stream()
+                    .filter(LivingEntity.class::isInstance)
+                    .map(LivingEntity.class::cast)
+                    .filter(
+                            target ->
+                                    target != owner
+                                            && !(target instanceof ArmorStand)
+                                            && !target.isDead())
+                    .sorted(
+                            java.util.Comparator.<LivingEntity>comparingDouble(
+                                            target -> target.getLocation().distanceSquared(center))
+                                    .thenComparing(target -> target.getUniqueId().toString()))
+                    .limit(profile.maximumTargetsPerPulse())
+                    .forEach(
+                            target ->
+                                    applyArcaneSpellHit(
+                                            owner,
+                                            target,
+                                            spell,
+                                            spell.output().powerCoefficient()));
+        }
+    }
+
+    private double applyArcaneSpellHit(
+            Player owner, LivingEntity target, SpellDefinition spell, double powerCoefficient) {
+        long tick = plugin.getServer().getCurrentTick();
+        PostureRuntime posture = postureAt(target.getUniqueId(), tick);
+        java.util.EnumSet<ConditionalAdvantage> advantages =
+                java.util.EnumSet.noneOf(ConditionalAdvantage.class);
+        if (postures.phaseAt(posture, tick) == PosturePhase.BROKEN) {
+            advantages.add(ConditionalAdvantage.POSTURE_BREAK);
+        }
+        ArcaneDamageBreakdown breakdown =
+                arcaneDamage.resolve(
+                        new ArcaneDamageRequest(
+                                spell.output().arcaneSchool(),
+                                trainingStaffPower,
+                                powerCoefficient,
+                                0,
+                                advantages,
+                                spell.profiles().pveMultiplier()));
+        CombatHealthRuntime current =
+                trainingTargetHealth.computeIfAbsent(
+                        target.getUniqueId(),
+                        ignored -> CombatHealthRuntime.full(enemyHealth.profile(), tick));
+        CombatHealthResolution health = enemyHealth.damage(current, tick, breakdown.finalDamage());
+        trainingTargetHealth.put(target.getUniqueId(), health.runtime());
+        PostureResolution postureResolution =
+                postures.damage(posture, tick, spell.output().posture());
+        trainingTargetPosture.put(target.getUniqueId(), postureResolution.runtime());
+        LiveSession session = sessions.get(owner.getUniqueId());
+        if (session != null) {
+            session.lastResolution =
+                    spellLabel(spell)
+                            + " HIT damage="
+                            + roundOne(health.appliedAmount())
+                            + " health="
+                            + roundOne(health.runtime().current())
+                            + " posture="
+                            + postureLabel(postureResolution.runtime(), tick);
+            owner.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
+        }
+        if (health.lethalNow()) {
+            target.setHealth(0);
+        }
+        return health.appliedAmount();
+    }
+
+    private List<SpellDefinition> attunedStaffSpells(Player player) {
+        return characters
+                .active(player)
+                .map(
+                        character ->
+                                TRAINING_STAFF_SPELL_ORDER.stream()
+                                        .filter(
+                                                character.snapshot().build().attunedEffects()
+                                                        ::contains)
+                                        .map(trainingStaffSpells::get)
+                                        .filter(Objects::nonNull)
+                                        .toList())
+                .orElseGet(List::of);
+    }
+
+    private Optional<SpellDefinition> selectedStaffSpell(Player player, LiveSession session) {
+        List<SpellDefinition> available = attunedStaffSpells(player);
+        if (available.isEmpty()) {
+            session.selectedSpell = null;
+            return Optional.empty();
+        }
+        SpellDefinition selected =
+                available.stream()
+                        .filter(spell -> spell.id().equals(session.selectedSpell))
+                        .findFirst()
+                        .orElse(available.getFirst());
+        session.selectedSpell = selected.id();
+        return Optional.of(selected);
+    }
+
+    private int activeZonesFor(UUID ownerId) {
+        return (int)
+                activeZones.values().stream()
+                        .filter(zone -> zone.ownerId().equals(ownerId))
+                        .count();
+    }
+
+    private static String spellLabel(SpellDefinition spell) {
+        String id = spell.id().value();
+        return id.substring(id.lastIndexOf('.') + 1)
+                .replace('_', ' ')
+                .toUpperCase(java.util.Locale.ROOT);
     }
 
     private void cancelSpell(LiveSession session, String reason) {
@@ -3263,6 +3748,7 @@ final class CombatSessionController implements Listener {
             session.resources = success.value().resources();
         }
         session.spellCast = null;
+        session.spellOrigin = null;
         session.lastResolution = "SPELL CANCELLED " + reason;
         if (!session.action.hardControl()) {
             session.action = ActionState.IDLE;
@@ -3774,9 +4260,9 @@ final class CombatSessionController implements Listener {
     }
 
     private record PendingSpellLaunch(
-            UUID projectileId, UUID worldId, CombatVector origin, CombatVector direction) {
+            UUID effectId, UUID worldId, CombatVector origin, CombatVector direction) {
         private PendingSpellLaunch {
-            Objects.requireNonNull(projectileId, "projectileId");
+            Objects.requireNonNull(effectId, "effectId");
             Objects.requireNonNull(worldId, "worldId");
             Objects.requireNonNull(origin, "origin");
             Objects.requireNonNull(direction, "direction");
@@ -3789,9 +4275,9 @@ final class CombatSessionController implements Listener {
             Objects.requireNonNull(operationId, "operationId");
             Objects.requireNonNull(catalystItemId, "catalystItemId");
             Objects.requireNonNull(launch, "launch");
-            if (!operationId.equals(launch.projectileId())) {
+            if (!operationId.equals(launch.effectId())) {
                 throw new IllegalArgumentException(
-                        "spell operation and projectile identity must match");
+                        "spell operation and effect identity must match");
             }
         }
     }
@@ -3809,8 +4295,11 @@ final class CombatSessionController implements Listener {
         private CrossbowRuntime crossbow;
         private PendingCrossbowCommit pendingCrossbowCommit;
         private SpellCastRuntime spellCast;
+        private CombatVector spellOrigin;
         private PendingSpellCommit pendingSpellCommit;
         private boolean spellCommitInterrupted;
+        private DefinitionId selectedSpell;
+        private RunicImbuementRuntime imbuement;
         private long crossbowRecoveryUntilTick = -1;
         private UUID pendingAmmoCycleId;
         private long ammoSwitchHandlingUntilTick = -1;

@@ -8,7 +8,7 @@ import com.branz.mmorpg.magic.definition.SpellDefinition;
 import java.util.Objects;
 import java.util.Set;
 
-/** Deterministic charge-cast runtime. Persistence commits remain adapter-owned. */
+/** Deterministic V1 instant, windup, charge and channel runtime. */
 public final class SpellCastEngine {
     public Result<SpellCastRuntime, SpellCastErrorCode> start(
             SpellDefinition spell,
@@ -22,10 +22,10 @@ public final class SpellCastEngine {
         if (currentTick < 0) {
             throw new IllegalArgumentException("currentTick must not be negative");
         }
-        if (spell.castType() != SpellCastType.CHARGE) {
+        if (spell.castType() == SpellCastType.SUSTAIN || spell.castType() == SpellCastType.RITUAL) {
             return Result.failure(
                     SpellCastErrorCode.CAST_TYPE_UNSUPPORTED,
-                    "This runtime slice supports CHARGE casts only.");
+                    "Normal combat runtime does not support SUSTAIN or RITUAL casts.");
         }
         if (!catalystTags.containsAll(spell.requirements().catalystTags())) {
             return Result.failure(
@@ -45,11 +45,24 @@ public final class SpellCastEngine {
         }
         CombatResources next =
                 ((Result.Success<CombatResources, ActionTimelineErrorCode>) reserved).value();
-        SpellCastPhase phase =
-                spell.phases().windupTicks() == 0 ? SpellCastPhase.CHARGING : SpellCastPhase.WINDUP;
+        SpellCastPhase phase;
+        if (spell.phases().windupTicks() > 0) {
+            phase = SpellCastPhase.WINDUP;
+        } else if (spell.castType() == SpellCastType.CHARGE) {
+            phase = SpellCastPhase.CHARGING;
+        } else {
+            phase = SpellCastPhase.READY;
+        }
         return Result.success(
                 new SpellCastRuntime(
-                        spell, phase, currentTick, java.util.OptionalLong.empty(), false, next));
+                        spell,
+                        phase,
+                        currentTick,
+                        java.util.OptionalLong.empty(),
+                        false,
+                        0,
+                        -1,
+                        next));
     }
 
     public SpellCastRuntime advance(SpellCastRuntime runtime, long currentTick) {
@@ -63,12 +76,18 @@ public final class SpellCastEngine {
         if (runtime.phase() == SpellCastPhase.WINDUP
                 && currentTick - runtime.startedAtTick()
                         >= runtime.spell().phases().windupTicks()) {
+            SpellCastPhase nextPhase =
+                    runtime.spell().castType() == SpellCastType.CHARGE
+                            ? SpellCastPhase.CHARGING
+                            : SpellCastPhase.READY;
             return new SpellCastRuntime(
                     runtime.spell(),
-                    SpellCastPhase.CHARGING,
+                    nextPhase,
                     runtime.startedAtTick(),
                     runtime.releasedAtTick(),
                     runtime.manaCommitted(),
+                    runtime.pulsesCompleted(),
+                    -1,
                     runtime.resources());
         }
         if (runtime.phase() == SpellCastPhase.RECOVERY
@@ -80,6 +99,8 @@ public final class SpellCastEngine {
                     runtime.startedAtTick(),
                     runtime.releasedAtTick(),
                     true,
+                    runtime.pulsesCompleted(),
+                    -1,
                     runtime.resources());
         }
         return runtime;
@@ -87,6 +108,9 @@ public final class SpellCastEngine {
 
     public boolean canRelease(SpellCastRuntime runtime, long currentTick) {
         Objects.requireNonNull(runtime, "runtime");
+        if (runtime.phase() == SpellCastPhase.READY) {
+            return true;
+        }
         return runtime.phase() == SpellCastPhase.CHARGING
                 && runtime.chargeTicks(currentTick)
                         >= runtime.spell().phases().minimumChargeTicks();
@@ -115,14 +139,67 @@ public final class SpellCastEngine {
                     SpellCastErrorCode.RELEASE_TOO_EARLY,
                     "Charge has not reached the minimum release tick.");
         }
+        boolean channel = runtime.spell().castType() == SpellCastType.CHANNEL;
         return Result.success(
                 new SpellCastRuntime(
                         runtime.spell(),
-                        SpellCastPhase.RECOVERY,
+                        channel ? SpellCastPhase.CHANNELING : SpellCastPhase.RECOVERY,
                         runtime.startedAtTick(),
                         java.util.OptionalLong.of(currentTick),
                         true,
+                        0,
+                        channel ? currentTick : -1,
                         runtime.resources().commitReservedMana(runtime.spell().manaCost())));
+    }
+
+    public ChannelPulseResolution pulse(SpellCastRuntime runtime, long currentTick) {
+        Objects.requireNonNull(runtime, "runtime");
+        if (runtime.phase() != SpellCastPhase.CHANNELING) {
+            throw new IllegalArgumentException("only an active channel may pulse");
+        }
+        SpellDefinition.Channel channel = runtime.spell().channel().orElseThrow();
+        if (currentTick < runtime.nextPulseAtTick()) {
+            return new ChannelPulseResolution(runtime, false, false);
+        }
+        if (runtime.pulsesCompleted() >= channel.maximumPulses()) {
+            return new ChannelPulseResolution(stopChannel(runtime, currentTick), false, false);
+        }
+        java.util.Optional<CombatResources> paid =
+                runtime.resources().spendMana(channel.manaPerPulse());
+        if (paid.isEmpty()) {
+            return new ChannelPulseResolution(stopChannel(runtime, currentTick), false, true);
+        }
+        int pulses = runtime.pulsesCompleted() + 1;
+        SpellCastRuntime next =
+                new SpellCastRuntime(
+                        runtime.spell(),
+                        SpellCastPhase.CHANNELING,
+                        runtime.startedAtTick(),
+                        runtime.releasedAtTick(),
+                        true,
+                        pulses,
+                        currentTick + channel.pulseIntervalTicks(),
+                        paid.orElseThrow());
+        if (pulses >= channel.maximumPulses()) {
+            next = stopChannel(next, currentTick);
+        }
+        return new ChannelPulseResolution(next, true, false);
+    }
+
+    public SpellCastRuntime stopChannel(SpellCastRuntime runtime, long currentTick) {
+        Objects.requireNonNull(runtime, "runtime");
+        if (runtime.phase() != SpellCastPhase.CHANNELING) {
+            throw new IllegalArgumentException("only an active channel may stop");
+        }
+        return new SpellCastRuntime(
+                runtime.spell(),
+                SpellCastPhase.RECOVERY,
+                runtime.startedAtTick(),
+                java.util.OptionalLong.of(currentTick),
+                true,
+                runtime.pulsesCompleted(),
+                -1,
+                runtime.resources());
     }
 
     public Result<SpellCastRuntime, SpellCastErrorCode> cancel(SpellCastRuntime runtime) {
@@ -142,6 +219,8 @@ public final class SpellCastEngine {
                         runtime.startedAtTick(),
                         runtime.releasedAtTick(),
                         runtime.manaCommitted(),
+                        runtime.pulsesCompleted(),
+                        -1,
                         resources));
     }
 }

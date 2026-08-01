@@ -1554,3 +1554,53 @@ Non-goals:
 Schema/config/migration impact: public content adds `TECHNIQUE` and `FORM`, spell schema adds
 attunement tag/conflict metadata, and config adds `scene.rest-context-spawn-radius-blocks` (16 by
 default). Migration V0004 adds `character_build_state`, documented by ADR 0013.
+
+## Milestone 5 - complete Ember Art and Runic Imbuement slice
+
+Implemented:
+
+- Spell runtime now supports `INSTANT`, `WINDUP`, `CHARGE` and `CHANNEL`, with explicit Ready and
+  Channeling phases, initial mana reservation/commit, per-pulse upkeep, bounded pulses, clean
+  insufficient-mana termination and recovery;
+- the training Ember art contains Cinder Snap (Direct), Fire Lance (Projectile), Scorching Ground
+  (Zone) and Flame Torrent (Beam Channel); Runic Ember Edge provides the required Imbuement family;
+- F cycles only committed attuned Staff spells and RMB starts/releases/stops the selected runtime;
+  `/mmo health` exposes selected spell, phase, pending commit, active zones and Imbuement charges;
+- every delivery crosses the existing PostgreSQL catalyst CAS before its live effect. Direct/Beam
+  targeting, Zone target ordering and limits, projectile collision, HP/posture and arcane damage are
+  server authoritative;
+- active zones are capped at four per caster and have bounded duration/pulse/target profiles;
+  channels pay Form-scaled mana per pulse and end when released, exhausted or interrupted;
+- Runic Ember Edge adds one separately resolved Fire packet to a physical hit and consumes one of
+  four bounded charges; it cannot multiply the physical packet and clears with encounter/session
+  invalidation;
+- the integrated Milestone 5 gate compiles each weapon/item/Technique pair, JSON-round-trips its
+  build and completes an ActionTimeline for Greatsword, Sword and Shield, Bow, Crossbow and Staff.
+
+Tests and completion evidence:
+
+- cast tests cover Instant commit, Charge release and complete bounded Channel upkeep/recovery;
+- effect tests cover exact Zone pulse/expiry and Runic charge/expiry semantics;
+- Spell Engine compiles all five actual content fixtures and rejects mismatched delivery profiles;
+- integrated family acceptance covers all five stable item/Technique/move contracts and executable
+  action completion;
+- existing PostgreSQL integration covers linked equipment, Bow/Quiver lot consumption, Crossbow
+  checkpoints, Staff catalyst wear and character build/attunement across reconnect/database restart;
+- generated schemas and the 34-definition content snapshot validate with all references resolved.
+
+Failure/recovery behavior:
+
+- cap, mana, attunement, catalyst, action and movement failures are visible and produce no unpaid
+  live effect;
+- a pre-commit cancellation refunds reservation; an in-flight durable commit resolves once and
+  cannot be replayed into a duplicate effect;
+- projectile, zone, channel and Imbuement runtimes are intentionally encounter-scoped and are not
+  reconstructed after logout/restart; their durable paid inputs and selected build remain saved.
+
+Milestone status: **Milestone 5 complete on `newmmo`.** All five families have executable encounter
+paths and their owning durable equipment/ammo/checkpoint/catalyst/build state has reconnect and
+database-restart coverage.
+
+Schema/config/migration impact: spell schema adds bounded `direct`, `channel`, `zone` and
+`imbuement` profiles; the manifest adds four spell definitions. No config or SQL migration is
+required, documented by ADR 0014.

@@ -12,6 +12,8 @@ public record SpellCastRuntime(
         long startedAtTick,
         OptionalLong releasedAtTick,
         boolean manaCommitted,
+        int pulsesCompleted,
+        long nextPulseAtTick,
         CombatResources resources) {
     public SpellCastRuntime {
         Objects.requireNonNull(spell, "spell");
@@ -21,12 +23,23 @@ public record SpellCastRuntime(
         }
         Objects.requireNonNull(releasedAtTick, "releasedAtTick");
         Objects.requireNonNull(resources, "resources");
+        if (pulsesCompleted < 0 || nextPulseAtTick < -1) {
+            throw new IllegalArgumentException("invalid channel pulse state");
+        }
         if (releasedAtTick.isPresent() != manaCommitted) {
             throw new IllegalArgumentException("release and mana commit must share one boundary");
         }
-        if ((phase == SpellCastPhase.RECOVERY || phase == SpellCastPhase.COMPLETE)
+        if ((phase == SpellCastPhase.CHANNELING
+                        || phase == SpellCastPhase.RECOVERY
+                        || phase == SpellCastPhase.COMPLETE)
                 && !manaCommitted) {
-            throw new IllegalArgumentException("recovery requires committed mana");
+            throw new IllegalArgumentException("committed cast phase requires committed mana");
+        }
+        if (phase == SpellCastPhase.CHANNELING && nextPulseAtTick < 0) {
+            throw new IllegalArgumentException("channel requires a next-pulse tick");
+        }
+        if (phase != SpellCastPhase.CHANNELING && nextPulseAtTick != -1) {
+            throw new IllegalArgumentException("only a channel may own a next-pulse tick");
         }
     }
 

@@ -89,6 +89,37 @@ public final class SpellEngine {
                                         integer(body, "projectile.pierce_count"),
                                         text(body, "projectile.hit_group")))
                         : Optional.empty(),
+                delivery == SpellDeliveryType.DIRECT
+                        ? Optional.of(
+                                new SpellDefinition.Direct(
+                                        number(body, "direct.range"),
+                                        integer(body, "direct.maximum_targets")))
+                        : Optional.empty(),
+                SpellCastType.valueOf(text(body, "cast_type")) == SpellCastType.CHANNEL
+                        ? Optional.of(
+                                new SpellDefinition.Channel(
+                                        integer(body, "channel.pulse_interval_ticks"),
+                                        integer(body, "channel.maximum_pulses"),
+                                        integer(body, "channel.mana_per_pulse"),
+                                        number(body, "channel.range"),
+                                        integer(body, "channel.maximum_targets_per_pulse")))
+                        : Optional.empty(),
+                delivery == SpellDeliveryType.ZONE
+                        ? Optional.of(
+                                new SpellDefinition.Zone(
+                                        number(body, "zone.placement_range"),
+                                        number(body, "zone.radius"),
+                                        integer(body, "zone.duration_ticks"),
+                                        integer(body, "zone.pulse_interval_ticks"),
+                                        integer(body, "zone.maximum_targets_per_pulse")))
+                        : Optional.empty(),
+                delivery == SpellDeliveryType.IMBUE
+                        ? Optional.of(
+                                new SpellDefinition.Imbuement(
+                                        integer(body, "imbuement.duration_ticks"),
+                                        integer(body, "imbuement.maximum_charges"),
+                                        number(body, "imbuement.power_coefficient")))
+                        : Optional.empty(),
                 new SpellDefinition.Output(
                         ArcaneSchool.valueOf(text(body, "output.arcane_school")),
                         number(body, "output.power_coefficient"),

@@ -144,3 +144,17 @@ Interactions are definition-driven events with recursion depth capped at 2 to pr
 - Maximum chain targets: 5.
 - Maximum temporary summons per caster: 2.
 - Area target checks are distributed and budgeted; no per-tick full-world scans.
+
+## Milestone 5 training implementation
+
+The `newmmo` training snapshot exercises the normal combat runtime with Cinder Snap
+(`INSTANT`/`DIRECT`), Fire Lance (`CHARGE`/`PROJECTILE`), Scorching Ground
+(`WINDUP`/`ZONE`), Flame Torrent (`CHANNEL`/`BEAM`) and Runic Ember Edge
+(`INSTANT`/`IMBUE`). With a Staff ready, F cycles the character's committed attuned spells and RMB
+starts, releases or stops the selected cast.
+
+Direct and Beam are single-target in this V1 adapter. Zones retain the global four-per-caster cap,
+authored pulse/target bounds and deterministic server ordering. Runic Ember Edge is an
+encounter-scoped four-charge coating: each physical target hit consumes one charge and resolves a
+separate Fire packet. Live effects clear on session/encounter invalidation; catalyst wear and the
+attuned character build remain durable.

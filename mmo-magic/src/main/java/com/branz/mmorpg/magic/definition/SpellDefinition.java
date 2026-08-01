@@ -17,6 +17,10 @@ public record SpellDefinition(
         Phases phases,
         Interruption interruption,
         Optional<Projectile> projectile,
+        Optional<Direct> direct,
+        Optional<Channel> channel,
+        Optional<Zone> zone,
+        Optional<Imbuement> imbuement,
         Output output,
         String presentationArchetype,
         CombatProfiles profiles) {
@@ -33,12 +37,35 @@ public record SpellDefinition(
         Objects.requireNonNull(phases, "phases");
         Objects.requireNonNull(interruption, "interruption");
         Objects.requireNonNull(projectile, "projectile");
+        Objects.requireNonNull(direct, "direct");
+        Objects.requireNonNull(channel, "channel");
+        Objects.requireNonNull(zone, "zone");
+        Objects.requireNonNull(imbuement, "imbuement");
         Objects.requireNonNull(output, "output");
         presentationArchetype = requireText(presentationArchetype, "presentationArchetype");
         Objects.requireNonNull(profiles, "profiles");
         if ((deliveryType == SpellDeliveryType.PROJECTILE) != projectile.isPresent()) {
             throw new IllegalArgumentException(
                     "PROJECTILE delivery requires projectile fields and other deliveries forbid them");
+        }
+        if ((deliveryType == SpellDeliveryType.DIRECT) != direct.isPresent()) {
+            throw new IllegalArgumentException(
+                    "DIRECT delivery requires direct fields and other deliveries forbid them");
+        }
+        if ((castType == SpellCastType.CHANNEL) != channel.isPresent()) {
+            throw new IllegalArgumentException(
+                    "CHANNEL cast requires channel fields and other casts forbid them");
+        }
+        if (castType == SpellCastType.CHANNEL && deliveryType != SpellDeliveryType.BEAM) {
+            throw new IllegalArgumentException("V1 CHANNEL casts require BEAM delivery");
+        }
+        if ((deliveryType == SpellDeliveryType.ZONE) != zone.isPresent()) {
+            throw new IllegalArgumentException(
+                    "ZONE delivery requires zone fields and other deliveries forbid them");
+        }
+        if ((deliveryType == SpellDeliveryType.IMBUE) != imbuement.isPresent()) {
+            throw new IllegalArgumentException(
+                    "IMBUE delivery requires imbuement fields and other deliveries forbid them");
         }
     }
 
@@ -100,6 +127,73 @@ public record SpellDefinition(
                     || pierceCount < 0
                     || pierceCount > 7) {
                 throw new IllegalArgumentException("invalid spell projectile fields");
+            }
+        }
+    }
+
+    public record Direct(double range, int maximumTargets) {
+        public Direct {
+            if (!Double.isFinite(range) || range <= 0 || range > 32 || maximumTargets != 1) {
+                throw new IllegalArgumentException("invalid direct-delivery fields");
+            }
+        }
+    }
+
+    public record Channel(
+            int pulseIntervalTicks,
+            int maximumPulses,
+            int manaPerPulse,
+            double range,
+            int maximumTargetsPerPulse) {
+        public Channel {
+            if (pulseIntervalTicks < 1
+                    || pulseIntervalTicks > 100
+                    || maximumPulses < 1
+                    || maximumPulses > 100
+                    || manaPerPulse < 0
+                    || !Double.isFinite(range)
+                    || range <= 0
+                    || range > 32
+                    || maximumTargetsPerPulse != 1) {
+                throw new IllegalArgumentException("invalid channel fields");
+            }
+        }
+    }
+
+    public record Zone(
+            double placementRange,
+            double radius,
+            int durationTicks,
+            int pulseIntervalTicks,
+            int maximumTargetsPerPulse) {
+        public Zone {
+            if (!Double.isFinite(placementRange)
+                    || placementRange <= 0
+                    || placementRange > 32
+                    || !Double.isFinite(radius)
+                    || radius <= 0
+                    || radius > 12
+                    || durationTicks < 1
+                    || durationTicks > 400
+                    || pulseIntervalTicks < 1
+                    || pulseIntervalTicks > durationTicks
+                    || maximumTargetsPerPulse < 1
+                    || maximumTargetsPerPulse > 16) {
+                throw new IllegalArgumentException("invalid zone fields");
+            }
+        }
+    }
+
+    public record Imbuement(int durationTicks, int maximumCharges, double powerCoefficient) {
+        public Imbuement {
+            if (durationTicks < 1
+                    || durationTicks > 1200
+                    || maximumCharges < 1
+                    || maximumCharges > 32
+                    || !Double.isFinite(powerCoefficient)
+                    || powerCoefficient <= 0
+                    || powerCoefficient > 2) {
+                throw new IllegalArgumentException("invalid imbuement fields");
             }
         }
     }

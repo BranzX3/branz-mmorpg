@@ -10,7 +10,9 @@ import com.branz.mmorpg.content.definition.DefinitionRegistry;
 import com.branz.mmorpg.content.manifest.ContentManifest;
 import com.branz.mmorpg.content.reference.ReferenceIndex;
 import com.branz.mmorpg.content.schema.DefinitionType;
+import com.branz.mmorpg.content.snapshot.ContentLoadFailure;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
+import com.branz.mmorpg.content.snapshot.ContentSnapshotLoader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.List;
@@ -58,6 +60,47 @@ class SpellEngineTest {
         assertEquals(
                 SpellEngineErrorCode.SPELL_FIELD_INVALID,
                 ((Result.Failure<SpellEngine, SpellEngineErrorCode>) result).error());
+    }
+
+    @Test
+    void compilesCompleteEmberAndRunicTrainingFixture() {
+        Path fixture = Path.of("..", "example-content", "milestone-1").toAbsolutePath().normalize();
+        Result<ContentSnapshot, ContentLoadFailure> loaded =
+                new ContentSnapshotLoader().load(fixture);
+        assertTrue(loaded.isSuccess());
+
+        Result<SpellEngine, SpellEngineErrorCode> compiled =
+                SpellEngine.compile(
+                        ((Result.Success<ContentSnapshot, ContentLoadFailure>) loaded).value());
+
+        assertTrue(compiled.isSuccess());
+        SpellEngine engine = ((Result.Success<SpellEngine, SpellEngineErrorCode>) compiled).value();
+        assertEquals(5, engine.all().size());
+        assertTrue(
+                engine.find(DefinitionId.of("spell.ember.cinder_snap"))
+                        .orElseThrow()
+                        .direct()
+                        .isPresent());
+        assertTrue(
+                engine.find(DefinitionId.of("spell.ember.fire_lance"))
+                        .orElseThrow()
+                        .projectile()
+                        .isPresent());
+        assertTrue(
+                engine.find(DefinitionId.of("spell.ember.scorching_ground"))
+                        .orElseThrow()
+                        .zone()
+                        .isPresent());
+        assertTrue(
+                engine.find(DefinitionId.of("spell.ember.flame_torrent"))
+                        .orElseThrow()
+                        .channel()
+                        .isPresent());
+        assertTrue(
+                engine.find(DefinitionId.of("spell.runic.ember_edge"))
+                        .orElseThrow()
+                        .imbuement()
+                        .isPresent());
     }
 
     private static String validBody() {

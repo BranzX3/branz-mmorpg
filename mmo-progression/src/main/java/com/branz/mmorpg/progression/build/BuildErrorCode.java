@@ -5,6 +5,7 @@ import com.branz.mmorpg.api.result.ErrorCode;
 public enum BuildErrorCode implements ErrorCode {
     BUILD_DEFINITION_INVALID,
     BUILD_UNKNOWN_TECHNIQUE,
+    BUILD_KNOWLEDGE_REQUIRED,
     BUILD_UNKNOWN_FORM,
     BUILD_UNKNOWN_ATTUNEMENT,
     BUILD_TECHNIQUE_LIMIT_EXCEEDED,

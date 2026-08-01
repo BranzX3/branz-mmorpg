@@ -55,15 +55,15 @@ class PostgresMigrationRunnerIntegrationTest {
         Result<MigrationReport, MigrationErrorCode> second = runner.migrate(catalog);
 
         assertTrue(first.isSuccess());
-        assertEquals(List.of(1, 2, 3, 4, 5), success(first).appliedVersions());
+        assertEquals(List.of(1, 2, 3, 4, 5, 6), success(first).appliedVersions());
         assertTrue(second.isSuccess());
         assertEquals(List.of(), success(second).appliedVersions());
-        assertEquals(5, scalarInt("SELECT COUNT(*) FROM mmo_schema_migrations"));
+        assertEquals(6, scalarInt("SELECT COUNT(*) FROM mmo_schema_migrations"));
         assertEquals(
                 1,
                 scalarInt("SELECT COUNT(*) FROM pg_type WHERE typname = 'mmo_transaction_state'"));
         assertEquals(
-                8,
+                12,
                 scalarInt(
                         "SELECT COUNT(*) FROM information_schema.tables "
                                 + "WHERE table_schema = 'public' "
@@ -71,7 +71,9 @@ class PostgresMigrationRunnerIntegrationTest {
                                 + "'character_leases', 'transaction_journal', "
                                 + "'item_instance', 'commodity_lot', 'audit_log', "
                                 + "'character_build_state', 'character_progression_track', "
-                                + "'combat_progression_evidence')"));
+                                + "'combat_progression_evidence', 'character_knowledge', "
+                                + "'character_renown', 'renown_deed_journal', "
+                                + "'teaching_completion_journal')"));
     }
 
     @Test
@@ -98,6 +100,63 @@ class PostgresMigrationRunnerIntegrationTest {
         }
         Result<MigrationReport, MigrationErrorCode> unknown = runner.migrate(original);
         assertEquals(MigrationErrorCode.MIGRATION_UNKNOWN_APPLIED, failure(unknown));
+    }
+
+    @Test
+    void v0006BackfillsKnowledgeFromPreMigrationBuilds() throws Exception {
+        MigrationCatalog full = defaultCatalog();
+        Result<MigrationCatalog, MigrationErrorCode> priorResult =
+                MigrationCatalog.from(full.migrations().subList(0, 5));
+        assertTrue(priorResult.isSuccess());
+        MigrationCatalog prior =
+                ((Result.Success<MigrationCatalog, MigrationErrorCode>) priorResult).value();
+        PostgresMigrationRunner runner = new PostgresMigrationRunner(dataSource);
+        assertTrue(runner.migrate(prior).isSuccess());
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement()) {
+            statement.executeUpdate(
+                    """
+                    INSERT INTO transaction_journal(
+                        transaction_id, idempotency_key, character_id, session_id,
+                        operation_type, state, reserved_inputs, intended_outputs,
+                        content_version, created_at, updated_at
+                    ) VALUES (
+                        '00000000-0000-0000-0000-000000000001', 'legacy-build',
+                        '00000000-0000-0000-0000-000000000002', NULL,
+                        'CHARACTER_BUILD_COMMIT', 'COMMITTED', '{}'::jsonb, '{}'::jsonb,
+                        'legacy-content', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    )
+                    """);
+            statement.executeUpdate(
+                    """
+                    INSERT INTO character_build_state(
+                        character_id, build_payload, content_version, version,
+                        last_transaction_id, created_at, updated_at
+                    ) VALUES (
+                        '00000000-0000-0000-0000-000000000002',
+                        '{"schemaVersion":1,"attunementCapacity":6,"techniques":{"PRIMARY_1":"technique.staff.sweep"},"form":"form.ember_channel","attunedEffects":["spell.ember.fire_lance"]}'::jsonb,
+                        'legacy-content', 1,
+                        '00000000-0000-0000-0000-000000000001',
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    )
+                    """);
+        }
+
+        MigrationReport report = success(runner.migrate(full));
+
+        assertEquals(List.of(6), report.appliedVersions());
+        assertEquals(3, scalarInt("SELECT COUNT(*) FROM character_knowledge"));
+        assertEquals(
+                1,
+                scalarInt(
+                        "SELECT COUNT(*) FROM character_knowledge "
+                                + "WHERE knowledge_type = 'TECHNIQUE' "
+                                + "AND definition_id = 'technique.staff.sweep'"));
+        assertEquals(
+                3,
+                scalarInt(
+                        "SELECT COUNT(*) FROM character_knowledge "
+                                + "WHERE source_type = 'LEGACY_BUILD_BACKFILL'"));
     }
 
     @Test

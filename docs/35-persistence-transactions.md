@@ -39,6 +39,16 @@ rolls back the batch. Repetition context is reconstructed from accepted matching
 the preceding 30 minutes; per-track daily context is reconstructed from accepted awards since
 00:00 UTC.
 
+### Multi-character teaching completion
+
+A durable teaching completion locks teacher and student with transaction-scoped advisory locks in
+sorted UUID order. One transaction inserts the student's permanent Technique Knowledge, the
+teacher's immutable mentorship deed, any positive Renown projection change and the exact
+teaching-session binding. The session UUID and deed UUID are immutable idempotency keys: exact
+retry returns stored truth, while mismatched reuse or an independently learned Technique rejects
+and rolls back every new row. Both active Player Sessions reload database truth before success is
+published; session replacement during the asynchronous operation never receives a stale snapshot.
+
 ### Derived/cache
 
 - calculated stats;

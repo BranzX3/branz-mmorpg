@@ -13,6 +13,7 @@ import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.persistence.progression.ProgressionEvidenceExecution;
 import com.branz.mmorpg.persistence.progression.ProgressionTrackRecord;
+import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
 import com.branz.mmorpg.progression.evidence.EncounterOutcome;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import com.branz.mmorpg.progression.evidence.EvidenceContext;
@@ -175,8 +176,32 @@ final class MmoCommandController implements CommandExecutor, Listener {
                             NamedTextColor.RED));
             return;
         }
+        if (args.length >= 2 && "status".equalsIgnoreCase(args[1])) {
+            Player target = onlineTarget(player, args, 2);
+            if (target != null) {
+                showKnowledgeStatus(player, target);
+            }
+            return;
+        }
         if (args.length == 3 && "simulate".equalsIgnoreCase(args[1])) {
             simulateTeaching(player, args[2].toLowerCase(Locale.ROOT));
+            return;
+        }
+        if (args.length >= 3 && "record".equalsIgnoreCase(args[1])) {
+            Player student = Bukkit.getPlayerExact(args[2]);
+            if (student == null) {
+                player.sendMessage(Component.text("Student is not online.", NamedTextColor.RED));
+                return;
+            }
+            UUID teachingSessionId = parseUuid(player, args, 3, "Teaching session");
+            if (teachingSessionId == null) {
+                return;
+            }
+            UUID deedId = parseUuid(player, args, 4, "Renown deed");
+            if (deedId == null) {
+                return;
+            }
+            recordTeaching(player, student, teachingSessionId, deedId);
             return;
         }
         teachingUsage(player);
@@ -655,8 +680,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
         CharacterId studentId = new CharacterId(player.getUniqueId());
         KnowledgeKey technique =
                 new KnowledgeKey(
-                        KnowledgeType.TECHNIQUE,
-                        DefinitionId.of("technique.greatsword.cleaving_arc"));
+                        KnowledgeType.TECHNIQUE, DefinitionId.of("technique.greatsword.cleave"));
         KnowledgeKey foundation =
                 new KnowledgeKey(
                         KnowledgeType.FOUNDATION, DefinitionId.of("foundation.greatsword"));
@@ -703,7 +727,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
                         teachingEngine.demonstrate(
                                 session,
                                 teacherId,
-                                DefinitionId.of("move.greatsword.cleaving_arc"),
+                                DefinitionId.of("move.training_greatsword.committed_cleave"),
                                 101));
         if (session == null) {
             return;
@@ -725,7 +749,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                         session,
                                         studentId,
                                         observedActionId,
-                                        DefinitionId.of("move.greatsword.cleaving_arc"),
+                                        DefinitionId.of(
+                                                "move.training_greatsword.committed_cleave"),
                                         true,
                                         102 + index));
                 if (session == null) {
@@ -747,6 +772,151 @@ final class MmoCommandController implements CommandExecutor, Listener {
         Result.Failure<TeachingCompletion, TeachingErrorCode> failure =
                 (Result.Failure<TeachingCompletion, TeachingErrorCode>) completion;
         teachingLabMessage(player, scenario, failure.error().code(), failure.detail(), false);
+    }
+
+    private void recordTeaching(
+            Player teacher, Player student, UUID teachingSessionId, UUID deedId) {
+        if (teacher.getUniqueId().equals(student.getUniqueId())) {
+            teacher.sendMessage(
+                    Component.text(
+                            "Teacher and student must be different players.", NamedTextColor.RED));
+            return;
+        }
+        ContentSnapshot snapshot = snapshotSource.get();
+        if (snapshot == null) {
+            teacher.sendMessage(
+                    Component.text("Content snapshot is not ready.", NamedTextColor.RED));
+            return;
+        }
+        KnowledgeKey technique =
+                new KnowledgeKey(
+                        KnowledgeType.TECHNIQUE, DefinitionId.of("technique.greatsword.cleave"));
+        TeachingCommitRequest request =
+                new TeachingCommitRequest(
+                        new TeachingCompletion(
+                                teachingSessionId,
+                                new CharacterId(teacher.getUniqueId()),
+                                new CharacterId(student.getUniqueId()),
+                                technique),
+                        new RenownDeedCandidate(
+                                deedId,
+                                new CharacterId(teacher.getUniqueId()),
+                                DefinitionId.of("renown.mentorship"),
+                                "mentorship:" + technique.id().value(),
+                                20,
+                                snapshot.manifest().contentVersion()));
+        teacher.sendMessage(
+                Component.text(
+                        "Committing teaching fixture through PostgreSQL…", NamedTextColor.YELLOW));
+        characterSessions.commitTeaching(
+                teacher,
+                student,
+                request,
+                result -> {
+                    if (result
+                            instanceof
+                            Result.Failure<TeachingSessionCommitResult, CharacterSessionErrorCode>
+                                    failure) {
+                        teacher.sendMessage(
+                                Component.text(
+                                        "Teaching record failed: "
+                                                + failure.error().code()
+                                                + " "
+                                                + failure.detail(),
+                                        NamedTextColor.RED));
+                        return;
+                    }
+                    TeachingSessionCommitResult committed =
+                            ((Result.Success<
+                                                    TeachingSessionCommitResult,
+                                                    CharacterSessionErrorCode>)
+                                            result)
+                                    .value();
+                    long renown =
+                            committed
+                                    .teacherSession()
+                                    .snapshot()
+                                    .renown()
+                                    .map(record -> record.renown())
+                                    .orElse(0L);
+                    String replay = committed.execution().replayed() ? " REPLAY" : "";
+                    teacher.sendMessage(
+                            Component.text(
+                                    "Teaching PERSISTED"
+                                            + replay
+                                            + " | student="
+                                            + student.getName()
+                                            + " | learned="
+                                            + technique.id().value()
+                                            + " | award="
+                                            + committed
+                                                    .execution()
+                                                    .teacherDeed()
+                                                    .decision()
+                                                    .awardedRenown()
+                                            + " | Renown="
+                                            + renown
+                                            + " | session-id="
+                                            + teachingSessionId
+                                            + " | deed-id="
+                                            + deedId,
+                                    NamedTextColor.GREEN));
+                    student.sendMessage(
+                            Component.text(
+                                    "Learned "
+                                            + technique.id().value()
+                                            + " from "
+                                            + teacher.getName()
+                                            + ".",
+                                    NamedTextColor.LIGHT_PURPLE));
+                });
+    }
+
+    private void showKnowledgeStatus(Player viewer, Player target) {
+        characterSessions
+                .active(target)
+                .ifPresentOrElse(
+                        session -> {
+                            String knowledge =
+                                    session.snapshot().learnedKnowledge().isEmpty()
+                                            ? "none"
+                                            : session.snapshot().learnedKnowledge().stream()
+                                                    .map(record -> record.knowledge().id().value())
+                                                    .collect(
+                                                            java.util.stream.Collectors.joining(
+                                                                    ", "));
+                            long renown =
+                                    session.snapshot()
+                                            .renown()
+                                            .map(record -> record.renown())
+                                            .orElse(0L);
+                            viewer.sendMessage(
+                                    Component.text(
+                                            "Knowledge/Renown ["
+                                                    + target.getName()
+                                                    + "]: learned="
+                                                    + knowledge
+                                                    + " | Renown="
+                                                    + renown,
+                                            NamedTextColor.LIGHT_PURPLE));
+                        },
+                        () ->
+                                viewer.sendMessage(
+                                        Component.text(
+                                                "Target character session is not ready.",
+                                                NamedTextColor.RED)));
+    }
+
+    private static UUID parseUuid(Player player, String[] args, int index, String fieldName) {
+        if (args.length <= index) {
+            return UUID.randomUUID();
+        }
+        try {
+            return UUID.fromString(args[index]);
+        } catch (IllegalArgumentException exception) {
+            player.sendMessage(Component.text(fieldName + " UUID is invalid.", NamedTextColor.RED));
+            return null;
+        }
     }
 
     private TeachingSession teachingSuccess(
@@ -832,8 +1002,9 @@ final class MmoCommandController implements CommandExecutor, Listener {
 
     private static void teachingUsage(Player player) {
         player.sendMessage(
-                "Usage: /mmo teaching simulate "
-                        + "<success|missing-teacher|unready-teacher|student-prerequisite|duplicate-action|expired|disconnect>");
+                "Usage: /mmo teaching status [player] | /mmo teaching simulate "
+                        + "<success|missing-teacher|unready-teacher|student-prerequisite|duplicate-action|expired|disconnect> "
+                        + "| /mmo teaching record <student> [teaching-session-uuid] [deed-uuid]");
     }
 
     private static void renownUsage(Player player) {

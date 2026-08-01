@@ -2,6 +2,7 @@ package com.branz.mmorpg.progression.teaching;
 
 import com.branz.mmorpg.api.identity.CharacterId;
 import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
+import com.branz.mmorpg.progression.knowledge.KnowledgeType;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -16,5 +17,11 @@ public record TeachingCompletion(
         Objects.requireNonNull(teacherId, "teacherId");
         Objects.requireNonNull(studentId, "studentId");
         Objects.requireNonNull(learnedTechnique, "learnedTechnique");
+        if (teacherId.equals(studentId)) {
+            throw new IllegalArgumentException("teacher and student must be different characters");
+        }
+        if (learnedTechnique.type() != KnowledgeType.TECHNIQUE) {
+            throw new IllegalArgumentException("teaching completion must grant a Technique");
+        }
     }
 }

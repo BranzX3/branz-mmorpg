@@ -151,6 +151,7 @@ import com.branz.mmorpg.progression.evidence.CombatEvidenceAccumulator;
 import com.branz.mmorpg.progression.evidence.EncounterOutcome;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
+import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -160,6 +161,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -3169,7 +3171,7 @@ final class CombatSessionController implements Listener {
             return Optional.of("Combat not ready: character build is unavailable.");
         }
         Result<BuildResolution, BuildErrorCode> build =
-                builds.resolve(character.snapshot().build(), family);
+                builds.resolve(character.snapshot().build(), family, learnedKnowledge(character));
         return build instanceof Result.Failure<BuildResolution, BuildErrorCode> failure
                 ? Optional.of("Combat not ready: " + failure.detail())
                 : Optional.empty();
@@ -3305,7 +3307,10 @@ final class CombatSessionController implements Listener {
                 .flatMap(
                         character -> {
                             Result<BuildResolution, BuildErrorCode> result =
-                                    builds.resolve(character.snapshot().build(), family);
+                                    builds.resolve(
+                                            character.snapshot().build(),
+                                            family,
+                                            learnedKnowledge(character));
                             return result
                                             instanceof
                                             Result.Success<BuildResolution, BuildErrorCode> success
@@ -3342,6 +3347,12 @@ final class CombatSessionController implements Listener {
                 move.interruptResistance(),
                 move.presentationArchetype(),
                 move.profiles());
+    }
+
+    private static Set<KnowledgeKey> learnedKnowledge(LoadedCharacterSession character) {
+        return character.snapshot().learnedKnowledge().stream()
+                .map(record -> record.knowledge())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private static SpellDefinition spellWithBuildCosts(

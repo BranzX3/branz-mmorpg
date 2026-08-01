@@ -24,6 +24,7 @@ import com.branz.mmorpg.items.definition.ShieldProfile;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
 import com.branz.mmorpg.progression.build.BuildEngine;
 import com.branz.mmorpg.progression.build.BuildErrorCode;
 import com.branz.mmorpg.progression.build.CharacterBuild;
@@ -34,6 +35,10 @@ import com.branz.mmorpg.progression.evidence.EncounterOutcome;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
 import com.branz.mmorpg.progression.evidence.ProgressionTrack;
+import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
+import com.branz.mmorpg.progression.knowledge.KnowledgeType;
+import com.branz.mmorpg.progression.renown.RenownDeedCandidate;
+import com.branz.mmorpg.progression.teaching.TeachingCompletion;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -45,6 +50,87 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CharacterSessionServiceIntegrationTest {
+    @Test
+    void teachingCommitReloadsBothSessionsAndSurvivesReconnectAndRestart(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(10));
+        UUID teacherPlayerId = UUID.randomUUID();
+        UUID studentPlayerId = UUID.randomUUID();
+        UUID teachingSessionId = UUID.randomUUID();
+        UUID deedId = UUID.randomUUID();
+        TeachingCommitRequest request =
+                new TeachingCommitRequest(
+                        new TeachingCompletion(
+                                teachingSessionId,
+                                new com.branz.mmorpg.api.identity.CharacterId(teacherPlayerId),
+                                new com.branz.mmorpg.api.identity.CharacterId(studentPlayerId),
+                                new KnowledgeKey(
+                                        KnowledgeType.TECHNIQUE,
+                                        DefinitionId.of("technique.greatsword.cleaving_arc"))),
+                        new RenownDeedCandidate(
+                                deedId,
+                                new com.branz.mmorpg.api.identity.CharacterId(teacherPlayerId),
+                                DefinitionId.of("renown.mentorship"),
+                                "mentorship:greatsword:utc-day",
+                                20,
+                                "content.test.1"));
+
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database);
+            LoadedCharacterSession teacher = success(service.open(teacherPlayerId));
+            LoadedCharacterSession student = success(service.open(studentPlayerId));
+
+            TeachingSessionCommitResult committed =
+                    teachingSuccess(service.commitTeaching(teacher, student, request));
+
+            assertTrue(!committed.execution().replayed());
+            assertEquals(20, committed.teacherSession().snapshot().renown().orElseThrow().renown());
+            assertEquals(1, committed.studentSession().snapshot().learnedKnowledge().size());
+            assertEquals(
+                    request.completion().learnedTechnique(),
+                    committed
+                            .studentSession()
+                            .snapshot()
+                            .learnedKnowledge()
+                            .getFirst()
+                            .knowledge());
+            service.close(committed.teacherSession());
+            service.close(committed.studentSession());
+
+            LoadedCharacterSession reconnectedTeacher = success(service.open(teacherPlayerId));
+            LoadedCharacterSession reconnectedStudent = success(service.open(studentPlayerId));
+            assertEquals(20, reconnectedTeacher.snapshot().renown().orElseThrow().renown());
+            assertEquals(1, reconnectedStudent.snapshot().learnedKnowledge().size());
+            service.close(reconnectedTeacher);
+            service.close(reconnectedStudent);
+        }
+
+        try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(restarted);
+            LoadedCharacterSession teacher = success(service.open(teacherPlayerId));
+            LoadedCharacterSession student = success(service.open(studentPlayerId));
+            TeachingSessionCommitResult replayed =
+                    teachingSuccess(service.commitTeaching(teacher, student, request));
+            assertTrue(replayed.execution().replayed());
+            assertEquals(1, replayed.teacherSession().snapshot().renown().orElseThrow().version());
+            assertEquals(1, replayed.studentSession().snapshot().learnedKnowledge().size());
+            service.close(replayed.teacherSession());
+            service.close(replayed.studentSession());
+        }
+    }
+
     @Test
     void combatOutcomeBatchPublishesMasteryAndConditioningIntoSessionSnapshot(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
@@ -226,12 +312,36 @@ class CharacterSessionServiceIntegrationTest {
         try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
             CharacterSessionService service = new CharacterSessionService(database, builds);
             LoadedCharacterSession session = success(service.open(playerId));
+            LoadedCharacterSession teacher = success(service.open(UUID.randomUUID()));
+            KnowledgeKey staffTechnique =
+                    new KnowledgeKey(
+                            KnowledgeType.TECHNIQUE, DefinitionId.of("technique.staff.sweep"));
+            TeachingCommitRequest learning =
+                    new TeachingCommitRequest(
+                            new TeachingCompletion(
+                                    UUID.randomUUID(),
+                                    teacher.characterId(),
+                                    session.characterId(),
+                                    staffTechnique),
+                            new RenownDeedCandidate(
+                                    UUID.randomUUID(),
+                                    teacher.characterId(),
+                                    DefinitionId.of("renown.mentorship"),
+                                    "mentorship:staff:utc-day",
+                                    20,
+                                    "content.test.1"));
+            TeachingSessionCommitResult learned =
+                    teachingSuccess(service.commitTeaching(teacher, session, learning));
             LoadedCharacterSession committed =
                     success(
                             service.commitBuild(
-                                    session, desired, UUID.randomUUID(), "content.test.1"));
+                                    learned.studentSession(),
+                                    desired,
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
             assertEquals(desired, committed.snapshot().build());
             assertEquals(1, committed.snapshot().buildRecord().orElseThrow().version());
+            service.close(learned.teacherSession());
             service.close(committed);
         }
         try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
@@ -916,6 +1026,23 @@ class CharacterSessionServiceIntegrationTest {
                     return "";
                 });
         return ((Result.Success<ProgressionEvidenceCommitResult, CharacterSessionErrorCode>) result)
+                .value();
+    }
+
+    private static TeachingSessionCommitResult teachingSuccess(
+            Result<TeachingSessionCommitResult, CharacterSessionErrorCode> result) {
+        assertTrue(
+                result.isSuccess(),
+                () ->
+                        result
+                                        instanceof
+                                        Result.Failure<
+                                                        TeachingSessionCommitResult,
+                                                        CharacterSessionErrorCode>
+                                                failure
+                                ? failure.error() + ": " + failure.detail()
+                                : "");
+        return ((Result.Success<TeachingSessionCommitResult, CharacterSessionErrorCode>) result)
                 .value();
     }
 

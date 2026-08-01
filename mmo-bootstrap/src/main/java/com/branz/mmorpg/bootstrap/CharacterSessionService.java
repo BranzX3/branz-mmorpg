@@ -16,9 +16,14 @@ import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.lease.CharacterLease;
 import com.branz.mmorpg.persistence.lease.LeaseAcquireOutcome;
 import com.branz.mmorpg.persistence.lease.LeaseErrorCode;
+import com.branz.mmorpg.persistence.progression.KnowledgePersistenceErrorCode;
+import com.branz.mmorpg.persistence.progression.KnowledgeRecord;
 import com.branz.mmorpg.persistence.progression.ProgressionEvidenceExecution;
 import com.branz.mmorpg.persistence.progression.ProgressionPersistenceErrorCode;
 import com.branz.mmorpg.persistence.progression.ProgressionTrackRecord;
+import com.branz.mmorpg.persistence.progression.RenownRecord;
+import com.branz.mmorpg.persistence.progression.TeachingCommitExecution;
+import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildCommit;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildCommitExecution;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRecord;
@@ -43,10 +48,12 @@ import com.branz.mmorpg.progression.build.BuildResolution;
 import com.branz.mmorpg.progression.build.CharacterBuild;
 import com.branz.mmorpg.progression.build.CharacterBuildJsonCodec;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
+import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** Blocking session/lease aggregate. Callers must run every method off the Paper thread. */
@@ -138,6 +145,22 @@ final class CharacterSessionService {
             releaseQuietly(characterId, sessionId, lease);
             return persistenceFailure(failure.error(), failure.detail());
         }
+        Result<List<KnowledgeRecord>, KnowledgePersistenceErrorCode> knowledgeRows =
+                database.knowledge().findKnowledge(characterId);
+        if (knowledgeRows
+                instanceof
+                Result.Failure<List<KnowledgeRecord>, KnowledgePersistenceErrorCode> failure) {
+            releaseQuietly(characterId, sessionId, lease);
+            return persistenceFailure(failure.error(), failure.detail());
+        }
+        Result<Optional<RenownRecord>, KnowledgePersistenceErrorCode> renownRow =
+                database.knowledge().findRenown(characterId);
+        if (renownRow
+                instanceof
+                Result.Failure<Optional<RenownRecord>, KnowledgePersistenceErrorCode> failure) {
+            releaseQuietly(characterId, sessionId, lease);
+            return persistenceFailure(failure.error(), failure.detail());
+        }
         try {
             PersistentCharacterSnapshot snapshot =
                     PersistentCharacterSnapshotMapper.map(
@@ -154,9 +177,15 @@ final class CharacterSessionService {
                                                     List<ProgressionTrackRecord>,
                                                     ProgressionPersistenceErrorCode>)
                                             progressionRows)
+                                    .value(),
+                            ((Result.Success<List<KnowledgeRecord>, KnowledgePersistenceErrorCode>)
+                                            knowledgeRows)
+                                    .value(),
+                            ((Result.Success<Optional<RenownRecord>, KnowledgePersistenceErrorCode>)
+                                            renownRow)
                                     .value());
             Result<BuildResolution, BuildErrorCode> buildResolution =
-                    buildEngine.resolve(snapshot.build());
+                    buildEngine.resolve(snapshot.build(), learnedKnowledge(snapshot));
             if (buildResolution
                     instanceof Result.Failure<BuildResolution, BuildErrorCode> failure) {
                 releaseQuietly(characterId, sessionId, lease);
@@ -817,7 +846,8 @@ final class CharacterSessionService {
         Objects.requireNonNull(desired, "desired");
         Objects.requireNonNull(operationId, "operationId");
         Objects.requireNonNull(contentVersion, "contentVersion");
-        Result<BuildResolution, BuildErrorCode> validation = buildEngine.resolve(desired);
+        Result<BuildResolution, BuildErrorCode> validation =
+                buildEngine.resolve(desired, learnedKnowledge(session.snapshot()));
         if (validation instanceof Result.Failure<BuildResolution, BuildErrorCode> failure) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
@@ -902,6 +932,57 @@ final class CharacterSessionService {
                                 .value()));
     }
 
+    Result<TeachingSessionCommitResult, CharacterSessionErrorCode> commitTeaching(
+            LoadedCharacterSession teacherSession,
+            LoadedCharacterSession studentSession,
+            TeachingCommitRequest request) {
+        Objects.requireNonNull(teacherSession, "teacherSession");
+        Objects.requireNonNull(studentSession, "studentSession");
+        Objects.requireNonNull(request, "request");
+        if (!teacherSession.characterId().equals(request.completion().teacherId())
+                || !studentSession.characterId().equals(request.completion().studentId())) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Teaching completion participants do not own these Player Sessions.");
+        }
+        Result<TeachingCommitExecution, KnowledgePersistenceErrorCode> committed =
+                database.knowledge().commitTeaching(request);
+        if (committed
+                instanceof
+                Result.Failure<TeachingCommitExecution, KnowledgePersistenceErrorCode> failure) {
+            CharacterSessionErrorCode error =
+                    failure.error() == KnowledgePersistenceErrorCode.KNOWLEDGE_DATABASE_UNAVAILABLE
+                            ? CharacterSessionErrorCode.CHARACTER_PERSISTENCE_UNAVAILABLE
+                            : CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED;
+            return Result.failure(error, failure.error().code() + ": " + failure.detail());
+        }
+        Result<LoadedCharacterSession, CharacterSessionErrorCode> reloadedTeacher =
+                reload(teacherSession);
+        if (reloadedTeacher
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            return Result.failure(failure.error(), failure.detail());
+        }
+        Result<LoadedCharacterSession, CharacterSessionErrorCode> reloadedStudent =
+                reload(studentSession);
+        if (reloadedStudent
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            return Result.failure(failure.error(), failure.detail());
+        }
+        return Result.success(
+                new TeachingSessionCommitResult(
+                        ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                        reloadedTeacher)
+                                .value(),
+                        ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                        reloadedStudent)
+                                .value(),
+                        ((Result.Success<TeachingCommitExecution, KnowledgePersistenceErrorCode>)
+                                        committed)
+                                .value()));
+    }
+
     void close(LoadedCharacterSession session) {
         Objects.requireNonNull(session, "session");
         releaseQuietly(session.characterId(), session.sessionId(), session.lease());
@@ -936,6 +1017,20 @@ final class CharacterSessionService {
                         failure) {
             return persistenceFailure(failure.error(), failure.detail());
         }
+        Result<List<KnowledgeRecord>, KnowledgePersistenceErrorCode> knowledgeRows =
+                database.knowledge().findKnowledge(session.characterId());
+        if (knowledgeRows
+                instanceof
+                Result.Failure<List<KnowledgeRecord>, KnowledgePersistenceErrorCode> failure) {
+            return persistenceFailure(failure.error(), failure.detail());
+        }
+        Result<Optional<RenownRecord>, KnowledgePersistenceErrorCode> renownRow =
+                database.knowledge().findRenown(session.characterId());
+        if (renownRow
+                instanceof
+                Result.Failure<Optional<RenownRecord>, KnowledgePersistenceErrorCode> failure) {
+            return persistenceFailure(failure.error(), failure.detail());
+        }
         try {
             PersistentCharacterSnapshot snapshot =
                     PersistentCharacterSnapshotMapper.map(
@@ -952,6 +1047,12 @@ final class CharacterSessionService {
                                                     List<ProgressionTrackRecord>,
                                                     ProgressionPersistenceErrorCode>)
                                             progressionRows)
+                                    .value(),
+                            ((Result.Success<List<KnowledgeRecord>, KnowledgePersistenceErrorCode>)
+                                            knowledgeRows)
+                                    .value(),
+                            ((Result.Success<Optional<RenownRecord>, KnowledgePersistenceErrorCode>)
+                                            renownRow)
                                     .value());
             return Result.success(
                     new LoadedCharacterSession(
@@ -1045,6 +1146,12 @@ final class CharacterSessionService {
                         && item.location().equals(ValueLocation.nativeEquipped("MAIN_HAND"))
                 ? item
                 : null;
+    }
+
+    private static Set<KnowledgeKey> learnedKnowledge(PersistentCharacterSnapshot snapshot) {
+        return snapshot.learnedKnowledge().stream()
+                .map(KnowledgeRecord::knowledge)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private static Result<LoadedCharacterSession, CharacterSessionErrorCode> transactionFailure(

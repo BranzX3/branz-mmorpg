@@ -438,6 +438,23 @@ teaching session, teacher rewards or Renown to PostgreSQL.
 113. Run `/mmo renown simulate fresh`, `repeat-1`, `repeat-2` and `exhausted`; verify awards
      20, 10, 5 and 0. Run `duplicate`; verify `DUPLICATE_DEED`, award 0 and unchanged total.
 
+The durable developer fixture requires two online operator/test accounts with ready Player Sessions.
+It represents an already validated completion intent; it is disabled outside permitted non-production
+environments and is not the live challenge-input path.
+
+114. As the teacher run `/mmo teaching status` and
+     `/mmo teaching status <student>`; verify both start with learned `none` and Renown 0.
+115. Choose two UUIDs and run `/mmo teaching record <student> <teaching-session-uuid> <deed-uuid>`.
+     Verify `Teaching PERSISTED`, the student receives `technique.greatsword.cleave`, the teacher
+     receives 20 Renown and both `/mmo teaching status` views update from reloaded Player Sessions.
+116. Repeat the exact command. Verify `PERSISTED REPLAY`, no second Knowledge row, no additional
+     Renown and no projection version advance. Reuse only one UUID with changed input and verify the
+     stable conflict reason with no partial reward.
+117. Have the student open Chronicle at Rest Context and select Greatsword Cleave. Verify it can be
+     committed after learning; an untaught Technique must report `BUILD_KNOWLEDGE_REQUIRED`.
+118. Disconnect/reconnect both players and restart Paper. Verify the student's learned Technique and
+     teacher's Renown return. Repeating the exact record after restart must remain a replay.
+
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded
 mode is rejected outside `LOCAL` and `INTEGRATION`.

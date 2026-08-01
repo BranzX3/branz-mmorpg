@@ -11,6 +11,7 @@ import com.branz.mmorpg.items.definition.QuiverProfile;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.progression.build.CharacterBuild;
@@ -647,6 +648,67 @@ final class CharacterSessionController implements Listener {
                         });
     }
 
+    void commitTeaching(
+            Player teacher,
+            Player student,
+            TeachingCommitRequest request,
+            Consumer<Result<TeachingSessionCommitResult, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(teacher, "teacher");
+        Objects.requireNonNull(student, "student");
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession teacherSession = active.get(teacher.getUniqueId());
+        LoadedCharacterSession studentSession = active.get(student.getUniqueId());
+        if (teacherSession == null
+                || studentSession == null
+                || !ready(teacher)
+                || !ready(student)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Both teaching participants must have ready Player Sessions."));
+            return;
+        }
+        UUID teacherId = teacher.getUniqueId();
+        UUID studentId = student.getUniqueId();
+        if (teacherId.equals(studentId)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Teacher and student must be different players."));
+            return;
+        }
+        if (valueMutationInFlight.contains(teacherId)
+                || valueMutationInFlight.contains(studentId)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                            "Another durable participant mutation is in progress."));
+            return;
+        }
+        valueMutationInFlight.add(teacherId);
+        valueMutationInFlight.add(studentId);
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<TeachingSessionCommitResult, CharacterSessionErrorCode> result =
+                                    sessions.commitTeaching(
+                                            teacherSession, studentSession, request);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeTeachingMutation(
+                                                            teacherSession,
+                                                            studentSession,
+                                                            result,
+                                                            completion));
+                        });
+    }
+
     void shutdown() {
         if (heartbeatTaskId >= 0) {
             plugin.getServer().getScheduler().cancelTask(heartbeatTaskId);
@@ -966,6 +1028,47 @@ final class CharacterSessionController implements Listener {
         completion.accept(
                 Result.success(
                         new ProgressionEvidenceCommitResult(updated, committed.executions())));
+    }
+
+    private void completeTeachingMutation(
+            LoadedCharacterSession previousTeacher,
+            LoadedCharacterSession previousStudent,
+            Result<TeachingSessionCommitResult, CharacterSessionErrorCode> result,
+            Consumer<Result<TeachingSessionCommitResult, CharacterSessionErrorCode>> completion) {
+        UUID teacherId = previousTeacher.characterId().value();
+        UUID studentId = previousStudent.characterId().value();
+        valueMutationInFlight.remove(teacherId);
+        valueMutationInFlight.remove(studentId);
+        LoadedCharacterSession currentTeacher = active.get(teacherId);
+        LoadedCharacterSession currentStudent = active.get(studentId);
+        if (currentTeacher == null
+                || currentStudent == null
+                || !currentTeacher.sessionId().equals(previousTeacher.sessionId())
+                || !currentStudent.sessionId().equals(previousStudent.sessionId())) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "A participant session changed before teaching commit completed."));
+            return;
+        }
+        if (result
+                instanceof Result.Failure<TeachingSessionCommitResult, CharacterSessionErrorCode>) {
+            completion.accept(result);
+            return;
+        }
+        TeachingSessionCommitResult committed =
+                ((Result.Success<TeachingSessionCommitResult, CharacterSessionErrorCode>) result)
+                        .value();
+        LoadedCharacterSession updatedTeacher =
+                currentTeacher.withSnapshot(committed.teacherSession().snapshot());
+        LoadedCharacterSession updatedStudent =
+                currentStudent.withSnapshot(committed.studentSession().snapshot());
+        active.put(teacherId, updatedTeacher);
+        active.put(studentId, updatedStudent);
+        completion.accept(
+                Result.success(
+                        new TeachingSessionCommitResult(
+                                updatedTeacher, updatedStudent, committed.execution())));
     }
 
     private void runCrossbowMutation(

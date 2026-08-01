@@ -1747,3 +1747,46 @@ participant integration, Flask/consumables/ailments, Rest Context and boss Flask
 
 Schema/config/migration impact: no SQL or content-schema migration. Fixed V1 session, challenge and
 Renown repetition defaults are documented by ADR 0018.
+
+## Milestone 6 - durable Knowledge, teaching completion and Renown slice
+
+Implemented:
+
+- PostgreSQL migration V0006 adds permanent character Knowledge, visible Renown projection, Renown
+  deed journal and teaching-completion journal;
+- one multi-character transaction locks teacher/student in stable UUID order and atomically writes
+  the student's Technique, mentorship deed/award, teacher projection and exact session binding;
+- exact session/deed replay is idempotent, while mismatched UUID reuse and already learned
+  Techniques reject without a partial Knowledge row or teacher reward;
+- Player Session snapshots load Knowledge/Renown on join, reload both participants after teaching
+  and retain database truth across reconnect/restart;
+- production Build/Scene/combat resolution rejects selected Techniques absent from permanent
+  Knowledge with `BUILD_KNOWLEDGE_REQUIRED`;
+- V0006 imports pre-migration Technique/Form/Spell build selections as explicit legacy Knowledge so
+  existing committed builds remain usable;
+- `/mmo teaching status [player]` and the environment-gated two-player `/mmo teaching record`
+  fixture expose durable replay/recovery testing in game.
+
+Tests and completion evidence:
+
+- repository integration covers atomic first commit, exact replay after repository restart, daily
+  mentorship factors, zero-reward fourth teaching, session/deed conflicts and already-learned
+  rollback;
+- migration integration proves six ordered migrations, all V0006 tables and legacy build backfill;
+- Player Session integration proves both participant snapshots, reconnect, embedded-database restart
+  and exact replay;
+- Build Engine tests prove missing learned Technique rejection and immediate success after learning.
+- the full build passes 531 tests with zero failures/errors (16 skipped), and Paper 26.2 migrates the
+  existing embedded PostgreSQL data to V0006, reaches runtime ready and shuts down cleanly.
+
+Failure/recovery behavior: database or identity failure leaves both live snapshots unchanged. A
+successful database commit followed by participant session replacement publishes no stale memory;
+retrying the immutable IDs returns the stored outcome and reloads current sessions. Renown version
+advances only for a positive award.
+
+Milestone status: **Milestone 6 remains in progress.** Live demonstration/challenge action wiring,
+Form/Spell acquisition gating, Flask/consumables/ailments, Rest Context and boss Flask snapshot
+remain.
+
+Schema/config/migration impact: forward migration V0006 adds four tables and three query indexes plus
+one-time legacy build Knowledge import. ADR 0019 owns atomicity, replay and learned-Technique gating.

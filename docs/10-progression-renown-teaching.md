@@ -177,8 +177,31 @@ learning prerequisite. The session lasts 12,000 server ticks (10 minutes):
 A repeated contact/action UUID does not advance the challenge. A miss, wrong move, wrong actor,
 expiry or participant disconnect cannot produce a completion intent. Disconnect or expiry cancels
 the complete session, including one whose challenge was ready but not yet committed. Knowledge and
-the capped teacher reward must eventually commit atomically; the pure state machine and development
+the capped teacher reward must eventually commit atomically; the pure state machine and simulation
 lab intentionally grant neither.
+
+### Durable teaching completion contract
+
+Migration V0006 stores permanent character Knowledge, the visible Renown projection, an immutable
+Renown deed journal and an immutable teaching-completion journal. One completion transaction locks
+teacher and student in UUID order, then either commits all of the following or none:
+
+- the student's Technique Knowledge row;
+- the server-authored mentorship deed and its resolved daily repetition result;
+- the teacher's Renown projection when the deed awards a positive amount;
+- the teaching-session UUID and its exact immutable participant/Technique/deed binding.
+
+Exact replay of the same teaching-session and deed UUID returns the original result without a new
+Knowledge row, deed, award or version. Reusing either UUID with different input, or teaching a
+Technique the student already knows through another source, rejects and rolls back every new output.
+After commit, both active Player Sessions reload database truth before success is published. If a
+session changes during asynchronous completion, memory state is not patched; exact retry reloads the
+already committed truth.
+
+Production build resolution requires a selected Technique to exist in permanent Knowledge. V0006
+grandfathers Technique/Form/Spell selections already committed before the migration by importing
+their stable IDs as `LEGACY_BUILD_BACKFILL`; it never infers knowledge from post-migration GUI state.
+Form and Spell learned-state gating remains with their authored acquisition-source slice.
 
 ## Renown
 

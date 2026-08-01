@@ -17,15 +17,16 @@ class MigrationCatalogTest {
         assertTrue(loaded.isSuccess());
         MigrationCatalog catalog =
                 ((Result.Success<MigrationCatalog, MigrationErrorCode>) loaded).value();
-        assertEquals(5, catalog.migrations().size());
+        assertEquals(6, catalog.migrations().size());
         assertEquals(1, catalog.migrations().getFirst().version());
-        assertEquals(5, catalog.migrations().getLast().version());
+        assertEquals(6, catalog.migrations().getLast().version());
         assertEquals(64, catalog.migrations().getFirst().checksum().length());
         assertTrue(catalog.migrations().getFirst().sql().contains("character_leases"));
         assertTrue(catalog.migrations().get(1).sql().contains("commodity_lot"));
         assertTrue(catalog.migrations().get(2).sql().contains("audit_log"));
         assertTrue(catalog.migrations().get(3).sql().contains("character_build_state"));
-        assertTrue(catalog.migrations().getLast().sql().contains("combat_progression_evidence"));
+        assertTrue(catalog.migrations().get(4).sql().contains("combat_progression_evidence"));
+        assertTrue(catalog.migrations().getLast().sql().contains("teaching_completion_journal"));
     }
 
     @Test

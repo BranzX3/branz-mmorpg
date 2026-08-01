@@ -24,6 +24,7 @@ import com.branz.mmorpg.progression.build.BuildResolution;
 import com.branz.mmorpg.progression.build.CharacterBuild;
 import com.branz.mmorpg.progression.build.FormDefinition;
 import com.branz.mmorpg.progression.build.TechniqueDefinition;
+import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import com.branz.mmorpg.scenes.QuiverAmmoTransferPreview;
 import com.branz.mmorpg.scenes.QuiverTransferDirection;
 import com.branz.mmorpg.scenes.SceneCloseReason;
@@ -721,7 +722,7 @@ final class SceneHubController implements Listener {
     private void populateBuildCommitStatus(
             Player player, Inventory inventory, SceneSession sceneSession, String family) {
         Result<BuildResolution, BuildErrorCode> resolved =
-                resolveBuild(sceneSession.previewState().build(), family);
+                resolveBuild(player, sceneSession.previewState().build(), family);
         if (resolved instanceof Result.Success<BuildResolution, BuildErrorCode> success) {
             BuildResolution value = success.value();
             inventory.setItem(
@@ -831,7 +832,7 @@ final class SceneHubController implements Listener {
     private void previewBuild(Player player, SceneInventoryHolder holder, CharacterBuild desired) {
         SceneSession current = sessions.find(player.getUniqueId()).orElseThrow();
         String family = previewWeaponFamily(player, current).orElse(null);
-        Result<BuildResolution, BuildErrorCode> validation = resolveBuild(desired, family);
+        Result<BuildResolution, BuildErrorCode> validation = resolveBuild(player, desired, family);
         if (validation instanceof Result.Failure<BuildResolution, BuildErrorCode> failure) {
             throw new IllegalArgumentException(failure.error().code() + ": " + failure.detail());
         }
@@ -864,7 +865,7 @@ final class SceneHubController implements Listener {
         }
         String family = previewWeaponFamily(player, sceneSession).orElse(null);
         Result<BuildResolution, BuildErrorCode> validation =
-                resolveBuild(sceneSession.previewState().build(), family);
+                resolveBuild(player, sceneSession.previewState().build(), family);
         if (validation instanceof Result.Failure<BuildResolution, BuildErrorCode> failure) {
             committing.remove(player.getUniqueId());
             player.sendActionBar(
@@ -914,8 +915,21 @@ final class SceneHubController implements Listener {
     }
 
     private Result<BuildResolution, BuildErrorCode> resolveBuild(
-            CharacterBuild build, String family) {
-        return family == null ? buildEngine.resolve(build) : buildEngine.resolve(build, family);
+            Player player, CharacterBuild build, String family) {
+        Set<KnowledgeKey> learned =
+                characterSessions
+                        .active(player)
+                        .map(
+                                session ->
+                                        session.snapshot().learnedKnowledge().stream()
+                                                .map(record -> record.knowledge())
+                                                .collect(
+                                                        java.util.stream.Collectors
+                                                                .toUnmodifiableSet()))
+                        .orElse(Set.of());
+        return family == null
+                ? buildEngine.resolve(build, learned)
+                : buildEngine.resolve(build, family, learned);
     }
 
     private Optional<String> previewWeaponFamily(Player player, SceneSession sceneSession) {

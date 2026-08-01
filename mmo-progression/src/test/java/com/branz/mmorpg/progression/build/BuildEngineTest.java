@@ -9,6 +9,8 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.content.snapshot.ContentLoadFailure;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.branz.mmorpg.content.snapshot.ContentSnapshotLoader;
+import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
+import com.branz.mmorpg.progression.knowledge.KnowledgeType;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +60,25 @@ class BuildEngineTest {
         Result<BuildResolution, BuildErrorCode> capacity = engine.resolve(overflow, "STAFF");
         assertFalse(capacity.isSuccess());
         assertEquals(BuildErrorCode.BUILD_ATTUNEMENT_CAPACITY_EXCEEDED, failure(capacity));
+    }
+
+    @Test
+    void productionResolutionRequiresPermanentTechniqueKnowledge() {
+        BuildEngine engine = engine();
+        CharacterBuild build =
+                CharacterBuild.initial()
+                        .withTechnique(MovesetBranch.PRIMARY_1, Optional.of(STAFF_TECHNIQUE));
+
+        Result<BuildResolution, BuildErrorCode> missing = engine.resolve(build, "STAFF", Set.of());
+        Result<BuildResolution, BuildErrorCode> learned =
+                engine.resolve(
+                        build,
+                        "STAFF",
+                        Set.of(new KnowledgeKey(KnowledgeType.TECHNIQUE, STAFF_TECHNIQUE)));
+
+        assertFalse(missing.isSuccess());
+        assertEquals(BuildErrorCode.BUILD_KNOWLEDGE_REQUIRED, failure(missing));
+        assertTrue(learned.isSuccess());
     }
 
     @Test

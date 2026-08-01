@@ -5,6 +5,8 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.content.definition.ContentDefinition;
 import com.branz.mmorpg.content.schema.DefinitionType;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
+import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
+import com.branz.mmorpg.progression.knowledge.KnowledgeType;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -90,16 +92,37 @@ public final class BuildEngine {
     }
 
     public Result<BuildResolution, BuildErrorCode> resolve(CharacterBuild build) {
-        return resolve(build, Optional.empty());
+        return resolve(build, Optional.empty(), Optional.empty());
     }
 
     public Result<BuildResolution, BuildErrorCode> resolve(
             CharacterBuild build, String weaponFamily) {
-        return resolve(build, Optional.of(requireText(weaponFamily, "weaponFamily")));
+        return resolve(
+                build, Optional.of(requireText(weaponFamily, "weaponFamily")), Optional.empty());
+    }
+
+    public Result<BuildResolution, BuildErrorCode> resolve(
+            CharacterBuild build, Set<KnowledgeKey> learnedKnowledge) {
+        return resolve(
+                build,
+                Optional.empty(),
+                Optional.of(
+                        Set.copyOf(Objects.requireNonNull(learnedKnowledge, "learnedKnowledge"))));
+    }
+
+    public Result<BuildResolution, BuildErrorCode> resolve(
+            CharacterBuild build, String weaponFamily, Set<KnowledgeKey> learnedKnowledge) {
+        return resolve(
+                build,
+                Optional.of(requireText(weaponFamily, "weaponFamily")),
+                Optional.of(
+                        Set.copyOf(Objects.requireNonNull(learnedKnowledge, "learnedKnowledge"))));
     }
 
     private Result<BuildResolution, BuildErrorCode> resolve(
-            CharacterBuild build, Optional<String> weaponFamily) {
+            CharacterBuild build,
+            Optional<String> weaponFamily,
+            Optional<Set<KnowledgeKey>> learnedKnowledge) {
         Objects.requireNonNull(build, "build");
         int replaceable =
                 (int)
@@ -120,6 +143,13 @@ public final class BuildEngine {
                 return Result.failure(
                         BuildErrorCode.BUILD_UNKNOWN_TECHNIQUE,
                         "Technique is missing or does not own branch " + entry.getKey() + ".");
+            }
+            KnowledgeKey required = new KnowledgeKey(KnowledgeType.TECHNIQUE, technique.id());
+            if (learnedKnowledge.isPresent()
+                    && !learnedKnowledge.orElseThrow().contains(required)) {
+                return Result.failure(
+                        BuildErrorCode.BUILD_KNOWLEDGE_REQUIRED,
+                        "Technique " + technique.id().value() + " has not been learned.");
             }
             if (weaponFamily.isPresent() && !technique.supports(weaponFamily.orElseThrow())) {
                 return Result.failure(

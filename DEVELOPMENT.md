@@ -591,6 +591,25 @@ live inventory, change Bukkit resources or write PostgreSQL.
 159. Verify victory can freeze a pending wipe, requests reward reconciliation once and makes every
      later reset invalid. Replaying the victory or reward operation must produce no second effect or
      reward grant.
+160. In `LOCAL` with dev tools enabled, open `/mmo dev` and select `Boss Encounter Lab`, or run
+     `/mmo encounter start <new-uuid>` directly. Verify the green ACTIVE message appears only after
+     the Player Session checkpoint commit and `/mmo encounter status` reports attempt 1 with the
+     same encounter/checkpoint UUID.
+161. Spend an Expedition Flask charge, then die or run `/mmo encounter defeat`. Verify solo enters
+     confirmed wipe, restores the exact prepared Flask after PostgreSQL acknowledgement and reports
+     attempt 2. Verify normal consumable effects and ailments shown by `/mmo consumable status` are
+     unchanged.
+162. Start with `/mmo encounter start <new-uuid> <player-one> <player-two>`. Defeat one participant
+     and verify the active survivor prevents wipe/restore. Defeat the survivor and verify both
+     prepared Flasks restore once; an offline participant must remain pending until reconnect and
+     Player Session readiness.
+163. Quit/rejoin before 1,200 ticks and verify the same attempt remains active. Run `/mmo encounter
+     boundary` followed by `/mmo encounter rejoin` and verify the same result; allow the grace to
+     expire while every other participant is defeated and verify one confirmed wipe occurs.
+164. Start a fresh encounter and run `/mmo encounter victory` before wipe. Verify status is
+     `VICTORY_PENDING`, death cannot trigger Flask restore, then run `/mmo encounter rewards
+     <new-grant-uuid>` and verify the empty lab reconciliation completes once. Actual personal loot
+     is intentionally deferred to the reward slice.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

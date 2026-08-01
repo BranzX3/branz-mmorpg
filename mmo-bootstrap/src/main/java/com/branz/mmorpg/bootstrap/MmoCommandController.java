@@ -99,7 +99,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
                             "Progression Evidence Lab",
                             "progression"),
                     new DevModule(24, Material.WRITABLE_BOOK, "Teaching & Renown Lab", "teaching"),
-                    new DevModule(28, Material.ZOMBIE_HEAD, "Encounter Spawner (locked)", "locked"),
+                    new DevModule(28, Material.ZOMBIE_HEAD, "Boss Encounter Lab", "encounter"),
                     new DevModule(30, Material.PAINTING, "Scene/UI Tester", "scene"),
                     new DevModule(
                             32,
@@ -121,6 +121,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final CombatSessionController combatSessions;
     private final LiveTeachingSessionController liveTeaching;
     private final KnowledgeAcquisitionController knowledgeAcquisition;
+    private final BossEncounterController bossEncounters;
     private final CombatTraceFileExporter traceExporter;
     private final ProgressionEvidenceEngine progressionEvidence = new ProgressionEvidenceEngine();
     private final TeachingSessionEngine teachingEngine = new TeachingSessionEngine();
@@ -139,7 +140,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
             CharacterSessionController characterSessions,
             CombatSessionController combatSessions,
             LiveTeachingSessionController liveTeaching,
-            KnowledgeAcquisitionController knowledgeAcquisition) {
+            KnowledgeAcquisitionController knowledgeAcquisition,
+            BossEncounterController bossEncounters) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.packGate = Objects.requireNonNull(packGate, "packGate");
@@ -154,6 +156,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
         this.liveTeaching = Objects.requireNonNull(liveTeaching, "liveTeaching");
         this.knowledgeAcquisition =
                 Objects.requireNonNull(knowledgeAcquisition, "knowledgeAcquisition");
+        this.bossEncounters = Objects.requireNonNull(bossEncounters, "bossEncounters");
         traceExporter =
                 new CombatTraceFileExporter(
                         plugin.getDataFolder().toPath().resolve("combat-traces"));
@@ -202,8 +205,21 @@ final class MmoCommandController implements CommandExecutor, Listener {
             handleConsumableTool(sender, args);
             return true;
         }
+        if ("encounter".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Encounter Lab requires an in-game player.");
+            } else if (!devToolsAllowed(player)) {
+                player.sendMessage(
+                        Component.text(
+                                "Encounter Lab is disabled for this environment/account.",
+                                NamedTextColor.RED));
+            } else {
+                bossEncounters.handleCommand(player, args);
+            }
+            return true;
+        }
         sender.sendMessage(
-                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable>");
+                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|encounter>");
         return true;
     }
 
@@ -886,6 +902,11 @@ final class MmoCommandController implements CommandExecutor, Listener {
                 player.closeInventory();
                 simulateTeaching(player, "success");
                 simulateRenown(player, "fresh");
+            }
+            case "encounter" -> {
+                player.closeInventory();
+                bossEncounters.handleCommand(
+                        player, new String[] {"encounter", "start", UUID.randomUUID().toString()});
             }
             case "locked" ->
                     player.sendActionBar(

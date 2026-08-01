@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":mmo-progression"))
     implementation(project(":mmo-persistence"))
     implementation(project(":mmo-scenes"))
+    implementation(project(":mmo-worldloop"))
     implementation(project(":mmo-integrations"))
     implementation(project(":mmo-integrations:integration-oraxen"))
     implementation(project(":mmo-integrations:integration-mythicmobs"))

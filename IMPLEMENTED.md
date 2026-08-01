@@ -2135,3 +2135,37 @@ Milestone status: **Milestone 7 remains in progress.** Durable encounter persist
 confirmed-wipe bridge, personal rewards, Death Pouch, party/LFG, downed/revive and PvP hooks remain.
 
 Schema/config/migration impact: none. ADR 0026 owns the lifecycle and replay invariants.
+
+## Milestone 7 - live confirmed-wipe Flask bridge slice
+
+Implemented:
+
+- the environment-gated Boss Encounter Lab starts a solo encounter from the dev hub or a one-to-five
+  player encounter by command and captures a shared durable Flask checkpoint before activation;
+- partial checkpoint preparation can retry the same encounter UUID and reuses captures that already
+  match instead of writing them again;
+- real Paper death and quit events drive participant defeat and reconnect grace, while ready-session
+  rejoin and the server-tick grace monitor preserve or expire membership authoritatively;
+- only a confirmed all-participant wipe begins reset, with stable per-attempt operation IDs and one
+  asynchronous Flask restore per locked character;
+- reset preserves normal consumables, ailments and all unrelated values, waits for offline players,
+  retries transient mutation failure and starts the next attempt only after every acknowledgement;
+- victory prevents restore and exposes an empty reward-reconciliation fixture without pretending
+  that personal rewards are implemented.
+
+Tests and completion evidence:
+
+- the existing world-loop suite proves all lifecycle decisions and replay behavior used by the live
+  adapter;
+- bootstrap compilation covers Paper events, command wiring, Player Session integration and the
+  newly unlocked dev-hub tile;
+- the full build and Paper smoke test cover module assembly and clean local startup.
+
+Failure/recovery behavior: missing/mismatched snapshots block reset visibly; offline characters stay
+pending and transient mutation failure retries the same derived operation. Encounter runtime is
+process-local in this slice, so restart recovery remains explicit follow-up work.
+
+Milestone status: **Milestone 7 remains in progress.** Durable encounter persistence/recovery,
+personal rewards, Death Pouch, party/LFG, downed/revive and PvP hooks remain.
+
+Schema/config/migration impact: none. ADR 0027 composes the V0008 Flask snapshot with ADR 0026.

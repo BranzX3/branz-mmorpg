@@ -146,7 +146,10 @@ The pure party kernel now owns five-member capacity, invitation lifecycle, leade
 five-minute reconnect grace, leave/kick/disband and bounded ready checks with operation replay.
 The live Paper adapter now exposes those transitions through `/mmo party`, binds ready online party
 members to boss admission and reconstructs membership only for active durable checkpoint encounters.
-The party/boss flow is ready for in-game acceptance; LFG is the next social slice.
+The pure LFG kernel now owns stable party listings, public activity/region/language/role matching,
+bounded experience notes, leader approval by default, optional automatic joining and admission-time
+capacity. Hidden Mastery cannot enter its public requirement tags. Live directory commands and
+party composition are the next social slice.
 
 ## Milestone 8 — Lifeskill kernel
 

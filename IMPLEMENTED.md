@@ -2438,3 +2438,32 @@ Milestone status: **Milestone 7 remains in progress.** Live party membership and
 are ready for in-game acceptance; LFG, personal rewards, Death Pouch and PvP remain.
 
 Schema/config/migration impact: none. ADR 0036 owns live party and boss binding semantics.
+
+## Milestone 7 - LFG listing kernel slice
+
+Implemented:
+
+- stable `LfgListingId` joins the sealed persistent identity model;
+- immutable listings bind a party/leader to stable activity and region IDs, normalized language,
+  descriptive role, bounded experience note, public entry tags and available slots;
+- leader approval is the default request flow, while explicit automatic joining emits the same
+  accepted-applicant effect and obeys the admission-time capacity boundary;
+- applicants can cancel pending requests, only the leader can accept/decline and close clears all
+  unresolved applications;
+- pure search matches activity, region, language, role and the same public eligibility predicate;
+- public tag validation rejects Mastery-shaped data, and operation UUIDs make exact replay a no-op.
+
+Tests and completion evidence:
+
+- social tests cover default approval, public requirements, automatic capacity, authority,
+  cancellation/close, search filtering and operation replay;
+- module formatting, compilation and tests pass.
+
+Failure/recovery behavior: invalid listings and decisions mutate nothing. The kernel emits an
+accepted applicant but does not claim party authority; the live adapter must compose that effect
+with the party engine.
+
+Milestone status: **Milestone 7 remains in progress.** The LFG kernel is ready; live directory and
+party composition, personal rewards, Death Pouch and PvP remain.
+
+Schema/config/migration impact: none. ADR 0037 owns LFG kernel semantics.

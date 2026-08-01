@@ -713,6 +713,23 @@ live inventory, change Bukkit resources or write PostgreSQL.
      directory. Verify boss recovery completes first, `/mmo party status` reconstructs the checkpoint
      membership, online members reconnect and absent members retain the five-minute grace. A party
      that was not in an active checkpoint must not survive restart.
+199. Run `./gradlew :mmo-social:test` and create an LFG listing without an explicit join policy.
+     Verify it defaults to leader approval and a qualifying applicant remains pending until the
+     listing leader decides.
+200. Accept a pending request and verify one accepted-applicant effect plus one consumed slot. Fill
+     the last slot, then submit/approve another applicant and verify the full boundary mutates
+     neither pending nor accepted state.
+201. Create an automatic listing and verify a qualifying application emits the same accepted effect
+     immediately. Verify automatic mode is opt-in and never changes the default approval listing.
+202. Require a public eligibility tag and verify search/admission reject an applicant without it.
+     Attempt to construct a requirement containing `mastery` and verify validation fails before the
+     listing enters the directory; no hidden Mastery number may be exposed.
+203. Search by activity, region, normalized language and descriptive role. Verify mismatched filters,
+     closed listings, full listings and unmet public requirements are excluded without consulting
+     combat/progression internals.
+204. Cancel a pending request, reject another as a non-leader and close as leader. Replay one exact
+     operation UUID and verify no duplicate accepted effect; reuse it for a different command kind
+     and verify failure without mutation.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

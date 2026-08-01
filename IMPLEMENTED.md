@@ -1629,7 +1629,7 @@ Tests:
 
 Failure/recovery behavior: this slice is a pure deterministic resolver. It performs no database or
 Bukkit mutation, trusts no client value and cannot grant progression from the dev lab. Durable
-idempotent batching and live encounter evidence emission belong to the next Milestone 6 slice.
+idempotent batching and live encounter evidence emission are supplied by the later slices below.
 
 Schema/config/migration impact: no content-schema or SQL migration. The authoritative subsystem
 spec and default balance targets now define the previously unspecified V1 evidence curve. The
@@ -1664,8 +1664,46 @@ Failure/recovery behavior: database or validation failure retains the previous a
 snapshot. Suppressed evidence is auditable, failed batches leave no partial rows, and successful
 writes reload database truth before later session mutations.
 
-Milestone status: **Milestone 6 remains in progress.** Live encounter evidence emission,
-learning/teaching/Renown, Flask/consumables/ailments, Rest Context and boss Flask snapshot remain.
+Milestone status: **Milestone 6 remains in progress.** Learning/teaching/Renown,
+Flask/consumables/ailments, Rest Context and boss Flask snapshot remain.
 
 Schema/config/migration impact: forward migration V0005 adds two tables and two indexes. No content
 schema or configuration change is required; ADR 0016 owns the transaction and recovery decision.
+
+## Milestone 6 - live combat evidence outcome slice
+
+Implemented:
+
+- live melee, Bow/Crossbow projectile and Staff Direct/Projectile/Zone/Channel resolutions feed a
+  bounded session accumulator with unique action IDs rather than awarding per hit;
+- authoritative target death, player death, engagement exit and forced abandonment close Victory,
+  Defeat, Retreat and Abandoned summaries respectively;
+- each used weapon/magic discipline emits one Mastery candidate and one mapped Body Conditioning
+  candidate with stable retry identity and a fresh encounter UUID on re-engagement;
+- target challenge uses server maximum-health/attack/armor attributes; invulnerability and explicit
+  dummy/self-loop/zero-risk tags enter the resolver's anti-farm paths;
+- completed candidates queue in batches of at most 256 through serialized Player Session writes;
+  busy/unavailable persistence retries the same immutable candidates;
+- normal in-game completion feedback reports only track readiness bands, never exact evidence.
+
+Tests and completion evidence:
+
+- candidate composition covers deterministic pair identity, bounded action base, diversity and
+  execution ratios;
+- accumulator tests cover outcome-only emission, deduplicated action contacts, committed misses,
+  target/action bounds, defeat stress, completion clearing and new identity on re-engagement;
+- Player Session integration persists one composed Mastery/Conditioning outcome batch into the
+  reloaded character snapshot;
+- the full build passes 512 tests with no failures/errors, and Paper 26.2 reaches PostgreSQL runtime
+  ready against the existing V0005 data before its clean smoke-test shutdown.
+
+Failure/recovery behavior: open encounter summaries remain transient and grant nothing after an
+unclean restart. Completed immutable batches retry on temporary session/database contention and rely
+on V0005 exact replay for at-most-once advancement; permanent identity conflict is logged and not
+retried forever.
+
+Milestone status: **Milestone 6 remains in progress.** Learning/teaching/Renown,
+Flask/consumables/ailments, Rest Context and boss Flask snapshot remain.
+
+Schema/config/migration impact: none. The runtime consumes V0005; ADR 0017 owns the live outcome
+boundary and bounded transient accumulator.

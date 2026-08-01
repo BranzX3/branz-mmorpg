@@ -393,8 +393,8 @@ After joining the local Paper server as an operator/test account with an active 
     repetition/daily decay is soft rather than a hard cap.
 
 The simulation lab is non-authoritative test presentation: it creates no evidence row and cannot
-alter a character. The following developer-only commands exercise the durable path; live encounter
-emission is still deferred to the next Milestone 6 slice.
+alter a character. The following developer-only commands exercise the durable path; the live combat
+outcome checks below exercise the server-authored adapter.
 
 100. Run `/mmo progression status`; a new character must report `no meaningful evidence yet`.
 101. Choose a UUID and run `/mmo progression record meaningful <uuid>`. Verify a positive
@@ -406,6 +406,20 @@ emission is still deferred to the next Milestone 6 slice.
 103. Disconnect/reconnect, then stop and restart Paper. `/mmo progression status` must restore the
      same qualitative band. Record `invulnerable` with a fresh UUID and verify a zero-award
      suppressed row without track advancement.
+104. Equip each supported combat family and defeat a naturally hostile mob through the MMO combat
+     runtime. Verify chat reports only `Combat learning recorded: <track>=<band>` and
+     `/mmo progression status` contains the matching Mastery plus mapped Conditioning track.
+105. Hit one durable hostile with repeated Zone/Channel pulses or a piercing projectile. Defeat it
+     and verify one outcome summary is persisted: contacts sharing an action UUID must not become
+     separate evidence candidates.
+106. Tag a fresh hostile with `branzmmo.training_dummy`, defeat it repeatedly and verify it cannot
+     advance beyond introductory familiarity. Repeat with `branzmmo.zero_risk` and verify no track
+     advancement.
+107. Hit a hostile, disengage until combat returns to `EXPLORATION`, then re-engage the same entity.
+     Verify the Retreat and later Victory use separate encounter/evidence identities without an
+     idempotency conflict.
+108. Die after landing a valid action and verify Defeat evidence is bounded and qualitative. Force
+     teleport during another active segment and verify Abandoned produces no award.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

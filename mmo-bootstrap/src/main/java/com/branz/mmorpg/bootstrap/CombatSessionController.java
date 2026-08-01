@@ -1,5 +1,6 @@
 package com.branz.mmorpg.bootstrap;
 
+import com.branz.mmorpg.api.identity.CharacterId;
 import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.result.Result;
@@ -140,10 +141,18 @@ import com.branz.mmorpg.magic.effect.RunicImbuementRuntime;
 import com.branz.mmorpg.magic.effect.ZoneEngine;
 import com.branz.mmorpg.magic.effect.ZoneRuntime;
 import com.branz.mmorpg.magic.effect.ZoneTickResolution;
+import com.branz.mmorpg.persistence.progression.ProgressionEvidenceExecution;
 import com.branz.mmorpg.progression.build.BuildEngine;
 import com.branz.mmorpg.progression.build.BuildErrorCode;
 import com.branz.mmorpg.progression.build.BuildResolution;
 import com.branz.mmorpg.progression.build.MovesetBranch;
+import com.branz.mmorpg.progression.evidence.BodyConditioningAxis;
+import com.branz.mmorpg.progression.evidence.CombatEvidenceAccumulator;
+import com.branz.mmorpg.progression.evidence.EncounterOutcome;
+import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
+import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -224,6 +233,11 @@ final class CombatSessionController implements Listener {
                     EMBER_FLAME_TORRENT,
                     RUNIC_EMBER_EDGE);
     private static final int MAXIMUM_ACTIVE_ZONES_PER_CASTER = 4;
+    private static final int MAXIMUM_PROGRESSION_EVIDENCE_BATCH = 256;
+    private static final long PROGRESSION_RETRY_TICKS = 10L;
+    private static final String TRAINING_DUMMY_TAG = "branzmmo.training_dummy";
+    private static final String SELF_CREATED_LOOP_TAG = "branzmmo.self_created_loop";
+    private static final String ZERO_RISK_TAG = "branzmmo.zero_risk";
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
@@ -1187,6 +1201,20 @@ final class CombatSessionController implements Listener {
     public void onEntityDeath(EntityDeathEvent event) {
         UUID threatOwner = event.getEntity().getUniqueId();
         sessions.values().forEach(session -> session.threatOwners.remove(threatOwner));
+        sessions.forEach(
+                (playerId, session) -> {
+                    Player player = plugin.getServer().getPlayer(playerId);
+                    if (player != null && player.isOnline()) {
+                        queueProgressionEvidence(
+                                player,
+                                session,
+                                session.combatEvidence.completeTarget(
+                                        new CharacterId(playerId),
+                                        threatOwner,
+                                        contentVersion,
+                                        EncounterOutcome.ABANDONED));
+                    }
+                });
         trainingTargetHealth.remove(threatOwner);
         trainingTargetPosture.remove(threatOwner);
     }
@@ -1198,6 +1226,7 @@ final class CombatSessionController implements Listener {
         if (session == null) {
             return;
         }
+        completeOpenCombatEvidence(player, session, EncounterOutcome.DEFEAT);
         long tick = plugin.getServer().getCurrentTick();
         session.health = playerHealth.kill(session.health, tick);
         cancelAction(session, "DEATH");
@@ -1275,6 +1304,7 @@ final class CombatSessionController implements Listener {
         if (authoritativeDodgeStep) {
             return;
         }
+        completeOpenCombatEvidence(event.getPlayer(), session, EncounterOutcome.ABANDONED);
         cancelAction(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         cancelBow(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         cancelCrossbow(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
@@ -1368,6 +1398,11 @@ final class CombatSessionController implements Listener {
                 && session.timeline.resourceState() == ResourceCommitState.COMMITTED) {
             session.lastStaminaSpendTick = plugin.getServer().getCurrentTick();
             session.staminaRegenRemainder = 0;
+            observeCommittedCombatAction(
+                    session,
+                    activeMove.family(),
+                    Objects.requireNonNull(session.activeMoveEvidenceActionId),
+                    activeMove.id());
             markHostile(player, session);
         }
         if (session.timeline.phase() != prior) {
@@ -1394,6 +1429,7 @@ final class CombatSessionController implements Listener {
             finishTrace(session, session.timeline);
             session.timeline = null;
             session.previousActionTransform = null;
+            session.activeMoveEvidenceActionId = null;
             session.action = ActionState.IDLE;
         } else {
             session.action = actionState(session.timeline.phase());
@@ -1552,6 +1588,14 @@ final class CombatSessionController implements Listener {
             CombatHealthResolution healthResolution =
                     enemyHealth.damage(targetHealth, currentTick, resolvedDamage);
             trainingTargetHealth.put(target.entityId(), healthResolution.runtime());
+            observeSuccessfulCombatAction(
+                    player,
+                    session,
+                    entity,
+                    activeMove.family(),
+                    Objects.requireNonNull(session.activeMoveEvidenceActionId),
+                    activeMove.id(),
+                    meleePower(activeMove.family()));
             totalDamage += healthResolution.appliedAmount();
             PostureResolution postureResolution =
                     postures.damage(posture, currentTick, resolvedPosture);
@@ -1570,6 +1614,7 @@ final class CombatSessionController implements Listener {
             }
             if (healthResolution.lethalNow()) {
                 deaths++;
+                completeCombatTarget(player, session, entity, EncounterOutcome.VICTORY);
                 entity.setHealth(0);
             }
         }
@@ -1778,6 +1823,21 @@ final class CombatSessionController implements Listener {
             PostureResolution postureResolution = postures.damage(posture, tick, postureDamage);
             trainingTargetPosture.put(hit.entityId(), postureResolution.runtime());
             if (ownerSession != null) {
+                DefinitionId sourceId = live.runtime().identity().sourceMoveId();
+                String family =
+                        live.context().arcaneSchool().isPresent()
+                                ? "STAFF"
+                                : moves.find(sourceId)
+                                        .map(MoveDefinition::family)
+                                        .orElse("ENDURANCE");
+                observeSuccessfulCombatAction(
+                        owner,
+                        ownerSession,
+                        entity,
+                        family,
+                        live.runtime().identity().projectileId(),
+                        sourceId,
+                        live.context().sourcePower());
                 ownerSession.lastResolution =
                         "PROJECTILE HIT damage="
                                 + roundOne(health.appliedAmount())
@@ -1789,6 +1849,9 @@ final class CombatSessionController implements Listener {
                         Component.text(ownerSession.lastResolution, NamedTextColor.GREEN));
             }
             if (health.lethalNow()) {
+                if (ownerSession != null) {
+                    completeCombatTarget(owner, ownerSession, entity, EncounterOutcome.VICTORY);
+                }
                 entity.setHealth(0);
             }
         }
@@ -2458,6 +2521,7 @@ final class CombatSessionController implements Listener {
                                 trainingBowMove,
                                 pending.charge().postureMultiplier(),
                                 pending.charge().penetrationPercentage())));
+        observeCommittedCombatAction(session, "BOW", pending.projectileId(), trainingBowMove.id());
         markHostile(player, session);
         session.lastResolution =
                 "BOW FIRED charge="
@@ -2657,6 +2721,7 @@ final class CombatSessionController implements Listener {
     }
 
     private void tickEngagement(Player player, LiveSession session) {
+        EngagementState previousState = session.engagement.state();
         session.threatOwners.removeIf(
                 entityId -> {
                     Entity entity = plugin.getServer().getEntity(entityId);
@@ -2676,6 +2741,10 @@ final class CombatSessionController implements Listener {
         if (session.engagement.state() != EngagementState.ENGAGED) {
             releaseGuard(session);
         }
+        if (previousState != EngagementState.EXPLORATION
+                && session.engagement.state() == EngagementState.EXPLORATION) {
+            completeOpenCombatEvidence(player, session, EncounterOutcome.RETREAT);
+        }
     }
 
     private void markHostile(Player player, LiveSession session) {
@@ -2685,6 +2754,209 @@ final class CombatSessionController implements Listener {
                 instanceof SceneInventoryHolder) {
             player.closeInventory();
         }
+    }
+
+    private void observeCommittedCombatAction(
+            LiveSession session, String family, UUID actionId, DefinitionId moveOrSpellId) {
+        session.combatEvidence.observeCommittedAction(
+                progressionDiscipline(family), actionId, moveOrSpellId);
+    }
+
+    private void observeSuccessfulCombatAction(
+            Player player,
+            LiveSession session,
+            LivingEntity target,
+            String family,
+            UUID actionId,
+            DefinitionId moveOrSpellId,
+            double demonstratedCapability) {
+        boolean observed =
+                session.combatEvidence.observeSuccessfulAction(
+                        target.getUniqueId(),
+                        progressionTargetKind(target),
+                        target.getType().name().toLowerCase(java.util.Locale.ROOT),
+                        progressionChallenge(target),
+                        progressionDiscipline(family),
+                        conditioningAxis(family),
+                        actionId,
+                        moveOrSpellId,
+                        demonstratedCapability,
+                        combatStress(session, family));
+        if (!observed) {
+            plugin.getLogger()
+                    .warning(
+                            "Progression evidence target bound reached for "
+                                    + player.getUniqueId()
+                                    + "; this target will not produce evidence.");
+        }
+    }
+
+    private void completeCombatTarget(
+            Player player, LiveSession session, LivingEntity target, EncounterOutcome outcome) {
+        session.combatEvidence.observeStress(combatStress(session, "ENDURANCE"));
+        queueProgressionEvidence(
+                player,
+                session,
+                session.combatEvidence.completeTarget(
+                        new CharacterId(player.getUniqueId()),
+                        target.getUniqueId(),
+                        contentVersion,
+                        outcome));
+    }
+
+    private void completeOpenCombatEvidence(
+            Player player, LiveSession session, EncounterOutcome outcome) {
+        if (session.combatEvidence.activeTargetCount() == 0) {
+            return;
+        }
+        session.combatEvidence.observeStress(combatStress(session, "ENDURANCE"));
+        queueProgressionEvidence(
+                player,
+                session,
+                session.combatEvidence.completeAll(
+                        new CharacterId(player.getUniqueId()), contentVersion, outcome));
+    }
+
+    private void queueProgressionEvidence(
+            Player player, LiveSession session, List<EvidenceCandidate> candidates) {
+        if (candidates.isEmpty()) {
+            return;
+        }
+        session.pendingProgressionEvidence.addAll(candidates);
+        flushProgressionEvidence(player, session);
+    }
+
+    private void flushProgressionEvidence(Player player, LiveSession session) {
+        if (session.progressionEvidenceCommitInFlight
+                || session.pendingProgressionEvidence.isEmpty()
+                || sessions.get(player.getUniqueId()) != session
+                || !player.isOnline()) {
+            return;
+        }
+        List<EvidenceCandidate> batch = new ArrayList<>();
+        while (!session.pendingProgressionEvidence.isEmpty()
+                && batch.size() < MAXIMUM_PROGRESSION_EVIDENCE_BATCH) {
+            batch.add(session.pendingProgressionEvidence.removeFirst());
+        }
+        session.progressionEvidenceCommitInFlight = true;
+        characters.recordProgressionEvidence(
+                player,
+                batch,
+                result -> completeProgressionEvidenceFlush(player, session, batch, result));
+    }
+
+    private void completeProgressionEvidenceFlush(
+            Player player,
+            LiveSession session,
+            List<EvidenceCandidate> batch,
+            Result<ProgressionEvidenceCommitResult, CharacterSessionErrorCode> result) {
+        session.progressionEvidenceCommitInFlight = false;
+        if (result
+                instanceof
+                Result.Failure<ProgressionEvidenceCommitResult, CharacterSessionErrorCode>
+                        failure) {
+            boolean retryable =
+                    failure.error() == CharacterSessionErrorCode.CHARACTER_PERSISTENCE_UNAVAILABLE
+                            || failure.error()
+                                            == CharacterSessionErrorCode
+                                                    .CHARACTER_TRANSACTION_REJECTED
+                                    && failure.detail().contains("Another durable");
+            if (retryable && sessions.get(player.getUniqueId()) == session && player.isOnline()) {
+                for (int index = batch.size() - 1; index >= 0; index--) {
+                    session.pendingProgressionEvidence.addFirst(batch.get(index));
+                }
+                plugin.getServer()
+                        .getScheduler()
+                        .runTaskLater(
+                                plugin,
+                                () -> flushProgressionEvidence(player, session),
+                                PROGRESSION_RETRY_TICKS);
+                return;
+            }
+            plugin.getLogger()
+                    .warning(
+                            "Combat progression evidence failed for "
+                                    + player.getUniqueId()
+                                    + ": "
+                                    + failure.error().code()
+                                    + " "
+                                    + failure.detail());
+            return;
+        }
+        List<ProgressionEvidenceExecution> executions =
+                ((Result.Success<ProgressionEvidenceCommitResult, CharacterSessionErrorCode>)
+                                result)
+                        .value()
+                        .executions();
+        String readiness =
+                executions.stream()
+                        .filter(execution -> execution.evidence().decision().accepted())
+                        .map(
+                                execution ->
+                                        execution.evidence().candidate().track().id().value()
+                                                + "="
+                                                + execution.evidence().decision().resultingBand())
+                        .distinct()
+                        .collect(java.util.stream.Collectors.joining(", "));
+        if (!readiness.isBlank() && player.isOnline()) {
+            player.sendMessage(
+                    Component.text("Combat learning recorded: " + readiness, NamedTextColor.AQUA));
+        }
+        flushProgressionEvidence(player, session);
+    }
+
+    private double combatStress(LiveSession session, String family) {
+        CombatResources resources =
+                session.timeline == null ? session.resources : session.timeline.resources();
+        double healthStress = 1.0 - session.health.current() / playerHealth.profile().maximum();
+        double resourceStress =
+                "STAFF".equalsIgnoreCase(family)
+                        ? 1.0 - resources.mana() / 100.0
+                        : 1.0 - resources.stamina() / 100.0;
+        return Math.max(0.0, Math.min(1.5, Math.max(healthStress, resourceStress)));
+    }
+
+    private static String progressionDiscipline(String family) {
+        return family.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static BodyConditioningAxis conditioningAxis(String family) {
+        return switch (family.toUpperCase(java.util.Locale.ROOT)) {
+            case "GREATSWORD" -> BodyConditioningAxis.MIGHT;
+            case "SWORD_SHIELD" -> BodyConditioningAxis.FORTITUDE;
+            case "BOW", "CROSSBOW" -> BodyConditioningAxis.COORDINATION;
+            case "STAFF" -> BodyConditioningAxis.COMPOSURE;
+            default -> BodyConditioningAxis.ENDURANCE;
+        };
+    }
+
+    private static EvidenceTargetKind progressionTargetKind(LivingEntity target) {
+        if (target.isInvulnerable()) {
+            return EvidenceTargetKind.INVULNERABLE_TARGET;
+        }
+        if (target.getScoreboardTags().contains(TRAINING_DUMMY_TAG)) {
+            return EvidenceTargetKind.TRAINING_DUMMY;
+        }
+        if (target.getScoreboardTags().contains(SELF_CREATED_LOOP_TAG)) {
+            return EvidenceTargetKind.SELF_CREATED_LOOP;
+        }
+        if (target.getScoreboardTags().contains(ZERO_RISK_TAG)) {
+            return EvidenceTargetKind.ZERO_RISK_INTERACTION;
+        }
+        return EvidenceTargetKind.MEANINGFUL_ENCOUNTER;
+    }
+
+    private static double progressionChallenge(LivingEntity target) {
+        double health = attributeValue(target, Attribute.MAX_HEALTH);
+        double attack = attributeValue(target, Attribute.ATTACK_DAMAGE);
+        double armor = attributeValue(target, Attribute.ARMOR);
+        return Math.max(1.0, health * 2.0 + attack * 6.0 + armor * 3.0);
+    }
+
+    private static double attributeValue(LivingEntity target, Attribute attribute) {
+        return target.getAttribute(attribute) == null
+                ? 0.0
+                : Objects.requireNonNull(target.getAttribute(attribute)).getValue();
     }
 
     private void pollBuffered(Player player, LiveSession session) {
@@ -2739,6 +3011,7 @@ final class CombatSessionController implements Listener {
         }
         session.timeline =
                 ((Result.Success<ActionTimeline, ActionTimelineErrorCode>) started).value();
+        session.activeMoveEvidenceActionId = UUID.randomUUID();
         session.previousActionTransform = combatTransform(player);
         session.activeTraceInitialResources = session.resources;
         session.activeTraceCommands.clear();
@@ -2766,6 +3039,7 @@ final class CombatSessionController implements Listener {
         }
         session.timeline = null;
         session.previousActionTransform = null;
+        session.activeMoveEvidenceActionId = null;
         session.action = ActionState.IDLE;
     }
 
@@ -3314,6 +3588,7 @@ final class CombatSessionController implements Listener {
             session.resources = session.spellCast.resources();
             session.spellCast = null;
             session.spellOrigin = null;
+            session.spellEvidenceActionId = null;
             session.action = ActionState.IDLE;
         }
     }
@@ -3398,6 +3673,9 @@ final class CombatSessionController implements Listener {
         session.resources = session.spellCast.resources();
         session.lastManaCommitTick = tick;
         session.manaRegenRemainder = 0;
+        session.spellEvidenceActionId = pending.launch().effectId();
+        observeCommittedCombatAction(
+                session, "STAFF", pending.launch().effectId(), session.spellCast.spell().id());
         if (session.spellCommitInterrupted
                 || player == null
                 || !player.isOnline()
@@ -3405,6 +3683,7 @@ final class CombatSessionController implements Listener {
                 || !player.getWorld().getUID().equals(pending.launch().worldId())) {
             session.spellCast = null;
             session.spellOrigin = null;
+            session.spellEvidenceActionId = null;
             if (!session.action.hardControl()) {
                 session.action = ActionState.IDLE;
             }
@@ -3477,7 +3756,7 @@ final class CombatSessionController implements Listener {
         SpellDefinition spell = session.spellCast.spell();
         switch (spell.deliveryType()) {
             case PROJECTILE -> launchStaffSpellProjectile(player, session, pending);
-            case DIRECT -> applyDirectSpell(player, session, spell);
+            case DIRECT -> applyDirectSpell(player, session, spell, pending.effectId());
             case ZONE -> launchSpellZone(player, session, pending, spell);
             case BEAM -> {
                 session.lastResolution =
@@ -3498,7 +3777,8 @@ final class CombatSessionController implements Listener {
         }
     }
 
-    private void applyDirectSpell(Player player, LiveSession session, SpellDefinition spell) {
+    private void applyDirectSpell(
+            Player player, LiveSession session, SpellDefinition spell, UUID actionId) {
         SpellDefinition.Direct direct = spell.direct().orElseThrow();
         Location eye = player.getEyeLocation();
         RayTraceResult trace =
@@ -3517,7 +3797,7 @@ final class CombatSessionController implements Listener {
             session.lastResolution = spellLabel(spell) + " MISS";
             return;
         }
-        applyArcaneSpellHit(player, target, spell, spell.output().powerCoefficient());
+        applyArcaneSpellHit(player, target, spell, spell.output().powerCoefficient(), actionId);
         markHostile(player, session);
     }
 
@@ -3577,7 +3857,12 @@ final class CombatSessionController implements Listener {
                                                 && !(entity instanceof ArmorStand)
                                                 && !entity.isDead());
         if (trace != null && trace.getHitEntity() instanceof LivingEntity target) {
-            applyArcaneSpellHit(player, target, spell, spell.output().powerCoefficient());
+            applyArcaneSpellHit(
+                    player,
+                    target,
+                    spell,
+                    spell.output().powerCoefficient(),
+                    Objects.requireNonNull(session.spellEvidenceActionId));
             markHostile(player, session);
         } else {
             session.lastResolution =
@@ -3640,12 +3925,17 @@ final class CombatSessionController implements Listener {
                                             owner,
                                             target,
                                             spell,
-                                            spell.output().powerCoefficient()));
+                                            spell.output().powerCoefficient(),
+                                            entry.getKey()));
         }
     }
 
     private double applyArcaneSpellHit(
-            Player owner, LivingEntity target, SpellDefinition spell, double powerCoefficient) {
+            Player owner,
+            LivingEntity target,
+            SpellDefinition spell,
+            double powerCoefficient,
+            UUID actionId) {
         long tick = plugin.getServer().getCurrentTick();
         PostureRuntime posture = postureAt(target.getUniqueId(), tick);
         java.util.EnumSet<ConditionalAdvantage> advantages =
@@ -3673,6 +3963,8 @@ final class CombatSessionController implements Listener {
         trainingTargetPosture.put(target.getUniqueId(), postureResolution.runtime());
         LiveSession session = sessions.get(owner.getUniqueId());
         if (session != null) {
+            observeSuccessfulCombatAction(
+                    owner, session, target, "STAFF", actionId, spell.id(), trainingStaffPower);
             session.lastResolution =
                     spellLabel(spell)
                             + " HIT damage="
@@ -3684,6 +3976,9 @@ final class CombatSessionController implements Listener {
             owner.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));
         }
         if (health.lethalNow()) {
+            if (session != null) {
+                completeCombatTarget(owner, session, target, EncounterOutcome.VICTORY);
+            }
             target.setHealth(0);
         }
         return health.appliedAmount();
@@ -3749,6 +4044,7 @@ final class CombatSessionController implements Listener {
         }
         session.spellCast = null;
         session.spellOrigin = null;
+        session.spellEvidenceActionId = null;
         session.lastResolution = "SPELL CANCELLED " + reason;
         if (!session.action.hardControl()) {
             session.action = ActionState.IDLE;
@@ -4054,6 +4350,8 @@ final class CombatSessionController implements Listener {
                         runtime,
                         ProjectileCombatContext.physical(
                                 trainingCrossbowPower, trainingCrossbowMove, 1.0, 0.0)));
+        observeCommittedCombatAction(
+                session, "CROSSBOW", pending.projectileId(), trainingCrossbowMove.id());
         markHostile(player, session);
         session.lastResolution =
                 "CROSSBOW FIRED projectile="
@@ -4326,6 +4624,11 @@ final class CombatSessionController implements Listener {
         private double manaRegenRemainder;
         private String lastResolution;
         private final java.util.Set<UUID> threatOwners = new java.util.HashSet<>();
+        private final CombatEvidenceAccumulator combatEvidence = new CombatEvidenceAccumulator();
+        private final ArrayDeque<EvidenceCandidate> pendingProgressionEvidence = new ArrayDeque<>();
+        private boolean progressionEvidenceCommitInFlight;
+        private UUID activeMoveEvidenceActionId;
+        private UUID spellEvidenceActionId;
 
         private LiveSession(
                 EngagementRuntime engagement,

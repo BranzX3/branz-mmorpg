@@ -28,6 +28,8 @@ import com.branz.mmorpg.progression.build.BuildEngine;
 import com.branz.mmorpg.progression.build.BuildErrorCode;
 import com.branz.mmorpg.progression.build.CharacterBuild;
 import com.branz.mmorpg.progression.build.MovesetBranch;
+import com.branz.mmorpg.progression.evidence.BodyConditioningAxis;
+import com.branz.mmorpg.progression.evidence.CombatEvidenceAccumulator;
 import com.branz.mmorpg.progression.evidence.EncounterOutcome;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
@@ -43,6 +45,72 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CharacterSessionServiceIntegrationTest {
+    @Test
+    void combatOutcomeBatchPublishesMasteryAndConditioningIntoSessionSnapshot(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(10));
+        UUID playerId = UUID.randomUUID();
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database);
+            LoadedCharacterSession session = success(service.open(playerId));
+            CombatEvidenceAccumulator accumulator = new CombatEvidenceAccumulator();
+            UUID targetId = UUID.randomUUID();
+            assertTrue(
+                    accumulator.observeSuccessfulAction(
+                            targetId,
+                            EvidenceTargetKind.MEANINGFUL_ENCOUNTER,
+                            "minecraft:zombie",
+                            80.0,
+                            "greatsword",
+                            BodyConditioningAxis.MIGHT,
+                            UUID.randomUUID(),
+                            DefinitionId.of("move.training_greatsword.committed_cleave"),
+                            100.0,
+                            0.6));
+            List<EvidenceCandidate> batch =
+                    accumulator.completeTarget(
+                            session.characterId(),
+                            targetId,
+                            "content.test.1",
+                            EncounterOutcome.VICTORY);
+
+            ProgressionEvidenceCommitResult committed =
+                    progressionSuccess(service.recordProgressionEvidence(session, batch));
+
+            assertEquals(2, committed.executions().size());
+            assertEquals(2, committed.session().snapshot().progressionTracks().size());
+            assertTrue(
+                    committed.session().snapshot().progressionTracks().stream()
+                            .anyMatch(
+                                    track ->
+                                            track.track()
+                                                    .equals(
+                                                            ProgressionTrack.mastery(
+                                                                    "greatsword"))));
+            assertTrue(
+                    committed.session().snapshot().progressionTracks().stream()
+                            .anyMatch(
+                                    track ->
+                                            track.track()
+                                                    .equals(
+                                                            ProgressionTrack.conditioning(
+                                                                    BodyConditioningAxis.MIGHT))));
+            service.close(committed.session());
+        }
+    }
+
     @Test
     void progressionEvidenceSurvivesReconnectAndDatabaseRestart(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {

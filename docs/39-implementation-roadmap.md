@@ -83,8 +83,9 @@ evidence kernel, durable PostgreSQL evidence batches and Player Session reload p
 with bounded factors, exact idempotent replay, atomic conflict rollback, soft repetition/daily
 decay, five qualitative readiness bands and explicit anti-dummy suppression. The local dev tools
 can simulate without mutation or persist a fixed evidence UUID to verify reconnect/restart behavior.
-Live encounter emission, learning/teaching/Renown, Flask/consumables/ailments and boss snapshot
-restore remain before Milestone 6 completion.
+Live melee, projectile and spell outcomes now emit bounded Mastery/Conditioning batches without
+per-hit awards. Learning/teaching/Renown, Flask/consumables/ailments and boss snapshot restore remain
+before Milestone 6 completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

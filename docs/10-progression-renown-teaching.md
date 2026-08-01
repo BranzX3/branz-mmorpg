@@ -80,6 +80,27 @@ and rolls back the whole batch. Suppressed evidence remains journaled for audit 
 inspection even when no track row exists. A successful Player Session mutation reloads track state
 from the database before publishing its new snapshot.
 
+### Live combat evidence boundary
+
+The Paper combat adapter starts one server-owned encounter segment on the first authoritative
+successful action against a living target. It accumulates unique committed/successful action UUIDs,
+distinct move or spell IDs and peak health/resource stress; repeated hitbox contacts, projectile
+pierces, Zone pulses and Channel pulses sharing one action UUID do not create extra actions. No row
+or award is produced at hit time.
+
+The segment closes as Victory on authoritative target death, Defeat on player death, Retreat when
+engagement returns to Exploration, or Abandoned on a forced teleport/external target death. Each
+used discipline emits at most one Mastery and one mapped Body Conditioning candidate. A re-engage
+against the same surviving entity receives a new server encounter UUID. One session tracks at most
+64 active targets, each discipline summary counts at most 64 action UUIDs, and persistence splits
+the output into batches of at most 256 candidates.
+
+V1 maps Greatsword to Might, Sword and Shield to Fortitude, Bow/Crossbow to Coordination, Staff to
+Composure and fallback families to Endurance. Target challenge is derived only from server entity
+maximum health, attack damage and armor. Invulnerable entities and entities tagged
+`branzmmo.training_dummy`, `branzmmo.self_created_loop` or `branzmmo.zero_risk` enter the matching
+anti-farm classification before resolution.
+
 ## Mastery effects
 
 Mastery may:

@@ -61,7 +61,15 @@ mastery_dummy_familiarity_limit: 25
 mastery_repetition_window_minutes: 30
 mastery_daily_curve: { full_until: 100, half_until: 250, late_factor: 0.25 }
 mastery_readiness_thresholds: [0, 100, 300, 600, 850]
+combat_evidence_active_target_cap: 64
+combat_evidence_action_cap_per_discipline: 64
+combat_evidence_persistence_batch_cap: 256
 ```
+
+The V1 Paper adapter derives target challenge as
+`max(1, maximum_health * 2 + attack_damage * 6 + armor * 3)`. These inputs are authoritative entity
+attributes, never client claims. One successful action contributes base evidence `2.5`, bounded by
+the per-candidate cap; the paired Body Conditioning candidate uses half that base.
 
 ## Lifeskill
 

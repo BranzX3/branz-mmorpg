@@ -133,6 +133,10 @@ recovers `ACTIVE`, `WIPE_PENDING`, `RESETTING` and `VICTORY_PENDING` records on 
 is rebased to the new server clock and reset operations replay safely. The boss wipe/retry/reconnect
 boundary is ready for in-game restart acceptance; authored rewards and party systems remain.
 
+The pure party-PvE downed kernel now owns the one-revive encounter allowance, 15-second downed
+window, four-second interruptible channel, 25% revive and Execute/solo/second-defeat death rules.
+Live Paper interception, durable recovery and party membership are the next social slices.
+
 ## Milestone 8 — Lifeskill kernel
 
 - Rank/Mastery/Focus;

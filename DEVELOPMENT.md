@@ -629,6 +629,15 @@ live inventory, change Bukkit resources or write PostgreSQL.
 170. Stop Paper in `VICTORY_PENDING`, restart and verify death cannot trigger reset/Flask restore.
      Reconcile the empty lab reward using a stable grant UUID, restart again and verify the completed
      encounter is excluded from recovery and its participant locks are released.
+171. Run `./gradlew :mmo-social:test` and inspect the downed flow. Verify the first non-Execute lethal
+     event in a two-player encounter emits DOWNED with a 300-tick deadline, while solo and Execute
+     emit death immediately.
+172. Begin an ally revive, interrupt it before 80 ticks and verify the revive allowance remains
+     unused. Restart and commit a channel; verify the output requests exactly 25% health, marks the
+     revive consumed and grants 60 ticks of protection.
+173. Apply hostile action to end protection, then apply another lethal event and verify immediate
+     death. Advance an unfinished revive exactly at the 300-tick downed deadline and verify expiry
+     wins with no heal output. Replay operation UUIDs and verify no effect is emitted twice.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

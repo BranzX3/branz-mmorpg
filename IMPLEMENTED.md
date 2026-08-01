@@ -2234,3 +2234,32 @@ downed/revive and PvP hooks remain; the boss wipe/retry persistence boundary is 
 restart acceptance.
 
 Schema/config/migration impact: none beyond existing V0009. ADR 0029 owns live recovery ordering.
+
+## Milestone 7 - party-PvE downed/revive kernel slice
+
+Implemented:
+
+- one-to-five participant encounter life state distinguishes active, 15-second downed and dead;
+- solo, Execute, lethal damage while downed and the second lethal event after revival bypass downed
+  and become death immediately;
+- an active ally channels revive for four seconds, with one channel per reviver/target and explicit
+  interruption that does not consume the encounter revive;
+- downed expiry wins over an unfinished revive, while committed revive emits 25% health, consumes
+  exactly one revive and grants short protection that hostile action ends;
+- operation UUIDs make lethal, channel, interruption, clock and hostile-action transitions replay
+  safe and reject reuse across command kinds.
+
+Tests and completion evidence:
+
+- social tests cover first/second lethal events, solo and Execute, interrupted/restarted revive,
+  expiry priority, protection cancellation and operation replay/reuse;
+- module formatting, compilation and test checks pass.
+
+Failure/recovery behavior: invalid actors/targets/life states and busy/expired channels mutate
+nothing. Effects are explicit transition outputs for a later durable Paper adapter.
+
+Milestone status: **Milestone 7 remains in progress.** Live damage interception, party membership,
+durable downed state, rewards, Death Pouch, LFG and PvP hooks remain.
+
+Schema/config/migration impact: none. ADR 0030 owns current downed/revive semantics and supersedes
+the old no-downed assumption in document 14.

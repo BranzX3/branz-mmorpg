@@ -8,7 +8,9 @@
 - No raid conversion in V1.
 - Party membership is persistent across short disconnects for 5 minutes, but not across server restart unless the group is in an active checkpoint encounter.
 - Friendly fire is off in PvE.
-- Party HUD shows HP, primary resource state, status warnings and dead/disconnected state. There is no downed state; dead is dead.
+- Party HUD shows HP, primary resource state, status warnings and downed/dead/disconnected state.
+  The later V1 rule in `31-party-lfg-downed-pvp.md` supersedes this document's original no-downed
+  assumption.
 
 ## Quest sharing
 
@@ -48,7 +50,9 @@ Joining may occur by region entry, hostile action or explicit start interaction.
 
 ## Death and respawn
 
-V1 has no downed/crawl/revive state and no combat resurrection.
+V1 party PvE uses the one-revive downed flow defined by `31-party-lfg-downed-pvp.md`; solo, Execute,
+second defeat and duel/arena terminal defeat remain immediate death. There is no unrestricted combat
+resurrection.
 
 ### Open-world PvE death
 

@@ -137,8 +137,9 @@ The pure party-PvE downed kernel now owns the one-revive encounter allowance, 15
 window, four-second interruptible channel, 25% revive and Execute/solo/second-defeat death rules.
 The Paper adapter now binds those rules to real lethal damage in multi-player boss attempts and
 provides `/mmo downed` acceptance controls. V0010 now supplies a journaled optimistic downed-state
-repository and recovery index. Activating persist-before-effect recovery in the live adapter, then
-general party membership, are the next social slices.
+repository and recovery index. Its canonical codec/store now preserves remaining tick durations and
+operation identities across restart. Activating persist-before-effect recovery in the live adapter,
+then general party membership, are the next social slices.
 
 ## Milestone 8 — Lifeskill kernel
 

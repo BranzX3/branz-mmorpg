@@ -2321,3 +2321,31 @@ Milestone status: **Milestone 7 remains in progress.** The live adapter must ser
 through V0010 and recover them before gameplay effects become restart-safe.
 
 Schema/config/migration impact: forward-only V0010. ADR 0032 owns the repository contract.
+
+## Milestone 7 - durable downed codec/store slice
+
+Implemented:
+
+- canonical V1 JSON round-trips encounter identity, participant life/revive/deadline state, revive
+  channels, processed operation identities and the checkpoint server tick;
+- stable UUID ordering makes repeated encoding byte-identical;
+- decode reconstructs domain objects and rejects unknown schemas, duplicate identities and all
+  participant/channel invariant violations;
+- restart rebasing preserves remaining downed, channel and protection ticks without counting
+  offline wall-clock time;
+- a durable store maps create, optimistic replace and recoverable scan results to V0010 while
+  rechecking encounter and attempt identity.
+
+Tests and completion evidence:
+
+- codec tests cover a mixed runtime containing consumed revive protection plus an active revive
+  channel, canonical round trip, clock rebasing, unknown schema and invariant rejection;
+- bootstrap formatting, compilation and tests pass.
+
+Failure/recovery behavior: invalid JSON or clock arithmetic fails closed with no runtime install.
+Expired-at-checkpoint work is eligible on the first live kernel advance after recovery.
+
+Milestone status: **Milestone 7 remains in progress.** The live controller must queue and persist
+transitions through this store before applying gameplay effects.
+
+Schema/config/migration impact: none beyond V0010. ADR 0033 owns payload and clock semantics.

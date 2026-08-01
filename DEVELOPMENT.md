@@ -661,6 +661,13 @@ live inventory, change Bukkit resources or write PostgreSQL.
      final version and audit history.
 180. Attempt a stale expected version and reuse a committed operation UUID with changed payload.
      Verify both fail closed without changing the latest downed row, transaction journal or audit.
+181. Run the bootstrap downed-codec tests and verify a runtime containing one revived/protected
+     participant plus another active revive channel round-trips to byte-identical canonical JSON.
+182. Rebase that payload onto a lower fresh server tick and verify every downed, channel and
+     protection deadline preserves only its remaining online duration. An elapsed deadline must be
+     eligible on the first kernel advance; offline wall-clock time must not count down state.
+183. Change the schema version, duplicate a participant/channel identity or violate a reconstructed
+     domain invariant. Verify decode fails closed and no partial runtime is returned for recovery.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

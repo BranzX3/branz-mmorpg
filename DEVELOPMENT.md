@@ -421,6 +421,23 @@ outcome checks below exercise the server-authored adapter.
 108. Die after landing a valid action and verify Defeat evidence is bounded and qualitative. Force
      teleport during another active segment and verify Abandoned produces no award.
 
+## Milestone 6 learning, teaching and Renown kernel lab
+
+The following commands are environment-gated pure simulations. They do not write knowledge, a
+teaching session, teacher rewards or Renown to PostgreSQL.
+
+109. Open `/mmo dev` and click `Teaching & Renown Lab`. Verify Teaching reports
+     `READY_TO_COMMIT`, Renown reports a fresh award of 20 and both print `Simulation only`.
+110. Run `/mmo teaching simulate success`; verify a demonstration followed by three unique
+     successful student actions reaches `READY_TO_COMMIT`. Run `duplicate-action`; three reports
+     sharing one action UUID must remain `INVALID_PHASE` because only one unique success counted.
+111. Simulate `missing-teacher`, `unready-teacher` and `student-prerequisite`; verify stable
+     `TEACHER_MISSING_KNOWLEDGE`, `TEACHER_NOT_READY` and `STUDENT_NOT_ELIGIBLE` results.
+112. Simulate `expired` and `disconnect`; both must reject completion without granting knowledge or
+     a teacher reward.
+113. Run `/mmo renown simulate fresh`, `repeat-1`, `repeat-2` and `exhausted`; verify awards
+     20, 10, 5 and 0. Run `duplicate`; verify `DUPLICATE_DEED`, award 0 and unchanged total.
+
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded
 mode is rejected outside `LOCAL` and `INTEGRATION`.

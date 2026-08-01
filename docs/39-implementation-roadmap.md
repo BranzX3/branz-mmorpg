@@ -84,8 +84,10 @@ with bounded factors, exact idempotent replay, atomic conflict rollback, soft re
 decay, five qualitative readiness bands and explicit anti-dummy suppression. The local dev tools
 can simulate without mutation or persist a fixed evidence UUID to verify reconnect/restart behavior.
 Live melee, projectile and spell outcomes now emit bounded Mastery/Conditioning batches without
-per-hit awards. Learning/teaching/Renown, Flask/consumables/ailments and boss snapshot restore remain
-before Milestone 6 completion.
+per-hit awards. The pure permanent-learning prerequisite resolver, synchronous player-teaching state
+machine and non-combat Renown resolver are implemented with environment-gated simulation labs.
+Durable knowledge/teaching/Renown transactions and live participant wiring, Flask/consumables/
+ailments and boss snapshot restore remain before Milestone 6 completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

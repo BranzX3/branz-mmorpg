@@ -21,11 +21,25 @@ import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
 import com.branz.mmorpg.progression.evidence.ProgressionEvidenceEngine;
 import com.branz.mmorpg.progression.evidence.ProgressionTrack;
 import com.branz.mmorpg.progression.evidence.ReadinessBand;
+import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
+import com.branz.mmorpg.progression.knowledge.KnowledgeProfile;
+import com.branz.mmorpg.progression.knowledge.KnowledgeType;
+import com.branz.mmorpg.progression.knowledge.LearningRequirements;
+import com.branz.mmorpg.progression.renown.RenownContext;
+import com.branz.mmorpg.progression.renown.RenownDecision;
+import com.branz.mmorpg.progression.renown.RenownDeedCandidate;
+import com.branz.mmorpg.progression.renown.RenownEngine;
+import com.branz.mmorpg.progression.teaching.TeachingCompletion;
+import com.branz.mmorpg.progression.teaching.TeachingErrorCode;
+import com.branz.mmorpg.progression.teaching.TeachingSession;
+import com.branz.mmorpg.progression.teaching.TeachingSessionEngine;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 import net.kyori.adventure.text.Component;
@@ -60,6 +74,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
                             Material.EXPERIENCE_BOTTLE,
                             "Progression Evidence Lab",
                             "progression"),
+                    new DevModule(24, Material.WRITABLE_BOOK, "Teaching & Renown Lab", "teaching"),
                     new DevModule(28, Material.ZOMBIE_HEAD, "Encounter Spawner (locked)", "locked"),
                     new DevModule(30, Material.PAINTING, "Scene/UI Tester", "scene"),
                     new DevModule(
@@ -81,6 +96,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final CombatSessionController combatSessions;
     private final CombatTraceFileExporter traceExporter;
     private final ProgressionEvidenceEngine progressionEvidence = new ProgressionEvidenceEngine();
+    private final TeachingSessionEngine teachingEngine = new TeachingSessionEngine();
+    private final RenownEngine renownEngine = new RenownEngine();
     private final NamespacedKey actionKey;
 
     MmoCommandController(
@@ -134,9 +151,54 @@ final class MmoCommandController implements CommandExecutor, Listener {
             handleProgressionTool(sender, args);
             return true;
         }
-        sender.sendMessage(
-                "Usage: /mmo <health|dev|combat debug|combat trace export|progression status|progression simulate|progression record>");
+        if ("teaching".equalsIgnoreCase(args[0])) {
+            handleTeachingTool(sender, args);
+            return true;
+        }
+        if ("renown".equalsIgnoreCase(args[0])) {
+            handleRenownTool(sender, args);
+            return true;
+        }
+        sender.sendMessage("Usage: /mmo <health|dev|combat|progression|teaching|renown>");
         return true;
+    }
+
+    private void handleTeachingTool(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Teaching Lab requires an in-game player.");
+            return;
+        }
+        if (!devToolsAllowed(player)) {
+            player.sendMessage(
+                    Component.text(
+                            "Teaching Lab is disabled for this environment/account.",
+                            NamedTextColor.RED));
+            return;
+        }
+        if (args.length == 3 && "simulate".equalsIgnoreCase(args[1])) {
+            simulateTeaching(player, args[2].toLowerCase(Locale.ROOT));
+            return;
+        }
+        teachingUsage(player);
+    }
+
+    private void handleRenownTool(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Renown Lab requires an in-game player.");
+            return;
+        }
+        if (!devToolsAllowed(player)) {
+            player.sendMessage(
+                    Component.text(
+                            "Renown Lab is disabled for this environment/account.",
+                            NamedTextColor.RED));
+            return;
+        }
+        if (args.length == 3 && "simulate".equalsIgnoreCase(args[1])) {
+            simulateRenown(player, args[2].toLowerCase(Locale.ROOT));
+            return;
+        }
+        renownUsage(player);
     }
 
     private void handleProgressionTool(CommandSender sender, String[] args) {
@@ -307,6 +369,11 @@ final class MmoCommandController implements CommandExecutor, Listener {
             case "progression" -> {
                 player.closeInventory();
                 simulateProgressionEvidence(player, "meaningful");
+            }
+            case "teaching" -> {
+                player.closeInventory();
+                simulateTeaching(player, "success");
+                simulateRenown(player, "fresh");
             }
             case "locked" ->
                     player.sendActionBar(
@@ -581,6 +648,197 @@ final class MmoCommandController implements CommandExecutor, Listener {
                 Component.text(
                         "Simulation only: no character progression was persisted.",
                         NamedTextColor.GRAY));
+    }
+
+    private void simulateTeaching(Player player, String scenario) {
+        CharacterId teacherId = new CharacterId(UUID.randomUUID());
+        CharacterId studentId = new CharacterId(player.getUniqueId());
+        KnowledgeKey technique =
+                new KnowledgeKey(
+                        KnowledgeType.TECHNIQUE,
+                        DefinitionId.of("technique.greatsword.cleaving_arc"));
+        KnowledgeKey foundation =
+                new KnowledgeKey(
+                        KnowledgeType.FOUNDATION, DefinitionId.of("foundation.greatsword"));
+        KnowledgeProfile teacherProfile =
+                new KnowledgeProfile(Set.of(technique), Map.of(), Set.of());
+        KnowledgeProfile studentProfile = new KnowledgeProfile(Set.of(), Map.of(), Set.of());
+        LearningRequirements requirements = LearningRequirements.none();
+        boolean teacherReady = true;
+        if ("missing-teacher".equals(scenario)) {
+            teacherProfile = studentProfile;
+        } else if ("unready-teacher".equals(scenario)) {
+            teacherReady = false;
+        } else if ("student-prerequisite".equals(scenario)) {
+            requirements = new LearningRequirements(Set.of(foundation), Map.of(), Set.of());
+        } else if (!Set.of("success", "duplicate-action", "expired", "disconnect")
+                .contains(scenario)) {
+            teachingUsage(player);
+            return;
+        }
+
+        Result<TeachingSession, TeachingErrorCode> started =
+                teachingEngine.start(
+                        UUID.randomUUID(),
+                        teacherId,
+                        studentId,
+                        technique,
+                        requirements,
+                        teacherProfile,
+                        teacherReady,
+                        true,
+                        true,
+                        studentProfile,
+                        100);
+        if (started instanceof Result.Failure<TeachingSession, TeachingErrorCode> failure) {
+            teachingLabMessage(player, scenario, failure.error().code(), failure.detail(), false);
+            return;
+        }
+        TeachingSession session =
+                ((Result.Success<TeachingSession, TeachingErrorCode>) started).value();
+        session =
+                teachingSuccess(
+                        player,
+                        scenario,
+                        teachingEngine.demonstrate(
+                                session,
+                                teacherId,
+                                DefinitionId.of("move.greatsword.cleaving_arc"),
+                                101));
+        if (session == null) {
+            return;
+        }
+        if ("expired".equals(scenario)) {
+            session = teachingEngine.expire(session, session.expiresTick());
+        } else if ("disconnect".equals(scenario)) {
+            session = teachingEngine.cancelForDisconnect(session, studentId, 102);
+        } else {
+            UUID actionId = UUID.randomUUID();
+            int uniqueActions = "duplicate-action".equals(scenario) ? 1 : 3;
+            for (int index = 0; index < 3; index++) {
+                UUID observedActionId = uniqueActions == 1 ? actionId : UUID.randomUUID();
+                session =
+                        teachingSuccess(
+                                player,
+                                scenario,
+                                teachingEngine.observeStudentAction(
+                                        session,
+                                        studentId,
+                                        observedActionId,
+                                        DefinitionId.of("move.greatsword.cleaving_arc"),
+                                        true,
+                                        102 + index));
+                if (session == null) {
+                    return;
+                }
+            }
+        }
+        Result<TeachingCompletion, TeachingErrorCode> completion =
+                teachingEngine.completion(session, Math.min(110, session.expiresTick()));
+        if (completion instanceof Result.Success<TeachingCompletion, TeachingErrorCode> success) {
+            teachingLabMessage(
+                    player,
+                    scenario,
+                    "READY_TO_COMMIT",
+                    "session=" + success.value().teachingSessionId(),
+                    true);
+            return;
+        }
+        Result.Failure<TeachingCompletion, TeachingErrorCode> failure =
+                (Result.Failure<TeachingCompletion, TeachingErrorCode>) completion;
+        teachingLabMessage(player, scenario, failure.error().code(), failure.detail(), false);
+    }
+
+    private TeachingSession teachingSuccess(
+            Player player, String scenario, Result<TeachingSession, TeachingErrorCode> result) {
+        if (result instanceof Result.Success<TeachingSession, TeachingErrorCode> success) {
+            return success.value();
+        }
+        Result.Failure<TeachingSession, TeachingErrorCode> failure =
+                (Result.Failure<TeachingSession, TeachingErrorCode>) result;
+        teachingLabMessage(player, scenario, failure.error().code(), failure.detail(), false);
+        return null;
+    }
+
+    private static void teachingLabMessage(
+            Player player, String scenario, String result, String detail, boolean accepted) {
+        player.sendMessage(
+                Component.text(
+                        "Teaching Lab [" + scenario + "]: " + result + " | " + detail,
+                        accepted ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+        player.sendMessage(
+                Component.text(
+                        "Simulation only: no knowledge or teacher reward was persisted.",
+                        NamedTextColor.GRAY));
+    }
+
+    private void simulateRenown(Player player, String scenario) {
+        int repetitions;
+        boolean duplicate;
+        switch (scenario) {
+            case "fresh" -> {
+                repetitions = 0;
+                duplicate = false;
+            }
+            case "repeat-1" -> {
+                repetitions = 1;
+                duplicate = false;
+            }
+            case "repeat-2" -> {
+                repetitions = 2;
+                duplicate = false;
+            }
+            case "exhausted" -> {
+                repetitions = 3;
+                duplicate = false;
+            }
+            case "duplicate" -> {
+                repetitions = 0;
+                duplicate = true;
+            }
+            default -> {
+                renownUsage(player);
+                return;
+            }
+        }
+        RenownDeedCandidate candidate =
+                new RenownDeedCandidate(
+                        UUID.randomUUID(),
+                        new CharacterId(player.getUniqueId()),
+                        DefinitionId.of("renown.mentorship"),
+                        "dev-lab:teacher:student:technique:utc-day",
+                        20,
+                        "dev-lab-v1");
+        RenownDecision decision =
+                renownEngine.evaluate(candidate, new RenownContext(75, repetitions, duplicate));
+        player.sendMessage(
+                Component.text(
+                        "Renown Lab ["
+                                + scenario
+                                + "]: "
+                                + (decision.accepted() ? "ACCEPTED" : "SUPPRESSED")
+                                + " | award="
+                                + decision.awardedRenown()
+                                + " | total="
+                                + decision.resultingRenown()
+                                + " | factor="
+                                + decision.repetitionFactor()
+                                + " | reason="
+                                + decision.suppressionReason(),
+                        decision.accepted() ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+        player.sendMessage(
+                Component.text("Simulation only: no Renown was persisted.", NamedTextColor.GRAY));
+    }
+
+    private static void teachingUsage(Player player) {
+        player.sendMessage(
+                "Usage: /mmo teaching simulate "
+                        + "<success|missing-teacher|unready-teacher|student-prerequisite|duplicate-action|expired|disconnect>");
+    }
+
+    private static void renownUsage(Player player) {
+        player.sendMessage(
+                "Usage: /mmo renown simulate <fresh|repeat-1|repeat-2|exhausted|duplicate>");
     }
 
     private void recordProgressionEvidence(Player player, String scenario, UUID evidenceId) {

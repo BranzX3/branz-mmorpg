@@ -64,6 +64,10 @@ mastery_readiness_thresholds: [0, 100, 300, 600, 850]
 combat_evidence_active_target_cap: 64
 combat_evidence_action_cap_per_discipline: 64
 combat_evidence_persistence_batch_cap: 256
+teaching_session_duration_ticks: 12000
+teaching_challenge_unique_successes: 3
+renown_deed_base_cap: 100
+renown_identical_daily_factors: [1.0, 0.5, 0.25, 0.0]
 ```
 
 The V1 Paper adapter derives target challenge as

@@ -1707,3 +1707,43 @@ Flask/consumables/ailments, Rest Context and boss Flask snapshot remain.
 
 Schema/config/migration impact: none. The runtime consumes V0005; ADR 0017 owns the live outcome
 boundary and bounded transient accumulator.
+
+## Milestone 6 - learning, player teaching and Renown kernel slice
+
+Implemented:
+
+- permanent Knowledge keys cover Foundation, Technique, Form, Spell, Recipe and Lore, with one
+  deterministic resolver for prior knowledge, qualitative Mastery/Conditioning readiness and world
+  or trial flags;
+- the player-teaching state machine verifies distinct teacher/student identity, teacher ownership
+  and readiness plus student prerequisites before opening a ten-minute synchronous session;
+- a server-resolved demonstration and three unique successful student action UUIDs are required
+  before an immutable, idempotency-keyed teaching completion intent can be produced;
+- wrong actors/moves, misses, repeated action contacts, expiry and either participant disconnect
+  cannot complete teaching;
+- Renown deeds are server-authored, bounded and idempotency-keyed, never modify combat stats, never
+  decay in V1 and use daily identical-deed factors 1.00, 0.50, 0.25 then zero;
+- `/mmo teaching simulate <scenario>`, `/mmo renown simulate <scenario>` and the local dev hub expose
+  non-mutating in-game acceptance paths.
+
+Tests and completion evidence:
+
+- learning tests cover the accepted path, stable prerequisite ordering, qualitative readiness and
+  permanent duplicate rejection;
+- teaching tests cover the complete demonstration/challenge flow, unique action deduplication,
+  ownership/readiness/prerequisite failures, actor/move validation, expiry and disconnect;
+- Renown tests cover visible accumulation, exact daily diminishing returns, duplicate suppression
+  and bounded authored awards;
+- the full build passes 524 tests with zero failures/errors (16 skipped), and Paper 26.2 reaches the
+  PostgreSQL-ready runtime with the new command surface before a clean smoke-test shutdown.
+
+Failure/recovery behavior: this slice is a pure deterministic kernel and test presentation. It
+cannot persist knowledge, teaching sessions/rewards or Renown. A ready challenge remains ungranted
+until a later PostgreSQL transaction consumes its completion intent; disconnect/expiry before that
+commit cancels it.
+
+Milestone status: **Milestone 6 remains in progress.** Durable knowledge/teaching/Renown and live
+participant integration, Flask/consumables/ailments, Rest Context and boss Flask snapshot remain.
+
+Schema/config/migration impact: no SQL or content-schema migration. Fixed V1 session, challenge and
+Renown repetition defaults are documented by ADR 0018.

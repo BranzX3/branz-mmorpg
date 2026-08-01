@@ -155,6 +155,31 @@ A teacher must own the technique and meet its teaching readiness. Student prereq
 
 Teacher rewards are capped mentorship tokens, social renown or training evidence, never direct duplication of materials or currency.
 
+### V1 learning and teaching contract
+
+Knowledge identity is a stable pair of knowledge type and definition ID. The V1 types are
+Foundation, Technique, Form, Spell, Recipe and Lore. A learning source resolves authored permanent
+knowledge prerequisites first, then qualitative Mastery/Conditioning readiness, then world or trial
+flags. Exact hidden evidence is never included in a learning rejection. Already learned knowledge
+cannot be granted twice.
+
+Player teaching supports Technique knowledge only in V1. Teacher and student must be different,
+online characters. Before a session starts, the server verifies that the teacher owns the Technique,
+meets its authored teaching readiness and that the student is not already learned and satisfies every
+learning prerequisite. The session lasts 12,000 server ticks (10 minutes):
+
+1. the teacher successfully demonstrates one server-resolved move;
+2. the student executes that exact move successfully three times;
+3. every successful execution must have a distinct server action UUID;
+4. only then does the state machine produce an immutable completion intent keyed by teaching-session
+   UUID for a later durable commit.
+
+A repeated contact/action UUID does not advance the challenge. A miss, wrong move, wrong actor,
+expiry or participant disconnect cannot produce a completion intent. Disconnect or expiry cancels
+the complete session, including one whose challenge was ready but not yet committed. Knowledge and
+the capped teacher reward must eventually commit atomically; the pure state machine and development
+lab intentionally grant neither.
+
 ## Renown
 
 Renown is visible world recognition with no combat stats. It records notable deeds and unlocks:
@@ -166,3 +191,12 @@ Renown is visible world recognition with no combat stats. It records notable dee
 - mentor trust.
 
 Renown does not decay in V1. Faction reputation is separate and may be positive, neutral or hostile, but core gameplay families remain recoverable.
+
+### V1 Renown resolution contract
+
+A server-authored deed owns an idempotency UUID, character ID, stable `renown.*` deed type, novelty
+fingerprint, immutable content version and base award from 1 to 100. Renown never alters combat
+statistics and never decays in V1. For the same novelty fingerprint in one UTC day, the first,
+second and third accepted deed use factors `1.00`, `0.50` and `0.25`; later identical deeds award
+zero. Replaying a deed UUID awards zero. The future durable resolver reconstructs repetition and
+idempotency context from PostgreSQL rather than trusting client input.

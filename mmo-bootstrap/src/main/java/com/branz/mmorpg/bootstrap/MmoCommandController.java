@@ -122,6 +122,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final LiveTeachingSessionController liveTeaching;
     private final KnowledgeAcquisitionController knowledgeAcquisition;
     private final BossEncounterController bossEncounters;
+    private final DownedController downed;
     private final CombatTraceFileExporter traceExporter;
     private final ProgressionEvidenceEngine progressionEvidence = new ProgressionEvidenceEngine();
     private final TeachingSessionEngine teachingEngine = new TeachingSessionEngine();
@@ -141,7 +142,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
             CombatSessionController combatSessions,
             LiveTeachingSessionController liveTeaching,
             KnowledgeAcquisitionController knowledgeAcquisition,
-            BossEncounterController bossEncounters) {
+            BossEncounterController bossEncounters,
+            DownedController downed) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.packGate = Objects.requireNonNull(packGate, "packGate");
@@ -157,6 +159,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
         this.knowledgeAcquisition =
                 Objects.requireNonNull(knowledgeAcquisition, "knowledgeAcquisition");
         this.bossEncounters = Objects.requireNonNull(bossEncounters, "bossEncounters");
+        this.downed = Objects.requireNonNull(downed, "downed");
         traceExporter =
                 new CombatTraceFileExporter(
                         plugin.getDataFolder().toPath().resolve("combat-traces"));
@@ -218,8 +221,21 @@ final class MmoCommandController implements CommandExecutor, Listener {
             }
             return true;
         }
+        if ("downed".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Downed Lab requires an in-game player.");
+            } else if (!devToolsAllowed(player)) {
+                player.sendMessage(
+                        Component.text(
+                                "Downed Lab is disabled for this environment/account.",
+                                NamedTextColor.RED));
+            } else {
+                downed.handleCommand(player, args);
+            }
+            return true;
+        }
         sender.sendMessage(
-                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|encounter>");
+                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|encounter|downed>");
         return true;
     }
 

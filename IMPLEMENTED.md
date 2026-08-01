@@ -2263,3 +2263,34 @@ durable downed state, rewards, Death Pouch, LFG and PvP hooks remain.
 
 Schema/config/migration impact: none. ADR 0030 owns current downed/revive semantics and supersedes
 the old no-downed assumption in document 14.
+
+## Milestone 7 - live party-PvE downed adapter slice
+
+Implemented:
+
+- active boss attempts with two to five locked participants instantiate one downed runtime per
+  encounter attempt;
+- real entity and environmental lethal damage enter DOWNED before Bukkit death, cancel combat
+  actions/projectiles and lock positional movement;
+- the server tick commits four-second revives, applies 25% authoritative combat health, expires the
+  15-second window into real death and grants three seconds of incoming-damage protection;
+- reviver damage, movement or disconnect interrupts the channel without consuming the revive;
+- successful hostile combat ends protection, while Execute, downed lethal and post-revive lethal
+  results continue through PlayerDeathEvent into the durable boss wipe flow;
+- the environment-gated `/mmo downed` command provides status, down, Execute, revive, interrupt and
+  hostile-action acceptance controls.
+
+Tests and completion evidence:
+
+- the social kernel suite covers every transition used by the adapter;
+- bootstrap compilation validates the live combat, boss-context and command wiring;
+- the full 315-test repository build passes with no failures, and Paper smoke covers the activated
+  dependency/controller graph plus clean startup and shutdown.
+
+Failure/recovery behavior: invalid targets or mismatched attempts fail without combat mutation.
+Downed state is currently memory-only and is intentionally reported as not restart-safe.
+
+Milestone status: **Milestone 7 remains in progress.** Durable downed recovery, general party/LFG,
+personal rewards, Death Pouch and PvP hooks remain.
+
+Schema/config/migration impact: none. ADR 0031 owns the live adapter boundary.

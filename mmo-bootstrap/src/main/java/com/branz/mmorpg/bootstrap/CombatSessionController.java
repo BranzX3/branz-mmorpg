@@ -165,6 +165,7 @@ import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.FluidCollisionMode;
@@ -311,6 +312,9 @@ final class CombatSessionController implements Listener {
     private SuccessfulCombatActionObserver successfulActionObserver =
             SuccessfulCombatActionObserver.NONE;
     private BiConsumer<Player, String> consumableInterruptObserver = (player, reason) -> {};
+    private Predicate<Player> lethalDamageObserver = player -> false;
+    private Predicate<Player> damageImmunityObserver = player -> false;
+    private BiConsumer<Player, String> hostileActionObserver = (player, reason) -> {};
     private int tickTaskId = -1;
 
     CombatSessionController(
@@ -726,6 +730,66 @@ final class CombatSessionController implements Listener {
         consumableInterruptObserver = Objects.requireNonNull(observer, "observer");
     }
 
+    void setLethalDamageObserver(Predicate<Player> observer) {
+        lethalDamageObserver = Objects.requireNonNull(observer, "observer");
+    }
+
+    void setDamageImmunityObserver(Predicate<Player> observer) {
+        damageImmunityObserver = Objects.requireNonNull(observer, "observer");
+    }
+
+    void setHostileActionObserver(BiConsumer<Player, String> observer) {
+        hostileActionObserver = Objects.requireNonNull(observer, "observer");
+    }
+
+    boolean forceLethalDamage(Player player) {
+        Objects.requireNonNull(player, "player");
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session == null || session.health.dead()) {
+            return false;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        session.health = playerHealth.kill(session.health, tick);
+        completePlayerLethalDamage(player, session);
+        return true;
+    }
+
+    boolean reviveFromDowned(Player player, double healthRatio) {
+        Objects.requireNonNull(player, "player");
+        if (!Double.isFinite(healthRatio) || healthRatio <= 0 || healthRatio > 1) {
+            throw new IllegalArgumentException("healthRatio must be in (0, 1]");
+        }
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session == null || session.action != ActionState.DOWNED) {
+            return false;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        session.health =
+                new CombatHealthRuntime(playerHealth.profile().maximum() * healthRatio, tick, tick);
+        session.weapon = weapons.resetTransient();
+        session.action = ActionState.IDLE;
+        session.crowdControl = CcRuntime.initial(tick);
+        session.poise = PoiseRuntime.initial(tick);
+        updateHealthPresentation(player, session);
+        return true;
+    }
+
+    boolean killPlayer(Player player) {
+        Objects.requireNonNull(player, "player");
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session == null || session.health.dead()) {
+            return false;
+        }
+        session.health = playerHealth.kill(session.health, plugin.getServer().getCurrentTick());
+        player.setHealth(0);
+        return true;
+    }
+
+    boolean isDowned(Player player) {
+        LiveSession session = sessions.get(Objects.requireNonNull(player, "player").getUniqueId());
+        return session != null && session.action == ActionState.DOWNED;
+    }
+
     boolean beginFlaskUse(Player player, UUID operationId) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(operationId, "operationId");
@@ -1030,6 +1094,10 @@ final class CombatSessionController implements Listener {
             return;
         }
         event.setCancelled(true);
+        if (damageImmunityObserver.test(defender)) {
+            defender.sendActionBar(Component.text("REVIVE PROTECTION", NamedTextColor.AQUA));
+            return;
+        }
         if (defenderSession.health.dead()) {
             return;
         }
@@ -1100,7 +1168,7 @@ final class CombatSessionController implements Listener {
                     source instanceof Player);
         }
         if (healthResolution.lethalNow()) {
-            defender.setHealth(0);
+            completePlayerLethalDamage(defender, defenderSession);
         }
     }
 
@@ -1274,6 +1342,10 @@ final class CombatSessionController implements Listener {
             return;
         }
         event.setCancelled(true);
+        if (damageImmunityObserver.test(player)) {
+            player.sendActionBar(Component.text("REVIVE PROTECTION", NamedTextColor.AQUA));
+            return;
+        }
         applyScaledVanillaDamage(player, session, event, "ENVIRONMENT");
     }
 
@@ -1294,10 +1366,37 @@ final class CombatSessionController implements Listener {
                         + roundOne(session.health.current());
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.RED));
         if (resolution.lethalNow()) {
-            player.setHealth(0);
+            completePlayerLethalDamage(player, session);
         } else {
             updateHealthPresentation(player, session);
         }
+    }
+
+    private void completePlayerLethalDamage(Player player, LiveSession session) {
+        if (!lethalDamageObserver.test(player)) {
+            player.setHealth(0);
+            return;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        cancelAction(session, "DOWNED");
+        cancelBow(session, "DOWNED");
+        cancelCrossbow(session, "DOWNED");
+        cancelSpell(session, "DOWNED");
+        removeOwnerProjectiles(player.getUniqueId());
+        removeOwnerSpellEffects(player.getUniqueId());
+        session.imbuement = null;
+        session.input.clearBuffer(InputBufferClearReason.HARD_CC);
+        releaseGuard(session);
+        session.dodge = null;
+        session.dodgeDirection = null;
+        session.sneakPress = null;
+        session.crowdControl = CcRuntime.initial(tick);
+        session.poise = PoiseRuntime.initial(tick);
+        session.health =
+                new CombatHealthRuntime(playerHealth.profile().maximum() * 0.01, tick, tick);
+        session.weapon = weapons.interrupt(session.weapon, ActionState.DOWNED);
+        session.action = ActionState.DOWNED;
+        updateHealthPresentation(player, session);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -2919,6 +3018,7 @@ final class CombatSessionController implements Listener {
                 actionId,
                 moveOrSpellId,
                 plugin.getServer().getCurrentTick());
+        hostileActionObserver.accept(player, "SUCCESSFUL_HOSTILE_ACTION");
         if (!observed) {
             plugin.getLogger()
                     .warning(

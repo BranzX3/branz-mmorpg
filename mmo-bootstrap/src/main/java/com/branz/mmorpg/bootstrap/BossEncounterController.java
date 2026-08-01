@@ -27,6 +27,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -839,6 +840,19 @@ final class BossEncounterController implements Listener {
     private BossEncounterRuntime runtimeFor(CharacterId characterId) {
         EncounterId encounterId = encounterByParticipant.get(characterId);
         return encounterId == null ? null : active.get(encounterId);
+    }
+
+    Optional<PartyEncounterContext> partyEncounter(Player player) {
+        BossEncounterRuntime runtime =
+                runtimeFor(characterId(Objects.requireNonNull(player, "player")));
+        if (runtime == null
+                || runtime.phase() != BossEncounterPhase.ACTIVE
+                || runtime.participants().size() < 2) {
+            return Optional.empty();
+        }
+        return Optional.of(
+                new PartyEncounterContext(
+                        runtime.encounterId(), runtime.attempt(), runtime.participants().keySet()));
     }
 
     private void runSyncIfEnabled(Runnable task) {

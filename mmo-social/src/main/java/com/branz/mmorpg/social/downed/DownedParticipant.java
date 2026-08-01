@@ -28,7 +28,7 @@ public record DownedParticipant(
                 characterId, EncounterLifeState.ACTIVE, false, NO_DEADLINE, NO_DEADLINE);
     }
 
-    boolean protectedAt(long currentTick) {
+    public boolean protectedAt(long currentTick) {
         return protectionUntilTick > currentTick;
     }
 }

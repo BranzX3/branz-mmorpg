@@ -638,6 +638,21 @@ live inventory, change Bukkit resources or write PostgreSQL.
 173. Apply hostile action to end protection, then apply another lethal event and verify immediate
      death. Advance an unfinished revive exactly at the 300-tick downed deadline and verify expiry
      wins with no heal output. Replay operation UUIDs and verify no effect is emitted twice.
+174. In `LOCAL` with two ready players, run `/mmo encounter start <new-uuid> <player-one>
+     <player-two>`, then `/mmo downed down <player-one>`. Verify PlayerDeathEvent does not fire,
+     positional movement is locked and the action bar counts down from 15 seconds.
+175. As the active ally, run `/mmo downed revive <player-one>`. Stand still and avoid damage for four
+     seconds; verify the target returns at 25% combat health with three seconds of damage protection.
+     Repeat on a fresh attempt but move or receive damage before commit; verify the channel cancels
+     and `/mmo downed status` still reports `reviveConsumed=false` for the target.
+176. After a committed revive, deal or simulate another lethal event with `/mmo downed down
+     <player-one>` and verify normal death reaches the boss lifecycle. On another fresh attempt run
+     `/mmo downed execute <player-one>` and verify it bypasses DOWNED immediately. Let a first downed
+     timer expire and verify it also becomes real death.
+177. During revive protection, take incoming entity/environment damage and verify health is not
+     reduced. Run `/mmo downed hostile` or land a successful hostile combat action and verify the
+     next hit applies normally. Defeat the final participant and verify the existing durable boss
+     wipe and prepared-Flask restore advance to a new attempt with a fresh revive allowance.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

@@ -135,7 +135,9 @@ boundary is ready for in-game restart acceptance; authored rewards and party sys
 
 The pure party-PvE downed kernel now owns the one-revive encounter allowance, 15-second downed
 window, four-second interruptible channel, 25% revive and Execute/solo/second-defeat death rules.
-Live Paper interception, durable recovery and party membership are the next social slices.
+The Paper adapter now binds those rules to real lethal damage in multi-player boss attempts and
+provides `/mmo downed` acceptance controls. Durable recovery and general party membership are the
+next social slices.
 
 ## Milestone 8 — Lifeskill kernel
 

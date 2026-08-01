@@ -818,6 +818,11 @@ live inventory, change Bukkit resources or write PostgreSQL.
      team does not end the match and defeating the final ready member awards the opposing team.
 233. Restart Paper during a duel/arena and verify the process-local match is cancelled, transient
      combat effects are gone and every durable item/ammo/catalyst snapshot remains unchanged.
+234. Run `./gradlew :mmo-lifeskills:test --tests
+     com.branz.mmorpg.lifeskills.progression.LifeskillProgressionTest`. Verify all thirty authored
+     rank labels/thresholds, exact committed-evidence replay, Mastery 0–1000 diminishing caps,
+     zero-Focus normal work, one-to-five focused costs, ten-minute offline recovery, no over-cap
+     banking and backward-clock rejection.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

@@ -203,6 +203,14 @@ acceptance pass; Milestone 8 is the next planned development boundary.
 
 **Done when:** node reservation and harvest remain correct through chunk unload/crash.
 
+**Implementation status (`newmmo`): In progress.** The pure progression kernel now owns stable
+`lifeskill.*` identities, all thirty visible Rank labels, content-authored cumulative promotion
+thresholds and exact committed-evidence replay. Visible Mastery composes the six declared sources,
+clamps at 1000 and follows diminishing curves bounded by the published work-speed, basic-yield and
+relative rare-yield caps. Life Focus now recovers from an offline-safe wall-clock anchor, clamps at
+100, permits normal work at zero and spends one to five points through an exact work-operation
+boundary. Durable node reservation/harvest is the next Milestone 8 slice.
+
 ## Milestone 9 — Production, farming and workers
 
 - Cooking, Alchemy, Smithing;

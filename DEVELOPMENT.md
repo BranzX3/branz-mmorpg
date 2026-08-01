@@ -837,6 +837,22 @@ live inventory, change Bukkit resources or write PostgreSQL.
      Lifeskill/Focus documents, place frozen output lots in Pending Rewards, return exact committed
      replay without duplicates and roll back every write when stale versions or injected
      node/tool/output crash checkpoints fail before retry.
+237. Run `./gradlew :mmo-content:run --args="validate $((Resolve-Path
+     example-content\milestone-1).Path)"` and `./gradlew :mmo-bootstrap:test --tests
+     com.branz.mmorpg.bootstrap.ResourceNodeLiveCodecTest --tests
+     com.branz.mmorpg.bootstrap.DurableResourceNodeServiceIntegrationTest`. Verify the authored
+     node/tool/yield and thirty rank thresholds compile, canonical node/Lifeskill/tool documents
+     round-trip, exact harvest replay creates one Pending Rewards lot and restart recovery releases
+     both the pre-commit node reservation and exact pickaxe.
+238. Start the local Paper server, join with an operator account and use `/mmo node tool`, `/mmo
+     node status`, then `/mmo node harvest 3`. Verify the signed iron pickaxe appears, the action
+     commits after 36 ticks, durability changes from 100 to 99, Focus changes from 100 to 97, Rank
+     changes from Trainee I to Trainee II and one `material.iron_ore` lot enters Pending Rewards.
+239. After the node recovers, start `/mmo node harvest 0` and stop Paper before the 36-tick commit.
+     Restart with the same embedded PostgreSQL directory and run `/mmo node status`. Verify startup
+     reports the personal node `AVAILABLE`, the pickaxe has no reservation and no additional ore or
+     Rank/Focus value was committed. Repeat while unloading/changing chunks and verify the authored
+     timer continues independently of chunk load.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

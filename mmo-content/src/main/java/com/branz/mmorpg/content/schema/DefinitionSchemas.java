@@ -1331,6 +1331,20 @@ public final class DefinitionSchemas {
                                                 "CORRUPTED"),
                                         "",
                                         "Resource node lifecycle type."),
+                                optionalAllowed(
+                                        "sharing",
+                                        STRING,
+                                        Set.of("PERSONAL", "SHARED"),
+                                        "",
+                                        "Persistent extraction-state sharing mode."),
+                                optional("discipline", STRING, "", "Lifeskill discipline suffix."),
+                                optionalRanged(
+                                        "maximum_charges",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "charges",
+                                        "Maximum extraction charges."),
                                 ranged(
                                         "action_ticks",
                                         INTEGER,
@@ -1345,6 +1359,13 @@ public final class DefinitionSchemas {
                                         120,
                                         "ticks",
                                         "Gathering commit tick."),
+                                optionalRanged(
+                                        "reservation_timeout_seconds",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "seconds",
+                                        "Wall-clock reservation timeout."),
                                 ranged(
                                         "recovery_seconds",
                                         INTEGER,
@@ -1352,8 +1373,54 @@ public final class DefinitionSchemas {
                                         null,
                                         "seconds",
                                         "Wall-clock recovery duration."),
-                                array("base_yields", true, 1, null, "Base item yields.")),
+                                optionalRanged(
+                                        "durability_cost",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "durability",
+                                        "Exact tool durability cost."),
+                                array(
+                                        "required_tool_tags",
+                                        false,
+                                        1,
+                                        null,
+                                        "Required authoritative tool tags."),
+                                optional(
+                                        "tool_definition",
+                                        STRING,
+                                        "",
+                                        "Durable tool definition used by the Paper Node Lab."),
+                                optionalRanged(
+                                        "rank_evidence",
+                                        NUMBER,
+                                        0.000001,
+                                        null,
+                                        "evidence",
+                                        "Committed rank evidence per harvest."),
+                                array(
+                                        "rank_thresholds",
+                                        false,
+                                        30,
+                                        30,
+                                        "Thirty authored cumulative rank thresholds."),
+                                optionalRanged(
+                                        "rank_thresholds.*",
+                                        NUMBER,
+                                        0,
+                                        null,
+                                        "evidence",
+                                        "Cumulative evidence threshold."),
+                                array("base_yields", true, 1, null, "Base item yields."),
+                                optionalRanged(
+                                        "base_yields.*.quantity",
+                                        INTEGER,
+                                        1,
+                                        null,
+                                        "items",
+                                        "Committed base-yield quantity.")),
                         List.of(
+                                to(DefinitionType.ITEM, "tool_definition"),
                                 to(DefinitionType.ITEM, "base_yields", "*", "item"),
                                 to(DefinitionType.ITEM, "byproducts", "*", "item"))));
         schemas.put(

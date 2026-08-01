@@ -26,9 +26,11 @@ import com.branz.mmorpg.persistence.transaction.JdbcDeathPouchRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcDownedEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcPersonalRewardGrantRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcReconciliationScanner;
+import com.branz.mmorpg.persistence.transaction.JdbcResourceNodeStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcValueTransactionService;
 import com.branz.mmorpg.persistence.transaction.PersonalRewardGrantRepository;
 import com.branz.mmorpg.persistence.transaction.ReconciliationScanner;
+import com.branz.mmorpg.persistence.transaction.ResourceNodeStateRepository;
 import com.branz.mmorpg.persistence.transaction.ValueTransactionService;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -55,6 +57,7 @@ final class DatabaseRuntime implements AutoCloseable {
     private final ProgressionEvidenceRepository progression;
     private final KnowledgeProgressionRepository knowledge;
     private final ReconciliationScanner reconciliation;
+    private final ResourceNodeStateRepository resourceNodes;
     private final ServerInstanceId serverInstanceId;
 
     private DatabaseRuntime(
@@ -77,6 +80,7 @@ final class DatabaseRuntime implements AutoCloseable {
         progression = new JdbcProgressionEvidenceRepository(dataSource);
         knowledge = new JdbcKnowledgeProgressionRepository(dataSource);
         reconciliation = new JdbcReconciliationScanner(dataSource);
+        resourceNodes = new JdbcResourceNodeStateRepository(dataSource);
         serverInstanceId =
                 new ServerInstanceId(
                         settings.environment().toLowerCase(java.util.Locale.ROOT)
@@ -172,6 +176,10 @@ final class DatabaseRuntime implements AutoCloseable {
 
     ReconciliationScanner reconciliation() {
         return reconciliation;
+    }
+
+    ResourceNodeStateRepository resourceNodes() {
+        return resourceNodes;
     }
 
     ServerInstanceId serverInstanceId() {

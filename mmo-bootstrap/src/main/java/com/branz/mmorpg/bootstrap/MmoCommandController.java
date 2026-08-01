@@ -101,11 +101,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
                     new DevModule(24, Material.WRITABLE_BOOK, "Teaching & Renown Lab", "teaching"),
                     new DevModule(28, Material.ZOMBIE_HEAD, "Boss Encounter Lab", "encounter"),
                     new DevModule(30, Material.PAINTING, "Scene/UI Tester", "scene"),
-                    new DevModule(
-                            32,
-                            Material.DIAMOND_PICKAXE,
-                            "Resource Node Tester (locked)",
-                            "locked"),
+                    new DevModule(32, Material.DIAMOND_PICKAXE, "Resource Node Tester", "node"),
                     new DevModule(34, Material.CRAFTING_TABLE, "Recipe Tester (locked)", "locked"),
                     new DevModule(49, Material.BARRIER, "Close", "close"));
 
@@ -127,6 +123,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final LfgController lfg;
     private final DownedController downed;
     private final PvpController pvp;
+    private final ResourceNodeController resourceNodes;
     private final CombatTraceFileExporter traceExporter;
     private final ProgressionEvidenceEngine progressionEvidence = new ProgressionEvidenceEngine();
     private final TeachingSessionEngine teachingEngine = new TeachingSessionEngine();
@@ -151,7 +148,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
             PartyController parties,
             LfgController lfg,
             DownedController downed,
-            PvpController pvp) {
+            PvpController pvp,
+            ResourceNodeController resourceNodes) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.packGate = Objects.requireNonNull(packGate, "packGate");
@@ -172,6 +170,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
         this.lfg = Objects.requireNonNull(lfg, "lfg");
         this.downed = Objects.requireNonNull(downed, "downed");
         this.pvp = Objects.requireNonNull(pvp, "pvp");
+        this.resourceNodes = resourceNodes;
         traceExporter =
                 new CombatTraceFileExporter(
                         plugin.getDataFolder().toPath().resolve("combat-traces"));
@@ -283,8 +282,26 @@ final class MmoCommandController implements CommandExecutor, Listener {
             }
             return true;
         }
+        if ("node".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Resource Node Lab requires an in-game player.");
+            } else if (!devToolsAllowed(player)) {
+                player.sendMessage(
+                        Component.text(
+                                "Resource Node Lab is disabled for this environment/account.",
+                                NamedTextColor.RED));
+            } else if (resourceNodes == null) {
+                player.sendMessage(
+                        Component.text(
+                                "Active content has no usable Resource Node Lab definition.",
+                                NamedTextColor.RED));
+            } else {
+                resourceNodes.handleCommand(player, args);
+            }
+            return true;
+        }
         sender.sendMessage(
-                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|party|lfg|encounter|downed|pouch|pvp>");
+                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|party|lfg|encounter|downed|pouch|pvp|node>");
         return true;
     }
 
@@ -972,6 +989,17 @@ final class MmoCommandController implements CommandExecutor, Listener {
                 player.closeInventory();
                 bossEncounters.handleCommand(
                         player, new String[] {"encounter", "start", UUID.randomUUID().toString()});
+            }
+            case "node" -> {
+                player.closeInventory();
+                if (resourceNodes == null) {
+                    player.sendMessage(
+                            Component.text(
+                                    "Active content has no usable Resource Node Lab definition.",
+                                    NamedTextColor.RED));
+                } else {
+                    resourceNodes.handleCommand(player, new String[] {"node", "status"});
+                }
             }
             case "locked" ->
                     player.sendActionBar(

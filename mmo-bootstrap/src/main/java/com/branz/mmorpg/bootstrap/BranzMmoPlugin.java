@@ -9,6 +9,7 @@ import com.branz.mmorpg.combat.status.AilmentDefinitionEngine;
 import com.branz.mmorpg.combat.status.AilmentDefinitionEngineErrorCode;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.branz.mmorpg.integrations.PluginCapabilityProbe;
+import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.ItemEngineErrorCode;
 import com.branz.mmorpg.items.projection.ProjectionTokenSigner;
@@ -59,6 +60,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private LfgController lfgController;
     private DownedController downedController;
     private PvpController pvpController;
+    private ResourceNodeController resourceNodeController;
 
     @Override
     public void onEnable() {
@@ -153,6 +155,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
         if (pvpController != null) {
             pvpController.shutdown();
             pvpController = null;
+        }
+        if (resourceNodeController != null) {
+            resourceNodeController.shutdown();
+            resourceNodeController = null;
         }
         if (lfgController != null) {
             lfgController.shutdown();
@@ -694,6 +700,34 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         characterSessionController,
                         combatSessionController,
                         bossEncounterController);
+        ResourceNodeContentCompiler.compileFirst(snapshot)
+                .ifPresent(
+                        compiledNode -> {
+                            ItemDefinition tool =
+                                    activeItemEngine
+                                            .get()
+                                            .find(compiledNode.toolDefinitionId())
+                                            .orElse(null);
+                            if (tool == null || tool.baseMaxDurability().isEmpty()) {
+                                getLogger()
+                                        .warning(
+                                                "Resource Node Lab disabled: authored durable tool is missing.");
+                                return;
+                            }
+                            resourceNodeController =
+                                    new ResourceNodeController(
+                                            this,
+                                            characterSessionController,
+                                            activeItemEngine.get(),
+                                            new DurableResourceNodeService(
+                                                    databaseRuntime.resourceNodes(),
+                                                    databaseRuntime.values(),
+                                                    compiledNode,
+                                                    snapshot.manifest().contentVersion(),
+                                                    tool.baseMaxDurability().getAsInt()),
+                                            snapshot.manifest().contentVersion(),
+                                            Clock.systemUTC());
+                        });
         combatSessionController.setPvpCombatPolicy(pvpController);
         deathPouchController.setPvpSuppression(pvpController::suppressesDeathPouch);
         combatSessionController.setLethalDamageObserver(
@@ -749,7 +783,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         partyController,
                         lfgController,
                         downedController,
-                        pvpController);
+                        pvpController,
+                        resourceNodeController);
         getServer().getPluginManager().registerEvents(chronicleController, this);
         return null;
     }
@@ -767,6 +802,9 @@ public final class BranzMmoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(partyController, this);
         getServer().getPluginManager().registerEvents(downedController, this);
         getServer().getPluginManager().registerEvents(pvpController, this);
+        if (resourceNodeController != null) {
+            getServer().getPluginManager().registerEvents(resourceNodeController, this);
+        }
         getServer().getPluginManager().registerEvents(sceneHubController, this);
         getServer().getPluginManager().registerEvents(commandController, this);
         Objects.requireNonNull(getCommand("mmo"), "mmo command").setExecutor(commandController);
@@ -780,6 +818,9 @@ public final class BranzMmoPlugin extends JavaPlugin {
         partyController.start();
         downedController.start();
         pvpController.start();
+        if (resourceNodeController != null) {
+            resourceNodeController.start();
+        }
         getLogger()
                 .info(
                         "Milestone 3 runtime ready; item definitions="

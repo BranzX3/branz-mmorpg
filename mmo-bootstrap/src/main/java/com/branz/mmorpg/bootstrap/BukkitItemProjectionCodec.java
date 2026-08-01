@@ -106,6 +106,9 @@ final class BukkitItemProjectionCodec {
         if (definition.shieldProfile().isPresent()) {
             return Material.SHIELD;
         }
+        if (definition.id().value().endsWith(".training_pickaxe")) {
+            return Material.IRON_PICKAXE;
+        }
         return definition
                 .weaponProfile()
                 .map(

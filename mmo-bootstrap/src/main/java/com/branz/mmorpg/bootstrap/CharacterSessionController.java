@@ -109,6 +109,27 @@ final class CharacterSessionController implements Listener {
                 active.get(Objects.requireNonNull(player, "player").getUniqueId()));
     }
 
+    Optional<LoadedCharacterSession> beginExternalValueMutation(Player player) {
+        Objects.requireNonNull(player, "player");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player) || !valueMutationInFlight.add(player.getUniqueId())) {
+            return Optional.empty();
+        }
+        return Optional.of(session);
+    }
+
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> reloadExternalValueMutation(
+            LoadedCharacterSession session) {
+        return sessions.reload(Objects.requireNonNull(session, "session"));
+    }
+
+    void completeExternalValueMutation(
+            LoadedCharacterSession previous,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> result,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        completeSnapshotMutation(previous, result, completion);
+    }
+
     void grantTestValue(
             Player player,
             ItemDefinition definition,

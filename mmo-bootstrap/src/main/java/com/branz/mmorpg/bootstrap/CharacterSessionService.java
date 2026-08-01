@@ -1399,7 +1399,7 @@ final class CharacterSessionService {
         releaseQuietly(session.characterId(), session.sessionId(), session.lease());
     }
 
-    private Result<LoadedCharacterSession, CharacterSessionErrorCode> reload(
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> reload(
             LoadedCharacterSession session) {
         Result<List<ItemLocationRecord>, TransactionErrorCode> itemRows =
                 database.values().findItemsOwnedBy(session.characterId());

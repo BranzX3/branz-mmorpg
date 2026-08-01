@@ -217,8 +217,14 @@ Restart releases pre-commit reservations while committed depletion survives; exa
 cannot emit a second harvest. V0014 now journals the exact node document, actor Lifeskill/Focus
 document, durable tool payload and Pending Rewards output lots in one PostgreSQL transaction.
 Committed replay is read-only, partial node/tool/output crash checkpoints roll back and retry once,
-and startup can query every non-available node for wall-clock reconciliation. The live Paper Node
-Lab is the next Milestone 8 slice.
+and startup can query every non-available node for wall-clock reconciliation. The LOCAL/INTEGRATION
+Paper Node Lab now compiles the authored Common iron node, thirty rank thresholds, exact durable
+pickaxe and iron-ore yield from the active content snapshot. Its environment-gated commands reserve
+the signed tool, wait for the authored commit tick, atomically spend durability/Focus, advance Rank
+and place one deterministic lot in Pending Rewards. Exact replay creates no second lot; startup and
+five-second wall-clock reconciliation release pre-commit reservations and advance recovery without
+chunk state. This node slice is ready for its in-game acceptance pass; tools/workwear breadth,
+Fishing, Hunting and processing remain planned Milestone 8 work.
 
 ## Milestone 9 — Production, farming and workers
 

@@ -749,6 +749,20 @@ live inventory, change Bukkit resources or write PostgreSQL.
      leadership or change membership outside LFG, then issue another directory command and verify
      the stale listing closes. Restart Paper and verify ordinary listings do not recover, including
      when an unrelated boss checkpoint party does recover.
+211. Run `./gradlew :mmo-worldloop:test` and freeze one participant at each category floor: damage/
+     posture, guard/control, healing/support and objective. Verify all four receive personal grants
+     without requiring last hit or a damage contribution from the support paths.
+212. Freeze evidence for a late join, invalid encounter recovery, AFK participant, below-floor
+     participant and an already-granted character. Verify each produces its distinct stable rejection
+     reason and no grant.
+213. Freeze identical encounter/attempt/seed/evidence twice and verify every character receives the
+     same grant UUID and roll seed regardless of input order. Change only the attempt and verify grant
+     identity changes without colliding.
+214. Mark a contributed participant as valid encounter recovery while dead/downed and verify the
+     life state does not enter the eligibility contract. Mark membership/recovery invalid and verify
+     rejection even when contribution is above a floor.
+215. Submit negative contribution, invalid activity ticks and duplicate character evidence. Verify
+     the resolver fails closed and cannot return a partial grant/rejection snapshot.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

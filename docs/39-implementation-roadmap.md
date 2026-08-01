@@ -153,6 +153,10 @@ now exposes those flows through `/mmo lfg` and installs acceptance only after Pa
 Party/LFG/boss/downed flows are ready for in-game acceptance; personal rewards are the next
 Milestone 7 slice.
 
+The pure personal-reward freeze now owns category-based participation floors, cutoff/membership/AFK
+checks, stable rejection reasons and deterministic per-character grant identity/roll seeds. Durable
+grant storage and live boss evidence/delivery are the next reward slices.
+
 ## Milestone 8 — Lifeskill kernel
 
 - Rank/Mastery/Focus;

@@ -2495,3 +2495,30 @@ Milestone status: **Milestone 7 remains in progress.** Party, LFG and durable do
 ready for in-game acceptance; personal rewards, Death Pouch and PvP remain.
 
 Schema/config/migration impact: none. ADR 0038 owns live LFG/party composition.
+
+## Milestone 7 - personal reward eligibility kernel slice
+
+Implemented:
+
+- category evidence independently tracks damage/posture, guard/control, healing/support and
+  objective actions, with authored positive floors and a bounded inactivity window;
+- pre-cutoff join, valid membership/recovery, recent activity, meaningful contribution and absence
+  of a prior completion grant jointly decide eligibility;
+- dead/downed state does not disqualify otherwise valid evidence, while AFK proximity is insufficient;
+- every rejection records one stable cutoff, membership, inactivity, contribution or replay reason;
+- eligible characters receive deterministic per-encounter-attempt grant UUIDs and stable
+  per-character roll seeds independent of iteration/retry order.
+
+Tests and completion evidence:
+
+- world-loop tests cover independent category qualification, all rejection paths, recovery validity,
+  deterministic grant/seed replay, attempt separation and invalid/duplicate evidence;
+- module formatting, compilation and tests pass.
+
+Failure/recovery behavior: invalid evidence/profile data fails before a result exists. The kernel
+freezes identity and eligibility only; it performs no roll, database or inventory effect.
+
+Milestone status: **Milestone 7 remains in progress.** Durable personal grant storage, live evidence,
+reward rolling/delivery, Death Pouch and PvP remain.
+
+Schema/config/migration impact: none. ADR 0039 owns eligibility freeze semantics.

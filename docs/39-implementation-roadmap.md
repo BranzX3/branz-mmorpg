@@ -124,6 +124,10 @@ feeds real death/quit/rejoin signals into that kernel and restores only the Flas
 wipe. Durable encounter storage/restart recovery is next; rewards, Death Pouch, party/LFG,
 downed/revive and PvP hooks remain.
 
+V0009 and its journaled optimistic repository now provide canonical encounter records, exact replay,
+audit and ordered non-completed recovery lookup. Wiring the live controller to persist-before-effect
+and resume `RESETTING`/`VICTORY_PENDING` work is the next restart-safety slice.
+
 ## Milestone 8 — Lifeskill kernel
 
 - Rank/Mastery/Focus;

@@ -610,6 +610,12 @@ live inventory, change Bukkit resources or write PostgreSQL.
      `VICTORY_PENDING`, death cannot trigger Flask restore, then run `/mmo encounter rewards
      <new-grant-uuid>` and verify the empty lab reconciliation completes once. Actual personal loot
      is intentionally deferred to the reward slice.
+165. Run the V0009 embedded PostgreSQL repository integration test. Verify encounter creation writes
+     version 1 with one committed journal/audit row, and exact request replay reports replay without
+     another state version or audit row.
+166. Replace the record through `RESETTING` and verify `findRecoverable` returns it in stable order;
+     replace it with `COMPLETED` and verify recovery excludes it. A stale expected version and a
+     reused operation ID with changed payload must both leave the latest row unchanged.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

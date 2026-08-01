@@ -2169,3 +2169,32 @@ Milestone status: **Milestone 7 remains in progress.** Durable encounter persist
 personal rewards, Death Pouch, party/LFG, downed/revive and PvP hooks remain.
 
 Schema/config/migration impact: none. ADR 0027 composes the V0008 Flask snapshot with ADR 0026.
+
+## Milestone 7 - durable boss encounter repository slice
+
+Implemented:
+
+- V0009 stores one canonical boss encounter JSON document with definition, indexed phase, content
+  version, optimistic version and last transaction identity;
+- create and replace operations use system transaction-journal requests, compare-and-set versions
+  and same-transaction `ENCOUNTER` audit records;
+- exact committed replay returns the current durable row without a second version increment, while
+  changed idempotency payload and stale-version writers fail closed;
+- ordered recovery lookup returns every non-completed encounter and excludes terminal completed
+  rows through the V0009 partial index.
+
+Tests and completion evidence:
+
+- embedded PostgreSQL integration covers create, replay, multi-phase update, reload, recoverable
+  filtering, stale rollback, idempotency conflict and journal/audit cardinality;
+- migration catalog and forward-application tests include V0009 and all 15 authoritative tables;
+- the full persistence module suite passes with the new repository and migration.
+
+Failure/recovery behavior: a failed state write commits neither encounter row nor audit. Callback
+loss can replay the same journal request or reload current row; non-completed records remain visible
+to startup reconciliation.
+
+Milestone status: **Milestone 7 remains in progress.** The live controller must consume this durable
+boundary and resume pending reset/victory work before restart behavior is complete.
+
+Schema/config/migration impact: forward-only V0009. ADR 0028 owns the record and repository contract.

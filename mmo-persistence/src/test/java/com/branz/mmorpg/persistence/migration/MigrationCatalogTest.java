@@ -17,9 +17,9 @@ class MigrationCatalogTest {
         assertTrue(loaded.isSuccess());
         MigrationCatalog catalog =
                 ((Result.Success<MigrationCatalog, MigrationErrorCode>) loaded).value();
-        assertEquals(10, catalog.migrations().size());
+        assertEquals(11, catalog.migrations().size());
         assertEquals(1, catalog.migrations().getFirst().version());
-        assertEquals(10, catalog.migrations().getLast().version());
+        assertEquals(11, catalog.migrations().getLast().version());
         assertEquals(64, catalog.migrations().getFirst().checksum().length());
         assertTrue(catalog.migrations().getFirst().sql().contains("character_leases"));
         assertTrue(catalog.migrations().get(1).sql().contains("commodity_lot"));
@@ -30,7 +30,8 @@ class MigrationCatalogTest {
         assertTrue(catalog.migrations().get(6).sql().contains("knowledge_acquisition_journal"));
         assertTrue(catalog.migrations().get(7).sql().contains("character_expedition_state"));
         assertTrue(catalog.migrations().get(8).sql().contains("boss_encounter_state"));
-        assertTrue(catalog.migrations().getLast().sql().contains("downed_encounter_state"));
+        assertTrue(catalog.migrations().get(9).sql().contains("downed_encounter_state"));
+        assertTrue(catalog.migrations().getLast().sql().contains("personal_reward_grant"));
     }
 
     @Test

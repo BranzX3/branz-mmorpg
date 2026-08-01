@@ -763,6 +763,19 @@ live inventory, change Bukkit resources or write PostgreSQL.
      rejection even when contribution is above a floor.
 215. Submit negative contribution, invalid activity ticks and duplicate character evidence. Verify
      the resolver fails closed and cannot return a partial grant/rejection snapshot.
+216. Run the V0011 embedded PostgreSQL integration test. Freeze one personal grant and verify version
+     1, one transaction-journal row and one `REWARD_GRANT` audit row in addition to the owning boss
+     encounter transaction.
+217. Replay the exact freeze request and verify no new grant version, journal or audit. Attempt a
+     second grant UUID for the same encounter/attempt/character and verify the unique boundary leaves
+     both grant and journal unchanged.
+218. Advance the grant from FROZEN to ROLLED with a deterministic outcome payload, restart/read it and
+     verify `findPending` returns the same roll seed/outcome without rerolling.
+219. Advance ROLLED to DELIVERED with delivery receipts and verify pending recovery excludes it while
+     direct lookup retains its final version and audit history.
+220. Attempt a stale version, identity/seed drift, ROLLED-to-FROZEN transition and changed reuse of a
+     committed transaction UUID. Verify each fails closed without changing the latest payload, state,
+     transaction journal or audit.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

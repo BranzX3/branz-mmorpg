@@ -20,8 +20,10 @@ import com.branz.mmorpg.persistence.transaction.JdbcBossEncounterStateRepository
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterExpeditionStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcDownedEncounterStateRepository;
+import com.branz.mmorpg.persistence.transaction.JdbcPersonalRewardGrantRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcReconciliationScanner;
 import com.branz.mmorpg.persistence.transaction.JdbcValueTransactionService;
+import com.branz.mmorpg.persistence.transaction.PersonalRewardGrantRepository;
 import com.branz.mmorpg.persistence.transaction.ReconciliationScanner;
 import com.branz.mmorpg.persistence.transaction.ValueTransactionService;
 import com.zaxxer.hikari.HikariConfig;
@@ -43,6 +45,7 @@ final class DatabaseRuntime implements AutoCloseable {
     private final CharacterExpeditionStateRepository expeditionStates;
     private final BossEncounterStateRepository bossEncounters;
     private final DownedEncounterStateRepository downedEncounters;
+    private final PersonalRewardGrantRepository personalRewards;
     private final ProgressionEvidenceRepository progression;
     private final KnowledgeProgressionRepository knowledge;
     private final ReconciliationScanner reconciliation;
@@ -62,6 +65,7 @@ final class DatabaseRuntime implements AutoCloseable {
         expeditionStates = new JdbcCharacterExpeditionStateRepository(dataSource);
         bossEncounters = new JdbcBossEncounterStateRepository(dataSource);
         downedEncounters = new JdbcDownedEncounterStateRepository(dataSource);
+        personalRewards = new JdbcPersonalRewardGrantRepository(dataSource);
         progression = new JdbcProgressionEvidenceRepository(dataSource);
         knowledge = new JdbcKnowledgeProgressionRepository(dataSource);
         reconciliation = new JdbcReconciliationScanner(dataSource);
@@ -136,6 +140,10 @@ final class DatabaseRuntime implements AutoCloseable {
 
     DownedEncounterStateRepository downedEncounters() {
         return downedEncounters;
+    }
+
+    PersonalRewardGrantRepository personalRewards() {
+        return personalRewards;
     }
 
     ProgressionEvidenceRepository progression() {

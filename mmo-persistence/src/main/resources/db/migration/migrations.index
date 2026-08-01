@@ -9,3 +9,4 @@ V0007__knowledge_acquisition_journal.sql
 V0008__character_expedition_state.sql
 V0009__boss_encounter_state.sql
 V0010__downed_encounter_state.sql
+V0011__personal_reward_grants.sql

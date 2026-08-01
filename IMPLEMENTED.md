@@ -2522,3 +2522,29 @@ Milestone status: **Milestone 7 remains in progress.** Durable personal grant st
 reward rolling/delivery, Death Pouch and PvP remain.
 
 Schema/config/migration impact: none. ADR 0039 owns eligibility freeze semantics.
+
+## Milestone 7 - durable personal reward grant slice
+
+Implemented:
+
+- V0011 adds one journaled personal grant row per encounter/attempt/character with immutable grant
+  UUID and roll seed identity;
+- optimistic state advances through `FROZEN`, `ROLLED` and `DELIVERED`, preserving a JSON evidence/
+  outcome/receipt payload and content version;
+- create requires FROZEN and replacement rejects identity drift, stale versions and backward state;
+- exact transaction replay returns the committed version while changed transaction reuse fails;
+- non-delivered recovery scan is stable and every committed version produces a reward-grant audit.
+
+Tests and completion evidence:
+
+- embedded PostgreSQL tests cover migration 11, create/replay, roll/deliver, pending exclusion,
+  uniqueness, stale/backward updates and idempotency conflict;
+- full repository build and Paper smoke cover V0011 startup migration and database lifecycle.
+
+Failure/recovery behavior: grant, journal and audit commit or roll back together. ROLLED preserves
+the outcome for restart delivery; DELIVERED is excluded from recovery.
+
+Milestone status: **Milestone 7 remains in progress.** Durable grant identity/state is ready; payload
+codec, live evidence/roll/delivery, Death Pouch and PvP remain.
+
+Schema/config/migration impact: forward-only V0011. ADR 0040 owns durable grant state.

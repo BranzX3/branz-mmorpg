@@ -10,4 +10,7 @@ public interface CharacterExpeditionStateRepository {
 
     Result<CharacterExpeditionStateCommitExecution, TransactionErrorCode> commit(
             TransactionRequest request, CharacterExpeditionStateCommit commit);
+
+    Result<CharacterFlaskPreparationCommitExecution, TransactionErrorCode> commitFlaskPreparation(
+            TransactionRequest request, CharacterFlaskPreparationCommit commit);
 }

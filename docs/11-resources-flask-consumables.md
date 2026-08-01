@@ -148,6 +148,19 @@ Normal completion returns to the previous combat slot unless the player delibera
 slot. Reconnect removes any stale representation and reconstructs one from durable Flask truth.
 ADR 0023 owns this input and recovery boundary.
 
+## V1 atomic Rest preparation adapter
+
+The Chronicle's Expedition Flask page is available at Rest Context and previews a fixed-capacity
+allocation among Healing, Mana and Stamina. It displays owned Infusion Stock, current Rest
+eligibility and whether the server-side two-charge Mercy rule can apply.
+
+Confirm consumes the exact versioned `material.infusion_stock` inventory lots and replaces the
+versioned expedition-state document in one journaled database transaction. Stock lots use a stable
+lock order. A stale lot, moved stock, stale Flask document or failed write rolls back both the stock
+and Flask update. Successful preparation clears any prior boss-checkpoint Flask snapshot, reloads
+the Player Session and then reconciles the hotbar representation. Exact retry cannot consume stock
+twice. ADR 0024 owns this atomic boundary.
+
 ## Item freshness
 
 Finished potions and normal ingredients do not expire in real time. `Fresh`, `Pristine`, `Corrupted` and `Infused` are material states. Special Unstable Concoctions may expire at rest, death or expedition end and are always labeled.

@@ -8,6 +8,10 @@ import com.branz.mmorpg.api.identity.SessionId;
 import com.branz.mmorpg.api.identity.TransactionId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
+import com.branz.mmorpg.combat.resource.ExpeditionFlaskEngine;
+import com.branz.mmorpg.combat.resource.FlaskAllocation;
+import com.branz.mmorpg.combat.resource.FlaskErrorCode;
+import com.branz.mmorpg.combat.resource.FlaskPreparation;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
@@ -32,6 +36,8 @@ import com.branz.mmorpg.persistence.transaction.CharacterBuildRecord;
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateCommit;
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateCommitExecution;
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRecord;
+import com.branz.mmorpg.persistence.transaction.CharacterFlaskPreparationCommit;
+import com.branz.mmorpg.persistence.transaction.CharacterFlaskPreparationCommitExecution;
 import com.branz.mmorpg.persistence.transaction.CrossbowBoltBinding;
 import com.branz.mmorpg.persistence.transaction.ItemLocationMove;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
@@ -63,6 +69,7 @@ import java.util.UUID;
 
 /** Blocking session/lease aggregate. Callers must run every method off the Paper thread. */
 final class CharacterSessionService {
+    private static final DefinitionId INFUSION_STOCK = DefinitionId.of("material.infusion_stock");
     private final DatabaseRuntime database;
     private final BuildEngine buildEngine;
 
@@ -951,6 +958,139 @@ final class CharacterSessionService {
         return reload(session);
     }
 
+    Result<FlaskPreparationCommitResult, CharacterSessionErrorCode> prepareFlaskAtRest(
+            LoadedCharacterSession session,
+            FlaskAllocation desiredAllocation,
+            boolean mercyRequested,
+            UUID operationId,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(desiredAllocation, "desiredAllocation");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        List<LotLocationRecord> stockLots =
+                session.snapshot().lotRecords().stream()
+                        .filter(lot -> lot.definitionId().equals(INFUSION_STOCK))
+                        .filter(lot -> lot.quantity() > 0)
+                        .filter(
+                                lot ->
+                                        lot.ownerCharacterId()
+                                                .filter(session.characterId()::equals)
+                                                .isPresent())
+                        .filter(
+                                lot ->
+                                        lot.location().type()
+                                                == com.branz.mmorpg.persistence.transaction
+                                                        .ValueLocationType.CHARACTER_INVENTORY)
+                        .sorted(
+                                java.util.Comparator.comparing(
+                                                (LotLocationRecord lot) ->
+                                                        lot.location().reference().orElse(""))
+                                        .thenComparing(lot -> lot.lotId().value()))
+                        .toList();
+        long totalStock = stockLots.stream().mapToLong(LotLocationRecord::quantity).sum();
+        int availableStock = (int) Math.min(Integer.MAX_VALUE, totalStock);
+        boolean mercyEligible =
+                mercyRequested
+                        && availableStock == 0
+                        && session.snapshot().expeditionState().flaskState().totalCharges()
+                                < ExpeditionFlaskEngine.MERCY_MINIMUM_CHARGES;
+        Result<FlaskPreparation, FlaskErrorCode> prepared =
+                new ExpeditionFlaskEngine()
+                        .prepare(
+                                session.snapshot().expeditionState().flaskState(),
+                                desiredAllocation,
+                                availableStock,
+                                mercyEligible);
+        if (prepared instanceof Result.Failure<FlaskPreparation, FlaskErrorCode> failure) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    failure.error().code() + ": " + failure.detail());
+        }
+        FlaskPreparation preparation =
+                ((Result.Success<FlaskPreparation, FlaskErrorCode>) prepared).value();
+        long remaining = preparation.infusionStockConsumed();
+        List<LotQuantityConsumption> consumptions = new java.util.ArrayList<>();
+        for (LotLocationRecord lot : stockLots) {
+            if (remaining == 0) {
+                break;
+            }
+            long quantity = Math.min(remaining, lot.quantity());
+            consumptions.add(
+                    new LotQuantityConsumption(
+                            lot.lotId(),
+                            lot.version(),
+                            lot.ownerCharacterId(),
+                            lot.location(),
+                            quantity));
+            remaining -= quantity;
+        }
+        if (remaining != 0) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Infusion Stock selection did not cover the Flask preparation cost.");
+        }
+        PersistentExpeditionState current = session.snapshot().expeditionState();
+        PersistentExpeditionState desired =
+                new PersistentExpeditionState(
+                        preparation.state(),
+                        current.consumableEffects(),
+                        current.ailments(),
+                        Optional.empty());
+        long expectedVersion =
+                session.snapshot()
+                        .expeditionStateRecord()
+                        .map(CharacterExpeditionStateRecord::version)
+                        .orElse(0L);
+        String payload = ExpeditionStateJsonCodec.encode(desired);
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "flask-rest:" + operationId,
+                        session.characterId(),
+                        session.sessionId(),
+                        com.branz.mmorpg.persistence.transaction
+                                .JdbcCharacterExpeditionStateRepository
+                                .CHARACTER_FLASK_PREPARATION_COMMIT,
+                        "{\"stateGuard\":\"optimistic-version\","
+                                + "\"stockPolicy\":\"infusion-first\"}",
+                        payload,
+                        contentVersion);
+        Result<CharacterFlaskPreparationCommitExecution, TransactionErrorCode> committed =
+                database.expeditionStates()
+                        .commitFlaskPreparation(
+                                request,
+                                new CharacterFlaskPreparationCommit(
+                                        session.characterId(),
+                                        expectedVersion,
+                                        payload,
+                                        INFUSION_STOCK,
+                                        consumptions));
+        if (committed
+                instanceof
+                Result.Failure<CharacterFlaskPreparationCommitExecution, TransactionErrorCode>
+                        failure) {
+            return transactionFailure(failure);
+        }
+        Result<LoadedCharacterSession, CharacterSessionErrorCode> reloaded = reload(session);
+        if (reloaded
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            return Result.failure(failure.error(), failure.detail());
+        }
+        CharacterFlaskPreparationCommitExecution execution =
+                ((Result.Success<CharacterFlaskPreparationCommitExecution, TransactionErrorCode>)
+                                committed)
+                        .value();
+        return Result.success(
+                new FlaskPreparationCommitResult(
+                        ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                        reloaded)
+                                .value(),
+                        preparation,
+                        execution.transaction().replayed()));
+    }
+
     Result<ProgressionEvidenceCommitResult, CharacterSessionErrorCode> recordProgressionEvidence(
             LoadedCharacterSession session, List<EvidenceCandidate> candidates) {
         Objects.requireNonNull(session, "session");
@@ -1267,7 +1407,7 @@ final class CharacterSessionService {
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
-    private static <T> Result<LoadedCharacterSession, CharacterSessionErrorCode> transactionFailure(
+    private static <T, U> Result<U, CharacterSessionErrorCode> transactionFailure(
             Result.Failure<T, TransactionErrorCode> failure) {
         return Result.failure(
                 CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,

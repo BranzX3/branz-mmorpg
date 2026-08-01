@@ -74,6 +74,14 @@ created/updated timestamps
 
 A retry with the same idempotency key returns the prior result.
 
+### Compound Flask Rest commit
+
+Flask Rest preparation deliberately crosses the lot and expedition-state repositories under one
+JDBC transaction. It validates and compare-and-set consumes each character-inventory Infusion Stock
+lot in stable UUID order, then compare-and-set replaces the expedition document before committing
+the journal and audit row. Any failure rolls back every lot, the state row and journal transition;
+an exact committed replay skips all mutations.
+
 ## Item versioning
 
 Each unique item and lot row has a version. Location changes use compare-and-set. A failure to match means the operation reloads and rejects; it never overwrites a newer location.

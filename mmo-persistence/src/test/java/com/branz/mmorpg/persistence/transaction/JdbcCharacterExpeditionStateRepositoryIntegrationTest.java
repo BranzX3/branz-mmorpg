@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.branz.mmorpg.api.identity.CharacterId;
+import com.branz.mmorpg.api.identity.DefinitionId;
+import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.identity.SessionId;
 import com.branz.mmorpg.api.identity.TransactionId;
 import com.branz.mmorpg.api.result.Result;
@@ -117,6 +119,112 @@ class JdbcCharacterExpeditionStateRepositoryIntegrationTest {
                 ((Result.Failure<CharacterExpeditionStateCommitExecution, TransactionErrorCode>)
                                 stale)
                         .error());
+    }
+
+    @Test
+    void flaskPreparationConsumesStockAtomicallyAndReplayDoesNotConsumeAgain() {
+        CharacterId characterId = new CharacterId(UUID.randomUUID());
+        SessionId sessionId = new SessionId(UUID.randomUUID());
+        DefinitionId infusionStock = DefinitionId.of("material.infusion_stock");
+        LotId stockLotId = new LotId(UUID.randomUUID());
+        JdbcValueTransactionService values = new JdbcValueTransactionService(dataSource);
+        assertTrue(
+                values.grantLot(
+                                TransactionRequest.forCharacter(
+                                        new TransactionId(UUID.randomUUID()),
+                                        "grant-infusion:" + stockLotId.value(),
+                                        characterId,
+                                        sessionId,
+                                        JdbcValueTransactionService.LOT_GRANT,
+                                        "{}",
+                                        "{\"quantity\":4}",
+                                        "test-content-v1"),
+                                new NewLotLocation(
+                                        stockLotId,
+                                        infusionStock,
+                                        "default",
+                                        4,
+                                        java.util.Optional.of(characterId),
+                                        ValueLocation.inventory("slot:4"),
+                                        "{}"))
+                        .isSuccess());
+        LotLocationRecord original = success(values.findLot(stockLotId)).orElseThrow();
+        String payload = "{\"schemaVersion\":2,\"flask\":{\"charges\":3}}";
+        UUID operationId = UUID.randomUUID();
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "flask-rest:" + operationId,
+                        characterId,
+                        sessionId,
+                        JdbcCharacterExpeditionStateRepository.CHARACTER_FLASK_PREPARATION_COMMIT,
+                        "{\"stockConsumed\":3}",
+                        payload,
+                        "test-content-v1");
+        CharacterFlaskPreparationCommit commit =
+                new CharacterFlaskPreparationCommit(
+                        characterId,
+                        0,
+                        payload,
+                        infusionStock,
+                        java.util.List.of(
+                                new LotQuantityConsumption(
+                                        stockLotId,
+                                        original.version(),
+                                        original.ownerCharacterId(),
+                                        original.location(),
+                                        3)));
+        JdbcCharacterExpeditionStateRepository repository =
+                new JdbcCharacterExpeditionStateRepository(dataSource);
+
+        CharacterFlaskPreparationCommitExecution first =
+                success(repository.commitFlaskPreparation(request, commit));
+        CharacterFlaskPreparationCommitExecution replay =
+                success(repository.commitFlaskPreparation(request, commit));
+
+        assertEquals(1, first.record().version());
+        assertEquals(3, first.infusionStockConsumed());
+        assertFalse(first.transaction().replayed());
+        assertTrue(replay.transaction().replayed());
+        LotLocationRecord remaining = success(values.findLot(stockLotId)).orElseThrow();
+        assertEquals(1, remaining.quantity());
+        assertEquals(original.version() + 1, remaining.version());
+
+        TransactionRequest staleRequest =
+                TransactionRequest.forCharacter(
+                        new TransactionId(UUID.randomUUID()),
+                        "flask-rest-stale:" + UUID.randomUUID(),
+                        characterId,
+                        sessionId,
+                        JdbcCharacterExpeditionStateRepository.CHARACTER_FLASK_PREPARATION_COMMIT,
+                        "{\"stockConsumed\":1}",
+                        "{\"schemaVersion\":2,\"flask\":{\"charges\":4}}",
+                        "test-content-v1");
+        Result<CharacterFlaskPreparationCommitExecution, TransactionErrorCode> stale =
+                repository.commitFlaskPreparation(
+                        staleRequest,
+                        new CharacterFlaskPreparationCommit(
+                                characterId,
+                                0,
+                                staleRequest.intendedOutputsJson(),
+                                infusionStock,
+                                java.util.List.of(
+                                        new LotQuantityConsumption(
+                                                stockLotId,
+                                                remaining.version(),
+                                                remaining.ownerCharacterId(),
+                                                remaining.location(),
+                                                1))));
+
+        assertFalse(stale.isSuccess());
+        assertEquals(
+                TransactionErrorCode.VALUE_STALE_VERSION,
+                ((Result.Failure<CharacterFlaskPreparationCommitExecution, TransactionErrorCode>)
+                                stale)
+                        .error());
+        LotLocationRecord afterRollback = success(values.findLot(stockLotId)).orElseThrow();
+        assertEquals(1, afterRollback.quantity());
+        assertEquals(remaining.version(), afterRollback.version());
     }
 
     private static TransactionRequest request(

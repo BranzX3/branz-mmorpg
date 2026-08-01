@@ -2030,3 +2030,39 @@ confirmed party-wipe signal.
 
 Schema/config/migration impact: none. ADR 0023 owns transient hotbar/input/action behavior; V0008
 continues to own all durable Flask value.
+
+## Milestone 6 - atomic Rest Flask preparation slice
+
+Implemented:
+
+- Chronicle adds an Expedition Flask page at the local Rest Context with a fixed five-slot Healing,
+  Mana and Stamina allocation preview, owned Infusion Stock count and visible Mercy eligibility;
+- confirmation derives eligibility from authoritative Player Session state and uses one immutable
+  operation UUID through the existing mutation gate;
+- one JDBC transaction consumes exact versioned character-inventory Infusion Stock lots, replaces
+  the optimistic-versioned expedition document, clears any obsolete boss snapshot, writes audit and
+  commits the transaction journal;
+- stock locks use deterministic lot UUID order, and stale/moved/wrong-definition stock or stale
+  expedition state rolls back every mutation;
+- successful commit reloads Player Session truth before the live Flask projection is reconciled;
+  exact journal replay never consumes stock twice;
+- the no-stock server-validated Mercy path guarantees at most the existing two-charge minimum.
+
+Tests and completion evidence:
+
+- persistence integration covers atomic stock/state success, exact replay and deliberate stale-state
+  rollback without stock loss;
+- Player Session integration covers full stock consumption, boss-snapshot clearing, Mercy and
+  reconnect/restart restoration from database truth;
+- the full build and Paper smoke test cover registration and local boot compatibility.
+
+Failure/recovery behavior: leaving Rest Context rejects before commit. Invalid allocation,
+busy/stale mutation or database failure exposes neither consumed stock nor refilled charges. A lost
+callback is recovered by Player Session reload and immutable operation replay.
+
+Milestone status: **Milestone 6 remains in progress.** The normal consumable-lot live adapter remains
+before the milestone's consumable loop is complete. Boss snapshot persistence remains ready for the
+Milestone 7 confirmed party-wipe signal.
+
+Schema/config/migration impact: none. ADR 0024 composes existing V0008 expedition state and value
+lots within the existing journal transaction.

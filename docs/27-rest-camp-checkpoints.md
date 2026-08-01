@@ -60,3 +60,12 @@ Death Pouch still forms at death location under its rules. Respawn never telepor
 ## Rest transaction
 
 Rest applies changes atomically after validating safety and owned resources. Interrupt before commit changes nothing. Rest commit persists character build, Flask and respawn state before presentation completes.
+
+### V1 local Flask Rest transaction
+
+The local Chronicle provides an Expedition Flask page only while the character is in
+`EXPLORATION` near sanctuary spawn. Allocation preview keeps all five slots assigned. Confirmation
+atomically consumes exact versioned Infusion Stock lots and replaces the versioned Flask document;
+stale stock or state rolls back the entire request. No-stock characters below two total charges may
+receive the server-validated Mercy minimum. A successful allocation/refill clears the previous boss
+checkpoint snapshot so it cannot restore an obsolete preparation. See ADR 0024.

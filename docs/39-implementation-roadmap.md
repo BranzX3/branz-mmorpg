@@ -102,7 +102,9 @@ prepared boss Flask snapshot bound to one checkpoint-instance UUID; capture/conf
 is journaled and rejects ordinary death or checkpoint mismatch. The live party-wipe trigger belongs
 to the Milestone 7 encounter controller. The live Flask hotbar representation and durable use path
 are now implemented with commit-before-restoration, interrupt/recovery and reconnect behavior.
-Normal consumable lots and atomic Rest allocation/refill remain before Milestone 6 completion.
+Atomic Rest allocation/refill is now available through Chronicle with exact Infusion Stock CAS,
+Mercy fallback, stale rollback and restart coverage. Normal consumable lots remain before Milestone
+6 completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

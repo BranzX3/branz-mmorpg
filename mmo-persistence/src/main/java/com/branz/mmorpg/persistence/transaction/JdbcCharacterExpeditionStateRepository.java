@@ -17,6 +17,8 @@ public final class JdbcCharacterExpeditionStateRepository
         implements CharacterExpeditionStateRepository {
     public static final String CHARACTER_EXPEDITION_STATE_COMMIT =
             "character.expedition-state.commit";
+    public static final String CHARACTER_FLASK_PREPARATION_COMMIT =
+            "character.flask-preparation.commit";
 
     private static final String COLUMNS =
             "character_id, state_payload, content_version, version, "
@@ -98,7 +100,7 @@ public final class JdbcCharacterExpeditionStateRepository
                             TransactionErrorCode.VALUE_STALE_VERSION,
                             "Character expedition state changed before commit.");
                 }
-                appendAudit(connection, request, record);
+                appendAudit(connection, request, record, CHARACTER_EXPEDITION_STATE_COMMIT, 0);
                 Result<JournalTransitionOutcome, TransactionErrorCode> transition =
                         JdbcTransactionJournalRepository.transition(
                                 connection, request.transactionId(), TransactionState.COMMITTED);
@@ -117,6 +119,145 @@ public final class JdbcCharacterExpeditionStateRepository
                 return Result.success(
                         new CharacterExpeditionStateCommitExecution(
                                 record, new TransactionExecution(journal, false)));
+            } catch (SQLException exception) {
+                JdbcTransactionJournalRepository.rollbackQuietly(connection);
+                return JdbcTransactionJournalRepository.failure(exception);
+            } catch (IllegalArgumentException exception) {
+                JdbcTransactionJournalRepository.rollbackQuietly(connection);
+                return invalidState();
+            } finally {
+                JdbcTransactionJournalRepository.restoreAutoCommit(connection, originalAutoCommit);
+            }
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    @Override
+    public Result<CharacterFlaskPreparationCommitExecution, TransactionErrorCode>
+            commitFlaskPreparation(
+                    TransactionRequest request, CharacterFlaskPreparationCommit commit) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(commit, "commit");
+        if (!request.operationType().equals(CHARACTER_FLASK_PREPARATION_COMMIT)) {
+            return Result.failure(
+                    TransactionErrorCode.TRANSACTION_OPERATION_MISMATCH,
+                    "Transaction operation does not match a Flask preparation commit.");
+        }
+        if (request.characterId().filter(commit.characterId()::equals).isEmpty()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                    "Transaction character does not match the Flask owner.");
+        }
+        try (Connection connection = dataSource.getConnection()) {
+            boolean originalAutoCommit = connection.getAutoCommit();
+            try {
+                connection.setAutoCommit(false);
+                Result<JournalPrepareOutcome, TransactionErrorCode> preparedResult =
+                        JdbcTransactionJournalRepository.prepare(connection, request);
+                if (preparedResult
+                        instanceof
+                        Result.Failure<JournalPrepareOutcome, TransactionErrorCode> failure) {
+                    connection.rollback();
+                    return Result.failure(failure.error(), failure.detail());
+                }
+                JournalPrepareOutcome prepared =
+                        ((Result.Success<JournalPrepareOutcome, TransactionErrorCode>)
+                                        preparedResult)
+                                .value();
+                if (!prepared.newlyPrepared()) {
+                    if (prepared.entry().state() != TransactionState.COMMITTED) {
+                        connection.rollback();
+                        return Result.failure(
+                                TransactionErrorCode.TRANSACTION_INVALID_STATE,
+                                "Existing Flask preparation transaction is not committed.");
+                    }
+                    CharacterExpeditionStateRecord replayed =
+                            find(connection, commit.characterId())
+                                    .orElseThrow(
+                                            () ->
+                                                    new SQLException(
+                                                            "Committed Flask state is missing."));
+                    connection.commit();
+                    return Result.success(
+                            new CharacterFlaskPreparationCommitExecution(
+                                    replayed,
+                                    commit.totalStockConsumed(),
+                                    new TransactionExecution(prepared.entry(), true)));
+                }
+
+                for (LotQuantityConsumption consumption : commit.stockConsumptions()) {
+                    Optional<LotLocationRecord> current =
+                            JdbcValueTransactionService.findLot(connection, consumption.lotId());
+                    if (current.isEmpty()) {
+                        connection.rollback();
+                        return Result.failure(
+                                TransactionErrorCode.VALUE_NOT_FOUND,
+                                "Infusion Stock lot does not exist.");
+                    }
+                    if (!current.orElseThrow()
+                            .definitionId()
+                            .equals(commit.infusionStockDefinitionId())) {
+                        connection.rollback();
+                        return Result.failure(
+                                TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                                "Rest preparation may consume only Infusion Stock.");
+                    }
+                    Result<JdbcValueTransactionService.MutationApplied, TransactionErrorCode>
+                            consumed =
+                                    JdbcValueTransactionService.updateLotQuantity(
+                                            connection, request.transactionId(), consumption);
+                    if (consumed
+                            instanceof
+                            Result.Failure<
+                                            JdbcValueTransactionService.MutationApplied,
+                                            TransactionErrorCode>
+                                    failure) {
+                        connection.rollback();
+                        return Result.failure(failure.error(), failure.detail());
+                    }
+                }
+
+                CharacterExpeditionStateRecord record =
+                        mutate(
+                                connection,
+                                request,
+                                new CharacterExpeditionStateCommit(
+                                        commit.characterId(),
+                                        commit.expectedStateVersion(),
+                                        commit.replacementPayloadJson()));
+                if (record == null) {
+                    connection.rollback();
+                    return Result.failure(
+                            TransactionErrorCode.VALUE_STALE_VERSION,
+                            "Character expedition state changed before Rest commit.");
+                }
+                appendAudit(
+                        connection,
+                        request,
+                        record,
+                        CHARACTER_FLASK_PREPARATION_COMMIT,
+                        commit.totalStockConsumed());
+                Result<JournalTransitionOutcome, TransactionErrorCode> transition =
+                        JdbcTransactionJournalRepository.transition(
+                                connection, request.transactionId(), TransactionState.COMMITTED);
+                if (transition
+                        instanceof
+                        Result.Failure<JournalTransitionOutcome, TransactionErrorCode> failure) {
+                    connection.rollback();
+                    return Result.failure(failure.error(), failure.detail());
+                }
+                TransactionJournalEntry journal =
+                        ((Result.Success<JournalTransitionOutcome, TransactionErrorCode>)
+                                        transition)
+                                .value()
+                                .entry();
+                connection.commit();
+                return Result.success(
+                        new CharacterFlaskPreparationCommitExecution(
+                                record,
+                                commit.totalStockConsumed(),
+                                new TransactionExecution(journal, false)));
             } catch (SQLException exception) {
                 JdbcTransactionJournalRepository.rollbackQuietly(connection);
                 return JdbcTransactionJournalRepository.failure(exception);
@@ -196,7 +337,9 @@ public final class JdbcCharacterExpeditionStateRepository
     private static void appendAudit(
             Connection connection,
             TransactionRequest request,
-            CharacterExpeditionStateRecord record)
+            CharacterExpeditionStateRecord record,
+            String actionType,
+            long infusionStockConsumed)
             throws SQLException {
         try (PreparedStatement statement =
                 connection.prepareStatement(
@@ -205,12 +348,14 @@ public final class JdbcCharacterExpeditionStateRepository
                                 + "'CHARACTER', ?, CAST(? AS JSONB), CURRENT_TIMESTAMP)")) {
             statement.setObject(1, request.transactionId().value());
             statement.setObject(2, record.characterId().value());
-            statement.setString(3, CHARACTER_EXPEDITION_STATE_COMMIT);
+            statement.setString(3, actionType);
             statement.setObject(4, record.characterId().value());
             statement.setString(
                     5,
                     "{\"version\":"
                             + record.version()
+                            + ",\"infusionStockConsumed\":"
+                            + infusionStockConsumed
                             + ",\"contentVersion\":\""
                             + escapeJson(record.contentVersion())
                             + "\"}");

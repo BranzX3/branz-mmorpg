@@ -5,6 +5,7 @@ import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
+import com.branz.mmorpg.combat.resource.FlaskAllocation;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.QuiverProfile;
@@ -625,6 +626,52 @@ final class CharacterSessionController implements Listener {
                 completion);
     }
 
+    void prepareFlaskAtRest(
+            Player player,
+            FlaskAllocation desiredAllocation,
+            boolean mercyRequested,
+            UUID operationId,
+            String contentVersion,
+            Consumer<Result<FlaskPreparationCommitResult, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(desiredAllocation, "desiredAllocation");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<FlaskPreparationCommitResult, CharacterSessionErrorCode> result =
+                                    sessions.prepareFlaskAtRest(
+                                            session,
+                                            desiredAllocation,
+                                            mercyRequested,
+                                            operationId,
+                                            contentVersion);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeFlaskPreparationMutation(
+                                                            session, result, completion));
+                        });
+    }
+
     void recordProgressionEvidence(
             Player player,
             List<EvidenceCandidate> candidates,
@@ -1088,6 +1135,42 @@ final class CharacterSessionController implements Listener {
                         new ProgressionEvidenceCommitResult(updated, committed.executions())));
     }
 
+    private void completeFlaskPreparationMutation(
+            LoadedCharacterSession previous,
+            Result<FlaskPreparationCommitResult, CharacterSessionErrorCode> result,
+            Consumer<Result<FlaskPreparationCommitResult, CharacterSessionErrorCode>> completion) {
+        UUID playerId = previous.characterId().value();
+        valueMutationInFlight.remove(playerId);
+        LoadedCharacterSession current = active.get(playerId);
+        if (current == null || !current.sessionId().equals(previous.sessionId())) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session changed before Flask preparation completed."));
+            return;
+        }
+        if (result
+                instanceof
+                Result.Failure<FlaskPreparationCommitResult, CharacterSessionErrorCode>) {
+            completion.accept(result);
+            return;
+        }
+        FlaskPreparationCommitResult committed =
+                ((Result.Success<FlaskPreparationCommitResult, CharacterSessionErrorCode>) result)
+                        .value();
+        LoadedCharacterSession updated = current.withSnapshot(committed.session().snapshot());
+        active.put(playerId, updated);
+        projected.remove(playerId);
+        Player player = plugin.getServer().getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            applyProjectionIfReady(player, false);
+        }
+        completion.accept(
+                Result.success(
+                        new FlaskPreparationCommitResult(
+                                updated, committed.preparation(), committed.replayed())));
+    }
+
     private void completeKnowledgeAcquisition(
             LoadedCharacterSession previous,
             Result<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode> result,
@@ -1200,7 +1283,7 @@ final class CharacterSessionController implements Listener {
                         });
     }
 
-    private static Result<LoadedCharacterSession, CharacterSessionErrorCode> valueMutationBusy() {
+    private static <T> Result<T, CharacterSessionErrorCode> valueMutationBusy() {
         return Result.failure(
                 CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
                 "Another authoritative value transaction is still in progress.");

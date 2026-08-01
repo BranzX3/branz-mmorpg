@@ -857,7 +857,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
         }
     }
 
-    private static Result<MutationApplied, TransactionErrorCode> updateLotQuantity(
+    static Result<MutationApplied, TransactionErrorCode> updateLotQuantity(
             Connection connection,
             TransactionId transactionId,
             LotQuantityConsumption consumption) {
@@ -996,7 +996,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
         }
     }
 
-    private static Optional<LotLocationRecord> findLot(Connection connection, LotId lotId)
+    static Optional<LotLocationRecord> findLot(Connection connection, LotId lotId)
             throws SQLException {
         try (PreparedStatement statement =
                 connection.prepareStatement(
@@ -1101,7 +1101,7 @@ public final class JdbcValueTransactionService implements ValueTransactionServic
         Result<MutationApplied, TransactionErrorCode> apply(Connection connection);
     }
 
-    private enum MutationApplied {
+    enum MutationApplied {
         INSTANCE
     }
 }

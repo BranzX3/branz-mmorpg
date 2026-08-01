@@ -4,6 +4,8 @@ import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.combat.resource.FlaskAllocation;
+import com.branz.mmorpg.combat.resource.FlaskDose;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
@@ -88,6 +90,7 @@ final class SceneHubController implements Listener {
     private final ScenePreviewProvider previewProvider = new CompactScenePreviewProvider();
     private final NamespacedKey actionKey;
     private final Map<UUID, ScenePreviewHandle> previewHandles = new HashMap<>();
+    private final Map<UUID, FlaskAllocation> flaskPreviews = new HashMap<>();
     private final Set<UUID> navigating = new HashSet<>();
     private final Set<UUID> committing = new HashSet<>();
 
@@ -162,6 +165,7 @@ final class SceneHubController implements Listener {
             previewProvider.close(handle);
         }
         previewHandles.clear();
+        flaskPreviews.clear();
         navigating.clear();
         committing.clear();
         sessions.closeAll(SceneCloseReason.PLUGIN_DISABLE);
@@ -261,6 +265,14 @@ final class SceneHubController implements Listener {
         }
         if ("confirm-build".equals(action)) {
             confirmBuild(player, holder);
+            return;
+        }
+        if (action.startsWith("flask-adjust:")) {
+            adjustFlaskAllocation(player, holder, action.substring("flask-adjust:".length()));
+            return;
+        }
+        if ("confirm-flask".equals(action)) {
+            confirmFlaskPreparation(player, holder);
             return;
         }
         SceneMode mode;
@@ -391,6 +403,8 @@ final class SceneHubController implements Listener {
                 populateCombatArtsPage(player, inventory, session);
             } else if (session.mode() == SceneMode.MAGIC_ATTUNEMENT) {
                 populateMagicAttunementPage(player, inventory, session);
+            } else if (session.mode() == SceneMode.FLASK_PREPARATION) {
+                populateFlaskPreparationPage(player, inventory);
             } else {
                 inventory.setItem(
                         22,
@@ -961,8 +975,232 @@ final class SceneHubController implements Listener {
     private void requireRestContext(Player player) {
         if (!restContext(player)) {
             throw new IllegalArgumentException(
-                    "Build changes require Rest Context: return near world spawn outside combat.");
+                    "Preparation requires Rest Context: return near world spawn outside combat.");
         }
+    }
+
+    private void populateFlaskPreparationPage(Player player, Inventory inventory) {
+        LoadedCharacterSession character = characterSessions.active(player).orElse(null);
+        if (character == null) {
+            inventory.setItem(
+                    22, button(Material.BARRIER, "Character session unavailable", "noop"));
+            return;
+        }
+        FlaskAllocation allocation =
+                flaskPreviews.computeIfAbsent(
+                        player.getUniqueId(),
+                        ignored ->
+                                character.snapshot().expeditionState().flaskState().allocation());
+        FlaskDose[] doses = FlaskDose.values();
+        int[] rows = {11, 20, 29};
+        for (int index = 0; index < doses.length; index++) {
+            FlaskDose dose = doses[index];
+            int center = rows[index];
+            inventory.setItem(
+                    center - 1,
+                    button(
+                            Material.RED_DYE,
+                            "Move one slot away from " + doseLabel(dose),
+                            "flask-adjust:" + dose.name() + ":-1"));
+            inventory.setItem(
+                    center,
+                    button(
+                            doseMaterial(dose),
+                            doseLabel(dose) + " allocation: " + allocation.maximum(dose),
+                            "noop"));
+            inventory.setItem(
+                    center + 1,
+                    button(
+                            Material.LIME_DYE,
+                            "Move one slot to " + doseLabel(dose),
+                            "flask-adjust:" + dose.name() + ":1"));
+        }
+        long stock = infusionStock(character);
+        int charges = character.snapshot().expeditionState().flaskState().totalCharges();
+        boolean mercyEligible = stock == 0 && charges < 2;
+        inventory.setItem(
+                38,
+                button(
+                        stock > 0 ? Material.GLOWSTONE_DUST : Material.GUNPOWDER,
+                        "Infusion Stock: " + stock,
+                        "noop"));
+        inventory.setItem(
+                40,
+                button(
+                        restContext(player) ? Material.CAMPFIRE : Material.REDSTONE_TORCH,
+                        restContext(player)
+                                ? "Rest Context ready"
+                                : "Return to spawn sanctuary outside combat",
+                        "noop"));
+        inventory.setItem(
+                42,
+                button(
+                        mercyEligible ? Material.HONEY_BOTTLE : Material.GLASS_BOTTLE,
+                        mercyEligible
+                                ? "Mercy refill available: 2 charges"
+                                : "Refill cost: up to " + allocation.capacity() + " Infusion Stock",
+                        "noop"));
+        inventory.setItem(
+                49,
+                button(
+                        restContext(player) ? Material.LIME_DYE : Material.GRAY_DYE,
+                        "Prepare and refill Flask",
+                        "confirm-flask"));
+    }
+
+    private void adjustFlaskAllocation(
+            Player player, SceneInventoryHolder holder, String adjustment) {
+        try {
+            requireRestContext(player);
+            String[] parts = adjustment.split(":", 2);
+            FlaskDose target = FlaskDose.valueOf(parts[0]);
+            int direction = Integer.parseInt(parts[1]);
+            if (direction != -1 && direction != 1) {
+                return;
+            }
+            LoadedCharacterSession character = characterSessions.active(player).orElseThrow();
+            FlaskAllocation current =
+                    flaskPreviews.computeIfAbsent(
+                            player.getUniqueId(),
+                            ignored ->
+                                    character
+                                            .snapshot()
+                                            .expeditionState()
+                                            .flaskState()
+                                            .allocation());
+            EnumMap<FlaskDose, Integer> doses = new EnumMap<>(FlaskDose.class);
+            doses.putAll(current.doses());
+            FlaskDose counterpart = allocationCounterpart(doses, target, direction);
+            if (counterpart == null) {
+                player.sendActionBar(
+                        Component.text("That allocation cannot move further.", NamedTextColor.RED));
+                return;
+            }
+            doses.put(target, doses.get(target) + direction);
+            doses.put(counterpart, doses.get(counterpart) - direction);
+            flaskPreviews.put(player.getUniqueId(), new FlaskAllocation(current.capacity(), doses));
+            sessions.find(player.getUniqueId())
+                    .filter(scene -> scene.sessionId().equals(holder.sessionId()))
+                    .ifPresent(scene -> navigate(player, scene));
+        } catch (IllegalArgumentException | java.util.NoSuchElementException exception) {
+            player.sendActionBar(Component.text(message(exception), NamedTextColor.RED));
+        }
+    }
+
+    private static FlaskDose allocationCounterpart(
+            Map<FlaskDose, Integer> doses, FlaskDose target, int direction) {
+        for (int offset = 1; offset < FlaskDose.values().length; offset++) {
+            FlaskDose candidate =
+                    FlaskDose.values()[(target.ordinal() + offset) % FlaskDose.values().length];
+            if (direction > 0 && doses.get(candidate) > 0) {
+                return candidate;
+            }
+            if (direction < 0 && doses.get(target) > 0) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private void confirmFlaskPreparation(Player player, SceneInventoryHolder holder) {
+        if (!committing.add(player.getUniqueId())) {
+            return;
+        }
+        SceneSession sceneSession = sessions.find(player.getUniqueId()).orElse(null);
+        LoadedCharacterSession character = characterSessions.active(player).orElse(null);
+        if (sceneSession == null
+                || character == null
+                || !sceneSession.sessionId().equals(holder.sessionId())) {
+            committing.remove(player.getUniqueId());
+            return;
+        }
+        try {
+            requireRestContext(player);
+        } catch (IllegalArgumentException exception) {
+            committing.remove(player.getUniqueId());
+            player.sendActionBar(Component.text(exception.getMessage(), NamedTextColor.RED));
+            return;
+        }
+        FlaskAllocation allocation =
+                flaskPreviews.getOrDefault(
+                        player.getUniqueId(),
+                        character.snapshot().expeditionState().flaskState().allocation());
+        boolean mercyRequested =
+                infusionStock(character) == 0
+                        && character.snapshot().expeditionState().flaskState().totalCharges() < 2;
+        player.sendActionBar(
+                Component.text("Preparing Expedition Flask...", NamedTextColor.YELLOW));
+        characterSessions.prepareFlaskAtRest(
+                player,
+                allocation,
+                mercyRequested,
+                UUID.randomUUID(),
+                contentVersion,
+                result -> {
+                    committing.remove(player.getUniqueId());
+                    if (result
+                            instanceof
+                            Result.Failure<FlaskPreparationCommitResult, CharacterSessionErrorCode>
+                                    failure) {
+                        player.sendActionBar(
+                                Component.text(
+                                        failure.error().code() + ": " + failure.detail(),
+                                        NamedTextColor.RED));
+                        return;
+                    }
+                    FlaskPreparationCommitResult committedResult =
+                            ((Result.Success<
+                                                    FlaskPreparationCommitResult,
+                                                    CharacterSessionErrorCode>)
+                                            result)
+                                    .value();
+                    flaskPreviews.put(
+                            player.getUniqueId(),
+                            committedResult.preparation().state().allocation());
+                    String cost =
+                            committedResult.preparation().mercyChargesGranted() > 0
+                                    ? "Mercy refill granted "
+                                            + committedResult.preparation().mercyChargesGranted()
+                                            + " charges."
+                                    : "Flask prepared using "
+                                            + committedResult.preparation().infusionStockConsumed()
+                                            + " Infusion Stock.";
+                    player.sendActionBar(Component.text(cost, NamedTextColor.GREEN));
+                    sessions.find(player.getUniqueId())
+                            .filter(scene -> scene.sessionId().equals(holder.sessionId()))
+                            .ifPresent(scene -> navigate(player, scene));
+                });
+    }
+
+    private static long infusionStock(LoadedCharacterSession character) {
+        DefinitionId stock = DefinitionId.of("material.infusion_stock");
+        return character.snapshot().lotRecords().stream()
+                .filter(lot -> lot.definitionId().equals(stock))
+                .filter(lot -> lot.quantity() > 0)
+                .filter(
+                        lot ->
+                                lot.ownerCharacterId()
+                                        .filter(character.characterId()::equals)
+                                        .isPresent())
+                .filter(lot -> lot.location().type() == ValueLocationType.CHARACTER_INVENTORY)
+                .mapToLong(LotLocationRecord::quantity)
+                .sum();
+    }
+
+    private static Material doseMaterial(FlaskDose dose) {
+        return switch (dose) {
+            case HEALING -> Material.REDSTONE;
+            case MANA -> Material.LAPIS_LAZULI;
+            case STAMINA -> Material.SUGAR;
+        };
+    }
+
+    private static String doseLabel(FlaskDose dose) {
+        return switch (dose) {
+            case HEALING -> "Healing";
+            case MANA -> "Mana";
+            case STAMINA -> "Stamina";
+        };
     }
 
     private static String message(Exception exception) {
@@ -1344,6 +1582,7 @@ final class SceneHubController implements Listener {
         }
         navigating.remove(player.getUniqueId());
         committing.remove(player.getUniqueId());
+        flaskPreviews.remove(player.getUniqueId());
         sessions.closeCurrent(player.getUniqueId(), reason);
     }
 
@@ -1354,6 +1593,7 @@ final class SceneHubController implements Listener {
             case WARDROBE_DYE -> "Wardrobe & Dye";
             case COMBAT_ARTS -> "Combat Arts";
             case MAGIC_ATTUNEMENT -> "Magic & Attunement";
+            case FLASK_PREPARATION -> "Expedition Flask";
             case JOURNAL_PENDING_REWARDS -> "Journal & Pending Rewards";
             case SETTINGS_HELP -> "Settings & Help";
         };
@@ -1374,6 +1614,9 @@ final class SceneHubController implements Listener {
         buttons.put(
                 SceneMode.JOURNAL_PENDING_REWARDS,
                 new ButtonSpec(29, Material.CHEST, "Journal & Pending Rewards"));
+        buttons.put(
+                SceneMode.FLASK_PREPARATION,
+                new ButtonSpec(31, Material.HONEY_BOTTLE, "Expedition Flask"));
         buttons.put(
                 SceneMode.SETTINGS_HELP,
                 new ButtonSpec(33, Material.COMPARATOR, "Settings & Help"));

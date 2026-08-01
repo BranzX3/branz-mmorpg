@@ -1097,6 +1097,125 @@ class CharacterSessionServiceIntegrationTest {
         }
     }
 
+    @Test
+    void restPreparationConsumesInfusionStockAndPersistsFlaskAtomically(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofMinutes(5),
+                        Duration.ofSeconds(10));
+        UUID playerId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database);
+            LoadedCharacterSession opened = success(service.open(playerId));
+            ItemDefinition stock =
+                    new ItemDefinition(
+                            DefinitionId.of("material.infusion_stock"),
+                            DefinitionId.of("material.infusion_stock"),
+                            ItemClass.STACKABLE_LOT,
+                            OptionalInt.empty(),
+                            false);
+            LoadedCharacterSession withStock =
+                    success(service.grantTestValue(opened, stock, 2, 3, "content.test.1"));
+
+            FlaskPreparationCommitResult committed =
+                    successFlaskPreparation(
+                            service.prepareFlaskAtRest(
+                                    withStock,
+                                    FlaskAllocation.balanced(),
+                                    false,
+                                    operationId,
+                                    "content.test.1"));
+
+            assertEquals(3, committed.preparation().infusionStockConsumed());
+            assertEquals(0, committed.preparation().mercyChargesGranted());
+            assertEquals(
+                    3,
+                    committed
+                            .session()
+                            .snapshot()
+                            .expeditionState()
+                            .flaskState()
+                            .charge(FlaskDose.HEALING));
+            assertEquals(
+                    0,
+                    committed
+                            .session()
+                            .snapshot()
+                            .expeditionState()
+                            .flaskState()
+                            .charge(FlaskDose.MANA));
+            assertEquals(
+                    0,
+                    committed.session().snapshot().lotRecords().stream()
+                            .filter(lot -> lot.definitionId().equals(stock.id()))
+                            .mapToLong(lot -> lot.quantity())
+                            .sum());
+            assertTrue(
+                    committed
+                            .session()
+                            .snapshot()
+                            .expeditionState()
+                            .preparedFlaskSnapshot()
+                            .isEmpty());
+
+            FlaskPreparationCommitResult replay =
+                    successFlaskPreparation(
+                            service.prepareFlaskAtRest(
+                                    committed.session(),
+                                    FlaskAllocation.balanced(),
+                                    false,
+                                    operationId,
+                                    "content.test.1"));
+            assertTrue(replay.replayed());
+            assertEquals(
+                    1, replay.session().snapshot().expeditionStateRecord().orElseThrow().version());
+            service.close(replay.session());
+
+            LoadedCharacterSession mercyCharacter = success(service.open(UUID.randomUUID()));
+            FlaskPreparationCommitResult mercy =
+                    successFlaskPreparation(
+                            service.prepareFlaskAtRest(
+                                    mercyCharacter,
+                                    FlaskAllocation.balanced(),
+                                    true,
+                                    UUID.randomUUID(),
+                                    "content.test.1"));
+            assertEquals(0, mercy.preparation().infusionStockConsumed());
+            assertEquals(2, mercy.preparation().mercyChargesGranted());
+            assertEquals(2, mercy.preparation().state().totalCharges());
+            service.close(mercy.session());
+        }
+
+        try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(restarted);
+            LoadedCharacterSession restored = success(service.open(playerId));
+            assertEquals(3, restored.snapshot().expeditionState().flaskState().totalCharges());
+            assertEquals(
+                    0,
+                    restored.snapshot().lotRecords().stream()
+                            .filter(
+                                    lot ->
+                                            lot.definitionId()
+                                                    .equals(
+                                                            DefinitionId.of(
+                                                                    "material.infusion_stock")))
+                            .mapToLong(lot -> lot.quantity())
+                            .sum());
+            service.close(restored);
+        }
+    }
+
     private static ItemId itemId(LoadedCharacterSession session, DefinitionId definitionId) {
         return new ItemId(
                 session.snapshot().inventory().stream()
@@ -1147,6 +1266,23 @@ class CharacterSessionServiceIntegrationTest {
                     return "";
                 });
         return ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result).value();
+    }
+
+    private static FlaskPreparationCommitResult successFlaskPreparation(
+            Result<FlaskPreparationCommitResult, CharacterSessionErrorCode> result) {
+        assertTrue(
+                result.isSuccess(),
+                () ->
+                        result
+                                        instanceof
+                                        Result.Failure<
+                                                        FlaskPreparationCommitResult,
+                                                        CharacterSessionErrorCode>
+                                                failure
+                                ? failure.error() + ": " + failure.detail()
+                                : "");
+        return ((Result.Success<FlaskPreparationCommitResult, CharacterSessionErrorCode>) result)
+                .value();
     }
 
     private static ProgressionEvidenceCommitResult progressionSuccess(

@@ -549,6 +549,19 @@ live inventory, change Bukkit resources or write PostgreSQL.
 147. Complete a use normally and verify the previous combat slot returns. Select another slot during
      use and verify it remains selected. Disconnect/reconnect and restart Paper; the spent charge
      remains spent and exactly one refreshed Flask representation returns.
+148. In `EXPLORATION` near world spawn, open Chronicle slot 9 and select `Expedition Flask`. Verify
+     the page shows the current five-slot Healing/Mana/Stamina allocation, owned Infusion Stock and
+     `Rest Context ready`. Move slots among all three dose types; the displayed total must stay five.
+149. In the environment-gated dev menu grant at least five `material.infusion_stock`, return to the
+     Flask page and confirm. Verify the green acknowledgement reports consumed stock, the hotbar
+     Flask shows the chosen full allocation and `/mmo consumable status` reports the new durable
+     version. Moving away from spawn or entering combat must reject without consuming stock.
+150. Deliberately race the confirmation against another durable character mutation or repeat the
+     same prepared transaction in the integration fixture. Verify stale/busy failure leaves both
+     stock and Flask unchanged, while exact operation replay does not consume stock twice.
+151. Spend the Flask below two total charges, remove all Infusion Stock and confirm at Rest. Verify
+     Mercy grants exactly two charges without stock. Disconnect/reconnect and restart Paper; verify
+     the chosen allocation, charges and remaining stock reload exactly once from database truth.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

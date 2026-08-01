@@ -653,6 +653,14 @@ live inventory, change Bukkit resources or write PostgreSQL.
      reduced. Run `/mmo downed hostile` or land a successful hostile combat action and verify the
      next hit applies normally. Defeat the final participant and verify the existing durable boss
      wipe and prepared-Flask restore advance to a new attempt with a fresh revive allowance.
+178. Run the V0010 embedded PostgreSQL repository integration test. Verify the first downed-state
+     create references an existing V0009 boss encounter and writes version 1 with one committed
+     journal/audit row. Exact request replay must not add another version or audit entry.
+179. Replace the state with attempt 2 and verify `findRecoverable` returns it in stable order. Mark
+     the same row non-recoverable and verify recovery excludes it while direct lookup retains the
+     final version and audit history.
+180. Attempt a stale expected version and reuse a committed operation UUID with changed payload.
+     Verify both fail closed without changing the latest downed row, transaction journal or audit.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

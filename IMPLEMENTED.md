@@ -2294,3 +2294,30 @@ Milestone status: **Milestone 7 remains in progress.** Durable downed recovery, 
 personal rewards, Death Pouch and PvP hooks remain.
 
 Schema/config/migration impact: none. ADR 0031 owns the live adapter boundary.
+
+## Milestone 7 - durable downed-state repository slice
+
+Implemented:
+
+- forward-only V0010 adds one downed-state row per durable boss encounter with owning-row cascade,
+  positive attempt/version checks, canonical JSON and a partial recoverable-state index;
+- the repository supports lookup, stable recovery scans and optimistic create/replace operations;
+- every mutation composes transaction-journal preparation, row compare-and-set, audit append and
+  journal commit in one PostgreSQL transaction;
+- exact replay returns the committed row without incrementing its version or duplicating audit;
+- the bootstrap database graph constructs and exposes the repository for the next live wiring slice.
+
+Tests and completion evidence:
+
+- embedded PostgreSQL integration covers create, exact replay, attempt advance, recovery filtering,
+  close, stale rollback and changed-payload idempotency conflict;
+- migration tests apply ten ordered migrations and validate all 16 authoritative tables;
+- persistence formatting, compilation and integration tests pass.
+
+Failure/recovery behavior: invalid or stale writes leave no partial state, journal or audit. The
+foreign key rejects downed state without an owning boss encounter.
+
+Milestone status: **Milestone 7 remains in progress.** The live adapter must serialize transitions
+through V0010 and recover them before gameplay effects become restart-safe.
+
+Schema/config/migration impact: forward-only V0010. ADR 0032 owns the repository contract.

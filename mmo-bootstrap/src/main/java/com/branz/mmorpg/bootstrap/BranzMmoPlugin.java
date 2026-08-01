@@ -45,6 +45,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private DatabaseRuntime databaseRuntime;
     private CharacterSessionController characterSessionController;
     private CombatSessionController combatSessionController;
+    private FlaskHotbarController flaskHotbarController;
     private LiveTeachingSessionController liveTeachingSessionController;
     private KnowledgeAcquisitionController knowledgeAcquisitionController;
 
@@ -133,6 +134,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
         if (liveTeachingSessionController != null) {
             liveTeachingSessionController.shutdown();
             liveTeachingSessionController = null;
+        }
+        if (flaskHotbarController != null) {
+            flaskHotbarController.shutdown();
+            flaskHotbarController = null;
         }
         if (combatSessionController != null) {
             combatSessionController.shutdown();
@@ -575,6 +580,14 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         trainingIncomingCcSeverity,
                         trainingIncomingCcTicks,
                         trainingPerfectGuardPostureDamage);
+        flaskHotbarController =
+                new FlaskHotbarController(
+                        this,
+                        characterSessionController,
+                        combatSessionController,
+                        snapshot.manifest().contentVersion());
+        combatSessionController.setConsumableInterruptObserver(
+                flaskHotbarController::interruptFromCombat);
         liveTeachingSessionController =
                 new LiveTeachingSessionController(
                         this,
@@ -593,6 +606,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         characterSessionController.addReadyHandler(chronicleController::reconcile);
         characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);
+        characterSessionController.addReadyHandler(flaskHotbarController::onCharacterReady);
         resourcePackGate.setReadyHandler(characterSessionController::onPackReady);
         sceneHubController =
                 new SceneHubController(
@@ -628,12 +642,14 @@ public final class BranzMmoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(resourcePackGate, this);
         getServer().getPluginManager().registerEvents(characterSessionController, this);
         getServer().getPluginManager().registerEvents(combatSessionController, this);
+        getServer().getPluginManager().registerEvents(flaskHotbarController, this);
         getServer().getPluginManager().registerEvents(liveTeachingSessionController, this);
         getServer().getPluginManager().registerEvents(sceneHubController, this);
         getServer().getPluginManager().registerEvents(commandController, this);
         Objects.requireNonNull(getCommand("mmo"), "mmo command").setExecutor(commandController);
         characterSessionController.start();
         combatSessionController.start();
+        flaskHotbarController.start();
         liveTeachingSessionController.start();
         getLogger()
                 .info(

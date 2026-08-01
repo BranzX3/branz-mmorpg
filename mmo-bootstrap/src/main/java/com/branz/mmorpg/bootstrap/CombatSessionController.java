@@ -97,6 +97,7 @@ import com.branz.mmorpg.combat.projectile.ProjectileProfile;
 import com.branz.mmorpg.combat.projectile.ProjectileRuntime;
 import com.branz.mmorpg.combat.projectile.ProjectileTickQuery;
 import com.branz.mmorpg.combat.projectile.ProjectileTickResolution;
+import com.branz.mmorpg.combat.resource.FlaskRestoration;
 import com.branz.mmorpg.combat.state.ActionState;
 import com.branz.mmorpg.combat.state.EngagementState;
 import com.branz.mmorpg.combat.state.UiState;
@@ -163,6 +164,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.FluidCollisionMode;
@@ -308,6 +310,7 @@ final class CombatSessionController implements Listener {
     private final Map<UUID, java.util.Set<UUID>> debugViewers = new HashMap<>();
     private SuccessfulCombatActionObserver successfulActionObserver =
             SuccessfulCombatActionObserver.NONE;
+    private BiConsumer<Player, String> consumableInterruptObserver = (player, reason) -> {};
     private int tickTaskId = -1;
 
     CombatSessionController(
@@ -717,6 +720,102 @@ final class CombatSessionController implements Listener {
                         resources.mana(),
                         resources.reservedMana(),
                         Optional.ofNullable(session.lastResolution)));
+    }
+
+    void setConsumableInterruptObserver(BiConsumer<Player, String> observer) {
+        consumableInterruptObserver = Objects.requireNonNull(observer, "observer");
+    }
+
+    boolean beginFlaskUse(Player player, UUID operationId) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(operationId, "operationId");
+        LiveSession session = sessions.get(player.getUniqueId());
+        long tick = plugin.getServer().getCurrentTick();
+        if (session == null
+                || session.flaskUseOperationId != null
+                || session.health.dead()
+                || session.action != ActionState.IDLE
+                || session.weapon.state() != WeaponState.SHEATHED
+                || session.timeline != null
+                || session.bowDraw != null
+                || session.pendingBowLaunch != null
+                || session.crossbow != null
+                        && (session.crossbow.phase() == CrossbowPhase.COCKING
+                                || session.crossbow.phase() == CrossbowPhase.LOCKING)
+                || session.pendingCrossbowCommit != null
+                || session.crossbowRecoveryUntilTick > tick
+                || session.spellCast != null
+                || session.pendingSpellCommit != null
+                || session.dodge != null
+                || session.guard.active()
+                || session.crowdControl.active().isPresent()
+                || session.pendingAmmoCycleId != null
+                || session.ammoSwitchHandlingUntilTick > tick
+                || session.bowRecoveryUntilTick > tick) {
+            return false;
+        }
+        session.flaskUseOperationId = operationId;
+        session.action = ActionState.WINDUP;
+        session.input.clearBuffer(InputBufferClearReason.ACTION_STARTED);
+        releaseGuard(session);
+        return true;
+    }
+
+    void markFlaskCommitting(Player player, UUID operationId) {
+        LiveSession session = sessions.get(Objects.requireNonNull(player, "player").getUniqueId());
+        if (ownsFlaskUse(session, operationId) && !session.action.hardControl()) {
+            session.action = ActionState.RECOVERY;
+        }
+    }
+
+    boolean applyFlaskRestoration(Player player, UUID operationId, FlaskRestoration restoration) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(restoration, "restoration");
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (!ownsFlaskUse(session, operationId) || session.health.dead()) {
+            return false;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        if (restoration.maximumHealthRatio() > 0) {
+            CombatHealthResolution healed =
+                    playerHealth.heal(
+                            session.health,
+                            tick,
+                            playerHealth.profile().maximum() * restoration.maximumHealthRatio());
+            session.health = healed.runtime();
+        }
+        if (restoration.maximumManaRatio() > 0) {
+            int mana =
+                    (int)
+                            Math.round(
+                                    session.resources.maximumMana()
+                                            * restoration.maximumManaRatio());
+            session.resources = session.resources.restoreMana(mana);
+            session.manaRegenRemainder = 0;
+        }
+        if (restoration.stamina() > 0) {
+            session.resources = session.resources.restoreStamina(restoration.stamina());
+            session.staminaRegenRemainder = 0;
+        }
+        updateHealthPresentation(player, session);
+        return true;
+    }
+
+    void endFlaskUse(Player player, UUID operationId) {
+        LiveSession session = sessions.get(Objects.requireNonNull(player, "player").getUniqueId());
+        if (!ownsFlaskUse(session, operationId)) {
+            return;
+        }
+        session.flaskUseOperationId = null;
+        if (!session.action.hardControl()) {
+            session.action = ActionState.IDLE;
+        }
+    }
+
+    private static boolean ownsFlaskUse(LiveSession session, UUID operationId) {
+        return session != null
+                && Objects.requireNonNull(operationId, "operationId")
+                        .equals(session.flaskUseOperationId);
     }
 
     Optional<Boolean> toggleDebug(Player viewer, Player target) {
@@ -1237,6 +1336,9 @@ final class CombatSessionController implements Listener {
         if (session == null) {
             return;
         }
+        if (session.flaskUseOperationId != null) {
+            consumableInterruptObserver.accept(player, "DEATH");
+        }
         completeOpenCombatEvidence(player, session, EncounterOutcome.DEFEAT);
         long tick = plugin.getServer().getCurrentTick();
         session.health = playerHealth.kill(session.health, tick);
@@ -1314,6 +1416,10 @@ final class CombatSessionController implements Listener {
         boolean authoritativeDodgeStep = sameWorld && session.applyingDodgeTeleport;
         if (authoritativeDodgeStep) {
             return;
+        }
+        if (session.flaskUseOperationId != null) {
+            consumableInterruptObserver.accept(
+                    event.getPlayer(), sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
         }
         completeOpenCombatEvidence(event.getPlayer(), session, EncounterOutcome.ABANDONED);
         cancelAction(session, sameWorld ? "FORCED_TELEPORT" : "WORLD_CHANGE");
@@ -2065,6 +2171,9 @@ final class CombatSessionController implements Listener {
         if (!application.applied()) {
             session.lastResolution = "CC " + severity + " " + application.outcome();
             return;
+        }
+        if (session.flaskUseOperationId != null) {
+            consumableInterruptObserver.accept(player, "CC_" + severity);
         }
         cancelAction(session, "CC_" + severity);
         cancelBow(session, "CC_" + severity);
@@ -4084,6 +4193,7 @@ final class CombatSessionController implements Listener {
             return;
         }
         if (session.pendingCrossbowCommit != null
+                || session.action != ActionState.IDLE
                 || session.timeline != null
                 || session.spellCast != null
                 || session.dodge != null
@@ -4654,6 +4764,7 @@ final class CombatSessionController implements Listener {
         private boolean progressionEvidenceCommitInFlight;
         private UUID activeMoveEvidenceActionId;
         private UUID spellEvidenceActionId;
+        private UUID flaskUseOperationId;
 
         private LiveSession(
                 EngagementRuntime engagement,

@@ -130,6 +130,24 @@ cannot mint charges. The environment-gated
 this journaled boundary. The Milestone 7 encounter controller will own the live full-party wipe
 signal; callers cannot select a different snapshot at restore time.
 
+## V1 live Flask hotbar adapter
+
+After Player Session projection, the server materializes exactly one character-bound Expedition
+Flask in hotbar slots 1-8. It is not an item/lot and cannot be dropped, stored, transferred or moved
+to off-hand. Sneak + right-click cycles allocated Healing, Mana and Stamina doses; right-click starts
+the selected dose after the weapon is fully sheathed.
+
+The live adapter owns the shared combat action during 28-tick windup and 20-tick recovery, slows
+walking to 60% and interrupts on sprint, jump, hotbar selection, applied CC, death or forced
+teleport. Offset 18 wins over an interrupt on the same tick. At commit it decrements the selected
+charge through the durable expedition-state transaction, waits for PostgreSQL acknowledgement and
+Player Session reload, and only then applies the authored restoration. Database failure never heals
+the player. Recovery begins at acknowledgement, and an interruption after commit never refunds.
+
+Normal completion returns to the previous combat slot unless the player deliberately chose another
+slot. Reconnect removes any stale representation and reconstructs one from durable Flask truth.
+ADR 0023 owns this input and recovery boundary.
+
 ## Item freshness
 
 Finished potions and normal ingredients do not expire in real time. `Fresh`, `Pristine`, `Corrupted` and `Infused` are material states. Special Unstable Concoctions may expire at rest, death or expedition end and are always labeled.

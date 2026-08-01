@@ -13,6 +13,8 @@ This matrix defines end-to-end scenarios that must pass before V1 release. Unit 
 
 - Player opens normal inventory while ENGAGED; enemies continue and may damage the player.
 - Moving a potion into hotbar and closing inventory allows normal consumable timeline; no snapshot/loadout restriction exists.
+- The character-bound Flask representation cannot leave gameplay hotbar slots, spends its durable
+  selected charge at commit and never restores that charge after a post-commit interrupt.
 - Weapon scroll spam cannot skip sheathe/draw or retain an illegal buffered attack.
 - Dodge, Perfect Guard, Parry and hard CC resolve in the documented priority under same-tick input tests.
 

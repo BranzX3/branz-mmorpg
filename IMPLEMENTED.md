@@ -1992,3 +1992,41 @@ Milestone 7 encounter controller against this completed persistence boundary.
 
 Schema/config/migration impact: expedition JSON advances from schema version 1 to 2 with backward
 decoding. No SQL, content-schema or configuration migration is required; ADR 0022 is updated.
+
+## Milestone 6 - live Expedition Flask hotbar slice
+
+Implemented:
+
+- one transient, character-bound Flask representation is reconciled into gameplay hotbar slots 1-8
+  from Player Session truth and blocked from drop, container, off-hand and vanilla-consume paths;
+- sneak + right-click cycles allocated doses and right-click uses the selected charge after combat
+  reaches the fully sheathed/idle state;
+- the 28/18/20 timeline owns combat action state, applies 60% walking speed and handles sprint,
+  jump, hotbar selection, applied CC, forced teleport and death interruptions;
+- an asynchronous durable gate preserves exact-commit-tick priority, pauses at `COMMITTING`, begins
+  recovery only after PostgreSQL acknowledgement and never applies restoration before the charge is
+  durably decremented and reloaded;
+- Healing restores 35% maximum HP, Mana restores 40% maximum Mana and Stamina restores 60 within
+  server-authoritative caps. Normal completion restores the prior combat slot unless the player
+  deliberately selected another slot;
+- disconnect removes process-local action/representation state and reconnect materializes one fresh
+  projection without refunding a committed charge.
+
+Tests and completion evidence:
+
+- durable live-timeline tests cover pre-commit cancellation, exact-tick commit priority, asynchronous
+  acknowledgement-based recovery and failed commit termination;
+- the existing Flask kernel covers exact charge decrement/restoration intent and the Player Session
+  integration covers journaled commit/reload/restart behavior;
+- the full repository build packages the registered Paper controller and its event contracts.
+
+Failure/recovery behavior: missing charges, no hotbar space or a non-idle combat state reject without
+mutation. Busy/stale/database failure applies no restoration. A commit whose callback arrives after
+death/disconnect remains durable but cannot heal a dead/offline actor; reconnect reloads truth.
+
+Milestone status: **Milestone 6 remains in progress.** Atomic Rest Context allocation/refill and the
+normal consumable-lot live adapter remain. Boss snapshot persistence is ready for the Milestone 7
+confirmed party-wipe signal.
+
+Schema/config/migration impact: none. ADR 0023 owns transient hotbar/input/action behavior; V0008
+continues to own all durable Flask value.

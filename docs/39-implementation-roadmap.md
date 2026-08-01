@@ -100,8 +100,9 @@ transaction journal and reloads it with the Player Session; the environment-gate
 can write and inspect the durable fixture. The same document now carries a backward-compatible
 prepared boss Flask snapshot bound to one checkpoint-instance UUID; capture/confirmed-wipe restore
 is journaled and rejects ordinary death or checkpoint mismatch. The live party-wipe trigger belongs
-to the Milestone 7 encounter controller. Live hotbar and Rest preparation behavior remain before
-Milestone 6 completion.
+to the Milestone 7 encounter controller. The live Flask hotbar representation and durable use path
+are now implemented with commit-before-restoration, interrupt/recovery and reconnect behavior.
+Normal consumable lots and atomic Rest allocation/refill remain before Milestone 6 completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

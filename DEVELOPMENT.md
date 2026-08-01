@@ -535,6 +535,20 @@ live inventory, change Bukkit resources or write PostgreSQL.
 143. Disconnect/reconnect and restart Paper. Verify the prepared checkpoint UUID and captured Flask
      remain available. Ordinary respawn/death must not invoke this fixture or restore charges; the
      live confirmed party-wipe signal is deferred to the encounter controller.
+144. Reconnect with a ready Player Session. Verify exactly one `Expedition Flask` representation is
+     present in gameplay hotbar slots 1-8, its lore matches `/mmo consumable status`, and it cannot
+     be dropped, shift-moved to a container, placed in off-hand or duplicated across reconnect.
+145. Select the Flask and use sneak + right-click to cycle Healing, Mana and Stamina. Right-click a
+     charged dose after the weapon finishes sheathing. Verify movement slows during windup; sprint,
+     jump or selecting another hotbar slot before offset 18 cancels without changing durable version
+     or charges.
+146. Use a fresh charged dose without interruption. At offset 18 verify the action reports
+     `COMMITTING`; only after PostgreSQL confirmation should HP, Mana or Stamina restore and
+     `/mmo consumable status` show one fewer selected charge. Interrupt during commit/recovery and
+     verify the charge remains spent and no second restoration occurs.
+147. Complete a use normally and verify the previous combat slot returns. Select another slot during
+     use and verify it remains selected. Disconnect/reconnect and restart Paper; the spent charge
+     remains spent and exactly one refreshed Flask representation returns.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

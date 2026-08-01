@@ -64,3 +64,7 @@ providers:
     enabled: true
     required: false
     plugin-name: Wallet
+
+pvp:
+  # Temporary LOCAL/INTEGRATION safe-region boundary for the PvP Lab.
+  local-arena-radius-blocks: 24.0

@@ -58,6 +58,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private PartyController partyController;
     private LfgController lfgController;
     private DownedController downedController;
+    private PvpController pvpController;
 
     @Override
     public void onEnable() {
@@ -148,6 +149,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
         if (downedController != null) {
             downedController.shutdown();
             downedController = null;
+        }
+        if (pvpController != null) {
+            pvpController.shutdown();
+            pvpController = null;
         }
         if (lfgController != null) {
             lfgController.shutdown();
@@ -683,7 +688,21 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         bossEncounterController,
                         databaseRuntime.downedEncounters(),
                         snapshot.manifest().contentVersion());
-        combatSessionController.setLethalDamageObserver(downedController::interceptLethal);
+        pvpController =
+                new PvpController(
+                        this,
+                        characterSessionController,
+                        combatSessionController,
+                        bossEncounterController);
+        combatSessionController.setPvpCombatPolicy(pvpController);
+        deathPouchController.setPvpSuppression(pvpController::suppressesDeathPouch);
+        combatSessionController.setLethalDamageObserver(
+                player -> {
+                    LethalDamageDisposition pvp = pvpController.interceptLethal(player);
+                    return pvp == LethalDamageDisposition.DEATH
+                            ? downedController.interceptLethal(player)
+                            : pvp;
+                });
         combatSessionController.setDamageImmunityObserver(downedController::protectedFromDamage);
         combatSessionController.setHostileActionObserver(downedController::observeHostileAction);
         combatSessionController.setSuccessfulActionObserver(
@@ -698,6 +717,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         characterSessionController.addReadyHandler(deathPouchController::onCharacterReady);
         characterSessionController.addReadyHandler(partyController::onCharacterReady);
         characterSessionController.addReadyHandler(downedController::onCharacterReady);
+        characterSessionController.addReadyHandler(pvpController::onCharacterReady);
         resourcePackGate.setReadyHandler(characterSessionController::onPackReady);
         sceneHubController =
                 new SceneHubController(
@@ -728,7 +748,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         deathPouchController,
                         partyController,
                         lfgController,
-                        downedController);
+                        downedController,
+                        pvpController);
         getServer().getPluginManager().registerEvents(chronicleController, this);
         return null;
     }
@@ -745,6 +766,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(deathPouchController, this);
         getServer().getPluginManager().registerEvents(partyController, this);
         getServer().getPluginManager().registerEvents(downedController, this);
+        getServer().getPluginManager().registerEvents(pvpController, this);
         getServer().getPluginManager().registerEvents(sceneHubController, this);
         getServer().getPluginManager().registerEvents(commandController, this);
         Objects.requireNonNull(getCommand("mmo"), "mmo command").setExecutor(commandController);
@@ -757,6 +779,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         deathPouchController.start();
         partyController.start();
         downedController.start();
+        pvpController.start();
         getLogger()
                 .info(
                         "Milestone 3 runtime ready; item definitions="

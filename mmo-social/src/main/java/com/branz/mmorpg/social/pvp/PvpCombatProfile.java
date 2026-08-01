@@ -20,7 +20,7 @@ public record PvpCombatProfile(
     }
 
     public static PvpCombatProfile canonical() {
-        return new PvpCombatProfile(0.70, 0.60, 0.85, 0.65, 30, true, false);
+        return new PvpCombatProfile(0.65, 0.70, 0.75, 0.60, 30, true, false);
     }
 
     public boolean durabilityLossAllowed() {

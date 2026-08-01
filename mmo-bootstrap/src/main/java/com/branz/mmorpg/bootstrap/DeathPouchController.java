@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
@@ -54,6 +55,7 @@ final class DeathPouchController implements Listener {
     private final Set<CharacterId> creationInFlight = ConcurrentHashMap.newKeySet();
     private final Set<UUID> pouchInFlight = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean scanInFlight = new AtomicBoolean();
+    private Predicate<Player> pvpSuppression = player -> false;
     private int particleTaskId = -1;
     private int reconciliationTaskId = -1;
     private boolean recoveryReady;
@@ -103,6 +105,10 @@ final class DeathPouchController implements Listener {
                         .scheduleSyncRepeatingTask(
                                 plugin, () -> reconcileDurable(false), 200L, 200L);
         reconcileDurable(true);
+    }
+
+    void setPvpSuppression(Predicate<Player> suppression) {
+        pvpSuppression = Objects.requireNonNull(suppression, "suppression");
     }
 
     void shutdown() {
@@ -162,7 +168,7 @@ final class DeathPouchController implements Listener {
         if (!characterSessions.ready(player) || !recoveryReady) {
             return;
         }
-        if (bossEncounters.suppressesDeathPouch(player)) {
+        if (bossEncounters.suppressesDeathPouch(player) || pvpSuppression.test(player)) {
             return;
         }
         createAt(player, player.getKiller() != null);

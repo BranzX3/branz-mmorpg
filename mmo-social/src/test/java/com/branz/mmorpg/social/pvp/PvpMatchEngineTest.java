@@ -180,10 +180,10 @@ class PvpMatchEngineTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> new PvpCombatProfile(0, 1, 1, 1, 30, true, false));
-        assertEquals(0.70, profile.damageMultiplier());
-        assertEquals(0.60, profile.healingMultiplier());
-        assertEquals(0.85, profile.guardPressureMultiplier());
-        assertEquals(0.65, profile.ccDurationMultiplier());
+        assertEquals(0.65, profile.damageMultiplier());
+        assertEquals(0.70, profile.healingMultiplier());
+        assertEquals(0.75, profile.guardPressureMultiplier());
+        assertEquals(0.60, profile.ccDurationMultiplier());
         assertEquals(30, profile.hardCcImmunityTicks());
         assertTrue(profile.flaskAllowed());
         assertFalse(profile.externalBuffsAllowed());

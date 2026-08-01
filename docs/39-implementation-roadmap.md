@@ -185,6 +185,13 @@ two-team arena elimination, surrender, boundary forfeits, disconnect grace and e
 replay. Its canonical profile freezes separate damage/healing/guard/CC values and forbids durability
 or Death Pouch loss. Live Paper combat, command and safe-defeat wiring is the final Milestone 7
 slice.
+The environment-gated Paper PvP Lab now wires that kernel to `/mmo pvp` duel and two-team arena
+commands, a configurable local safe-region radius, countdown/boundary/disconnect handling and
+opponent-only hostile permission across melee, projectile and Staff spell targeting. Lethal damage
+becomes safe defeat, Flask healing uses the PvP profile, external consumables are rejected and
+ammo/catalyst/crossbow state remains on the pre-match durable snapshot. Death Pouch and progression
+evidence are suppressed. Milestone 7 is implementation-complete and ready for its in-game
+acceptance pass; Milestone 8 is the next planned development boundary.
 
 ## Milestone 8 — Lifeskill kernel
 

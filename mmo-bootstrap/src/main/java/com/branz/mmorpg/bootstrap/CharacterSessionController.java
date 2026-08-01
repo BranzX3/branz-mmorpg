@@ -99,6 +99,11 @@ final class CharacterSessionController implements Listener {
         return projected.contains(Objects.requireNonNull(player, "player").getUniqueId());
     }
 
+    boolean valueMutationInFlight(Player player) {
+        return valueMutationInFlight.contains(
+                Objects.requireNonNull(player, "player").getUniqueId());
+    }
+
     Optional<LoadedCharacterSession> active(Player player) {
         return Optional.ofNullable(
                 active.get(Objects.requireNonNull(player, "player").getUniqueId()));

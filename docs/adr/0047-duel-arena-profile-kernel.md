@@ -19,10 +19,18 @@ ticks, acceptance starts a 100-tick countdown, and hostile permission exists onl
 admission checks and starts at countdown.
 
 Admission requires a ready character outside Engagement, inside a safe PvP region and without an
-active external value transaction. The canonical balance profile freezes damage 0.70, healing 0.60,
-guard pressure 0.85, CC duration 0.65 and 30 ticks of hard-CC immunity. Flask is allowed by default;
+active external value transaction. The canonical balance profile freezes damage 0.65, Flask healing
+0.70, guard pressure 0.75, CC duration 0.60 and 30 ticks of hard-CC immunity. Flask is allowed;
 external buffs applied after countdown are not. Durability loss and Death Pouch creation are
 unconditionally disabled by the profile contract.
+
+The LOCAL/INTEGRATION Paper adapter keeps matches process-local: restart cancels the match and the
+normal durable character snapshot remains authoritative. `/mmo pvp` provides duel consent and a
+two-team arena lab inside a configurable radius from the initiator. The adapter resets transient
+combat state at activation/completion, grants hostile permission only through the kernel, converts
+lethal damage to safe defeat, scales Flask healing, uses authored PvP damage profiles and bypasses
+ammo/catalyst/crossbow mutations while the match is active. A production region/instance provider
+may replace the local radius without changing the kernel contract.
 
 Lethal defeat marks a participant defeated and completes when one whole team remains. Surrender and
 boundary violation forfeit the actor's team. Disconnect grants 200 ticks to reconnect before the

@@ -126,6 +126,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final PartyController parties;
     private final LfgController lfg;
     private final DownedController downed;
+    private final PvpController pvp;
     private final CombatTraceFileExporter traceExporter;
     private final ProgressionEvidenceEngine progressionEvidence = new ProgressionEvidenceEngine();
     private final TeachingSessionEngine teachingEngine = new TeachingSessionEngine();
@@ -149,7 +150,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
             DeathPouchController deathPouches,
             PartyController parties,
             LfgController lfg,
-            DownedController downed) {
+            DownedController downed,
+            PvpController pvp) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.packGate = Objects.requireNonNull(packGate, "packGate");
@@ -169,6 +171,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
         this.parties = Objects.requireNonNull(parties, "parties");
         this.lfg = Objects.requireNonNull(lfg, "lfg");
         this.downed = Objects.requireNonNull(downed, "downed");
+        this.pvp = Objects.requireNonNull(pvp, "pvp");
         traceExporter =
                 new CombatTraceFileExporter(
                         plugin.getDataFolder().toPath().resolve("combat-traces"));
@@ -267,8 +270,21 @@ final class MmoCommandController implements CommandExecutor, Listener {
             }
             return true;
         }
+        if ("pvp".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("PvP Lab requires an in-game player.");
+            } else if (!devToolsAllowed(player)) {
+                player.sendMessage(
+                        Component.text(
+                                "PvP Lab is disabled for this environment/account.",
+                                NamedTextColor.RED));
+            } else {
+                pvp.handleCommand(player, args);
+            }
+            return true;
+        }
         sender.sendMessage(
-                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|party|lfg|encounter|downed|pouch>");
+                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|party|lfg|encounter|downed|pouch|pvp>");
         return true;
     }
 

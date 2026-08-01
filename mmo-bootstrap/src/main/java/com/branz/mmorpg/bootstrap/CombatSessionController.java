@@ -153,6 +153,7 @@ import com.branz.mmorpg.progression.evidence.EncounterOutcome;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
 import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
+import com.branz.mmorpg.social.pvp.PvpCombatProfile;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -313,6 +314,7 @@ final class CombatSessionController implements Listener {
             SuccessfulCombatActionObserver.NONE;
     private BiConsumer<Player, String> consumableInterruptObserver = (player, reason) -> {};
     private LethalDamageObserver lethalDamageObserver = LethalDamageObserver.NONE;
+    private PvpCombatPolicy pvpCombatPolicy = PvpCombatPolicy.NONE;
     private Predicate<Player> damageImmunityObserver = player -> false;
     private BiConsumer<Player, String> hostileActionObserver = (player, reason) -> {};
     private int tickTaskId = -1;
@@ -734,6 +736,10 @@ final class CombatSessionController implements Listener {
         lethalDamageObserver = Objects.requireNonNull(observer, "observer");
     }
 
+    void setPvpCombatPolicy(PvpCombatPolicy policy) {
+        pvpCombatPolicy = Objects.requireNonNull(policy, "policy");
+    }
+
     void setDamageImmunityObserver(Predicate<Player> observer) {
         damageImmunityObserver = Objects.requireNonNull(observer, "observer");
     }
@@ -752,6 +758,18 @@ final class CombatSessionController implements Listener {
         session.health = playerHealth.kill(session.health, tick);
         completePlayerLethalDamage(player, session);
         return true;
+    }
+
+    boolean engaged(Player player) {
+        LiveSession session = sessions.get(Objects.requireNonNull(player, "player").getUniqueId());
+        return session != null && session.engagement.state() == EngagementState.ENGAGED;
+    }
+
+    void resetPvpParticipant(Player player) {
+        LiveSession session = sessions.get(Objects.requireNonNull(player, "player").getUniqueId());
+        if (session != null && !player.isDead()) {
+            resetPvpParticipant(player, session, 1.0);
+        }
     }
 
     boolean holdLethalDamage(Player player) {
@@ -825,6 +843,10 @@ final class CombatSessionController implements Listener {
         Objects.requireNonNull(operationId, "operationId");
         LiveSession session = sessions.get(player.getUniqueId());
         long tick = plugin.getServer().getCurrentTick();
+        PvpCombatProfile pvpProfile = pvpCombatPolicy.activeProfile(player).orElse(null);
+        if (pvpProfile != null && !pvpProfile.flaskAllowed()) {
+            return false;
+        }
         if (session == null
                 || session.flaskUseOperationId != null
                 || session.health.dead()
@@ -856,6 +878,10 @@ final class CombatSessionController implements Listener {
     }
 
     boolean beginConsumableUse(Player player, UUID operationId) {
+        PvpCombatProfile pvpProfile = pvpCombatPolicy.activeProfile(player).orElse(null);
+        if (pvpProfile != null && !pvpProfile.externalBuffsAllowed()) {
+            return false;
+        }
         return beginFlaskUse(player, operationId);
     }
 
@@ -878,12 +904,19 @@ final class CombatSessionController implements Listener {
             return false;
         }
         long tick = plugin.getServer().getCurrentTick();
+        double healingMultiplier =
+                pvpCombatPolicy
+                        .activeProfile(player)
+                        .map(PvpCombatProfile::healingMultiplier)
+                        .orElse(1.0);
         if (restoration.maximumHealthRatio() > 0) {
             CombatHealthResolution healed =
                     playerHealth.heal(
                             session.health,
                             tick,
-                            playerHealth.profile().maximum() * restoration.maximumHealthRatio());
+                            playerHealth.profile().maximum()
+                                    * restoration.maximumHealthRatio()
+                                    * healingMultiplier);
             session.health = healed.runtime();
         }
         if (restoration.maximumManaRatio() > 0) {
@@ -1119,8 +1152,17 @@ final class CombatSessionController implements Listener {
         if (!(event.getEntity() instanceof Player defender)) {
             return;
         }
+        Player playerSource =
+                event.getDamageSource().getCausingEntity() instanceof Player player ? player : null;
+        if (playerSource != null && pvpCombatPolicy.profile(playerSource, defender).isEmpty()) {
+            event.setCancelled(true);
+            return;
+        }
         LiveSession defenderSession = sessions.get(defender.getUniqueId());
         if (defenderSession == null) {
+            if (playerSource != null) {
+                event.setCancelled(true);
+            }
             return;
         }
         event.setCancelled(true);
@@ -1135,6 +1177,21 @@ final class CombatSessionController implements Listener {
             applyScaledVanillaDamage(defender, defenderSession, event, "ENTITY");
             return;
         }
+        PvpCombatProfile pvpProfile = null;
+        if (source instanceof Player attacker) {
+            pvpProfile = pvpCombatPolicy.profile(attacker, defender).orElse(null);
+            if (pvpProfile == null) {
+                return;
+            }
+        }
+        double incomingHealth =
+                pvpProfile == null
+                        ? trainingIncomingHealthDamage
+                        : trainingIncomingHealthDamage * pvpProfile.damageMultiplier();
+        double incomingGuardPressure =
+                pvpProfile == null
+                        ? trainingIncomingGuardPressure
+                        : trainingIncomingGuardPressure * pvpProfile.guardPressureMultiplier();
         CombatDefenseResolution resolved =
                 new CombatDefenseResolver(dodges, defenderSession.guardEngine)
                         .resolve(
@@ -1142,7 +1199,12 @@ final class CombatSessionController implements Listener {
                                 defenderSession.guard,
                                 plugin.getServer().getCurrentTick(),
                                 true,
-                                guardHitRequest(defender, defenderSession, source));
+                                guardHitRequest(
+                                        defender,
+                                        defenderSession,
+                                        source,
+                                        incomingHealth,
+                                        incomingGuardPressure));
         long currentTick = plugin.getServer().getCurrentTick();
         defenderSession.guard = resolved.guardRuntime();
         if (resolved.staminaSpent() > 0) {
@@ -1177,7 +1239,12 @@ final class CombatSessionController implements Listener {
                 };
         defender.sendActionBar(Component.text(defenderSession.lastResolution, feedbackColor));
         if (resolved.outcome() == CombatDefenseOutcome.HIT && !healthResolution.lethalNow()) {
-            applyIncomingPoise(defender, defenderSession, source, currentTick);
+            applyIncomingPoise(
+                    defender,
+                    defenderSession,
+                    source,
+                    currentTick,
+                    pvpProfile == null ? 1.0 : pvpProfile.guardPressureMultiplier());
         }
         if (resolved.outcome() == CombatDefenseOutcome.PERFECT_GUARD
                 && !(source instanceof Player)) {
@@ -1408,11 +1475,43 @@ final class CombatSessionController implements Listener {
             player.setHealth(0);
             return;
         }
+        if (disposition == LethalDamageDisposition.SAFE_DEFEAT) {
+            resetPvpParticipant(player, session, 0.25);
+            return;
+        }
         long tick = plugin.getServer().getCurrentTick();
         enterDowned(player, session, tick);
         if (disposition == LethalDamageDisposition.PENDING_COMMIT) {
             player.sendActionBar(Component.text("DOWNED STATE COMMITTING", NamedTextColor.YELLOW));
         }
+    }
+
+    private void resetPvpParticipant(Player player, LiveSession session, double healthRatio) {
+        long tick = plugin.getServer().getCurrentTick();
+        cancelAction(session, "PVP_RESET");
+        cancelBow(session, "PVP_RESET");
+        cancelCrossbow(session, "PVP_RESET");
+        cancelSpell(session, "PVP_RESET");
+        removeOwnerProjectiles(player.getUniqueId());
+        removeOwnerSpellEffects(player.getUniqueId());
+        session.imbuement = null;
+        session.input.clearBuffer(InputBufferClearReason.HARD_CC);
+        releaseGuard(session);
+        session.dodge = null;
+        session.dodgeDirection = null;
+        session.sneakPress = null;
+        session.crowdControl = CcRuntime.initial(tick);
+        session.poise = PoiseRuntime.initial(tick);
+        session.health =
+                new CombatHealthRuntime(playerHealth.profile().maximum() * healthRatio, tick, tick);
+        session.resources = CombatResources.full(1000, 100, 100);
+        session.engagement = EngagementRuntime.initial(tick);
+        session.weapon = weapons.resetTransient();
+        session.crossbow = null;
+        session.crossbowItemId = null;
+        session.action = ActionState.IDLE;
+        select(session, selectedSlot(player, player.getInventory().getHeldItemSlot()));
+        updateHealthPresentation(player, session);
     }
 
     private void enterDowned(Player player, LiveSession session, long tick) {
@@ -1766,9 +1865,7 @@ final class CombatSessionController implements Listener {
                                                                 entity.getBoundingBox().getWidthZ())
                                                         / 2.0,
                                                 entity.getBoundingBox().getHeight(),
-                                                !(entity instanceof Player)
-                                                        && !(entity instanceof ArmorStand)
-                                                        && !entity.isDead(),
+                                                eligibleCombatTarget(player, entity),
                                                 player.hasLineOfSight(entity),
                                                 false))
                         .toList();
@@ -1801,8 +1898,10 @@ final class CombatSessionController implements Listener {
         long currentTick = plugin.getServer().getCurrentTick();
         for (ResolvedTarget target : resolved) {
             LivingEntity entity = entities.get(target.entityId());
+            boolean pvpTarget = entity instanceof Player;
             PostureRuntime posture = postureAt(target.entityId(), currentTick);
-            boolean postureBroken = postures.phaseAt(posture, currentTick) == PosturePhase.BROKEN;
+            boolean postureBroken =
+                    !pvpTarget && postures.phaseAt(posture, currentTick) == PosturePhase.BROKEN;
             double armor =
                     entity.getAttribute(Attribute.ARMOR) == null
                             ? 0
@@ -1821,7 +1920,9 @@ final class CombatSessionController implements Listener {
                                     postureBroken
                                             ? java.util.Set.of(ConditionalAdvantage.POSTURE_BREAK)
                                             : java.util.Set.of(),
-                                    activeMove.profiles().pveMultiplier()));
+                                    pvpTarget
+                                            ? activeMove.profiles().pvpMultiplier()
+                                            : activeMove.profiles().pveMultiplier()));
             double resolvedDamage = breakdown.finalDamage();
             int resolvedPosture = activeMove.outputs().posture();
             if (session.imbuement != null) {
@@ -1841,10 +1942,35 @@ final class CombatSessionController implements Listener {
                                                     ? java.util.Set.of(
                                                             ConditionalAdvantage.POSTURE_BREAK)
                                                     : java.util.Set.of(),
-                                            rune.profiles().pveMultiplier()));
+                                            pvpTarget
+                                                    ? rune.profiles().pvpMultiplier()
+                                                    : rune.profiles().pveMultiplier()));
                     resolvedDamage += bonus.finalDamage();
                     resolvedPosture += rune.output().posture();
                 }
+            }
+            if (entity instanceof Player defender) {
+                double applied =
+                        applyPvpHit(
+                                player,
+                                defender,
+                                resolvedDamage,
+                                resolvedPosture,
+                                activeMove.id().value());
+                totalDamage += applied;
+                if (firstHealth == null) {
+                    LiveSession defenderSession = sessions.get(defender.getUniqueId());
+                    firstHealth =
+                            defenderSession == null
+                                    ? "unavailable"
+                                    : roundOne(defenderSession.health.current())
+                                            + "/"
+                                            + roundOne(playerHealth.profile().maximum());
+                }
+                if (firstPosture == null) {
+                    firstPosture = "PVP";
+                }
+                continue;
             }
             CombatHealthRuntime targetHealth =
                     trainingTargetHealth.computeIfAbsent(
@@ -1951,9 +2077,7 @@ final class CombatSessionController implements Listener {
                                                                             .getWidthZ())
                                                             / 2.0,
                                                     entity.getBoundingBox().getHeight(),
-                                                    !(entity instanceof Player)
-                                                            && !(entity instanceof ArmorStand)
-                                                            && !entity.isDead(),
+                                                    eligibleCombatTarget(owner, entity),
                                                     true,
                                                     false))
                             .toList();
@@ -2036,6 +2160,7 @@ final class CombatSessionController implements Listener {
             if (entity == null || entity.isDead()) {
                 continue;
             }
+            boolean pvpTarget = entity instanceof Player;
             long tick = plugin.getServer().getCurrentTick();
             PostureRuntime posture = postureAt(hit.entityId(), tick);
             java.util.EnumSet<ConditionalAdvantage> advantages =
@@ -2061,7 +2186,9 @@ final class CombatSessionController implements Listener {
                                         live.context().powerCoefficient(),
                                         0,
                                         advantages,
-                                        live.context().pveMultiplier()));
+                                        pvpTarget
+                                                ? live.context().pvpMultiplier()
+                                                : live.context().pveMultiplier()));
                 finalDamage = breakdown.finalDamage();
             } else {
                 PhysicalDamageBreakdown breakdown =
@@ -2075,8 +2202,22 @@ final class CombatSessionController implements Listener {
                                         0,
                                         0,
                                         advantages,
-                                        live.context().pveMultiplier()));
+                                        pvpTarget
+                                                ? live.context().pvpMultiplier()
+                                                : live.context().pveMultiplier()));
                 finalDamage = breakdown.finalDamage();
+            }
+            int postureDamage =
+                    (int) Math.round(live.context().posture() * live.context().postureMultiplier());
+            if (entity instanceof Player defender) {
+                double applied =
+                        applyPvpHit(owner, defender, finalDamage, postureDamage, "PROJECTILE");
+                if (ownerSession != null) {
+                    ownerSession.lastResolution = "PROJECTILE PVP HIT damage=" + roundOne(applied);
+                    owner.sendActionBar(
+                            Component.text(ownerSession.lastResolution, NamedTextColor.GREEN));
+                }
+                continue;
             }
             CombatHealthRuntime targetHealth =
                     trainingTargetHealth.computeIfAbsent(
@@ -2084,8 +2225,6 @@ final class CombatSessionController implements Listener {
                             ignored -> CombatHealthRuntime.full(enemyHealth.profile(), tick));
             CombatHealthResolution health = enemyHealth.damage(targetHealth, tick, finalDamage);
             trainingTargetHealth.put(hit.entityId(), health.runtime());
-            int postureDamage =
-                    (int) Math.round(live.context().posture() * live.context().postureMultiplier());
             PostureResolution postureResolution = postures.damage(posture, tick, postureDamage);
             trainingTargetPosture.put(hit.entityId(), postureResolution.runtime());
             if (ownerSession != null) {
@@ -2350,12 +2489,21 @@ final class CombatSessionController implements Listener {
 
     private void applyIncomingPoise(
             Player player, LiveSession session, LivingEntity source, long tick) {
+        applyIncomingPoise(player, session, source, tick, 1.0);
+    }
+
+    private void applyIncomingPoise(
+            Player player,
+            LiveSession session,
+            LivingEntity source,
+            long tick,
+            double poiseMultiplier) {
         PoiseResolution poiseResolution =
                 poise.apply(
                         session.poise,
                         tick,
                         trainingIncomingPoiseDamage,
-                        1.0,
+                        poiseMultiplier,
                         trainingIncomingCcSeverity);
         session.poise = poiseResolution.runtime();
         poiseResolution
@@ -2658,6 +2806,7 @@ final class CombatSessionController implements Listener {
         boolean compatible =
                 selectedAmmo != null
                         && quiver != null
+                        && characters.quiverAmmoQuantity(player, selectedAmmo) > 0
                         && items.find(selectedAmmo)
                                 .flatMap(ItemDefinition::ammoProfile)
                                 .filter(ammo -> ammo.family() == trainingBowAmmoFamily)
@@ -2676,6 +2825,17 @@ final class CombatSessionController implements Listener {
         session.action = ActionState.ACTIVE;
         session.lastResolution = "BOW AMMO COMMITTING";
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        if (pvpInventorySnapshotActive(player)) {
+            LoadedCharacterSession character = characters.active(player).orElse(null);
+            if (character == null) {
+                session.pendingBowLaunch = null;
+                session.action = ActionState.IDLE;
+                return;
+            }
+            completeBowAmmoCommit(
+                    player.getUniqueId(), session, pending, Result.success(character));
+            return;
+        }
         characters.consumeAmmo(
                 player,
                 pending.ammoDefinitionId(),
@@ -2898,6 +3058,20 @@ final class CombatSessionController implements Listener {
 
     private GuardHitRequest guardHitRequest(
             Player defender, LiveSession session, LivingEntity source) {
+        return guardHitRequest(
+                defender,
+                session,
+                source,
+                trainingIncomingHealthDamage,
+                trainingIncomingGuardPressure);
+    }
+
+    private GuardHitRequest guardHitRequest(
+            Player defender,
+            LiveSession session,
+            LivingEntity source,
+            double incomingHealthDamage,
+            double incomingGuardPressure) {
         org.bukkit.Location facingLocation = defender.getLocation().clone();
         facingLocation.setPitch(0);
         org.bukkit.util.Vector facing = facingLocation.getDirection();
@@ -2908,8 +3082,8 @@ final class CombatSessionController implements Listener {
             toAttacker = facing.clone();
         }
         return new GuardHitRequest(
-                trainingIncomingHealthDamage,
-                trainingIncomingGuardPressure,
+                incomingHealthDamage,
+                incomingGuardPressure,
                 true,
                 true,
                 new CombatVector(facing.getX(), 0, facing.getZ()),
@@ -3911,6 +4085,17 @@ final class CombatSessionController implements Listener {
         session.action = ActionState.ACTIVE;
         session.lastResolution = spellLabel(spell) + " COMMITTING";
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        if (pvpInventorySnapshotActive(player)) {
+            LoadedCharacterSession character = characters.active(player).orElse(null);
+            if (character == null) {
+                session.pendingSpellCommit = null;
+                cancelSpell(session, "CHARACTER_NOT_READY");
+                return;
+            }
+            completeStaffSpellCommit(
+                    player.getUniqueId(), session, pending, Result.success(character));
+            return;
+        }
         characters.commitCatalystUse(
                 player,
                 catalystItemId,
@@ -4074,9 +4259,8 @@ final class CombatSessionController implements Listener {
                                 0.35,
                                 entity ->
                                         entity instanceof LivingEntity
-                                                && entity != player
-                                                && !(entity instanceof ArmorStand)
-                                                && !entity.isDead());
+                                                && eligibleCombatTarget(
+                                                        player, (LivingEntity) entity));
         if (trace == null || !(trace.getHitEntity() instanceof LivingEntity target)) {
             session.lastResolution = spellLabel(spell) + " MISS";
             return;
@@ -4137,9 +4321,8 @@ final class CombatSessionController implements Listener {
                                 0.4,
                                 entity ->
                                         entity instanceof LivingEntity
-                                                && entity != player
-                                                && !(entity instanceof ArmorStand)
-                                                && !entity.isDead());
+                                                && eligibleCombatTarget(
+                                                        player, (LivingEntity) entity));
         if (trace != null && trace.getHitEntity() instanceof LivingEntity target) {
             applyArcaneSpellHit(
                     player,
@@ -4193,11 +4376,7 @@ final class CombatSessionController implements Listener {
             world.getNearbyEntities(center, profile.radius(), 2.5, profile.radius()).stream()
                     .filter(LivingEntity.class::isInstance)
                     .map(LivingEntity.class::cast)
-                    .filter(
-                            target ->
-                                    target != owner
-                                            && !(target instanceof ArmorStand)
-                                            && !target.isDead())
+                    .filter(target -> eligibleCombatTarget(owner, target))
                     .sorted(
                             java.util.Comparator.<LivingEntity>comparingDouble(
                                             target -> target.getLocation().distanceSquared(center))
@@ -4221,6 +4400,7 @@ final class CombatSessionController implements Listener {
             double powerCoefficient,
             UUID actionId) {
         long tick = plugin.getServer().getCurrentTick();
+        boolean pvpTarget = target instanceof Player;
         PostureRuntime posture = postureAt(target.getUniqueId(), tick);
         java.util.EnumSet<ConditionalAdvantage> advantages =
                 java.util.EnumSet.noneOf(ConditionalAdvantage.class);
@@ -4235,7 +4415,17 @@ final class CombatSessionController implements Listener {
                                 powerCoefficient,
                                 0,
                                 advantages,
-                                spell.profiles().pveMultiplier()));
+                                pvpTarget
+                                        ? spell.profiles().pvpMultiplier()
+                                        : spell.profiles().pveMultiplier()));
+        if (target instanceof Player defender) {
+            return applyPvpHit(
+                    owner,
+                    defender,
+                    breakdown.finalDamage(),
+                    spell.output().posture(),
+                    spell.id().value());
+        }
         CombatHealthRuntime current =
                 trainingTargetHealth.computeIfAbsent(
                         target.getUniqueId(),
@@ -4264,6 +4454,99 @@ final class CombatSessionController implements Listener {
                 completeCombatTarget(owner, session, target, EncounterOutcome.VICTORY);
             }
             target.setHealth(0);
+        }
+        return health.appliedAmount();
+    }
+
+    private boolean eligibleCombatTarget(Player attacker, LivingEntity target) {
+        if (target == attacker || target instanceof ArmorStand || target.isDead()) {
+            return false;
+        }
+        return !(target instanceof Player defender)
+                || pvpCombatPolicy.profile(attacker, defender).isPresent();
+    }
+
+    private double applyPvpHit(
+            Player attacker,
+            Player defender,
+            double incomingHealthDamage,
+            double incomingPostureDamage,
+            String sourceLabel) {
+        PvpCombatProfile profile = pvpCombatPolicy.profile(attacker, defender).orElse(null);
+        LiveSession defenderSession = sessions.get(defender.getUniqueId());
+        if (profile == null
+                || defenderSession == null
+                || defenderSession.health.dead()
+                || damageImmunityObserver.test(defender)) {
+            return 0;
+        }
+        long tick = plugin.getServer().getCurrentTick();
+        CombatDefenseResolution resolved =
+                new CombatDefenseResolver(dodges, defenderSession.guardEngine)
+                        .resolve(
+                                Optional.ofNullable(defenderSession.dodge),
+                                defenderSession.guard,
+                                tick,
+                                true,
+                                guardHitRequest(
+                                        defender,
+                                        defenderSession,
+                                        attacker,
+                                        incomingHealthDamage,
+                                        Math.max(1.0, incomingPostureDamage)
+                                                * profile.guardPressureMultiplier()));
+        defenderSession.guard = resolved.guardRuntime();
+        if (resolved.staminaSpent() > 0) {
+            defenderSession.resources =
+                    defenderSession.resources.spendStamina(resolved.staminaSpent()).orElseThrow();
+            defenderSession.lastStaminaSpendTick = tick;
+            defenderSession.staminaRegenRemainder = 0;
+        }
+        CombatHealthResolution health =
+                playerHealth.damage(defenderSession.health, tick, resolved.finalDamage());
+        defenderSession.health = health.runtime();
+        if (resolved.outcome() != CombatDefenseOutcome.DODGED) {
+            markHostile(defender, defenderSession);
+            LiveSession attackerSession = sessions.get(attacker.getUniqueId());
+            if (attackerSession != null) {
+                markHostile(attacker, attackerSession);
+            }
+        }
+        if (resolved.outcome() == CombatDefenseOutcome.HIT && !health.lethalNow()) {
+            PoiseResolution poiseResolution =
+                    poise.apply(
+                            defenderSession.poise,
+                            tick,
+                            Math.max(0, incomingPostureDamage),
+                            profile.guardPressureMultiplier(),
+                            CcSeverity.FLINCH);
+            defenderSession.poise = poiseResolution.runtime();
+            poiseResolution
+                    .triggeredSeverity()
+                    .ifPresent(
+                            severity ->
+                                    applyCc(
+                                            defender,
+                                            defenderSession,
+                                            severity,
+                                            trainingIncomingCcTicks,
+                                            true));
+        } else if (resolved.outcome() == CombatDefenseOutcome.GUARD_BREAK) {
+            applyCc(defender, defenderSession, CcSeverity.HEAVY_STAGGER, 24, true);
+        }
+        defenderSession.lastResolution =
+                sourceLabel
+                        + " "
+                        + resolved.outcome()
+                        + " damage="
+                        + roundOne(health.appliedAmount())
+                        + " health="
+                        + roundOne(defenderSession.health.current());
+        defender.sendActionBar(Component.text(defenderSession.lastResolution, NamedTextColor.RED));
+        if (health.lethalNow()) {
+            completePlayerLethalDamage(defender, defenderSession);
+        } else {
+            updateHealthPresentation(defender, defenderSession);
         }
         return health.appliedAmount();
     }
@@ -4424,6 +4707,39 @@ final class CombatSessionController implements Listener {
         session.action = ActionState.ACTIVE;
         session.lastResolution = "CROSSBOW BOLT COMMITTING";
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        if (pvpInventorySnapshotActive(player)) {
+            Result<CrossbowRuntime, com.branz.mmorpg.combat.crossbow.CrossbowErrorCode> placed =
+                    crossbows.boltPlaced(
+                            session.crossbow,
+                            plugin.getServer().getCurrentTick(),
+                            pending.ammoDefinitionId());
+            session.pendingCrossbowCommit = null;
+            if (placed
+                    instanceof
+                    Result.Success<
+                                    CrossbowRuntime,
+                                    com.branz.mmorpg.combat.crossbow.CrossbowErrorCode>
+                            success) {
+                session.crossbow = success.value();
+                Result<CrossbowRuntime, com.branz.mmorpg.combat.crossbow.CrossbowErrorCode>
+                        resumed =
+                                crossbows.beginOrResume(
+                                        session.crossbow, plugin.getServer().getCurrentTick());
+                if (resumed
+                        instanceof
+                        Result.Success<
+                                        CrossbowRuntime,
+                                        com.branz.mmorpg.combat.crossbow.CrossbowErrorCode>
+                                resumedSuccess) {
+                    session.crossbow = resumedSuccess.value();
+                    session.action = ActionState.CHANNELING;
+                    session.lastResolution = "CROSSBOW LOCKING (PVP SNAPSHOT)";
+                    return;
+                }
+            }
+            cancelCrossbow(session, "PVP_BOLT_CHECKPOINT_FAILED");
+            return;
+        }
         characters.bindCrossbowBolt(
                 player,
                 pending.crossbowItemId(),
@@ -4450,6 +4766,24 @@ final class CombatSessionController implements Listener {
         session.action = ActionState.ACTIVE;
         session.lastResolution = "CROSSBOW LOADED COMMITTING";
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        if (pvpInventorySnapshotActive(player)) {
+            Result<CrossbowRuntime, com.branz.mmorpg.combat.crossbow.CrossbowErrorCode> loaded =
+                    crossbows.loaded(session.crossbow, plugin.getServer().getCurrentTick());
+            session.pendingCrossbowCommit = null;
+            if (loaded
+                    instanceof
+                    Result.Success<
+                                    CrossbowRuntime,
+                                    com.branz.mmorpg.combat.crossbow.CrossbowErrorCode>
+                            success) {
+                session.crossbow = success.value();
+                session.action = ActionState.IDLE;
+                session.lastResolution = "CROSSBOW LOADED (PVP SNAPSHOT)";
+                return;
+            }
+            cancelCrossbow(session, "PVP_LOAD_CHECKPOINT_FAILED");
+            return;
+        }
         characters.completeCrossbowLoad(
                 player,
                 pending.crossbowItemId(),
@@ -4494,6 +4828,11 @@ final class CombatSessionController implements Listener {
         session.action = ActionState.ACTIVE;
         session.lastResolution = "CROSSBOW FIRE COMMITTING";
         player.sendActionBar(Component.text(session.lastResolution, NamedTextColor.YELLOW));
+        if (pvpInventorySnapshotActive(player)) {
+            session.pendingCrossbowCommit = null;
+            completeCrossbowFire(player, session, pending.launch());
+            return;
+        }
         characters.fireCrossbow(
                 player,
                 pending.crossbowItemId(),
@@ -4661,6 +5000,11 @@ final class CombatSessionController implements Listener {
     }
 
     private void restoreEquippedCrossbow(Player player, LiveSession session, long tick) {
+        if (pvpInventorySnapshotActive(player)
+                && session.crossbow != null
+                && equippedWeaponFamily(player).filter("CROSSBOW"::equals).isPresent()) {
+            return;
+        }
         if (player == null
                 || !equippedWeaponFamily(player).filter("CROSSBOW"::equals).isPresent()) {
             if (session.pendingCrossbowCommit == null) {
@@ -4709,6 +5053,13 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    private boolean pvpInventorySnapshotActive(Player player) {
+        return pvpCombatPolicy
+                .activeProfile(player)
+                .map(profile -> !profile.durabilityLossAllowed())
+                .orElse(false);
+    }
+
     private void cancelCrossbow(LiveSession session, String reason) {
         boolean active =
                 session.crossbow != null
@@ -4733,6 +5084,7 @@ final class CombatSessionController implements Listener {
             double powerCoefficient,
             int posture,
             double pveMultiplier,
+            double pvpMultiplier,
             double postureMultiplier,
             double penetrationPercentage,
             Optional<ArcaneSchool> arcaneSchool) {
@@ -4744,6 +5096,8 @@ final class CombatSessionController implements Listener {
                     || posture < 0
                     || !Double.isFinite(pveMultiplier)
                     || pveMultiplier <= 0
+                    || !Double.isFinite(pvpMultiplier)
+                    || pvpMultiplier <= 0
                     || !Double.isFinite(postureMultiplier)
                     || postureMultiplier <= 0
                     || !Double.isFinite(penetrationPercentage)
@@ -4768,6 +5122,7 @@ final class CombatSessionController implements Listener {
                     move.outputs().moveCoefficient(),
                     move.outputs().posture(),
                     move.profiles().pveMultiplier(),
+                    move.profiles().pvpMultiplier(),
                     postureMultiplier,
                     penetrationPercentage,
                     Optional.empty());
@@ -4780,6 +5135,7 @@ final class CombatSessionController implements Listener {
                     spell.output().powerCoefficient(),
                     spell.output().posture(),
                     spell.profiles().pveMultiplier(),
+                    spell.profiles().pvpMultiplier(),
                     1.0,
                     0,
                     Optional.of(spell.output().arcaneSchool()));

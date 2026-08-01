@@ -796,6 +796,28 @@ live inventory, change Bukkit resources or write PostgreSQL.
      com.branz.mmorpg.social.pvp.PvpMatchEngineTest`. Verify duel consent/countdown, hostile
      permission, arena team elimination, surrender, boundary forfeits, reconnect/timeout and exact
      operation replay all pass.
+227. Join local Paper with two operator/test accounts inside 24 blocks. Run `/mmo pvp challenge
+     <player>` and verify no player damage is possible before the target runs `/mmo pvp accept` and
+     the five-second countdown completes. Run `/mmo pvp status` on both accounts and verify opposing
+     teams share the same active duel.
+228. Exercise Sword, Greatsword, Bow, Crossbow and all four Training Staff delivery types against
+     the opponent. Verify melee sweeps, projectiles, channels, zones and direct spells can hit only
+     the opposing participant; a third player and an arena teammate must remain untargetable.
+229. Use a healing Flask during the match and verify health restoration is 70% of the normal Flask
+     amount. Attempt a crafted consumable and verify it is rejected. Fire prepared arrows/bolts and
+     cast Staff spells, then end the match and verify ammo, crossbow checkpoint and catalyst
+     durability still equal their pre-match durable values.
+230. Deal lethal damage and verify the loser is defeated without entering Downed or vanilla death,
+     without progression evidence or a Death Pouch. Verify `/mmo pvp surrender` also ends the match
+     and resets transient health/resources/action state.
+231. Start another duel, walk beyond `pvp.local-arena-radius-blocks` after activation and verify the
+     leaving team forfeits. Disconnect during an active match, reconnect within ten seconds and
+     verify participation resumes; repeat without reconnecting and verify timeout defeat.
+232. With three or more accounts, run `/mmo pvp arena <team-a-csv> <team-b-csv>` with the initiator
+     listed in team A. Verify the arena starts after countdown, defeating one member of a multi-player
+     team does not end the match and defeating the final ready member awards the opposing team.
+233. Restart Paper during a duel/arena and verify the process-local match is cancelled, transient
+     combat effects are gone and every durable item/ammo/catalyst snapshot remains unchanged.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

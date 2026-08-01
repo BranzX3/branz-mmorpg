@@ -823,6 +823,12 @@ live inventory, change Bukkit resources or write PostgreSQL.
      rank labels/thresholds, exact committed-evidence replay, Mastery 0–1000 diminishing caps,
      zero-Focus normal work, one-to-five focused costs, ten-minute offline recovery, no over-cap
      banking and backward-clock rejection.
+235. Run `./gradlew :mmo-lifeskills:test --tests
+     com.branz.mmorpg.lifeskills.node.ResourceNodeEngineTest`. Verify two characters reserve one
+     personal Common node independently, a shared Rare node admits only the first actor, timeout and
+     restart release pre-commit reservations, early/expired commits fail, committed depletion
+     survives restart, wall-clock recovery restores authored charges and exact replay emits no
+     second harvest intent.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

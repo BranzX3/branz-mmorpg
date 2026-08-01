@@ -210,6 +210,11 @@ clamps at 1000 and follows diminishing curves bounded by the published work-spee
 relative rare-yield caps. Life Focus now recovers from an offline-safe wall-clock anchor, clamps at
 100, permits normal work at zero and spends one to five points through an exact work-operation
 boundary. Durable node reservation/harvest is the next Milestone 8 slice.
+The pure resource-node kernel now separates personal Common slots from first-actor shared Rich/Rare
+slots, freezes exact tool/durability/Focus/yield inputs at reservation, enforces authored work and
+timeout boundaries, emits one harvest intent at commit and recovers charges from wall-clock state.
+Restart releases pre-commit reservations while committed depletion survives; exact operation replay
+cannot emit a second harvest. The PostgreSQL node/tool/output transaction is the next slice.
 
 ## Milestone 9 — Production, farming and workers
 

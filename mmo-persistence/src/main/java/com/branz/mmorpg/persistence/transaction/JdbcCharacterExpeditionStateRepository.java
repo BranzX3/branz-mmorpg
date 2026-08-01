@@ -19,6 +19,7 @@ public final class JdbcCharacterExpeditionStateRepository
             "character.expedition-state.commit";
     public static final String CHARACTER_FLASK_PREPARATION_COMMIT =
             "character.flask-preparation.commit";
+    public static final String CHARACTER_CONSUMABLE_USE_COMMIT = "character.consumable-use.commit";
 
     private static final String COLUMNS =
             "character_id, state_payload, content_version, version, "
@@ -272,6 +273,130 @@ public final class JdbcCharacterExpeditionStateRepository
         }
     }
 
+    @Override
+    public Result<CharacterConsumableUseCommitExecution, TransactionErrorCode> commitConsumableUse(
+            TransactionRequest request, CharacterConsumableUseCommit commit) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(commit, "commit");
+        if (!request.operationType().equals(CHARACTER_CONSUMABLE_USE_COMMIT)) {
+            return Result.failure(
+                    TransactionErrorCode.TRANSACTION_OPERATION_MISMATCH,
+                    "Transaction operation does not match a consumable-use commit.");
+        }
+        if (request.characterId().filter(commit.characterId()::equals).isEmpty()) {
+            return Result.failure(
+                    TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                    "Transaction character does not match the consumable owner.");
+        }
+        try (Connection connection = dataSource.getConnection()) {
+            boolean originalAutoCommit = connection.getAutoCommit();
+            try {
+                connection.setAutoCommit(false);
+                Result<JournalPrepareOutcome, TransactionErrorCode> preparedResult =
+                        JdbcTransactionJournalRepository.prepare(connection, request);
+                if (preparedResult
+                        instanceof
+                        Result.Failure<JournalPrepareOutcome, TransactionErrorCode> failure) {
+                    connection.rollback();
+                    return Result.failure(failure.error(), failure.detail());
+                }
+                JournalPrepareOutcome prepared =
+                        ((Result.Success<JournalPrepareOutcome, TransactionErrorCode>)
+                                        preparedResult)
+                                .value();
+                if (!prepared.newlyPrepared()) {
+                    if (prepared.entry().state() != TransactionState.COMMITTED) {
+                        connection.rollback();
+                        return Result.failure(
+                                TransactionErrorCode.TRANSACTION_INVALID_STATE,
+                                "Existing consumable-use transaction is not committed.");
+                    }
+                    CharacterExpeditionStateRecord replayed =
+                            find(connection, commit.characterId())
+                                    .orElseThrow(
+                                            () ->
+                                                    new SQLException(
+                                                            "Committed consumable state is missing."));
+                    connection.commit();
+                    return Result.success(
+                            new CharacterConsumableUseCommitExecution(
+                                    replayed, new TransactionExecution(prepared.entry(), true)));
+                }
+
+                Optional<LotLocationRecord> current =
+                        JdbcValueTransactionService.findLot(
+                                connection, commit.consumption().lotId());
+                if (current.isEmpty()) {
+                    connection.rollback();
+                    return Result.failure(
+                            TransactionErrorCode.VALUE_NOT_FOUND, "Consumable lot does not exist.");
+                }
+                if (!current.orElseThrow().definitionId().equals(commit.consumableDefinitionId())) {
+                    connection.rollback();
+                    return Result.failure(
+                            TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
+                            "Consumable lot definition changed before commit.");
+                }
+                Result<JdbcValueTransactionService.MutationApplied, TransactionErrorCode> consumed =
+                        JdbcValueTransactionService.updateLotQuantity(
+                                connection, request.transactionId(), commit.consumption());
+                if (consumed
+                        instanceof
+                        Result.Failure<
+                                        JdbcValueTransactionService.MutationApplied,
+                                        TransactionErrorCode>
+                                failure) {
+                    connection.rollback();
+                    return Result.failure(failure.error(), failure.detail());
+                }
+
+                CharacterExpeditionStateRecord record =
+                        mutate(
+                                connection,
+                                request,
+                                new CharacterExpeditionStateCommit(
+                                        commit.characterId(),
+                                        commit.expectedStateVersion(),
+                                        commit.replacementPayloadJson()));
+                if (record == null) {
+                    connection.rollback();
+                    return Result.failure(
+                            TransactionErrorCode.VALUE_STALE_VERSION,
+                            "Character expedition state changed before consumable commit.");
+                }
+                appendConsumableAudit(connection, request, record, commit.consumableDefinitionId());
+                Result<JournalTransitionOutcome, TransactionErrorCode> transition =
+                        JdbcTransactionJournalRepository.transition(
+                                connection, request.transactionId(), TransactionState.COMMITTED);
+                if (transition
+                        instanceof
+                        Result.Failure<JournalTransitionOutcome, TransactionErrorCode> failure) {
+                    connection.rollback();
+                    return Result.failure(failure.error(), failure.detail());
+                }
+                TransactionJournalEntry journal =
+                        ((Result.Success<JournalTransitionOutcome, TransactionErrorCode>)
+                                        transition)
+                                .value()
+                                .entry();
+                connection.commit();
+                return Result.success(
+                        new CharacterConsumableUseCommitExecution(
+                                record, new TransactionExecution(journal, false)));
+            } catch (SQLException exception) {
+                JdbcTransactionJournalRepository.rollbackQuietly(connection);
+                return JdbcTransactionJournalRepository.failure(exception);
+            } catch (IllegalArgumentException exception) {
+                JdbcTransactionJournalRepository.rollbackQuietly(connection);
+                return invalidState();
+            } finally {
+                JdbcTransactionJournalRepository.restoreAutoCommit(connection, originalAutoCommit);
+            }
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
     private static CharacterExpeditionStateRecord mutate(
             Connection connection,
             TransactionRequest request,
@@ -357,6 +482,34 @@ public final class JdbcCharacterExpeditionStateRepository
                             + ",\"infusionStockConsumed\":"
                             + infusionStockConsumed
                             + ",\"contentVersion\":\""
+                            + escapeJson(record.contentVersion())
+                            + "\"}");
+            statement.executeUpdate();
+        }
+    }
+
+    private static void appendConsumableAudit(
+            Connection connection,
+            TransactionRequest request,
+            CharacterExpeditionStateRecord record,
+            com.branz.mmorpg.api.identity.DefinitionId definitionId)
+            throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "INSERT INTO audit_log(transaction_id, actor_character_id, action_type, "
+                                + "subject_type, subject_id, details, created_at) VALUES (?, ?, ?, "
+                                + "'CHARACTER', ?, CAST(? AS JSONB), CURRENT_TIMESTAMP)")) {
+            statement.setObject(1, request.transactionId().value());
+            statement.setObject(2, record.characterId().value());
+            statement.setString(3, CHARACTER_CONSUMABLE_USE_COMMIT);
+            statement.setObject(4, record.characterId().value());
+            statement.setString(
+                    5,
+                    "{\"version\":"
+                            + record.version()
+                            + ",\"consumableDefinitionId\":\""
+                            + escapeJson(definitionId.value())
+                            + "\",\"quantityConsumed\":1,\"contentVersion\":\""
                             + escapeJson(record.contentVersion())
                             + "\"}");
             statement.executeUpdate();

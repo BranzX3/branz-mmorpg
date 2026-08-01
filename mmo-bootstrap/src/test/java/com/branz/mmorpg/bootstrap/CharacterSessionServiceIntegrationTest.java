@@ -18,6 +18,8 @@ import com.branz.mmorpg.content.snapshot.ContentLoadFailure;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
 import com.branz.mmorpg.content.snapshot.ContentSnapshotLoader;
 import com.branz.mmorpg.items.consumable.ConsumableCategory;
+import com.branz.mmorpg.items.consumable.ConsumableDefinitionProfile;
+import com.branz.mmorpg.items.consumable.ConsumableUseProfile;
 import com.branz.mmorpg.items.definition.AmmoFamily;
 import com.branz.mmorpg.items.definition.AmmoProfile;
 import com.branz.mmorpg.items.definition.CatalystProfile;
@@ -58,6 +60,141 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CharacterSessionServiceIntegrationTest {
+    @Test
+    void normalConsumableAtomicallyConsumesLotAndPersistsCategoryEffect(
+            @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
+        DatabaseSettings settings =
+                new DatabaseSettings(
+                        DatabaseMode.EMBEDDED_LOCAL,
+                        "LOCAL",
+                        databaseDirectory,
+                        "",
+                        "",
+                        "",
+                        4,
+                        Duration.ofSeconds(5),
+                        true,
+                        Duration.ofMinutes(5),
+                        Duration.ofSeconds(10));
+        UUID playerId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        DefinitionId tonicId = DefinitionId.of("consumable.training_utility_preparation");
+        ConsumableDefinitionProfile profile =
+                new ConsumableDefinitionProfile(
+                        ConsumableCategory.UTILITY_PREPARATION,
+                        new ConsumableUseProfile(20, 12, 12),
+                        600,
+                        true);
+        ItemDefinition tonic = consumableDefinition(tonicId, profile);
+        try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(database);
+            LoadedCharacterSession opened = success(service.open(playerId));
+            LoadedCharacterSession withTonic =
+                    success(service.grantTestValue(opened, tonic, 3, 2, "content.test.1"));
+            LotId lotId =
+                    withTonic.snapshot().lotRecords().stream()
+                            .filter(lot -> lot.definitionId().equals(tonicId))
+                            .findFirst()
+                            .orElseThrow()
+                            .lotId();
+
+            ConsumableUseCommitResult committed =
+                    successConsumable(
+                            service.consumeAndApplyEffect(
+                                    withTonic,
+                                    lotId,
+                                    tonicId,
+                                    profile,
+                                    false,
+                                    operationId,
+                                    "content.test.1"));
+
+            assertEquals(600, committed.effect().remainingTicks());
+            assertTrue(committed.effect().rare());
+            assertEquals(
+                    1,
+                    committed.session().snapshot().lotRecords().stream()
+                            .filter(lot -> lot.lotId().equals(lotId))
+                            .findFirst()
+                            .orElseThrow()
+                            .quantity());
+            ConsumableUseCommitResult replay =
+                    successConsumable(
+                            service.consumeAndApplyEffect(
+                                    committed.session(),
+                                    lotId,
+                                    tonicId,
+                                    profile,
+                                    false,
+                                    operationId,
+                                    "content.test.1"));
+            assertTrue(replay.replayed());
+            assertEquals(
+                    1,
+                    replay.session().snapshot().lotRecords().stream()
+                            .filter(lot -> lot.lotId().equals(lotId))
+                            .findFirst()
+                            .orElseThrow()
+                            .quantity());
+
+            DefinitionId replacementId = DefinitionId.of("consumable.training_replacement");
+            ConsumableDefinitionProfile replacementProfile =
+                    new ConsumableDefinitionProfile(
+                            ConsumableCategory.UTILITY_PREPARATION,
+                            new ConsumableUseProfile(20, 12, 12),
+                            300,
+                            false);
+            LoadedCharacterSession withReplacement =
+                    success(
+                            service.grantTestValue(
+                                    replay.session(),
+                                    consumableDefinition(replacementId, replacementProfile),
+                                    4,
+                                    1,
+                                    "content.test.1"));
+            LotId replacementLot =
+                    withReplacement.snapshot().lotRecords().stream()
+                            .filter(lot -> lot.definitionId().equals(replacementId))
+                            .findFirst()
+                            .orElseThrow()
+                            .lotId();
+            Result<ConsumableUseCommitResult, CharacterSessionErrorCode> rejected =
+                    service.consumeAndApplyEffect(
+                            withReplacement,
+                            replacementLot,
+                            replacementId,
+                            replacementProfile,
+                            false,
+                            UUID.randomUUID(),
+                            "content.test.1");
+            assertTrue(rejected instanceof Result.Failure<?, ?>);
+            assertEquals(
+                    1,
+                    withReplacement.snapshot().lotRecords().stream()
+                            .filter(lot -> lot.lotId().equals(replacementLot))
+                            .findFirst()
+                            .orElseThrow()
+                            .quantity());
+            service.close(withReplacement);
+        }
+
+        try (DatabaseRuntime restarted = DatabaseRuntime.start(settings)) {
+            CharacterSessionService service = new CharacterSessionService(restarted);
+            LoadedCharacterSession restored = success(service.open(playerId));
+            assertEquals(
+                    tonicId,
+                    restored.snapshot().expeditionState().consumableEffects().stream()
+                            .filter(
+                                    effect ->
+                                            effect.category()
+                                                    == ConsumableCategory.UTILITY_PREPARATION)
+                            .findFirst()
+                            .orElseThrow()
+                            .definitionId());
+            service.close(restored);
+        }
+    }
+
     @Test
     void teachingCommitReloadsBothSessionsAndSurvivesReconnectAndRestart(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
@@ -1266,6 +1403,39 @@ class CharacterSessionServiceIntegrationTest {
                     return "";
                 });
         return ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result).value();
+    }
+
+    private static ConsumableUseCommitResult successConsumable(
+            Result<ConsumableUseCommitResult, CharacterSessionErrorCode> result) {
+        assertTrue(
+                result.isSuccess(),
+                () ->
+                        result
+                                        instanceof
+                                        Result.Failure<
+                                                        ConsumableUseCommitResult,
+                                                        CharacterSessionErrorCode>
+                                                failure
+                                ? failure.error() + ": " + failure.detail()
+                                : "");
+        return ((Result.Success<ConsumableUseCommitResult, CharacterSessionErrorCode>) result)
+                .value();
+    }
+
+    private static ItemDefinition consumableDefinition(
+            DefinitionId id, ConsumableDefinitionProfile profile) {
+        return new ItemDefinition(
+                id,
+                id,
+                ItemClass.STACKABLE_LOT,
+                OptionalInt.empty(),
+                false,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(profile));
     }
 
     private static FlaskPreparationCommitResult successFlaskPreparation(

@@ -761,11 +761,19 @@ final class CombatSessionController implements Listener {
         return true;
     }
 
+    boolean beginConsumableUse(Player player, UUID operationId) {
+        return beginFlaskUse(player, operationId);
+    }
+
     void markFlaskCommitting(Player player, UUID operationId) {
         LiveSession session = sessions.get(Objects.requireNonNull(player, "player").getUniqueId());
         if (ownsFlaskUse(session, operationId) && !session.action.hardControl()) {
             session.action = ActionState.RECOVERY;
         }
+    }
+
+    void markConsumableCommitting(Player player, UUID operationId) {
+        markFlaskCommitting(player, operationId);
     }
 
     boolean applyFlaskRestoration(Player player, UUID operationId, FlaskRestoration restoration) {
@@ -810,6 +818,10 @@ final class CombatSessionController implements Listener {
         if (!session.action.hardControl()) {
             session.action = ActionState.IDLE;
         }
+    }
+
+    void endConsumableUse(Player player, UUID operationId) {
+        endFlaskUse(player, operationId);
     }
 
     private static boolean ownsFlaskUse(LiveSession session, UUID operationId) {

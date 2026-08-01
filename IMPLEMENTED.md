@@ -2066,3 +2066,42 @@ Milestone 7 confirmed party-wipe signal.
 
 Schema/config/migration impact: none. ADR 0024 composes existing V0008 expedition state and value
 lots within the existing journal transaction.
+
+## Milestone 6 - live normal consumable-lot slice
+
+Implemented:
+
+- signed projected Body Tonic, Elemental Ward, Weapon Coating, Utility Preparation and Meal lots can
+  be moved to gameplay hotbar slots and used by right-click without vanilla item consumption;
+- authored windup/commit/recovery timings share combat action ownership with the Expedition Flask,
+  including exact-commit-tick priority and jump, sprint, selection/inventory, CC, teleport and death
+  interruption behavior;
+- one journaled JDBC transaction consumes exactly one optimistic-versioned owned lot unit and
+  replaces only its category effect in the optimistic-versioned expedition document;
+- the adapter waits for database acknowledgement and Player Session reload before publishing the
+  effect/recovery result; stale/busy/database failure applies no effect;
+- active rare effects require sneak + right-click confirmation and are independently rejected by the
+  service kernel without confirmation; Meals require `EXPLORATION`;
+- moved signed projections verify against their authoritative origin slot, while lot identity,
+  definition, location, quantity and version remain database-enforced;
+- active relative durations checkpoint every 100 ticks, expire durably, resume from the last
+  checkpoint after restart and never advance during offline wall-clock time.
+
+Tests and completion evidence:
+
+- durable timeline tests cover pre-commit cancellation, exact-tick commit priority and
+  acknowledgement-based recovery;
+- persistence integration covers atomic lot/effect success, exact replay and stale-state rollback
+  without losing the remaining lot;
+- Player Session integration covers lot decrement, rare replacement rejection, replay and restart
+  restoration of the category effect.
+
+Failure/recovery behavior: invalid/tampered content projections fail closed. Pre-commit interruption
+consumes nothing; post-commit interruption cannot refund. An unclean server loss may restore at most
+one 100-tick effect checkpoint interval, never a consumed item.
+
+Milestone status: **Milestone 6 implementation is ready for in-game acceptance.** The confirmed
+party-wipe trigger against the completed boss Flask snapshot boundary remains Milestone 7 work.
+
+Schema/config/migration impact: none. ADR 0025 composes existing signed projections, lots, V0008
+expedition state and transaction journal.

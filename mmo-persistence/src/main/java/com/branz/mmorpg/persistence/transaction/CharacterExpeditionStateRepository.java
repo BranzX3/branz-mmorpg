@@ -13,4 +13,7 @@ public interface CharacterExpeditionStateRepository {
 
     Result<CharacterFlaskPreparationCommitExecution, TransactionErrorCode> commitFlaskPreparation(
             TransactionRequest request, CharacterFlaskPreparationCommit commit);
+
+    Result<CharacterConsumableUseCommitExecution, TransactionErrorCode> commitConsumableUse(
+            TransactionRequest request, CharacterConsumableUseCommit commit);
 }

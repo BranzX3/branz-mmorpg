@@ -82,6 +82,12 @@ lot in stable UUID order, then compare-and-set replaces the expedition document 
 the journal and audit row. Any failure rolls back every lot, the state row and journal transition;
 an exact committed replay skips all mutations.
 
+Normal consumable use follows the same compound rule: compare-and-set one exact owned lot unit,
+replace the optimistic-versioned category-effect document, then commit audit and journal. Failed or
+stale effect-state replacement rolls the lot quantity back. Remaining relative effect durations are
+checkpointed every 100 live ticks; restart resumes the last committed remainder without charging
+offline wall-clock time.
+
 ## Item versioning
 
 Each unique item and lot row has a version. Location changes use compare-and-set. A failure to match means the operation reloads and rejects; it never overwrites a newer location.

@@ -12,6 +12,11 @@ import com.branz.mmorpg.combat.resource.ExpeditionFlaskEngine;
 import com.branz.mmorpg.combat.resource.FlaskAllocation;
 import com.branz.mmorpg.combat.resource.FlaskErrorCode;
 import com.branz.mmorpg.combat.resource.FlaskPreparation;
+import com.branz.mmorpg.items.consumable.ActiveConsumableEffect;
+import com.branz.mmorpg.items.consumable.ConsumableDefinitionProfile;
+import com.branz.mmorpg.items.consumable.ConsumableEffectEngine;
+import com.branz.mmorpg.items.consumable.ConsumableEffectErrorCode;
+import com.branz.mmorpg.items.consumable.ConsumableEffectState;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
@@ -33,6 +38,8 @@ import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildCommit;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildCommitExecution;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRecord;
+import com.branz.mmorpg.persistence.transaction.CharacterConsumableUseCommit;
+import com.branz.mmorpg.persistence.transaction.CharacterConsumableUseCommitExecution;
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateCommit;
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateCommitExecution;
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRecord;
@@ -1088,6 +1095,170 @@ final class CharacterSessionService {
                                         reloaded)
                                 .value(),
                         preparation,
+                        execution.transaction().replayed()));
+    }
+
+    Result<ConsumableUseCommitResult, CharacterSessionErrorCode> consumeAndApplyEffect(
+            LoadedCharacterSession session,
+            LotId lotId,
+            DefinitionId definitionId,
+            ConsumableDefinitionProfile profile,
+            boolean replacementConfirmed,
+            UUID operationId,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(lotId, "lotId");
+        Objects.requireNonNull(definitionId, "definitionId");
+        Objects.requireNonNull(profile, "profile");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        LotLocationRecord lot =
+                session.snapshot().lotRecords().stream()
+                        .filter(record -> record.lotId().equals(lotId))
+                        .filter(record -> record.definitionId().equals(definitionId))
+                        .filter(record -> record.quantity() > 0)
+                        .filter(
+                                record ->
+                                        record.ownerCharacterId()
+                                                .filter(session.characterId()::equals)
+                                                .isPresent())
+                        .filter(
+                                record ->
+                                        record.location().type()
+                                                == com.branz.mmorpg.persistence.transaction
+                                                        .ValueLocationType.CHARACTER_INVENTORY)
+                        .findFirst()
+                        .orElse(null);
+        if (lot == null) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Consumable lot is missing from the authoritative character inventory.");
+        }
+        PersistentExpeditionState current = session.snapshot().expeditionState();
+        boolean journalReplayCandidate =
+                session.snapshot()
+                        .expeditionStateRecord()
+                        .map(record -> record.lastTransactionId().value().equals(operationId))
+                        .orElse(false);
+        java.util.EnumMap<
+                        com.branz.mmorpg.items.consumable.ConsumableCategory,
+                        ActiveConsumableEffect>
+                active =
+                        new java.util.EnumMap<>(
+                                com.branz.mmorpg.items.consumable.ConsumableCategory.class);
+        for (PersistentConsumableEffect effect : current.consumableEffects()) {
+            active.put(
+                    effect.category(),
+                    new ActiveConsumableEffect(
+                            effect.definitionId(),
+                            effect.category(),
+                            effect.remainingTicks(),
+                            effect.rare()));
+        }
+        Result<ConsumableEffectState, ConsumableEffectErrorCode> applied =
+                new ConsumableEffectEngine()
+                        .apply(
+                                new ConsumableEffectState(active),
+                                new ActiveConsumableEffect(
+                                        definitionId,
+                                        profile.category(),
+                                        profile.effectDurationTicks(),
+                                        profile.rare()),
+                                0,
+                                replacementConfirmed || journalReplayCandidate);
+        if (applied
+                instanceof
+                Result.Failure<ConsumableEffectState, ConsumableEffectErrorCode> failure) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    failure.error().code() + ": " + failure.detail());
+        }
+        ConsumableEffectState effectState =
+                ((Result.Success<ConsumableEffectState, ConsumableEffectErrorCode>) applied)
+                        .value();
+        List<PersistentConsumableEffect> effects =
+                effectState.active().values().stream()
+                        .sorted(java.util.Comparator.comparing(effect -> effect.category().name()))
+                        .map(
+                                effect ->
+                                        new PersistentConsumableEffect(
+                                                effect.effectId(),
+                                                effect.category(),
+                                                Math.toIntExact(effect.expiresTick()),
+                                                effect.rare()))
+                        .toList();
+        PersistentConsumableEffect committedEffect =
+                effects.stream()
+                        .filter(effect -> effect.category() == profile.category())
+                        .findFirst()
+                        .orElseThrow();
+        PersistentExpeditionState desired =
+                new PersistentExpeditionState(
+                        current.flaskState(),
+                        effects,
+                        current.ailments(),
+                        current.preparedFlaskSnapshot());
+        long expectedVersion =
+                session.snapshot()
+                        .expeditionStateRecord()
+                        .map(CharacterExpeditionStateRecord::version)
+                        .orElse(0L);
+        String payload = ExpeditionStateJsonCodec.encode(desired);
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "consumable-use:" + operationId,
+                        session.characterId(),
+                        session.sessionId(),
+                        com.branz.mmorpg.persistence.transaction
+                                .JdbcCharacterExpeditionStateRepository
+                                .CHARACTER_CONSUMABLE_USE_COMMIT,
+                        "{\"lotId\":\""
+                                + lotId.value()
+                                + "\",\"definitionId\":\""
+                                + definitionId.value()
+                                + "\",\"replacementConfirmed\":"
+                                + replacementConfirmed
+                                + "}",
+                        payload,
+                        contentVersion);
+        Result<CharacterConsumableUseCommitExecution, TransactionErrorCode> committed =
+                database.expeditionStates()
+                        .commitConsumableUse(
+                                request,
+                                new CharacterConsumableUseCommit(
+                                        session.characterId(),
+                                        expectedVersion,
+                                        payload,
+                                        definitionId,
+                                        new LotQuantityConsumption(
+                                                lot.lotId(),
+                                                lot.version(),
+                                                lot.ownerCharacterId(),
+                                                lot.location(),
+                                                1)));
+        if (committed
+                instanceof
+                Result.Failure<CharacterConsumableUseCommitExecution, TransactionErrorCode>
+                        failure) {
+            return transactionFailure(failure);
+        }
+        Result<LoadedCharacterSession, CharacterSessionErrorCode> reloaded = reload(session);
+        if (reloaded
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            return Result.failure(failure.error(), failure.detail());
+        }
+        CharacterConsumableUseCommitExecution execution =
+                ((Result.Success<CharacterConsumableUseCommitExecution, TransactionErrorCode>)
+                                committed)
+                        .value();
+        return Result.success(
+                new ConsumableUseCommitResult(
+                        ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                        reloaded)
+                                .value(),
+                        committedEffect,
                         execution.transaction().replayed()));
     }
 

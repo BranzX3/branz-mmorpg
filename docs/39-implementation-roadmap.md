@@ -103,8 +103,10 @@ is journaled and rejects ordinary death or checkpoint mismatch. The live party-w
 to the Milestone 7 encounter controller. The live Flask hotbar representation and durable use path
 are now implemented with commit-before-restoration, interrupt/recovery and reconnect behavior.
 Atomic Rest allocation/refill is now available through Chronicle with exact Infusion Stock CAS,
-Mercy fallback, stale rollback and restart coverage. Normal consumable lots remain before Milestone
-6 completion.
+Mercy fallback, stale rollback and restart coverage. Normal signed consumable lots now use authored
+timelines, shared combat action ownership and an atomic lot/effect commit with rare-replacement and
+bounded duration checkpoints. Milestone 6 implementation is ready for its in-game acceptance pass;
+the live party-wipe trigger remains owned by the Milestone 7 encounter controller.
 
 ## Milestone 7 — Encounters, rewards and party
 

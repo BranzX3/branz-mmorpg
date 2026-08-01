@@ -227,6 +227,107 @@ class JdbcCharacterExpeditionStateRepositoryIntegrationTest {
         assertEquals(remaining.version(), afterRollback.version());
     }
 
+    @Test
+    void consumableUseConsumesOneLotWithEffectStateOrRollsBackBoth() {
+        CharacterId characterId = new CharacterId(UUID.randomUUID());
+        SessionId sessionId = new SessionId(UUID.randomUUID());
+        DefinitionId definitionId = DefinitionId.of("consumable.training_body_tonic");
+        LotId lotId = new LotId(UUID.randomUUID());
+        JdbcValueTransactionService values = new JdbcValueTransactionService(dataSource);
+        assertTrue(
+                values.grantLot(
+                                TransactionRequest.forCharacter(
+                                        new TransactionId(UUID.randomUUID()),
+                                        "grant-consumable:" + lotId.value(),
+                                        characterId,
+                                        sessionId,
+                                        JdbcValueTransactionService.LOT_GRANT,
+                                        "{}",
+                                        "{\"quantity\":2}",
+                                        "test-content-v1"),
+                                new NewLotLocation(
+                                        lotId,
+                                        definitionId,
+                                        "default",
+                                        2,
+                                        java.util.Optional.of(characterId),
+                                        ValueLocation.inventory("slot:3"),
+                                        "{}"))
+                        .isSuccess());
+        LotLocationRecord original = success(values.findLot(lotId)).orElseThrow();
+        String payload = "{\"schemaVersion\":2,\"consumableEffects\":[{\"remainingTicks\":600}]}";
+        UUID operationId = UUID.randomUUID();
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(operationId),
+                        "consumable-use:" + operationId,
+                        characterId,
+                        sessionId,
+                        JdbcCharacterExpeditionStateRepository.CHARACTER_CONSUMABLE_USE_COMMIT,
+                        "{\"definitionId\":\"" + definitionId.value() + "\"}",
+                        payload,
+                        "test-content-v1");
+        CharacterConsumableUseCommit commit =
+                new CharacterConsumableUseCommit(
+                        characterId,
+                        0,
+                        payload,
+                        definitionId,
+                        new LotQuantityConsumption(
+                                lotId,
+                                original.version(),
+                                original.ownerCharacterId(),
+                                original.location(),
+                                1));
+        JdbcCharacterExpeditionStateRepository repository =
+                new JdbcCharacterExpeditionStateRepository(dataSource);
+
+        CharacterConsumableUseCommitExecution first =
+                success(repository.commitConsumableUse(request, commit));
+        CharacterConsumableUseCommitExecution replay =
+                success(repository.commitConsumableUse(request, commit));
+        assertEquals(1, first.state().version());
+        assertFalse(first.transaction().replayed());
+        assertTrue(replay.transaction().replayed());
+        LotLocationRecord remaining = success(values.findLot(lotId)).orElseThrow();
+        assertEquals(1, remaining.quantity());
+
+        UUID staleOperation = UUID.randomUUID();
+        TransactionRequest staleRequest =
+                TransactionRequest.forCharacter(
+                        new TransactionId(staleOperation),
+                        "consumable-use:" + staleOperation,
+                        characterId,
+                        sessionId,
+                        JdbcCharacterExpeditionStateRepository.CHARACTER_CONSUMABLE_USE_COMMIT,
+                        "{\"definitionId\":\"" + definitionId.value() + "\"}",
+                        payload,
+                        "test-content-v1");
+        Result<CharacterConsumableUseCommitExecution, TransactionErrorCode> stale =
+                repository.commitConsumableUse(
+                        staleRequest,
+                        new CharacterConsumableUseCommit(
+                                characterId,
+                                0,
+                                payload,
+                                definitionId,
+                                new LotQuantityConsumption(
+                                        lotId,
+                                        remaining.version(),
+                                        remaining.ownerCharacterId(),
+                                        remaining.location(),
+                                        1)));
+        assertFalse(stale.isSuccess());
+        assertEquals(
+                TransactionErrorCode.VALUE_STALE_VERSION,
+                ((Result.Failure<CharacterConsumableUseCommitExecution, TransactionErrorCode>)
+                                stale)
+                        .error());
+        LotLocationRecord rolledBack = success(values.findLot(lotId)).orElseThrow();
+        assertEquals(1, rolledBack.quantity());
+        assertEquals(remaining.version(), rolledBack.version());
+    }
+
     private static TransactionRequest request(
             UUID operationId,
             CharacterId characterId,

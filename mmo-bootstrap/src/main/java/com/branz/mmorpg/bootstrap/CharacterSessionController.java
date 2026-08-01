@@ -6,6 +6,7 @@ import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
 import com.branz.mmorpg.combat.resource.FlaskAllocation;
+import com.branz.mmorpg.items.consumable.ConsumableDefinitionProfile;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.QuiverProfile;
@@ -672,6 +673,58 @@ final class CharacterSessionController implements Listener {
                         });
     }
 
+    void consumeAndApplyEffect(
+            Player player,
+            LotId lotId,
+            DefinitionId definitionId,
+            ConsumableDefinitionProfile profile,
+            boolean replacementConfirmed,
+            UUID operationId,
+            String contentVersion,
+            Consumer<Result<ConsumableUseCommitResult, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(lotId, "lotId");
+        Objects.requireNonNull(definitionId, "definitionId");
+        Objects.requireNonNull(profile, "profile");
+        Objects.requireNonNull(operationId, "operationId");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<ConsumableUseCommitResult, CharacterSessionErrorCode> result =
+                                    sessions.consumeAndApplyEffect(
+                                            session,
+                                            lotId,
+                                            definitionId,
+                                            profile,
+                                            replacementConfirmed,
+                                            operationId,
+                                            contentVersion);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeConsumableUseMutation(
+                                                            session, result, completion));
+                        });
+    }
+
     void recordProgressionEvidence(
             Player player,
             List<EvidenceCandidate> candidates,
@@ -1169,6 +1222,41 @@ final class CharacterSessionController implements Listener {
                 Result.success(
                         new FlaskPreparationCommitResult(
                                 updated, committed.preparation(), committed.replayed())));
+    }
+
+    private void completeConsumableUseMutation(
+            LoadedCharacterSession previous,
+            Result<ConsumableUseCommitResult, CharacterSessionErrorCode> result,
+            Consumer<Result<ConsumableUseCommitResult, CharacterSessionErrorCode>> completion) {
+        UUID playerId = previous.characterId().value();
+        valueMutationInFlight.remove(playerId);
+        LoadedCharacterSession current = active.get(playerId);
+        if (current == null || !current.sessionId().equals(previous.sessionId())) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session changed before consumable use completed."));
+            return;
+        }
+        if (result
+                instanceof Result.Failure<ConsumableUseCommitResult, CharacterSessionErrorCode>) {
+            completion.accept(result);
+            return;
+        }
+        ConsumableUseCommitResult committed =
+                ((Result.Success<ConsumableUseCommitResult, CharacterSessionErrorCode>) result)
+                        .value();
+        LoadedCharacterSession updated = current.withSnapshot(committed.session().snapshot());
+        active.put(playerId, updated);
+        projected.remove(playerId);
+        Player player = plugin.getServer().getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            applyProjectionIfReady(player, false);
+        }
+        completion.accept(
+                Result.success(
+                        new ConsumableUseCommitResult(
+                                updated, committed.effect(), committed.replayed())));
     }
 
     private void completeKnowledgeAcquisition(

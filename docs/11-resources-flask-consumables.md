@@ -161,6 +161,20 @@ and Flask update. Successful preparation clears any prior boss-checkpoint Flask 
 the Player Session and then reconciles the hotbar representation. Exact retry cannot consume stock
 twice. ADR 0024 owns this atomic boundary.
 
+## V1 live normal-consumable adapter
+
+Signed projected lots with an authored `consumable_profile` can be moved to gameplay hotbar slots
+and used with right-click. The live action shares Flask action ownership, follows the definition's
+windup/commit/recovery ticks and interrupts on jump, sprint, selection/inventory change, applied CC,
+death or forced teleport. Meals require exploration. Vanilla item consumption is always cancelled.
+
+At the exact commit tick, one journaled JDBC transaction consumes one versioned owned lot unit and
+replaces only the matching durable effect category. Recovery begins after PostgreSQL acknowledgement
+and Player Session reload. Sneak + right-click explicitly confirms replacement of a rare active
+effect; the service validates confirmation again. Active durations checkpoint every 100 ticks and
+expired effects are durably removed. Offline wall-clock time does not advance them; a crash can
+recover up to one checkpoint interval. ADR 0025 owns this boundary.
+
 ## Item freshness
 
 Finished potions and normal ingredients do not expire in real time. `Fresh`, `Pristine`, `Corrupted` and `Infused` are material states. Special Unstable Concoctions may expire at rest, death or expedition end and are always labeled.

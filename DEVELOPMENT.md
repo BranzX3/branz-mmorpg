@@ -562,6 +562,26 @@ live inventory, change Bukkit resources or write PostgreSQL.
 151. Spend the Flask below two total charges, remove all Infusion Stock and confirm at Rest. Verify
      Mercy grants exactly two charges without stock. Disconnect/reconnect and restart Paper; verify
      the chosen allocation, charges and remaining stock reload exactly once from database truth.
+152. From the environment-gated dev menu, grant at least two each of
+     `consumable.training_body_tonic`, `consumable.training_elemental_ward`,
+     `consumable.training_weapon_coating`, `consumable.training_utility_preparation` and
+     `food.training_meal`. Move a signed stack to gameplay hotbar slots 1-8 and verify it retains its
+     database-authoritative lore.
+153. With the weapon fully sheathed, right-click a Body Tonic. Interrupt before its authored commit
+     tick by jumping, sprinting or selecting another slot; verify the stack quantity, durable version
+     and `/mmo consumable status` remain unchanged.
+154. Use the Tonic again without interruption. Verify `COMMITTING` occurs at the authored tick, the
+     stack decrements by exactly one only after PostgreSQL acknowledgement, BODY_TONIC appears in
+     `/mmo consumable status`, and recovery completes afterward. Repeat the exact operation in the
+     integration fixture and verify it cannot consume a second unit.
+155. Use one item from each other category and verify all five categories coexist while a new item
+     replaces only its own category. Attempt to replace the active rare Utility Preparation with a
+     normal right-click and verify no item is consumed; sneak + right-click must explicitly confirm.
+     Enter `ENGAGED` and verify a Meal is rejected until returning to `EXPLORATION`.
+156. Leave effects active for more than 100 ticks, disconnect/reconnect and restart Paper. Verify
+     remaining ticks resume from the latest bounded checkpoint, offline wall-clock time does not
+     reduce them and expired effects are durably removed. Tamper with or duplicate a signed client
+     projection and verify PostgreSQL version checks prevent a second effect/item consumption.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

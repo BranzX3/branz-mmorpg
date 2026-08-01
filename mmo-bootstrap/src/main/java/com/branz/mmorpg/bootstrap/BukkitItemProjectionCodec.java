@@ -88,6 +88,15 @@ final class BukkitItemProjectionCodec {
     }
 
     private static Material fallbackMaterial(ItemDefinition definition) {
+        if (definition.consumableProfile().isPresent()) {
+            return switch (definition.consumableProfile().orElseThrow().category()) {
+                case BODY_TONIC -> Material.POTION;
+                case ELEMENTAL_WARD -> Material.SPLASH_POTION;
+                case WEAPON_COATING -> Material.INK_SAC;
+                case UTILITY_PREPARATION -> Material.FERMENTED_SPIDER_EYE;
+                case MEAL -> Material.COOKED_BEEF;
+            };
+        }
         if (definition.id().value().startsWith("ammo.")) {
             return Material.ARROW;
         }

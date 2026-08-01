@@ -5,9 +5,13 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.content.definition.ContentDefinition;
 import com.branz.mmorpg.content.schema.DefinitionType;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
+import com.branz.mmorpg.progression.evidence.ProgressionTrack;
 import com.branz.mmorpg.progression.evidence.ReadinessBand;
+import com.branz.mmorpg.progression.knowledge.KnowledgeAcquisitionPolicy;
+import com.branz.mmorpg.progression.knowledge.KnowledgeAcquisitionSourceType;
 import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import com.branz.mmorpg.progression.knowledge.KnowledgeType;
+import com.branz.mmorpg.progression.knowledge.LearningRequirements;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -90,6 +94,20 @@ public final class BuildEngine {
 
     public Optional<FormDefinition> form(DefinitionId id) {
         return Optional.ofNullable(forms.get(Objects.requireNonNull(id, "id")));
+    }
+
+    public Optional<AttunableEffectDefinition> attunableEffect(DefinitionId id) {
+        return Optional.ofNullable(attunableEffects.get(Objects.requireNonNull(id, "id")));
+    }
+
+    public Optional<KnowledgeAcquisitionPolicy> acquisition(KnowledgeKey knowledge) {
+        Objects.requireNonNull(knowledge, "knowledge");
+        return switch (knowledge.type()) {
+            case FORM -> form(knowledge.id()).map(FormDefinition::acquisition);
+            case SPELL ->
+                    attunableEffect(knowledge.id()).map(AttunableEffectDefinition::acquisition);
+            default -> Optional.empty();
+        };
     }
 
     public Result<BuildResolution, BuildErrorCode> resolve(CharacterBuild build) {
@@ -177,6 +195,13 @@ public final class BuildEngine {
                 return Result.failure(
                         BuildErrorCode.BUILD_UNKNOWN_FORM, "Selected form is unavailable.");
             }
+            KnowledgeKey required = new KnowledgeKey(KnowledgeType.FORM, form.id());
+            if (learnedKnowledge.isPresent()
+                    && !learnedKnowledge.orElseThrow().contains(required)) {
+                return Result.failure(
+                        BuildErrorCode.BUILD_KNOWLEDGE_REQUIRED,
+                        "Form " + form.id().value() + " has not been learned.");
+            }
             if (weaponFamily.isPresent() && !form.supports(weaponFamily.orElseThrow())) {
                 return Result.failure(
                         BuildErrorCode.BUILD_FAMILY_INCOMPATIBLE,
@@ -199,6 +224,13 @@ public final class BuildEngine {
                 return Result.failure(
                         BuildErrorCode.BUILD_UNKNOWN_ATTUNEMENT,
                         effectId.value() + " is not an attunable effect.");
+            }
+            KnowledgeKey required = new KnowledgeKey(KnowledgeType.SPELL, effect.id());
+            if (learnedKnowledge.isPresent()
+                    && !learnedKnowledge.orElseThrow().contains(required)) {
+                return Result.failure(
+                        BuildErrorCode.BUILD_KNOWLEDGE_REQUIRED,
+                        "Spell " + effect.id().value() + " has not been learned.");
             }
             components.add(
                     new AttunementComponent(
@@ -273,7 +305,8 @@ public final class BuildEngine {
                 number(body, "resource.stamina_cost_multiplier"),
                 number(body, "resource.mana_cost_multiplier"),
                 optionalTextSet(body, "tags"),
-                optionalTextSet(body, "conflicts_with_tags"));
+                optionalTextSet(body, "conflicts_with_tags"),
+                compileAcquisition(source, KnowledgeType.FORM));
     }
 
     private static AttunableEffectDefinition compileSpellAttunement(ContentDefinition source) {
@@ -282,7 +315,45 @@ public final class BuildEngine {
                 source.id(),
                 integer(body, "requirements.attunement"),
                 optionalTextSet(body, "requirements.attunement_tags"),
-                optionalTextSet(body, "requirements.conflicts_with_tags"));
+                optionalTextSet(body, "requirements.conflicts_with_tags"),
+                compileAcquisition(source, KnowledgeType.SPELL));
+    }
+
+    private static KnowledgeAcquisitionPolicy compileAcquisition(
+            ContentDefinition source, KnowledgeType knowledgeType) {
+        JsonNode body = source.body();
+        Set<KnowledgeKey> prerequisites =
+                optionalTextSet(body, "acquisition.prerequisite_knowledge").stream()
+                        .map(BuildEngine::knowledgeKey)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        ProgressionTrack mastery =
+                ProgressionTrack.mastery(text(body, "acquisition.mastery_discipline"));
+        LearningRequirements requirements =
+                new LearningRequirements(
+                        prerequisites,
+                        Map.of(mastery, ReadinessBand.valueOf(text(body, "acquisition.readiness"))),
+                        optionalTextSet(body, "acquisition.world_flags"));
+        return new KnowledgeAcquisitionPolicy(
+                new KnowledgeKey(knowledgeType, source.id()),
+                KnowledgeAcquisitionSourceType.valueOf(text(body, "acquisition.source_type")),
+                definitionId(body, "acquisition.source"),
+                requirements);
+    }
+
+    private static KnowledgeKey knowledgeKey(String value) {
+        int separator = value.indexOf(':');
+        if (separator <= 0 || separator == value.length() - 1) {
+            throw new BuildCompileException(
+                    "acquisition.prerequisite_knowledge must use TYPE:definition.id");
+        }
+        try {
+            return new KnowledgeKey(
+                    KnowledgeType.valueOf(value.substring(0, separator)),
+                    DefinitionId.of(value.substring(separator + 1)));
+        } catch (IllegalArgumentException exception) {
+            throw new BuildCompileException(
+                    "acquisition.prerequisite_knowledge entry is invalid: " + value);
+        }
     }
 
     private static DefinitionId definitionId(JsonNode root, String path) {

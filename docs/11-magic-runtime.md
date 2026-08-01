@@ -6,6 +6,8 @@
 - Learning an art grants knowledge; attunement and catalyst determine active access.
 - V1 magic must be usable on a vanilla client without a custom targeting screen.
 - Spells are data-driven and server-authoritative.
+- A Spell must be permanently learned from its authored source before it can consume Attunement or
+  become the selected cast; catalyst ownership alone never grants the art.
 
 ## Spell definition
 

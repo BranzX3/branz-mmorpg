@@ -15,3 +15,9 @@ imbuement: {duration_ticks: 240, maximum_charges: 4, power_coefficient: 0.35}
 output: {arcane_school: FIRE, power_coefficient: 0.35, posture: 4, guard_pressure: 3}
 presentation: {archetype: RUNIC_EMBER_EDGE}
 profiles: {pve_multiplier: 1.0, pvp_multiplier: 0.65}
+acquisition:
+  source_type: FACTION_QUEST
+  source: quest.runic.ember_edge
+  mastery_discipline: staff
+  readiness: DEVELOPING
+  prerequisite_knowledge: ["SPELL:spell.ember.cinder_snap"]

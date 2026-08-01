@@ -90,7 +90,8 @@ Knowledge, teacher Renown/deed and exact teaching completion, reloads both Playe
 selected Techniques on learned state; environment-gated simulation and durable two-player fixtures
 expose the path in game. Live teaching now consumes successful server combat actions, enforces
 authored learning/teaching Mastery bands and atomically commits the completed challenge. Form/Spell
-acquisition gating, Flask/consumables/ailments and boss snapshot restore remain before Milestone 6
+acquisition policies now gate preview/commit/combat and V0007 persists their idempotent source
+completion. Flask/consumables/ailments and boss snapshot restore remain before Milestone 6
 completion.
 
 ## Milestone 7 — Encounters, rewards and party

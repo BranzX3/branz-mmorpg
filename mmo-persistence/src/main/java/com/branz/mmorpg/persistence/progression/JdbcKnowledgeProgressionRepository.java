@@ -3,6 +3,7 @@ package com.branz.mmorpg.persistence.progression;
 import com.branz.mmorpg.api.identity.CharacterId;
 import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.progression.knowledge.KnowledgeAcquisitionSourceType;
 import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import com.branz.mmorpg.progression.knowledge.KnowledgeType;
 import com.branz.mmorpg.progression.renown.RenownContext;
@@ -37,6 +38,9 @@ public final class JdbcKnowledgeProgressionRepository implements KnowledgeProgre
     private static final String TEACHING_COLUMNS =
             "teaching_session_id, teacher_id, student_id, knowledge_type, definition_id, "
                     + "deed_id, content_version, completed_at";
+    private static final String ACQUISITION_COLUMNS =
+            "acquisition_id, character_id, knowledge_type, definition_id, source_type, "
+                    + "source_definition_id, content_version, acquired_at";
 
     private final DataSource dataSource;
     private final RenownEngine renownEngine;
@@ -104,6 +108,61 @@ public final class JdbcKnowledgeProgressionRepository implements KnowledgeProgre
         } catch (SQLException exception) {
             return failure(exception);
         }
+    }
+
+    @Override
+    public Result<KnowledgeAcquisitionExecution, KnowledgePersistenceErrorCode> commitAcquisition(
+            KnowledgeAcquisitionRequest request) {
+        Objects.requireNonNull(request, "request");
+        try (Connection connection = dataSource.getConnection()) {
+            boolean originalAutoCommit = connection.getAutoCommit();
+            try {
+                connection.setAutoCommit(false);
+                lockCharacter(connection, request.characterId());
+                Result<KnowledgeAcquisitionExecution, KnowledgePersistenceErrorCode> result =
+                        commitAcquisitionLocked(connection, request);
+                if (result.isSuccess()) {
+                    connection.commit();
+                } else {
+                    connection.rollback();
+                }
+                return result;
+            } catch (SQLException | IllegalArgumentException exception) {
+                rollbackQuietly(connection);
+                return failure(exception);
+            } finally {
+                restoreAutoCommit(connection, originalAutoCommit);
+            }
+        } catch (SQLException exception) {
+            return failure(exception);
+        }
+    }
+
+    private Result<KnowledgeAcquisitionExecution, KnowledgePersistenceErrorCode>
+            commitAcquisitionLocked(Connection connection, KnowledgeAcquisitionRequest request)
+                    throws SQLException {
+        Optional<KnowledgeAcquisitionRecord> existing =
+                findAcquisition(connection, request.acquisitionId());
+        if (existing.isPresent()) {
+            KnowledgeAcquisitionRecord acquisition = existing.orElseThrow();
+            if (!acquisition.request().equals(request)) {
+                return Result.failure(
+                        KnowledgePersistenceErrorCode.ACQUISITION_ID_CONFLICT,
+                        "Acquisition UUID is bound to different immutable input.");
+            }
+            KnowledgeRecord learned =
+                    findKnowledge(connection, request.characterId(), request.knowledge())
+                            .orElseThrow();
+            return Result.success(new KnowledgeAcquisitionExecution(acquisition, learned, true));
+        }
+        if (findKnowledge(connection, request.characterId(), request.knowledge()).isPresent()) {
+            return Result.failure(
+                    KnowledgePersistenceErrorCode.KNOWLEDGE_ALREADY_LEARNED,
+                    "Character already knows " + request.knowledge().id().value() + ".");
+        }
+        KnowledgeRecord learned = insertAcquiredKnowledge(connection, request);
+        KnowledgeAcquisitionRecord acquisition = insertAcquisition(connection, request);
+        return Result.success(new KnowledgeAcquisitionExecution(acquisition, learned, false));
     }
 
     private Result<TeachingCommitExecution, KnowledgePersistenceErrorCode> commitLocked(
@@ -197,6 +256,50 @@ public final class JdbcKnowledgeProgressionRepository implements KnowledgeProgre
             try (ResultSet row = statement.executeQuery()) {
                 row.next();
                 return readKnowledge(row);
+            }
+        }
+    }
+
+    private static KnowledgeRecord insertAcquiredKnowledge(
+            Connection connection, KnowledgeAcquisitionRequest request) throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "INSERT INTO character_knowledge("
+                                + KNOWLEDGE_COLUMNS
+                                + ") VALUES (?, ?, ?, 'CONTENT_ACQUISITION', ?, ?, "
+                                + "CURRENT_TIMESTAMP) RETURNING "
+                                + KNOWLEDGE_COLUMNS)) {
+            statement.setObject(1, request.characterId().value());
+            statement.setString(2, request.knowledge().type().name());
+            statement.setString(3, request.knowledge().id().value());
+            statement.setObject(4, request.acquisitionId());
+            statement.setString(5, request.contentVersion());
+            try (ResultSet row = statement.executeQuery()) {
+                row.next();
+                return readKnowledge(row);
+            }
+        }
+    }
+
+    private static KnowledgeAcquisitionRecord insertAcquisition(
+            Connection connection, KnowledgeAcquisitionRequest request) throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "INSERT INTO knowledge_acquisition_journal("
+                                + ACQUISITION_COLUMNS
+                                + ") VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
+                                + "RETURNING acquired_at")) {
+            statement.setObject(1, request.acquisitionId());
+            statement.setObject(2, request.characterId().value());
+            statement.setString(3, request.knowledge().type().name());
+            statement.setString(4, request.knowledge().id().value());
+            statement.setString(5, request.sourceType().name());
+            statement.setString(6, request.sourceId().value());
+            statement.setString(7, request.contentVersion());
+            try (ResultSet row = statement.executeQuery()) {
+                row.next();
+                return new KnowledgeAcquisitionRecord(
+                        request, row.getObject("acquired_at", OffsetDateTime.class).toInstant());
             }
         }
     }
@@ -393,6 +496,20 @@ public final class JdbcKnowledgeProgressionRepository implements KnowledgeProgre
         }
     }
 
+    private static Optional<KnowledgeAcquisitionRecord> findAcquisition(
+            Connection connection, UUID acquisitionId) throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "SELECT "
+                                + ACQUISITION_COLUMNS
+                                + " FROM knowledge_acquisition_journal WHERE acquisition_id = ?")) {
+            statement.setObject(1, acquisitionId);
+            try (ResultSet row = statement.executeQuery()) {
+                return row.next() ? Optional.of(readAcquisition(row)) : Optional.empty();
+            }
+        }
+    }
+
     private static KnowledgeRecord readKnowledge(ResultSet row) throws SQLException {
         return new KnowledgeRecord(
                 new CharacterId(row.getObject("character_id", UUID.class)),
@@ -451,6 +568,21 @@ public final class JdbcKnowledgeProgressionRepository implements KnowledgeProgre
                 row.getObject("completed_at", OffsetDateTime.class).toInstant());
     }
 
+    private static KnowledgeAcquisitionRecord readAcquisition(ResultSet row) throws SQLException {
+        KnowledgeAcquisitionRequest request =
+                new KnowledgeAcquisitionRequest(
+                        row.getObject("acquisition_id", UUID.class),
+                        new CharacterId(row.getObject("character_id", UUID.class)),
+                        new KnowledgeKey(
+                                KnowledgeType.valueOf(row.getString("knowledge_type")),
+                                DefinitionId.of(row.getString("definition_id"))),
+                        KnowledgeAcquisitionSourceType.valueOf(row.getString("source_type")),
+                        DefinitionId.of(row.getString("source_definition_id")),
+                        row.getString("content_version"));
+        return new KnowledgeAcquisitionRecord(
+                request, row.getObject("acquired_at", OffsetDateTime.class).toInstant());
+    }
+
     private static void lockParticipants(
             Connection connection, CharacterId teacherId, CharacterId studentId)
             throws SQLException {
@@ -459,12 +591,17 @@ public final class JdbcKnowledgeProgressionRepository implements KnowledgeProgre
                         .sorted(Comparator.comparing(id -> id.value().toString()))
                         .toList();
         for (CharacterId participant : ordered) {
-            try (PreparedStatement statement =
-                    connection.prepareStatement(
-                            "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))")) {
-                statement.setString(1, "knowledge:" + participant.value());
-                statement.executeQuery();
-            }
+            lockCharacter(connection, participant);
+        }
+    }
+
+    private static void lockCharacter(Connection connection, CharacterId characterId)
+            throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement(
+                        "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))")) {
+            statement.setString(1, "knowledge:" + characterId.value());
+            statement.executeQuery();
         }
     }
 

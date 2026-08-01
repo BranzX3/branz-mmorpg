@@ -58,6 +58,22 @@ A Technique definition owns its stable `move` reference plus three progression f
 Readiness uses `UNFAMILIAR`, `DEVELOPING`, `RELIABLE`, `REFINED` or `EXCEPTIONAL`. Exact hidden
 evidence is never authored into a Technique or shown in a teaching rejection.
 
+Form and Spell definitions own one permanent acquisition policy:
+
+```yaml
+acquisition:
+  source_type: WORLD_DISCOVERY
+  source: discovery.ember.fire_lance_rune
+  mastery_discipline: staff
+  readiness: DEVELOPING
+  prerequisite_knowledge: ["SPELL:spell.ember.cinder_snap"]
+```
+
+`source_type` is one of `MENTOR`, `WORLD_DISCOVERY`, `BOSS_KNOWLEDGE` or `FACTION_QUEST`.
+`source` is the stable server event identity, never a client-provided label. Prerequisites use
+`TYPE:definition.id`; optional `world_flags` use durable trial/world identities. Acquisition checks
+qualitative readiness only and cannot author or expose an exact evidence threshold.
+
 ## Validation classes
 
 - Syntax: type, range and required fields.

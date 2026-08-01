@@ -40,3 +40,9 @@ presentation:
 profiles:
   pve_multiplier: 1.0
   pvp_multiplier: 0.65
+acquisition:
+  source_type: WORLD_DISCOVERY
+  source: discovery.ember.fire_lance_rune
+  mastery_discipline: staff
+  readiness: DEVELOPING
+  prerequisite_knowledge: ["SPELL:spell.ember.cinder_snap"]

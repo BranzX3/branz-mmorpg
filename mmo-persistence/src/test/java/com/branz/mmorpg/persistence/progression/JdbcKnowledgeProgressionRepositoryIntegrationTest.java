@@ -11,6 +11,7 @@ import com.branz.mmorpg.persistence.migration.ClasspathMigrationCatalog;
 import com.branz.mmorpg.persistence.migration.MigrationCatalog;
 import com.branz.mmorpg.persistence.migration.MigrationErrorCode;
 import com.branz.mmorpg.persistence.migration.PostgresMigrationRunner;
+import com.branz.mmorpg.progression.knowledge.KnowledgeAcquisitionSourceType;
 import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import com.branz.mmorpg.progression.knowledge.KnowledgeType;
 import com.branz.mmorpg.progression.renown.RenownDeedCandidate;
@@ -191,6 +192,76 @@ class JdbcKnowledgeProgressionRepositoryIntegrationTest {
         assertEquals(20, success(repository.findRenown(teacher)).orElseThrow().renown());
     }
 
+    @Test
+    void acquisitionCommitsKnowledgeAndExactReplaySurvivesRepositoryRestart() throws Exception {
+        CharacterId character = character();
+        UUID acquisitionId = UUID.randomUUID();
+        KnowledgeAcquisitionRequest request =
+                acquisition(
+                        acquisitionId,
+                        character,
+                        KnowledgeType.SPELL,
+                        "spell.ember.cinder_snap",
+                        KnowledgeAcquisitionSourceType.MENTOR,
+                        "mentor.ember.cinder_snap");
+        JdbcKnowledgeProgressionRepository repository =
+                new JdbcKnowledgeProgressionRepository(dataSource);
+
+        KnowledgeAcquisitionExecution committed = success(repository.commitAcquisition(request));
+        KnowledgeAcquisitionExecution replayed =
+                success(
+                        new JdbcKnowledgeProgressionRepository(dataSource)
+                                .commitAcquisition(request));
+
+        assertFalse(committed.replayed());
+        assertTrue(replayed.replayed());
+        assertEquals(request.knowledge(), committed.learnedKnowledge().knowledge());
+        assertEquals("CONTENT_ACQUISITION", committed.learnedKnowledge().sourceType());
+        assertEquals(1, scalarInt("SELECT COUNT(*) FROM character_knowledge"));
+        assertEquals(1, scalarInt("SELECT COUNT(*) FROM knowledge_acquisition_journal"));
+    }
+
+    @Test
+    void acquisitionIdConflictAndAlreadyLearnedRollbackWithoutExtraRows() throws Exception {
+        CharacterId character = character();
+        UUID acquisitionId = UUID.randomUUID();
+        JdbcKnowledgeProgressionRepository repository =
+                new JdbcKnowledgeProgressionRepository(dataSource);
+        KnowledgeAcquisitionRequest original =
+                acquisition(
+                        acquisitionId,
+                        character,
+                        KnowledgeType.FORM,
+                        "form.iron_root",
+                        KnowledgeAcquisitionSourceType.MENTOR,
+                        "mentor.martial.iron_root");
+        success(repository.commitAcquisition(original));
+
+        Result<KnowledgeAcquisitionExecution, KnowledgePersistenceErrorCode> conflict =
+                repository.commitAcquisition(
+                        acquisition(
+                                acquisitionId,
+                                character,
+                                KnowledgeType.SPELL,
+                                "spell.ember.cinder_snap",
+                                KnowledgeAcquisitionSourceType.MENTOR,
+                                "mentor.ember.cinder_snap"));
+        Result<KnowledgeAcquisitionExecution, KnowledgePersistenceErrorCode> alreadyLearned =
+                repository.commitAcquisition(
+                        acquisition(
+                                UUID.randomUUID(),
+                                character,
+                                KnowledgeType.FORM,
+                                "form.iron_root",
+                                KnowledgeAcquisitionSourceType.MENTOR,
+                                "mentor.martial.iron_root"));
+
+        assertFailure(conflict, KnowledgePersistenceErrorCode.ACQUISITION_ID_CONFLICT);
+        assertFailure(alreadyLearned, KnowledgePersistenceErrorCode.KNOWLEDGE_ALREADY_LEARNED);
+        assertEquals(1, scalarInt("SELECT COUNT(*) FROM character_knowledge"));
+        assertEquals(1, scalarInt("SELECT COUNT(*) FROM knowledge_acquisition_journal"));
+    }
+
     private static TeachingCommitRequest request(
             CharacterId teacher, CharacterId student, UUID sessionId, UUID deedId) {
         KnowledgeKey technique =
@@ -208,6 +279,22 @@ class JdbcKnowledgeProgressionRepositoryIntegrationTest {
                         20,
                         "test-content-v1");
         return new TeachingCommitRequest(completion, deed);
+    }
+
+    private static KnowledgeAcquisitionRequest acquisition(
+            UUID acquisitionId,
+            CharacterId character,
+            KnowledgeType type,
+            String definitionId,
+            KnowledgeAcquisitionSourceType sourceType,
+            String sourceId) {
+        return new KnowledgeAcquisitionRequest(
+                acquisitionId,
+                character,
+                new KnowledgeKey(type, DefinitionId.of(definitionId)),
+                sourceType,
+                DefinitionId.of(sourceId),
+                "test-content-v1");
     }
 
     private int scalarInt(String sql) throws Exception {

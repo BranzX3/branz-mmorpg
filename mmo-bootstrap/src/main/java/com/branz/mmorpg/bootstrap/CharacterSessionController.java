@@ -11,6 +11,7 @@ import com.branz.mmorpg.items.definition.QuiverProfile;
 import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.persistence.progression.KnowledgeAcquisitionRequest;
 import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
@@ -709,6 +710,46 @@ final class CharacterSessionController implements Listener {
                         });
     }
 
+    void commitKnowledgeAcquisition(
+            Player player,
+            KnowledgeAcquisitionRequest request,
+            Consumer<Result<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode>>
+                    completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                            "Another authoritative value transaction is still in progress."));
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode>
+                                    result = sessions.commitAcquisition(session, request);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeKnowledgeAcquisition(
+                                                            session, result, completion));
+                        });
+    }
+
     void shutdown() {
         if (heartbeatTaskId >= 0) {
             plugin.getServer().getScheduler().cancelTask(heartbeatTaskId);
@@ -1028,6 +1069,38 @@ final class CharacterSessionController implements Listener {
         completion.accept(
                 Result.success(
                         new ProgressionEvidenceCommitResult(updated, committed.executions())));
+    }
+
+    private void completeKnowledgeAcquisition(
+            LoadedCharacterSession previous,
+            Result<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode> result,
+            Consumer<Result<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode>>
+                    completion) {
+        UUID playerId = previous.characterId().value();
+        valueMutationInFlight.remove(playerId);
+        LoadedCharacterSession current = active.get(playerId);
+        if (current == null || !current.sessionId().equals(previous.sessionId())) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session changed before Knowledge acquisition completed."));
+            return;
+        }
+        if (result
+                instanceof
+                Result.Failure<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode>) {
+            completion.accept(result);
+            return;
+        }
+        KnowledgeAcquisitionCommitResult committed =
+                ((Result.Success<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode>)
+                                result)
+                        .value();
+        LoadedCharacterSession updated = current.withSnapshot(committed.session().snapshot());
+        active.put(playerId, updated);
+        completion.accept(
+                Result.success(
+                        new KnowledgeAcquisitionCommitResult(updated, committed.execution())));
     }
 
     private void completeTeachingMutation(

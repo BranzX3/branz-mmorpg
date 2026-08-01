@@ -16,6 +16,8 @@ import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.lease.CharacterLease;
 import com.branz.mmorpg.persistence.lease.LeaseAcquireOutcome;
 import com.branz.mmorpg.persistence.lease.LeaseErrorCode;
+import com.branz.mmorpg.persistence.progression.KnowledgeAcquisitionExecution;
+import com.branz.mmorpg.persistence.progression.KnowledgeAcquisitionRequest;
 import com.branz.mmorpg.persistence.progression.KnowledgePersistenceErrorCode;
 import com.branz.mmorpg.persistence.progression.KnowledgeRecord;
 import com.branz.mmorpg.persistence.progression.ProgressionEvidenceExecution;
@@ -979,6 +981,45 @@ final class CharacterSessionService {
                                         reloadedStudent)
                                 .value(),
                         ((Result.Success<TeachingCommitExecution, KnowledgePersistenceErrorCode>)
+                                        committed)
+                                .value()));
+    }
+
+    Result<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode> commitAcquisition(
+            LoadedCharacterSession session, KnowledgeAcquisitionRequest request) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(request, "request");
+        if (!session.characterId().equals(request.characterId())) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Knowledge acquisition character does not own this Player Session.");
+        }
+        Result<KnowledgeAcquisitionExecution, KnowledgePersistenceErrorCode> committed =
+                database.knowledge().commitAcquisition(request);
+        if (committed
+                instanceof
+                Result.Failure<KnowledgeAcquisitionExecution, KnowledgePersistenceErrorCode>
+                        failure) {
+            CharacterSessionErrorCode error =
+                    failure.error() == KnowledgePersistenceErrorCode.KNOWLEDGE_DATABASE_UNAVAILABLE
+                            ? CharacterSessionErrorCode.CHARACTER_PERSISTENCE_UNAVAILABLE
+                            : CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED;
+            return Result.failure(error, failure.error().code() + ": " + failure.detail());
+        }
+        Result<LoadedCharacterSession, CharacterSessionErrorCode> reloaded = reload(session);
+        if (reloaded
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+            return Result.failure(failure.error(), failure.detail());
+        }
+        return Result.success(
+                new KnowledgeAcquisitionCommitResult(
+                        ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                        reloaded)
+                                .value(),
+                        ((Result.Success<
+                                                KnowledgeAcquisitionExecution,
+                                                KnowledgePersistenceErrorCode>)
                                         committed)
                                 .value()));
     }

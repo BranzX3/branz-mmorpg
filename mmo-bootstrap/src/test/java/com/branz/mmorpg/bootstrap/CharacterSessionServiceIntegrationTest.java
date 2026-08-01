@@ -24,6 +24,7 @@ import com.branz.mmorpg.items.definition.ShieldProfile;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
+import com.branz.mmorpg.persistence.progression.KnowledgeAcquisitionRequest;
 import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
 import com.branz.mmorpg.progression.build.BuildEngine;
 import com.branz.mmorpg.progression.build.BuildErrorCode;
@@ -35,6 +36,7 @@ import com.branz.mmorpg.progression.evidence.EncounterOutcome;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import com.branz.mmorpg.progression.evidence.EvidenceTargetKind;
 import com.branz.mmorpg.progression.evidence.ProgressionTrack;
+import com.branz.mmorpg.progression.knowledge.KnowledgeAcquisitionSourceType;
 import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import com.branz.mmorpg.progression.knowledge.KnowledgeType;
 import com.branz.mmorpg.progression.renown.RenownDeedCandidate;
@@ -332,13 +334,40 @@ class CharacterSessionServiceIntegrationTest {
                                     "content.test.1"));
             TeachingSessionCommitResult learned =
                     teachingSuccess(service.commitTeaching(teacher, session, learning));
+            KnowledgeAcquisitionCommitResult cinder =
+                    acquisitionSuccess(
+                            service.commitAcquisition(
+                                    learned.studentSession(),
+                                    acquisition(
+                                            learned.studentSession(),
+                                            KnowledgeType.SPELL,
+                                            "spell.ember.cinder_snap",
+                                            KnowledgeAcquisitionSourceType.MENTOR,
+                                            "mentor.ember.cinder_snap")));
+            KnowledgeAcquisitionCommitResult form =
+                    acquisitionSuccess(
+                            service.commitAcquisition(
+                                    cinder.session(),
+                                    acquisition(
+                                            cinder.session(),
+                                            KnowledgeType.FORM,
+                                            "form.ember_channel",
+                                            KnowledgeAcquisitionSourceType.MENTOR,
+                                            "mentor.ember.ember_channel")));
+            KnowledgeAcquisitionCommitResult spell =
+                    acquisitionSuccess(
+                            service.commitAcquisition(
+                                    form.session(),
+                                    acquisition(
+                                            form.session(),
+                                            KnowledgeType.SPELL,
+                                            "spell.ember.fire_lance",
+                                            KnowledgeAcquisitionSourceType.WORLD_DISCOVERY,
+                                            "discovery.ember.fire_lance_rune")));
             LoadedCharacterSession committed =
                     success(
                             service.commitBuild(
-                                    learned.studentSession(),
-                                    desired,
-                                    UUID.randomUUID(),
-                                    "content.test.1"));
+                                    spell.session(), desired, UUID.randomUUID(), "content.test.1"));
             assertEquals(desired, committed.snapshot().build());
             assertEquals(1, committed.snapshot().buildRecord().orElseThrow().version());
             service.close(learned.teacherSession());
@@ -349,6 +378,7 @@ class CharacterSessionServiceIntegrationTest {
             LoadedCharacterSession restored = success(service.open(playerId));
             assertEquals(desired, restored.snapshot().build());
             assertEquals(1, restored.snapshot().buildRecord().orElseThrow().version());
+            assertEquals(4, restored.snapshot().learnedKnowledge().size());
             service.close(restored);
         }
     }
@@ -994,6 +1024,21 @@ class CharacterSessionServiceIntegrationTest {
         return ((Result.Success<BuildEngine, BuildErrorCode>) compiled).value();
     }
 
+    private static KnowledgeAcquisitionRequest acquisition(
+            LoadedCharacterSession session,
+            KnowledgeType type,
+            String definitionId,
+            KnowledgeAcquisitionSourceType sourceType,
+            String sourceId) {
+        return new KnowledgeAcquisitionRequest(
+                UUID.randomUUID(),
+                session.characterId(),
+                new KnowledgeKey(type, DefinitionId.of(definitionId)),
+                sourceType,
+                DefinitionId.of(sourceId),
+                "content.test.1");
+    }
+
     private static LoadedCharacterSession success(
             Result<LoadedCharacterSession, CharacterSessionErrorCode> result) {
         assertTrue(
@@ -1043,6 +1088,24 @@ class CharacterSessionServiceIntegrationTest {
                                 ? failure.error() + ": " + failure.detail()
                                 : "");
         return ((Result.Success<TeachingSessionCommitResult, CharacterSessionErrorCode>) result)
+                .value();
+    }
+
+    private static KnowledgeAcquisitionCommitResult acquisitionSuccess(
+            Result<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode> result) {
+        assertTrue(
+                result.isSuccess(),
+                () ->
+                        result
+                                        instanceof
+                                        Result.Failure<
+                                                        KnowledgeAcquisitionCommitResult,
+                                                        CharacterSessionErrorCode>
+                                                failure
+                                ? failure.error() + ": " + failure.detail()
+                                : "");
+        return ((Result.Success<KnowledgeAcquisitionCommitResult, CharacterSessionErrorCode>)
+                        result)
                 .value();
     }
 

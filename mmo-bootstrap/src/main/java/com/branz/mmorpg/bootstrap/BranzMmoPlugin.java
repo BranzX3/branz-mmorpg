@@ -42,6 +42,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private CharacterSessionController characterSessionController;
     private CombatSessionController combatSessionController;
     private LiveTeachingSessionController liveTeachingSessionController;
+    private KnowledgeAcquisitionController knowledgeAcquisitionController;
 
     @Override
     public void onEnable() {
@@ -550,6 +551,11 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         combatSessionController,
                         activeBuildEngine.get(),
                         snapshot.manifest().contentVersion());
+        knowledgeAcquisitionController =
+                new KnowledgeAcquisitionController(
+                        characterSessionController,
+                        activeBuildEngine.get(),
+                        snapshot.manifest().contentVersion());
         combatSessionController.setSuccessfulActionObserver(
                 liveTeachingSessionController::observeSuccessfulAction);
         ChronicleController chronicleController =
@@ -579,7 +585,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         sceneHubController,
                         characterSessionController,
                         combatSessionController,
-                        liveTeachingSessionController);
+                        liveTeachingSessionController,
+                        knowledgeAcquisitionController);
         getServer().getPluginManager().registerEvents(chronicleController, this);
         return null;
     }

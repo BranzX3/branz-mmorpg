@@ -1,6 +1,7 @@
 package com.branz.mmorpg.progression.build;
 
 import com.branz.mmorpg.api.identity.DefinitionId;
+import com.branz.mmorpg.progression.knowledge.KnowledgeAcquisitionPolicy;
 import java.util.Objects;
 import java.util.Set;
 
@@ -13,7 +14,8 @@ public record FormDefinition(
         double staminaCostMultiplier,
         double manaCostMultiplier,
         Set<String> tags,
-        Set<String> conflictsWithTags) {
+        Set<String> conflictsWithTags,
+        KnowledgeAcquisitionPolicy acquisition) {
     public FormDefinition {
         Objects.requireNonNull(id, "id");
         families = Set.copyOf(Objects.requireNonNull(families, "families"));
@@ -34,6 +36,10 @@ public record FormDefinition(
         tags = Set.copyOf(Objects.requireNonNull(tags, "tags"));
         conflictsWithTags =
                 Set.copyOf(Objects.requireNonNull(conflictsWithTags, "conflictsWithTags"));
+        acquisition = Objects.requireNonNull(acquisition, "acquisition");
+        if (!acquisition.target().id().equals(id)) {
+            throw new IllegalArgumentException("form acquisition target must match form ID");
+        }
     }
 
     public boolean supports(String weaponFamily) {

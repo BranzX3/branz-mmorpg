@@ -7,3 +7,8 @@ resource:
   stamina_cost_multiplier: 0.9
   mana_cost_multiplier: 1.15
 tags: [RANGED, MECHANICAL]
+acquisition:
+  source_type: WORLD_DISCOVERY
+  source: discovery.steady_crank_manual
+  mastery_discipline: crossbow
+  readiness: UNFAMILIAR

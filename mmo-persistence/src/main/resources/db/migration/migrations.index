@@ -5,3 +5,4 @@ V0003__audit_log.sql
 V0004__character_build_state.sql
 V0005__combat_progression_evidence.sql
 V0006__knowledge_teaching_and_renown.sql
+V0007__knowledge_acquisition_journal.sql

@@ -14,4 +14,7 @@ public interface KnowledgeProgressionRepository {
 
     Result<TeachingCommitExecution, KnowledgePersistenceErrorCode> commitTeaching(
             TeachingCommitRequest request);
+
+    Result<KnowledgeAcquisitionExecution, KnowledgePersistenceErrorCode> commitAcquisition(
+            KnowledgeAcquisitionRequest request);
 }

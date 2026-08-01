@@ -5,6 +5,8 @@ import com.branz.mmorpg.api.result.ErrorCode;
 public enum KnowledgePersistenceErrorCode implements ErrorCode {
     TEACHING_REQUEST_INVALID,
     TEACHING_SESSION_ID_CONFLICT,
+    ACQUISITION_REQUEST_INVALID,
+    ACQUISITION_ID_CONFLICT,
     RENOWN_DEED_ID_CONFLICT,
     KNOWLEDGE_ALREADY_LEARNED,
     KNOWLEDGE_STATE_INVALID,

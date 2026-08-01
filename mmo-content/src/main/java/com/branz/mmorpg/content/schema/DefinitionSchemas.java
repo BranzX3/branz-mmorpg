@@ -708,7 +708,50 @@ public final class DefinitionSchemas {
                                         false,
                                         1,
                                         null,
-                                        "Tags that make this form incompatible.")),
+                                        "Tags that make this form incompatible."),
+                                allowed(
+                                        "acquisition.source_type",
+                                        STRING,
+                                        Set.of(
+                                                "MENTOR",
+                                                "WORLD_DISCOVERY",
+                                                "BOSS_KNOWLEDGE",
+                                                "FACTION_QUEST"),
+                                        "",
+                                        "Server event family that can grant this Form."),
+                                required(
+                                        "acquisition.source",
+                                        STRING,
+                                        "",
+                                        "Stable server-owned acquisition source ID."),
+                                required(
+                                        "acquisition.mastery_discipline",
+                                        STRING,
+                                        "",
+                                        "Mastery discipline checked before learning."),
+                                allowed(
+                                        "acquisition.readiness",
+                                        STRING,
+                                        Set.of(
+                                                "UNFAMILIAR",
+                                                "DEVELOPING",
+                                                "RELIABLE",
+                                                "REFINED",
+                                                "EXCEPTIONAL"),
+                                        "",
+                                        "Minimum qualitative Mastery band."),
+                                array(
+                                        "acquisition.prerequisite_knowledge",
+                                        false,
+                                        1,
+                                        null,
+                                        "Permanent prerequisites encoded as TYPE:definition.id."),
+                                array(
+                                        "acquisition.world_flags",
+                                        false,
+                                        1,
+                                        null,
+                                        "Required durable world/trial flags.")),
                         List.of()));
         schemas.put(
                 DefinitionType.SPELL,
@@ -774,6 +817,49 @@ public final class DefinitionSchemas {
                                         1,
                                         null,
                                         "Tags that make this spell incompatible."),
+                                allowed(
+                                        "acquisition.source_type",
+                                        STRING,
+                                        Set.of(
+                                                "MENTOR",
+                                                "WORLD_DISCOVERY",
+                                                "BOSS_KNOWLEDGE",
+                                                "FACTION_QUEST"),
+                                        "",
+                                        "Server event family that can grant this Spell."),
+                                required(
+                                        "acquisition.source",
+                                        STRING,
+                                        "",
+                                        "Stable server-owned acquisition source ID."),
+                                required(
+                                        "acquisition.mastery_discipline",
+                                        STRING,
+                                        "",
+                                        "Mastery discipline checked before learning."),
+                                allowed(
+                                        "acquisition.readiness",
+                                        STRING,
+                                        Set.of(
+                                                "UNFAMILIAR",
+                                                "DEVELOPING",
+                                                "RELIABLE",
+                                                "REFINED",
+                                                "EXCEPTIONAL"),
+                                        "",
+                                        "Minimum qualitative Mastery band."),
+                                array(
+                                        "acquisition.prerequisite_knowledge",
+                                        false,
+                                        1,
+                                        null,
+                                        "Permanent prerequisites encoded as TYPE:definition.id."),
+                                array(
+                                        "acquisition.world_flags",
+                                        false,
+                                        1,
+                                        null,
+                                        "Required durable world/trial flags."),
                                 ranged(
                                         "cost.mana",
                                         INTEGER,

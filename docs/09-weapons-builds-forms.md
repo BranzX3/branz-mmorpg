@@ -47,6 +47,10 @@ A Form changes behavior, tradeoffs and branch relationships. Forms may alter sta
 
 Form changes require Rest Context, except techniques explicitly declared as combat form transitions. A combat transition has a timeline, resource cost and vulnerability.
 
+A Form must be permanently learned from its authored mentor, discovery, boss-knowledge or faction
+quest source before it can be selected. Knowing a compatible weapon family does not imply knowing
+its Forms. Build preview/commit and combat activation all enforce the same Knowledge gate.
+
 ## Attunement
 
 Attunement Capacity is visible and limits supernatural load. Spells, magical forms, summon contracts and supernatural item traits consume capacity. Mundane techniques do not.

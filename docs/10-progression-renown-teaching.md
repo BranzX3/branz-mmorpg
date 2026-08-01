@@ -201,7 +201,27 @@ already committed truth.
 Production build resolution requires a selected Technique to exist in permanent Knowledge. V0006
 grandfathers Technique/Form/Spell selections already committed before the migration by importing
 their stable IDs as `LEGACY_BUILD_BACKFILL`; it never infers knowledge from post-migration GUI state.
-Form and Spell learned-state gating remains with their authored acquisition-source slice.
+Form and Spell learned-state gating is supplied by the authored acquisition-source contract below.
+
+### Form and Spell acquisition contract
+
+Every Form and Spell authors exactly one source family and stable source ID plus permanent
+Knowledge, qualitative Mastery and optional durable world/trial prerequisites. The acquisition
+resolver first matches the server-observed source identity, then uses the same learning engine as
+teaching. A client command, item name or requested definition ID cannot substitute for a completed
+mentor/discovery/boss/quest event.
+
+Migration V0007 adds an immutable acquisition journal. One acquisition UUID binds character,
+Knowledge key, source type/source ID and content version. Exact replay returns the original grant;
+reusing the UUID for different input or trying to learn an already-owned key with a new UUID rejects
+and rolls back. The Character Knowledge row and journal row commit atomically, then the active
+Player Session reloads PostgreSQL truth before success is published.
+
+Production build preview, commit and combat activation require permanent Knowledge for selected
+Techniques, the active Form and every attuned Spell. The environment-gated
+`/mmo knowledge acquire <FORM|SPELL> <definition-id> [acquisition-uuid]` fixture simulates the
+authored source completion for local/integration verification; normal mentor, discovery, boss and
+quest adapters must call the same boundary with their own server event UUID.
 
 ### Live teaching action bridge
 

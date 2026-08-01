@@ -1831,3 +1831,38 @@ Flask/consumables/ailments, Rest Context and boss Flask snapshot remain.
 
 Schema/config/migration impact: no SQL or configuration change. Technique schema V1 adds three
 required progression-authoring fields. ADR 0020 owns the successful-action and live-session boundary.
+
+## Milestone 6 - permanent Form and Spell acquisition slice
+
+Implemented:
+
+- every authored Form and Spell declares a mentor/discovery/boss/quest source identity, qualitative
+  Mastery requirement and optional permanent Knowledge/world prerequisites;
+- the pure acquisition resolver rejects a mismatched source before evaluating the shared learning
+  requirements and never exposes numeric progression evidence;
+- production build preview/commit/combat resolution requires Knowledge for selected Techniques,
+  the active Form and every attuned Spell;
+- V0007 atomically stores `CONTENT_ACQUISITION` Knowledge and its immutable acquisition journal;
+- exact acquisition UUID replay, changed-input conflict, already-learned rejection, character lock
+  serialization and Player Session PostgreSQL reload are implemented;
+- the environment-gated `/mmo knowledge acquire` fixture exercises the authored source boundary
+  without making a production command into a normal learning source.
+
+Tests and completion evidence:
+
+- pure tests cover source mismatch, missing prerequisite Knowledge, qualitative readiness and
+  accepted acquisition;
+- build tests cover sequential Technique/Form/Spell Knowledge gates and compiled source policy;
+- migration/repository tests cover V0007, restart replay, UUID conflict and already-learned rollback;
+- bootstrap integration covers acquiring the Form/Spell chain, committing its build and restoring
+  Knowledge/build state after an embedded PostgreSQL restart;
+- the full build passes 537 tests with zero failures/errors (16 skipped), and Paper 26.2 admits
+  content `v1.milestone-1.example.3`, reaches the V0007 PostgreSQL-ready runtime and shuts down
+  cleanly.
+
+Milestone status: **Milestone 6 remains in progress.** Flask, consumable categories, six ailments,
+Rest Context allocation and boss Flask snapshot restore remain.
+
+Schema/config/migration impact: Form/Spell schema V1 adds required acquisition fields. Forward-only
+V0007 adds one journal table/index and extends the Knowledge source check. ADR 0021 owns the source,
+idempotency and build-gate boundary.

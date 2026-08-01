@@ -32,8 +32,8 @@ post-migration build edit.
 - student learning and teacher recognition cannot diverge during a successful transaction;
 - a fourth identical daily deed may still teach but awards zero Renown;
 - old committed builds remain valid, while new Technique selection requires learning;
-- Form/Spell knowledge is persisted/backfilled now, but their acquisition gates wait for authored
-  source delivery.
+- Form/Spell knowledge is persisted/backfilled here; ADR 0021 subsequently owns their authored
+  acquisition source and production build gates.
 
 ## Failure and recovery
 

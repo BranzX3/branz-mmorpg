@@ -478,6 +478,26 @@ teacher as the live student (that character does not own it).
      `/mmo teaching cancel`, separation beyond 16 blocks, disconnect and ten-minute expiry. Each
      must remove the session without Knowledge or Renown.
 
+The Form/Spell acquisition fixture is available only when development tools are enabled and the
+player has `branzmmo.dev`. It resolves the policy authored in the active content snapshot; it does
+not accept a caller-selected source identity.
+
+125. On a fresh character at Rest Context, try to select `form.iron_root` with a Greatsword and
+     commit. Verify `BUILD_KNOWLEDGE_REQUIRED`; owning/equipping the weapon must not teach the Form.
+126. Choose an acquisition UUID and run
+     `/mmo knowledge acquire FORM form.iron_root <uuid>`. Verify `Knowledge learned`, then repeat
+     the exact command and verify `Knowledge replay confirmed` with only one Knowledge/journal row.
+127. Repeat the same Form with a new UUID. Verify `KNOWLEDGE_ALREADY_LEARNED` and no new row. Reopen
+     Chronicle, select Iron Root and verify the build now commits at Rest Context.
+128. Run `/mmo knowledge acquire SPELL spell.ember.cinder_snap <uuid>` on a fresh acquisition UUID.
+     Equip a Staff, attune Cinder Snap and verify the cast becomes available. Disconnect/reconnect
+     and restart Paper; both learned keys and the prepared build must return.
+129. With Cinder Snap learned but Staff Mastery still Unfamiliar, run
+     `/mmo knowledge acquire SPELL spell.ember.fire_lance <uuid>`. Verify
+     `MASTERY_NOT_READY: mastery.staff>=DEVELOPING` and no durable grant.
+130. In a PostgreSQL integration fixture, reuse the Form acquisition UUID for a different Spell or
+     character. Verify `ACQUISITION_ID_CONFLICT` and atomic rollback.
+
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded
 mode is rejected outside `LOCAL` and `INTEGRATION`.

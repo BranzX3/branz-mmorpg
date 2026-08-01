@@ -96,6 +96,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final CharacterSessionController characterSessions;
     private final CombatSessionController combatSessions;
     private final LiveTeachingSessionController liveTeaching;
+    private final KnowledgeAcquisitionController knowledgeAcquisition;
     private final CombatTraceFileExporter traceExporter;
     private final ProgressionEvidenceEngine progressionEvidence = new ProgressionEvidenceEngine();
     private final TeachingSessionEngine teachingEngine = new TeachingSessionEngine();
@@ -112,7 +113,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
             SceneHubController sceneHub,
             CharacterSessionController characterSessions,
             CombatSessionController combatSessions,
-            LiveTeachingSessionController liveTeaching) {
+            LiveTeachingSessionController liveTeaching,
+            KnowledgeAcquisitionController knowledgeAcquisition) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.packGate = Objects.requireNonNull(packGate, "packGate");
@@ -123,6 +125,8 @@ final class MmoCommandController implements CommandExecutor, Listener {
         this.characterSessions = Objects.requireNonNull(characterSessions, "characterSessions");
         this.combatSessions = Objects.requireNonNull(combatSessions, "combatSessions");
         this.liveTeaching = Objects.requireNonNull(liveTeaching, "liveTeaching");
+        this.knowledgeAcquisition =
+                Objects.requireNonNull(knowledgeAcquisition, "knowledgeAcquisition");
         traceExporter =
                 new CombatTraceFileExporter(
                         plugin.getDataFolder().toPath().resolve("combat-traces"));
@@ -163,8 +167,52 @@ final class MmoCommandController implements CommandExecutor, Listener {
             handleRenownTool(sender, args);
             return true;
         }
-        sender.sendMessage("Usage: /mmo <health|dev|combat|progression|teaching|renown>");
+        if ("knowledge".equalsIgnoreCase(args[0])) {
+            handleKnowledgeTool(sender, args);
+            return true;
+        }
+        sender.sendMessage("Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge>");
         return true;
+    }
+
+    private void handleKnowledgeTool(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Knowledge Lab requires an in-game player.");
+            return;
+        }
+        if (!devToolsAllowed(player)) {
+            player.sendMessage(
+                    Component.text(
+                            "Knowledge Lab is disabled for this environment/account.",
+                            NamedTextColor.RED));
+            return;
+        }
+        if (args.length >= 4 && "acquire".equalsIgnoreCase(args[1])) {
+            KnowledgeType type;
+            try {
+                type = KnowledgeType.valueOf(args[2].toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException exception) {
+                knowledgeUsage(player);
+                return;
+            }
+            if (type != KnowledgeType.FORM && type != KnowledgeType.SPELL) {
+                knowledgeUsage(player);
+                return;
+            }
+            UUID acquisitionId = parseUuid(player, args, 4, "Acquisition");
+            if (acquisitionId == null) {
+                return;
+            }
+            try {
+                knowledgeAcquisition.completeAuthoredFixture(
+                        player, new KnowledgeKey(type, DefinitionId.of(args[3])), acquisitionId);
+            } catch (IllegalArgumentException exception) {
+                player.sendMessage(
+                        Component.text("Knowledge definition ID is invalid.", NamedTextColor.RED));
+            }
+            return;
+        }
+        knowledgeUsage(player);
     }
 
     private void handleTeachingTool(CommandSender sender, String[] args) {
@@ -1035,6 +1083,11 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private static void renownUsage(Player player) {
         player.sendMessage(
                 "Usage: /mmo renown simulate <fresh|repeat-1|repeat-2|exhausted|duplicate>");
+    }
+
+    private static void knowledgeUsage(Player player) {
+        player.sendMessage(
+                "Usage: /mmo knowledge acquire <FORM|SPELL> <definition-id> [acquisition-uuid]");
     }
 
     private void recordProgressionEvidence(Player player, String scenario, UUID evidenceId) {

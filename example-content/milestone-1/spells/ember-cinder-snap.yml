@@ -15,3 +15,8 @@ direct: {range: 6.0, maximum_targets: 1}
 output: {arcane_school: FIRE, power_coefficient: 0.45, posture: 4, guard_pressure: 3}
 presentation: {archetype: EMBER_CINDER_SNAP}
 profiles: {pve_multiplier: 1.0, pvp_multiplier: 0.65}
+acquisition:
+  source_type: MENTOR
+  source: mentor.ember.cinder_snap
+  mastery_discipline: staff
+  readiness: UNFAMILIAR

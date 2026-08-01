@@ -7,3 +7,8 @@ resource:
   stamina_cost_multiplier: 0.9
   mana_cost_multiplier: 1.2
 tags: [MARTIAL]
+acquisition:
+  source_type: MENTOR
+  source: mentor.martial.iron_root
+  mastery_discipline: greatsword
+  readiness: UNFAMILIAR

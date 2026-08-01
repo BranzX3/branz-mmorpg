@@ -65,21 +65,43 @@ class BuildEngineTest {
     }
 
     @Test
-    void productionResolutionRequiresPermanentTechniqueKnowledge() {
+    void productionResolutionRequiresPermanentTechniqueFormAndSpellKnowledge() {
         BuildEngine engine = engine();
         CharacterBuild build =
-                CharacterBuild.initial()
-                        .withTechnique(MovesetBranch.PRIMARY_1, Optional.of(STAFF_TECHNIQUE));
+                new CharacterBuild(
+                        Map.of(MovesetBranch.PRIMARY_1, STAFF_TECHNIQUE),
+                        Optional.of(EMBER_FORM),
+                        Set.of(FIRE_LANCE),
+                        6);
 
         Result<BuildResolution, BuildErrorCode> missing = engine.resolve(build, "STAFF", Set.of());
-        Result<BuildResolution, BuildErrorCode> learned =
+        Result<BuildResolution, BuildErrorCode> onlyTechnique =
                 engine.resolve(
                         build,
                         "STAFF",
                         Set.of(new KnowledgeKey(KnowledgeType.TECHNIQUE, STAFF_TECHNIQUE)));
+        Result<BuildResolution, BuildErrorCode> techniqueAndForm =
+                engine.resolve(
+                        build,
+                        "STAFF",
+                        Set.of(
+                                new KnowledgeKey(KnowledgeType.TECHNIQUE, STAFF_TECHNIQUE),
+                                new KnowledgeKey(KnowledgeType.FORM, EMBER_FORM)));
+        Result<BuildResolution, BuildErrorCode> learned =
+                engine.resolve(
+                        build,
+                        "STAFF",
+                        Set.of(
+                                new KnowledgeKey(KnowledgeType.TECHNIQUE, STAFF_TECHNIQUE),
+                                new KnowledgeKey(KnowledgeType.FORM, EMBER_FORM),
+                                new KnowledgeKey(KnowledgeType.SPELL, FIRE_LANCE)));
 
         assertFalse(missing.isSuccess());
         assertEquals(BuildErrorCode.BUILD_KNOWLEDGE_REQUIRED, failure(missing));
+        assertFalse(onlyTechnique.isSuccess());
+        assertEquals(BuildErrorCode.BUILD_KNOWLEDGE_REQUIRED, failure(onlyTechnique));
+        assertFalse(techniqueAndForm.isSuccess());
+        assertEquals(BuildErrorCode.BUILD_KNOWLEDGE_REQUIRED, failure(techniqueAndForm));
         assertTrue(learned.isSuccess());
     }
 
@@ -143,6 +165,20 @@ class BuildEngineTest {
         assertEquals(ReadinessBand.UNFAMILIAR, staff.teachingReadiness());
         assertEquals(4, engine.forms().size());
         assertEquals(5, engine.attunableEffects().size());
+        assertEquals(
+                DefinitionId.of("mentor.ember.ember_channel"),
+                engine.acquisition(new KnowledgeKey(KnowledgeType.FORM, EMBER_FORM))
+                        .orElseThrow()
+                        .sourceId());
+        assertEquals(
+                ReadinessBand.DEVELOPING,
+                engine.acquisition(new KnowledgeKey(KnowledgeType.SPELL, FIRE_LANCE))
+                        .orElseThrow()
+                        .requirements()
+                        .readiness()
+                        .get(
+                                com.branz.mmorpg.progression.evidence.ProgressionTrack.mastery(
+                                        "staff")));
         return engine;
     }
 

@@ -8,3 +8,9 @@ resource:
   mana_cost_multiplier: 0.85
 tags: [EMBER]
 conflicts_with_tags: [FROST]
+acquisition:
+  source_type: MENTOR
+  source: mentor.ember.ember_channel
+  mastery_discipline: staff
+  readiness: DEVELOPING
+  prerequisite_knowledge: ["SPELL:spell.ember.cinder_snap"]

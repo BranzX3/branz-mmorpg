@@ -21,6 +21,7 @@ import com.branz.mmorpg.worldloop.encounter.EncounterParticipantStatus;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -62,6 +63,7 @@ final class BossEncounterController implements Listener {
     private final Map<CharacterId, EncounterId> recentEncounterByParticipant = new HashMap<>();
     private final Map<EncounterId, ResetProgress> resets = new HashMap<>();
     private final Set<EncounterId> preparing = new HashSet<>();
+    private Function<Player, List<Player>> partyParticipantResolver = player -> List.of(player);
     private int graceTaskId = -1;
     private boolean recoveryReady;
 
@@ -130,6 +132,10 @@ final class BossEncounterController implements Listener {
             case "rewards" -> reconcileRewards(actor, args);
             default -> usage(actor);
         }
+    }
+
+    void setPartyParticipantResolver(Function<Player, List<Player>> resolver) {
+        partyParticipantResolver = Objects.requireNonNull(resolver, "resolver");
     }
 
     void onCharacterReady(Player player) {
@@ -224,7 +230,7 @@ final class BossEncounterController implements Listener {
         }
         LinkedHashSet<Player> players = new LinkedHashSet<>();
         if (args.length == 3) {
-            players.add(actor);
+            players.addAll(partyParticipantResolver.apply(actor));
         } else {
             for (int index = 3; index < args.length; index++) {
                 Player participant = plugin.getServer().getPlayerExact(args[index]);
@@ -850,6 +856,14 @@ final class BossEncounterController implements Listener {
 
     Optional<PartyEncounterContext> partyEncounter(EncounterId encounterId) {
         return partyEncounter(active.get(Objects.requireNonNull(encounterId, "encounterId")));
+    }
+
+    List<PartyEncounterContext> activePartyEncounters() {
+        return active.values().stream()
+                .map(BossEncounterController::partyEncounter)
+                .flatMap(Optional::stream)
+                .sorted(Comparator.comparing(context -> context.encounterId().value()))
+                .toList();
     }
 
     boolean recoveryReady() {

@@ -144,7 +144,9 @@ downed path is ready for restart acceptance; general party membership is the nex
 
 The pure party kernel now owns five-member capacity, invitation lifecycle, leader transfer,
 five-minute reconnect grace, leave/kick/disband and bounded ready checks with operation replay.
-Live commands, durable recovery and boss encounter binding are the next party slices.
+The live Paper adapter now exposes those transitions through `/mmo party`, binds ready online party
+members to boss admission and reconstructs membership only for active durable checkpoint encounters.
+The party/boss flow is ready for in-game acceptance; LFG is the next social slice.
 
 ## Milestone 8 — Lifeskill kernel
 

@@ -697,6 +697,22 @@ live inventory, change Bukkit resources or write PostgreSQL.
 193. Start a ready check, collect mixed responses and verify the final result is false only after all
      members answer. Start another and expire it at 600 ticks. Replay operation UUIDs and verify no
      duplicate membership/ready effect; reuse one UUID across command kinds and verify failure.
+194. Join with two ready players. Run `/mmo party create`, invite the second player and accept using
+     the displayed party UUID. Verify `/mmo party status` reports the same leader and two members on
+     both clients; decline and invite-expiry paths must not add a member.
+195. As leader run `/mmo party ready`, answer yes/no from both players and verify the final result is
+     broadcast only after every member responds. Start another check, then disconnect a member and
+     verify the stale check is cancelled.
+196. Transfer leadership, kick/reinvite a member and leave as leader. Verify authority follows the
+     current leader, automatic leadership uses earliest join order and the last leave disbands the
+     party. Reconnect before five minutes to preserve membership; allow grace to expire to remove it.
+197. With two ready online party members run `/mmo encounter start <new-uuid>` without player names.
+     Verify both members enter the same attempt and a disconnected or unready party member is not
+     admitted to a newly started encounter.
+198. Stop Paper during that active encounter and restart against the same embedded PostgreSQL
+     directory. Verify boss recovery completes first, `/mmo party status` reconstructs the checkpoint
+     membership, online members reconnect and absent members retain the five-minute grace. A party
+     that was not in an active checkpoint must not survive restart.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

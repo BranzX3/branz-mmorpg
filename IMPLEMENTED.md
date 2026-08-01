@@ -2409,3 +2409,32 @@ Milestone status: **Milestone 7 remains in progress.** Live party commands, dura
 boss binding, LFG, personal rewards, Death Pouch and PvP remain.
 
 Schema/config/migration impact: none. ADR 0035 owns party kernel semantics.
+
+## Milestone 7 - live party and boss binding slice
+
+Implemented:
+
+- `/mmo party` exposes create/status, invite/accept/decline, leader transfer, kick, leave and
+  ready-check commands through the deterministic party kernel;
+- character readiness gates membership operations, quit enters five-minute grace and Player Session
+  readiness reconnects a returning member;
+- a one-second main-thread clock advances invitation, ready-check and reconnect deadlines;
+- `/mmo encounter start <uuid>` admits the actor's ready online party members in stable UUID order,
+  while explicit lab participants remain supported;
+- after durable boss recovery, active multi-player checkpoints reconstruct one deterministic party;
+  unavailable members enter reconnect grace and ordinary parties intentionally do not survive restart.
+
+Tests and completion evidence:
+
+- party kernel tests cover every state transition used by the live adapter;
+- full repository build and Paper startup/shutdown smoke cover command/controller wiring, recovery
+  ordering and clean lifecycle shutdown.
+
+Failure/recovery behavior: failed party transitions mutate nothing. Boss admission retains its
+participant locking and durable V0009/V0010 ordering. Checkpoint reconstruction uses only the
+durable encounter participant set and cannot restore unrelated process-local parties.
+
+Milestone status: **Milestone 7 remains in progress.** Live party membership and checkpoint recovery
+are ready for in-game acceptance; LFG, personal rewards, Death Pouch and PvP remain.
+
+Schema/config/migration impact: none. ADR 0036 owns live party and boss binding semantics.

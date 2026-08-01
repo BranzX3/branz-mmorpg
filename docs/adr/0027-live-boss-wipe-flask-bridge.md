@@ -45,9 +45,9 @@ fixture. Actual reward grants remain owned by the personal-reward slice.
 
 An unavailable Player Session, stale mutation or database failure cannot advance reset. Retriable
 failures remain pending and use the same derived restore operation. Missing or mismatched Flask
-snapshots block visibly. Encounter runtime and reset progress are intentionally process-local in
-this slice; a restart clears the lab runtime, while already committed character Flask values remain
-durable. Persisted encounter recovery is the next Milestone 7 boundary.
+snapshots block visibly. Encounter runtime and reset progress were process-local in this slice; ADR
+0029 supersedes that limitation with V0009 persist-before-effect recovery. Already committed
+character Flask values remain durable in either design.
 
 ## Migration impact
 

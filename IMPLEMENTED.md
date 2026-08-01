@@ -2198,3 +2198,39 @@ Milestone status: **Milestone 7 remains in progress.** The live controller must 
 boundary and resume pending reset/victory work before restart behavior is complete.
 
 Schema/config/migration impact: forward-only V0009. ADR 0028 owns the record and repository contract.
+
+## Milestone 7 - restart-safe live boss encounter slice
+
+Implemented:
+
+- canonical V1 encounter JSON round-trips all kernel identity, participant availability, processed
+  operation, reset and reward fields while reconstructing record invariants on decode;
+- one asynchronous FIFO per encounter recalculates queued events from the latest acknowledged state,
+  preventing simultaneous deaths or disconnects from overwriting each other;
+- every lifecycle transition compare-and-sets V0009 before messages, Flask restore, next-attempt
+  activation, health refresh or participant-lock release;
+- startup blocks lab commands while it loads all recoverable records, re-registers participant locks
+  and resumes wipe, reset or victory work from the durable phase;
+- active restart recovery preserves defeated participants and rebases all other availability to a
+  fresh 1,200-tick disconnect grace on the new Paper clock;
+- recovered reset retries every deterministic Flask operation, treats already-restored state as
+  acknowledged and persists reset completion before announcing the next attempt.
+
+Tests and completion evidence:
+
+- codec tests cover canonical resetting-state round trip, unknown schema and reconstructed invariant
+  rejection;
+- world-loop tests cover restart grace rebasing and exact recovery-operation replay;
+- existing repository integration covers V0009 optimistic replay/recovery behavior;
+- full repository build and Paper smoke startup cover the activated repository graph, recovery scan,
+  controller registration and clean shutdown.
+
+Failure/recovery behavior: DB failure retains the queue head and publishes no new phase/effect.
+Invalid recovery JSON fails closed. Missing Flask snapshot leaves reset blocked rather than starting
+an unacknowledged attempt.
+
+Milestone status: **Milestone 7 remains in progress.** Personal rewards, Death Pouch, party/LFG,
+downed/revive and PvP hooks remain; the boss wipe/retry persistence boundary is ready for in-game
+restart acceptance.
+
+Schema/config/migration impact: none beyond existing V0009. ADR 0029 owns live recovery ordering.

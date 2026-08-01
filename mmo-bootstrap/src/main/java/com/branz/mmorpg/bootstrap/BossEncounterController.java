@@ -8,6 +8,9 @@ import com.branz.mmorpg.combat.resource.BossFlaskCheckpointEngine;
 import com.branz.mmorpg.combat.resource.FlaskCheckpointErrorCode;
 import com.branz.mmorpg.combat.resource.FlaskState;
 import com.branz.mmorpg.combat.resource.PreparedFlaskSnapshot;
+import com.branz.mmorpg.persistence.transaction.BossEncounterStateRecord;
+import com.branz.mmorpg.persistence.transaction.BossEncounterStateRepository;
+import com.branz.mmorpg.persistence.transaction.TransactionErrorCode;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterEngine;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterErrorCode;
 import com.branz.mmorpg.worldloop.encounter.BossEncounterPhase;
@@ -16,6 +19,7 @@ import com.branz.mmorpg.worldloop.encounter.BossEncounterTransition;
 import com.branz.mmorpg.worldloop.encounter.EncounterParticipant;
 import com.branz.mmorpg.worldloop.encounter.EncounterParticipantStatus;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.attribute.Attribute;
@@ -45,24 +50,31 @@ final class BossEncounterController implements Listener {
     private final CharacterSessionController characterSessions;
     private final FlaskHotbarController flaskHotbar;
     private final String contentVersion;
+    private final DurableBossEncounterStore durableStore;
     private final BossEncounterEngine encounters = new BossEncounterEngine();
     private final BossFlaskCheckpointEngine flaskCheckpoints = new BossFlaskCheckpointEngine();
     private final Map<EncounterId, BossEncounterRuntime> active = new HashMap<>();
+    private final Map<EncounterId, BossEncounterStateRecord> durableRecords = new HashMap<>();
+    private final Map<EncounterId, ArrayDeque<PendingMutation>> mutationQueues = new HashMap<>();
+    private final Set<EncounterId> mutationInFlight = new HashSet<>();
     private final Map<CharacterId, EncounterId> encounterByParticipant = new HashMap<>();
     private final Map<CharacterId, EncounterId> recentEncounterByParticipant = new HashMap<>();
     private final Map<EncounterId, ResetProgress> resets = new HashMap<>();
     private final Set<EncounterId> preparing = new HashSet<>();
     private int graceTaskId = -1;
+    private boolean recoveryReady;
 
     BossEncounterController(
             JavaPlugin plugin,
             CharacterSessionController characterSessions,
             FlaskHotbarController flaskHotbar,
+            BossEncounterStateRepository encounterStates,
             String contentVersion) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characterSessions = Objects.requireNonNull(characterSessions, "characterSessions");
         this.flaskHotbar = Objects.requireNonNull(flaskHotbar, "flaskHotbar");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
+        durableStore = new DurableBossEncounterStore(encounterStates, contentVersion);
     }
 
     void start() {
@@ -70,6 +82,15 @@ final class BossEncounterController implements Listener {
                 plugin.getServer()
                         .getScheduler()
                         .scheduleSyncRepeatingTask(plugin, this::advanceGrace, 20L, 20L);
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<List<StoredBossEncounter>, TransactionErrorCode> recovered =
+                                    durableStore.recoverable();
+                            runSyncIfEnabled(() -> completeRecovery(recovered));
+                        });
     }
 
     void shutdown() {
@@ -78,13 +99,22 @@ final class BossEncounterController implements Listener {
             graceTaskId = -1;
         }
         preparing.clear();
+        mutationInFlight.clear();
+        mutationQueues.clear();
+        durableRecords.clear();
         resets.clear();
         encounterByParticipant.clear();
         recentEncounterByParticipant.clear();
         active.clear();
+        recoveryReady = false;
     }
 
     void handleCommand(Player actor, String[] args) {
+        if (!recoveryReady) {
+            actor.sendMessage(
+                    Component.text("Encounter recovery is still loading.", NamedTextColor.YELLOW));
+            return;
+        }
         if (args.length < 2) {
             usage(actor);
             return;
@@ -117,13 +147,16 @@ final class BossEncounterController implements Listener {
                 && participant != null
                 && (participant.status() == EncounterParticipantStatus.DISCONNECTED_GRACE
                         || participant.status() == EncounterParticipantStatus.OUTSIDE_GRACE)) {
-            apply(
-                    runtime,
-                    encounters.reconnect(
-                            runtime,
-                            characterId,
-                            UUID.randomUUID(),
-                            plugin.getServer().getCurrentTick()),
+            UUID operationId = UUID.randomUUID();
+            mutate(
+                    runtime.encounterId(),
+                    operationId,
+                    current ->
+                            encounters.reconnect(
+                                    current,
+                                    characterId,
+                                    operationId,
+                                    plugin.getServer().getCurrentTick()),
                     "rejoined the encounter");
         }
     }
@@ -135,13 +168,16 @@ final class BossEncounterController implements Listener {
         if (runtime == null || runtime.phase() != BossEncounterPhase.ACTIVE) {
             return;
         }
-        apply(
-                runtime,
-                encounters.disconnect(
-                        runtime,
-                        characterId,
-                        UUID.randomUUID(),
-                        plugin.getServer().getCurrentTick()),
+        UUID operationId = UUID.randomUUID();
+        mutate(
+                runtime.encounterId(),
+                operationId,
+                current ->
+                        encounters.disconnect(
+                                current,
+                                characterId,
+                                operationId,
+                                plugin.getServer().getCurrentTick()),
                 "entered reconnect grace");
     }
 
@@ -153,13 +189,16 @@ final class BossEncounterController implements Listener {
         if (runtime == null || runtime.phase() != BossEncounterPhase.ACTIVE) {
             return;
         }
-        apply(
-                runtime,
-                encounters.defeat(
-                        runtime,
-                        characterId,
-                        UUID.randomUUID(),
-                        plugin.getServer().getCurrentTick()),
+        UUID operationId = UUID.randomUUID();
+        mutate(
+                runtime.encounterId(),
+                operationId,
+                current ->
+                        encounters.defeat(
+                                current,
+                                characterId,
+                                operationId,
+                                plugin.getServer().getCurrentTick()),
                 "was defeated");
     }
 
@@ -286,9 +325,9 @@ final class BossEncounterController implements Listener {
                                 encounterId.value(),
                                 participantIds,
                                 plugin.getServer().getCurrentTick());
-        preparing.remove(encounterId);
         if (started
                 instanceof Result.Failure<BossEncounterRuntime, BossEncounterErrorCode> failure) {
+            preparing.remove(encounterId);
             actor.sendMessage(
                     Component.text(
                             "Encounter start failed: " + failure.detail(), NamedTextColor.RED));
@@ -296,18 +335,48 @@ final class BossEncounterController implements Listener {
         }
         BossEncounterRuntime runtime =
                 ((Result.Success<BossEncounterRuntime, BossEncounterErrorCode>) started).value();
-        active.put(encounterId, runtime);
-        for (CharacterId participantId : participantIds) {
-            encounterByParticipant.put(participantId, encounterId);
-            recentEncounterByParticipant.put(participantId, encounterId);
-        }
-        broadcast(
-                runtime,
-                Component.text(
-                        "Boss encounter ACTIVE | id="
-                                + encounterId.value()
-                                + " | attempt=1 | Flask checkpoint captured",
-                        NamedTextColor.GREEN));
+        UUID startOperation = operation(encounterId, "state-start", null, 1);
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<StoredBossEncounter, TransactionErrorCode> committed =
+                                    durableStore.create(runtime, startOperation);
+                            runSyncIfEnabled(
+                                    () -> {
+                                        preparing.remove(encounterId);
+                                        if (committed
+                                                instanceof
+                                                Result.Failure<
+                                                                StoredBossEncounter,
+                                                                TransactionErrorCode>
+                                                        failure) {
+                                            actor.sendMessage(
+                                                    Component.text(
+                                                            "Encounter state commit failed: "
+                                                                    + failure.error().code()
+                                                                    + " "
+                                                                    + failure.detail(),
+                                                            NamedTextColor.RED));
+                                            return;
+                                        }
+                                        StoredBossEncounter stored =
+                                                ((Result.Success<
+                                                                        StoredBossEncounter,
+                                                                        TransactionErrorCode>)
+                                                                committed)
+                                                        .value();
+                                        install(stored);
+                                        broadcast(
+                                                stored.runtime(),
+                                                Component.text(
+                                                        "Boss encounter ACTIVE | id="
+                                                                + encounterId.value()
+                                                                + " | attempt=1 | Flask checkpoint captured and state committed",
+                                                        NamedTextColor.GREEN));
+                                    });
+                        });
     }
 
     private void failPreparation(Player actor, EncounterId encounterId, String detail) {
@@ -336,21 +405,22 @@ final class BossEncounterController implements Listener {
                     Component.text("Player is not in an active encounter.", NamedTextColor.RED));
             return;
         }
-        Result<BossEncounterTransition, BossEncounterErrorCode> result =
-                command == AvailabilityCommand.DEFEAT
-                        ? encounters.defeat(
-                                runtime,
-                                targetId,
-                                UUID.randomUUID(),
-                                plugin.getServer().getCurrentTick())
-                        : encounters.leaveBoundary(
-                                runtime,
-                                targetId,
-                                UUID.randomUUID(),
-                                plugin.getServer().getCurrentTick());
-        apply(
-                runtime,
-                result,
+        UUID operationId = UUID.randomUUID();
+        mutate(
+                runtime.encounterId(),
+                operationId,
+                current ->
+                        command == AvailabilityCommand.DEFEAT
+                                ? encounters.defeat(
+                                        current,
+                                        targetId,
+                                        operationId,
+                                        plugin.getServer().getCurrentTick())
+                                : encounters.leaveBoundary(
+                                        current,
+                                        targetId,
+                                        operationId,
+                                        plugin.getServer().getCurrentTick()),
                 command == AvailabilityCommand.DEFEAT
                         ? target.getName() + " was defeated"
                         : target.getName() + " entered boundary grace");
@@ -362,9 +432,11 @@ final class BossEncounterController implements Listener {
             actor.sendMessage(Component.text("No active encounter.", NamedTextColor.RED));
             return;
         }
-        apply(
-                runtime,
-                encounters.confirmVictory(runtime, UUID.randomUUID()),
+        UUID operationId = UUID.randomUUID();
+        mutate(
+                runtime.encounterId(),
+                operationId,
+                current -> encounters.confirmVictory(current, operationId),
                 "victory frozen; reward reconciliation pending");
     }
 
@@ -375,10 +447,13 @@ final class BossEncounterController implements Listener {
             actor.sendMessage(Component.text("No active encounter.", NamedTextColor.RED));
             return;
         }
-        apply(
-                runtime,
-                encounters.reconnect(
-                        runtime, actorId, UUID.randomUUID(), plugin.getServer().getCurrentTick()),
+        UUID operationId = UUID.randomUUID();
+        mutate(
+                runtime.encounterId(),
+                operationId,
+                current ->
+                        encounters.reconnect(
+                                current, actorId, operationId, plugin.getServer().getCurrentTick()),
                 actor.getName() + " rejoined the encounter");
     }
 
@@ -396,25 +471,12 @@ final class BossEncounterController implements Listener {
                     Component.text("Reward grant ID must be a UUID.", NamedTextColor.RED));
             return;
         }
-        Result<BossEncounterTransition, BossEncounterErrorCode> result =
-                encounters.reconcileRewards(runtime, UUID.randomUUID(), grantId);
-        if (result
-                instanceof
-                Result.Failure<BossEncounterTransition, BossEncounterErrorCode> failure) {
-            actor.sendMessage(
-                    Component.text(
-                            failure.error().code() + ": " + failure.detail(), NamedTextColor.RED));
-            return;
-        }
-        BossEncounterTransition transition =
-                ((Result.Success<BossEncounterTransition, BossEncounterErrorCode>) result).value();
-        active.put(runtime.encounterId(), transition.runtime());
-        broadcast(
-                transition.runtime(),
-                Component.text(
-                        "Encounter COMPLETED | empty lab reward grant=" + grantId,
-                        NamedTextColor.GREEN));
-        transition.runtime().participants().keySet().forEach(encounterByParticipant::remove);
+        UUID operationId = UUID.randomUUID();
+        mutate(
+                runtime.encounterId(),
+                operationId,
+                current -> encounters.reconcileRewards(current, operationId, grantId),
+                "empty lab reward grant committed=" + grantId);
     }
 
     private void showStatus(Player actor) {
@@ -466,95 +528,186 @@ final class BossEncounterController implements Listener {
             if (runtime.phase() != BossEncounterPhase.ACTIVE) {
                 continue;
             }
-            Result<BossEncounterTransition, BossEncounterErrorCode> result =
-                    encounters.advanceGrace(runtime, UUID.randomUUID(), tick);
-            if (result
-                            instanceof
-                            Result.Success<BossEncounterTransition, BossEncounterErrorCode> success
-                    && success.value().changed()) {
-                acceptTransition(runtime, success.value(), "participant grace expired");
-            }
+            UUID operationId = UUID.randomUUID();
+            mutate(
+                    runtime.encounterId(),
+                    operationId,
+                    current -> encounters.advanceGrace(current, operationId, tick),
+                    "participant grace expired");
         }
     }
 
-    private void apply(
-            BossEncounterRuntime expected,
-            Result<BossEncounterTransition, BossEncounterErrorCode> result,
+    private void mutate(
+            EncounterId encounterId,
+            UUID operationId,
+            Function<BossEncounterRuntime, Result<BossEncounterTransition, BossEncounterErrorCode>>
+                    mutation,
             String description) {
+        mutate(encounterId, operationId, mutation, description, false);
+    }
+
+    private void mutate(
+            EncounterId encounterId,
+            UUID operationId,
+            Function<BossEncounterRuntime, Result<BossEncounterTransition, BossEncounterErrorCode>>
+                    mutation,
+            String description,
+            boolean resumeOnlineParticipants) {
+        mutationQueues
+                .computeIfAbsent(encounterId, ignored -> new ArrayDeque<>())
+                .addLast(
+                        new PendingMutation(
+                                operationId, mutation, description, resumeOnlineParticipants));
+        drainMutations(encounterId);
+    }
+
+    private void drainMutations(EncounterId encounterId) {
+        ArrayDeque<PendingMutation> queue = mutationQueues.get(encounterId);
+        if (queue == null || queue.isEmpty() || !mutationInFlight.add(encounterId)) {
+            return;
+        }
+        BossEncounterRuntime current = active.get(encounterId);
+        BossEncounterStateRecord record = durableRecords.get(encounterId);
+        PendingMutation pending = queue.getFirst();
+        if (current == null || record == null) {
+            mutationInFlight.remove(encounterId);
+            queue.removeFirst();
+            drainMutations(encounterId);
+            return;
+        }
+        Result<BossEncounterTransition, BossEncounterErrorCode> result =
+                pending.mutation().apply(current);
         if (result
                 instanceof
                 Result.Failure<BossEncounterTransition, BossEncounterErrorCode> failure) {
-            Player participant = firstOnline(expected);
+            mutationInFlight.remove(encounterId);
+            queue.removeFirst();
+            Player participant = firstOnline(current);
             if (participant != null) {
                 participant.sendMessage(
                         Component.text(
                                 failure.error().code() + ": " + failure.detail(),
                                 NamedTextColor.RED));
             }
+            drainMutations(encounterId);
             return;
         }
         BossEncounterTransition transition =
                 ((Result.Success<BossEncounterTransition, BossEncounterErrorCode>) result).value();
-        if (transition.changed()) {
-            acceptTransition(expected, transition, description);
-        }
-    }
-
-    private void acceptTransition(
-            BossEncounterRuntime expected, BossEncounterTransition transition, String description) {
-        BossEncounterRuntime current = active.get(expected.encounterId());
-        if (current != expected) {
+        if (!transition.changed()) {
+            mutationInFlight.remove(encounterId);
+            queue.removeFirst();
+            drainMutations(encounterId);
             return;
         }
-        BossEncounterRuntime updated = transition.runtime();
-        active.put(updated.encounterId(), updated);
+        StoredBossEncounter expected = new StoredBossEncounter(current, record);
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<StoredBossEncounter, TransactionErrorCode> committed =
+                                    durableStore.replace(
+                                            expected, transition.runtime(), pending.operationId());
+                            runSyncIfEnabled(
+                                    () ->
+                                            completeMutation(
+                                                    encounterId, pending, transition, committed));
+                        });
+    }
+
+    private void completeMutation(
+            EncounterId encounterId,
+            PendingMutation pending,
+            BossEncounterTransition transition,
+            Result<StoredBossEncounter, TransactionErrorCode> committed) {
+        mutationInFlight.remove(encounterId);
+        ArrayDeque<PendingMutation> queue = mutationQueues.get(encounterId);
+        if (queue == null || queue.isEmpty() || queue.getFirst() != pending) {
+            return;
+        }
+        if (committed
+                instanceof Result.Failure<StoredBossEncounter, TransactionErrorCode> failure) {
+            broadcast(
+                    transition.runtime(),
+                    Component.text(
+                            "Encounter state retry pending: "
+                                    + failure.error().code()
+                                    + " "
+                                    + failure.detail(),
+                            NamedTextColor.RED));
+            plugin.getServer()
+                    .getScheduler()
+                    .runTaskLater(plugin, () -> drainMutations(encounterId), 20L);
+            return;
+        }
+        queue.removeFirst();
+        StoredBossEncounter stored =
+                ((Result.Success<StoredBossEncounter, TransactionErrorCode>) committed).value();
+        active.put(encounterId, stored.runtime());
+        durableRecords.put(encounterId, stored.record());
         broadcast(
-                updated,
+                stored.runtime(),
                 Component.text(
                         "Encounter "
-                                + updated.phase()
+                                + stored.runtime().phase()
                                 + " | attempt="
-                                + updated.attempt()
+                                + stored.runtime().attempt()
                                 + " | "
-                                + description,
+                                + pending.description(),
                         NamedTextColor.YELLOW));
-        if (updated.phase() == BossEncounterPhase.WIPE_PENDING) {
-            beginReset(updated);
+        afterPersisted(transition);
+        if (pending.resumeOnlineParticipants()) {
+            stored.runtime().participants().keySet().stream()
+                    .map(characterId -> plugin.getServer().getPlayer(characterId.value()))
+                    .filter(Objects::nonNull)
+                    .filter(Player::isOnline)
+                    .filter(characterSessions::ready)
+                    .forEach(this::onCharacterReady);
+        }
+        drainMutations(encounterId);
+    }
+
+    private void afterPersisted(BossEncounterTransition transition) {
+        BossEncounterRuntime runtime = transition.runtime();
+        if (runtime.phase() == BossEncounterPhase.WIPE_PENDING) {
+            beginReset(runtime);
+        } else if (runtime.phase() == BossEncounterPhase.RESETTING
+                && !transition.flaskRestoreParticipants().isEmpty()) {
+            startResetEffects(runtime, transition.flaskRestoreParticipants());
+        } else if (runtime.phase() == BossEncounterPhase.ACTIVE
+                && resets.containsKey(runtime.encounterId())) {
+            finishResetEffects(runtime);
+        } else if (runtime.phase() == BossEncounterPhase.COMPLETED) {
+            runtime.participants().keySet().forEach(encounterByParticipant::remove);
         }
     }
 
     private void beginReset(BossEncounterRuntime wiped) {
         UUID resetOperation = operation(wiped.encounterId(), "reset", null, wiped.attempt());
-        Result<BossEncounterTransition, BossEncounterErrorCode> result =
-                encounters.beginReset(wiped, resetOperation);
-        if (result
-                instanceof
-                Result.Failure<BossEncounterTransition, BossEncounterErrorCode> failure) {
-            plugin.getLogger()
-                    .severe(
-                            "Encounter reset failed: "
-                                    + failure.error().code()
-                                    + " "
-                                    + failure.detail());
-            return;
-        }
-        BossEncounterTransition reset =
-                ((Result.Success<BossEncounterTransition, BossEncounterErrorCode>) result).value();
-        active.put(wiped.encounterId(), reset.runtime());
+        mutate(
+                wiped.encounterId(),
+                resetOperation,
+                current -> encounters.beginReset(current, resetOperation),
+                "party wipe committed; Flask restore beginning");
+    }
+
+    private void startResetEffects(
+            BossEncounterRuntime reset, Set<CharacterId> restoreParticipants) {
         ResetProgress progress =
                 new ResetProgress(
-                        resetOperation,
-                        operation(wiped.encounterId(), "reset-complete", null, wiped.attempt()),
-                        new HashSet<>(reset.flaskRestoreParticipants()),
+                        reset.activeResetOperationId().orElseThrow(),
+                        operation(reset.encounterId(), "reset-complete", null, reset.attempt()),
+                        new HashSet<>(restoreParticipants),
                         new HashSet<>());
-        resets.put(wiped.encounterId(), progress);
+        resets.put(reset.encounterId(), progress);
         broadcast(
-                reset.runtime(),
+                reset,
                 Component.text(
                         "Party wipe confirmed; restoring prepared Flask only...",
                         NamedTextColor.YELLOW));
         List.copyOf(progress.pending())
-                .forEach(characterId -> attemptRestore(wiped.encounterId(), characterId));
+                .forEach(characterId -> attemptRestore(reset.encounterId(), characterId));
     }
 
     private void attemptRestore(EncounterId encounterId, CharacterId characterId) {
@@ -656,26 +809,17 @@ final class BossEncounterController implements Listener {
         if (!progress.pending().isEmpty()) {
             return;
         }
-        Result<BossEncounterTransition, BossEncounterErrorCode> completed =
-                encounters.completeReset(
-                        runtime, progress.resetOperation(), progress.completionOperation());
-        if (completed
-                instanceof
-                Result.Failure<BossEncounterTransition, BossEncounterErrorCode> failure) {
-            plugin.getLogger()
-                    .severe(
-                            "Encounter reset completion failed: "
-                                    + failure.error().code()
-                                    + " "
-                                    + failure.detail());
-            return;
-        }
-        BossEncounterRuntime next =
-                ((Result.Success<BossEncounterTransition, BossEncounterErrorCode>) completed)
-                        .value()
-                        .runtime();
-        active.put(encounterId, next);
-        resets.remove(encounterId);
+        mutate(
+                encounterId,
+                progress.completionOperation(),
+                current ->
+                        encounters.completeReset(
+                                current, progress.resetOperation(), progress.completionOperation()),
+                "all Flask restores acknowledged");
+    }
+
+    private void finishResetEffects(BossEncounterRuntime next) {
+        resets.remove(next.encounterId());
         for (CharacterId participantId : next.participants().keySet()) {
             Player participant = plugin.getServer().getPlayer(participantId.value());
             if (participant != null && participant.isOnline() && !participant.isDead()) {
@@ -695,6 +839,95 @@ final class BossEncounterController implements Listener {
     private BossEncounterRuntime runtimeFor(CharacterId characterId) {
         EncounterId encounterId = encounterByParticipant.get(characterId);
         return encounterId == null ? null : active.get(encounterId);
+    }
+
+    private void runSyncIfEnabled(Runnable task) {
+        if (!plugin.isEnabled()) {
+            return;
+        }
+        try {
+            plugin.getServer().getScheduler().runTask(plugin, task);
+        } catch (org.bukkit.plugin.IllegalPluginAccessException exception) {
+            if (plugin.isEnabled()) {
+                throw exception;
+            }
+        }
+    }
+
+    private void completeRecovery(
+            Result<List<StoredBossEncounter>, TransactionErrorCode> recovered) {
+        if (recovered
+                instanceof
+                Result.Failure<List<StoredBossEncounter>, TransactionErrorCode> failure) {
+            plugin.getLogger()
+                    .severe(
+                            "Boss encounter recovery failed: "
+                                    + failure.error().code()
+                                    + " "
+                                    + failure.detail());
+            return;
+        }
+        List<StoredBossEncounter> records =
+                ((Result.Success<List<StoredBossEncounter>, TransactionErrorCode>) recovered)
+                        .value();
+        for (StoredBossEncounter stored : records) {
+            if (stored.runtime().participants().keySet().stream()
+                    .anyMatch(encounterByParticipant::containsKey)) {
+                plugin.getLogger()
+                        .severe(
+                                "Skipping conflicting recoverable encounter "
+                                        + stored.runtime().encounterId().value());
+                continue;
+            }
+            install(stored);
+        }
+        recoveryReady = true;
+        for (StoredBossEncounter stored : records) {
+            BossEncounterRuntime runtime = active.get(stored.runtime().encounterId());
+            if (runtime == null) {
+                continue;
+            }
+            switch (runtime.phase()) {
+                case ACTIVE -> {
+                    UUID operationId = UUID.randomUUID();
+                    mutate(
+                            runtime.encounterId(),
+                            operationId,
+                            current ->
+                                    encounters.recoverAfterRestart(
+                                            current,
+                                            operationId,
+                                            plugin.getServer().getCurrentTick()),
+                            "restart recovery committed; rejoin grace rebased",
+                            true);
+                }
+                case WIPE_PENDING -> beginReset(runtime);
+                case RESETTING -> startResetEffects(runtime, runtime.participants().keySet());
+                case VICTORY_PENDING ->
+                        broadcast(
+                                runtime,
+                                Component.text(
+                                        "Recovered victory; reward reconciliation remains pending.",
+                                        NamedTextColor.YELLOW));
+                case COMPLETED -> {
+                    // Completed rows are excluded by the recovery query.
+                }
+                default ->
+                        throw new IllegalStateException(
+                                "Unsupported recovered encounter phase: " + runtime.phase());
+            }
+        }
+        plugin.getLogger().info("Recovered " + active.size() + " boss encounter(s) from V0009.");
+    }
+
+    private void install(StoredBossEncounter stored) {
+        BossEncounterRuntime runtime = stored.runtime();
+        active.put(runtime.encounterId(), runtime);
+        durableRecords.put(runtime.encounterId(), stored.record());
+        for (CharacterId participantId : runtime.participants().keySet()) {
+            encounterByParticipant.put(participantId, runtime.encounterId());
+            recentEncounterByParticipant.put(participantId, runtime.encounterId());
+        }
     }
 
     private void broadcast(BossEncounterRuntime runtime, Component message) {
@@ -753,6 +986,19 @@ final class BossEncounterController implements Listener {
             Objects.requireNonNull(completionOperation, "completionOperation");
             Objects.requireNonNull(pending, "pending");
             Objects.requireNonNull(inFlight, "inFlight");
+        }
+    }
+
+    private record PendingMutation(
+            UUID operationId,
+            Function<BossEncounterRuntime, Result<BossEncounterTransition, BossEncounterErrorCode>>
+                    mutation,
+            String description,
+            boolean resumeOnlineParticipants) {
+        private PendingMutation {
+            Objects.requireNonNull(operationId, "operationId");
+            Objects.requireNonNull(mutation, "mutation");
+            Objects.requireNonNull(description, "description");
         }
     }
 }

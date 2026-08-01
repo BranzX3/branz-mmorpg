@@ -12,8 +12,10 @@ import com.branz.mmorpg.persistence.progression.JdbcKnowledgeProgressionReposito
 import com.branz.mmorpg.persistence.progression.JdbcProgressionEvidenceRepository;
 import com.branz.mmorpg.persistence.progression.KnowledgeProgressionRepository;
 import com.branz.mmorpg.persistence.progression.ProgressionEvidenceRepository;
+import com.branz.mmorpg.persistence.transaction.BossEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRepository;
+import com.branz.mmorpg.persistence.transaction.JdbcBossEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterExpeditionStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcReconciliationScanner;
@@ -37,6 +39,7 @@ final class DatabaseRuntime implements AutoCloseable {
     private final ValueTransactionService values;
     private final CharacterBuildRepository builds;
     private final CharacterExpeditionStateRepository expeditionStates;
+    private final BossEncounterStateRepository bossEncounters;
     private final ProgressionEvidenceRepository progression;
     private final KnowledgeProgressionRepository knowledge;
     private final ReconciliationScanner reconciliation;
@@ -54,6 +57,7 @@ final class DatabaseRuntime implements AutoCloseable {
         values = new JdbcValueTransactionService(dataSource);
         builds = new JdbcCharacterBuildRepository(dataSource);
         expeditionStates = new JdbcCharacterExpeditionStateRepository(dataSource);
+        bossEncounters = new JdbcBossEncounterStateRepository(dataSource);
         progression = new JdbcProgressionEvidenceRepository(dataSource);
         knowledge = new JdbcKnowledgeProgressionRepository(dataSource);
         reconciliation = new JdbcReconciliationScanner(dataSource);
@@ -120,6 +124,10 @@ final class DatabaseRuntime implements AutoCloseable {
 
     CharacterExpeditionStateRepository expeditionStates() {
         return expeditionStates;
+    }
+
+    BossEncounterStateRepository bossEncounters() {
+        return bossEncounters;
     }
 
     ProgressionEvidenceRepository progression() {

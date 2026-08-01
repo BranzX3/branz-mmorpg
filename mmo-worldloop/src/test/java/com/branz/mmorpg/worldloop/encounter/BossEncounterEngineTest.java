@@ -181,6 +181,30 @@ class BossEncounterEngineTest {
     }
 
     @Test
+    void restartRecoveryRebasesAvailabilityGraceOnTheNewServerClock() {
+        BossEncounterRuntime runtime = start(first, second);
+        runtime = successful(engine.defeat(runtime, first, operation(), START_TICK + 1)).runtime();
+        UUID recoveryOperation = operation();
+
+        BossEncounterTransition recovered =
+                successful(engine.recoverAfterRestart(runtime, recoveryOperation, 5));
+
+        assertEquals(
+                EncounterParticipantStatus.DEFEATED,
+                recovered.runtime().participants().get(first).status());
+        assertEquals(
+                EncounterParticipantStatus.DISCONNECTED_GRACE,
+                recovered.runtime().participants().get(second).status());
+        assertEquals(
+                5 + BossEncounterEngine.REJOIN_GRACE_TICKS,
+                recovered.runtime().participants().get(second).graceDeadlineTick());
+        BossEncounterTransition replay =
+                successful(engine.recoverAfterRestart(recovered.runtime(), recoveryOperation, 500));
+        assertFalse(replay.changed());
+        assertEquals(recovered.runtime(), replay.runtime());
+    }
+
+    @Test
     void validatesParticipantMembershipAndPartyLimit() {
         assertFailure(
                 BossEncounterErrorCode.INVALID_PARTICIPANTS,

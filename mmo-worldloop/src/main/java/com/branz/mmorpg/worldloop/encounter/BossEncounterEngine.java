@@ -190,6 +190,44 @@ public final class BossEncounterEngine {
                         false));
     }
 
+    public Result<BossEncounterTransition, BossEncounterErrorCode> recoverAfterRestart(
+            BossEncounterRuntime runtime, UUID operationId, long currentTick) {
+        Objects.requireNonNull(runtime, "runtime");
+        Objects.requireNonNull(operationId, "operationId");
+        requireTick(currentTick);
+        Result<BossEncounterTransition, BossEncounterErrorCode> duplicate =
+                duplicate(runtime, operationId, EncounterOperationKind.RESTART_RECOVERED);
+        if (duplicate != null) {
+            return duplicate;
+        }
+        if (runtime.phase() != BossEncounterPhase.ACTIVE) {
+            return Result.failure(
+                    BossEncounterErrorCode.INVALID_PHASE,
+                    "Restart recovery availability applies only to an active encounter.");
+        }
+        long deadline = Math.addExact(currentTick, REJOIN_GRACE_TICKS);
+        HashMap<CharacterId, EncounterParticipant> participants =
+                new HashMap<>(runtime.participants());
+        participants.replaceAll(
+                (characterId, participant) ->
+                        participant.status() == EncounterParticipantStatus.DEFEATED
+                                ? participant
+                                : participant.withStatus(
+                                        EncounterParticipantStatus.DISCONNECTED_GRACE, deadline));
+        return Result.success(
+                transition(
+                        runtime,
+                        phaseFor(participants),
+                        runtime.attempt(),
+                        participants,
+                        withOperation(
+                                runtime, operationId, EncounterOperationKind.RESTART_RECOVERED),
+                        Optional.empty(),
+                        runtime.rewardGrantId(),
+                        Set.of(),
+                        false));
+    }
+
     public Result<BossEncounterTransition, BossEncounterErrorCode> beginReset(
             BossEncounterRuntime runtime, UUID operationId) {
         Objects.requireNonNull(runtime, "runtime");

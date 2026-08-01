@@ -616,6 +616,19 @@ live inventory, change Bukkit resources or write PostgreSQL.
 166. Replace the record through `RESETTING` and verify `findRecoverable` returns it in stable order;
      replace it with `COMPLETED` and verify recovery excludes it. A stale expected version and a
      reused operation ID with changed payload must both leave the latest row unchanged.
+167. Start a boss lab encounter, spend Flask charges and stop Paper while the encounter is `ACTIVE`.
+     Restart against the same embedded PostgreSQL directory, reconnect within the fresh 1,200-tick
+     grace and verify `/mmo encounter status` shows the same encounter/attempt with no Flask restore.
+168. Stop Paper after the last defeat is durably `WIPE_PENDING` but before reset begins. Restart and
+     verify the controller commits `RESETTING` before restoring any Flask. Stop again after one party
+     member receives the restore; restart and verify already-restored state is skipped, remaining
+     members restore once and the next attempt is committed once.
+169. Queue near-simultaneous `/mmo encounter defeat <player>` commands for two participants. Verify
+     both updates survive PostgreSQL acknowledgement in FIFO order and one confirmed wipe occurs;
+     no stale participant snapshot may overwrite the other.
+170. Stop Paper in `VICTORY_PENDING`, restart and verify death cannot trigger reset/Flask restore.
+     Reconcile the empty lab reward using a stable grant UUID, restart again and verify the completed
+     encounter is excluded from recovery and its participant locks are released.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

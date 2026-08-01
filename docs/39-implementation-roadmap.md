@@ -128,6 +128,11 @@ V0009 and its journaled optimistic repository now provide canonical encounter re
 audit and ordered non-completed recovery lookup. Wiring the live controller to persist-before-effect
 and resume `RESETTING`/`VICTORY_PENDING` work is the next restart-safety slice.
 
+The live controller now serializes participant events, persists every phase before effects and
+recovers `ACTIVE`, `WIPE_PENDING`, `RESETTING` and `VICTORY_PENDING` records on startup. Active grace
+is rebased to the new server clock and reset operations replay safely. The boss wipe/retry/reconnect
+boundary is ready for in-game restart acceptance; authored rewards and party systems remain.
+
 ## Milestone 8 — Lifeskill kernel
 
 - Rank/Mastery/Focus;

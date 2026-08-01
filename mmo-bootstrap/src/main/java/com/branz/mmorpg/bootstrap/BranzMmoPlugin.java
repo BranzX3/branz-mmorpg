@@ -626,6 +626,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         this,
                         characterSessionController,
                         flaskHotbarController,
+                        databaseRuntime.bossEncounters(),
                         snapshot.manifest().contentVersion());
         combatSessionController.setSuccessfulActionObserver(
                 liveTeachingSessionController::observeSuccessfulAction);
@@ -705,7 +706,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private void scheduleSmokeShutdown() {
         if (Boolean.getBoolean("mmo.bootstrap.smoke-test")) {
             getLogger().info("Bootstrap smoke test completed; scheduling a clean shutdown.");
-            getServer().getScheduler().runTaskLater(this, getServer()::shutdown, 1L);
+            getServer().getScheduler().runTaskLater(this, getServer()::shutdown, 20L);
         }
     }
 

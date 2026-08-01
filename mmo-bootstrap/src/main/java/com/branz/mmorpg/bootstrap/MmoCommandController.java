@@ -5,12 +5,15 @@ import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.EncounterId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.move.MoveEngine;
+import com.branz.mmorpg.combat.resource.BossFlaskCheckpointEngine;
 import com.branz.mmorpg.combat.resource.ExpeditionFlaskEngine;
 import com.branz.mmorpg.combat.resource.FlaskAllocation;
+import com.branz.mmorpg.combat.resource.FlaskCheckpointErrorCode;
 import com.branz.mmorpg.combat.resource.FlaskConsumption;
 import com.branz.mmorpg.combat.resource.FlaskDose;
 import com.branz.mmorpg.combat.resource.FlaskErrorCode;
 import com.branz.mmorpg.combat.resource.FlaskState;
+import com.branz.mmorpg.combat.resource.PreparedFlaskSnapshot;
 import com.branz.mmorpg.combat.status.AilmentDefinition;
 import com.branz.mmorpg.combat.status.AilmentDefinitionEngine;
 import com.branz.mmorpg.combat.status.AilmentEngine;
@@ -227,6 +230,21 @@ final class MmoCommandController implements CommandExecutor, Listener {
             }
             return;
         }
+        if (args.length >= 4 && "checkpoint".equalsIgnoreCase(args[1])) {
+            UUID checkpointId = parseUuid(player, args, 3, "Checkpoint instance");
+            UUID operationId = parseUuid(player, args, 4, "Expedition operation");
+            if (checkpointId == null || operationId == null) {
+                return;
+            }
+            if ("capture".equalsIgnoreCase(args[2])) {
+                captureFlaskCheckpoint(player, checkpointId, operationId);
+            } else if ("restore".equalsIgnoreCase(args[2])) {
+                restoreFlaskCheckpoint(player, checkpointId, operationId);
+            } else {
+                consumableUsage(player);
+            }
+            return;
+        }
         if (args.length != 3 || !"simulate".equalsIgnoreCase(args[1])) {
             consumableUsage(player);
             return;
@@ -353,7 +371,11 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                 + " | effects="
                                 + state.consumableEffects().size()
                                 + " | ailments="
-                                + state.ailments().size(),
+                                + state.ailments().size()
+                                + " | checkpoint="
+                                + state.preparedFlaskSnapshot()
+                                        .map(value -> value.checkpointInstanceId().toString())
+                                        .orElse("none"),
                         NamedTextColor.GOLD));
         state.consumableEffects()
                 .forEach(
@@ -383,6 +405,121 @@ final class MmoCommandController implements CommandExecutor, Listener {
                                                         + "t | tier="
                                                         + ailment.tier(),
                                                 NamedTextColor.LIGHT_PURPLE)));
+    }
+
+    private void captureFlaskCheckpoint(
+            Player player, UUID checkpointInstanceId, UUID operationId) {
+        LoadedCharacterSession session = readyCharacter(player);
+        if (session == null) {
+            return;
+        }
+        PersistentExpeditionState current = session.snapshot().expeditionState();
+        PreparedFlaskSnapshot prepared =
+                new BossFlaskCheckpointEngine().capture(checkpointInstanceId, current.flaskState());
+        PersistentExpeditionState desired =
+                new PersistentExpeditionState(
+                        current.flaskState(),
+                        current.consumableEffects(),
+                        current.ailments(),
+                        java.util.Optional.of(prepared));
+        commitCheckpointFixture(player, desired, operationId, "captured", checkpointInstanceId);
+    }
+
+    private void restoreFlaskCheckpoint(
+            Player player, UUID checkpointInstanceId, UUID operationId) {
+        LoadedCharacterSession session = readyCharacter(player);
+        if (session == null) {
+            return;
+        }
+        PersistentExpeditionState current = session.snapshot().expeditionState();
+        PreparedFlaskSnapshot prepared = current.preparedFlaskSnapshot().orElse(null);
+        if (prepared == null) {
+            player.sendMessage(
+                    Component.text("No prepared boss Flask snapshot exists.", NamedTextColor.RED));
+            return;
+        }
+        Result<FlaskState, FlaskCheckpointErrorCode> restored =
+                new BossFlaskCheckpointEngine().restore(checkpointInstanceId, prepared, true);
+        if (restored instanceof Result.Failure<FlaskState, FlaskCheckpointErrorCode> failure) {
+            player.sendMessage(
+                    Component.text(
+                            failure.error().code() + ": " + failure.detail(), NamedTextColor.RED));
+            return;
+        }
+        FlaskState restoredFlask =
+                ((Result.Success<FlaskState, FlaskCheckpointErrorCode>) restored).value();
+        PersistentExpeditionState desired =
+                new PersistentExpeditionState(
+                        restoredFlask,
+                        current.consumableEffects(),
+                        current.ailments(),
+                        current.preparedFlaskSnapshot());
+        commitCheckpointFixture(player, desired, operationId, "restored", checkpointInstanceId);
+    }
+
+    private LoadedCharacterSession readyCharacter(Player player) {
+        LoadedCharacterSession session = characterSessions.active(player).orElse(null);
+        if (session == null || !characterSessions.ready(player)) {
+            player.sendMessage(
+                    Component.text("Character session is not ready.", NamedTextColor.RED));
+            return null;
+        }
+        return session;
+    }
+
+    private void commitCheckpointFixture(
+            Player player,
+            PersistentExpeditionState desired,
+            UUID operationId,
+            String action,
+            UUID checkpointInstanceId) {
+        ContentSnapshot snapshot = snapshotSource.get();
+        if (snapshot == null) {
+            player.sendMessage(
+                    Component.text("Content snapshot is not ready.", NamedTextColor.RED));
+            return;
+        }
+        player.sendMessage(
+                Component.text("Committing boss Flask checkpoint...", NamedTextColor.YELLOW));
+        characterSessions.commitExpeditionState(
+                player,
+                desired,
+                operationId,
+                snapshot.manifest().contentVersion(),
+                result -> {
+                    if (result
+                            instanceof
+                            Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
+                                    failure) {
+                        player.sendMessage(
+                                Component.text(
+                                        "Boss Flask checkpoint failed: "
+                                                + failure.error().code()
+                                                + " "
+                                                + failure.detail(),
+                                        NamedTextColor.RED));
+                        return;
+                    }
+                    LoadedCharacterSession committed =
+                            ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>)
+                                            result)
+                                    .value();
+                    player.sendMessage(
+                            Component.text(
+                                    "Boss Flask checkpoint "
+                                            + action
+                                            + " | checkpoint="
+                                            + checkpointInstanceId
+                                            + " | version="
+                                            + committed
+                                                    .snapshot()
+                                                    .expeditionStateRecord()
+                                                    .orElseThrow()
+                                                    .version()
+                                            + " | operation="
+                                            + operationId,
+                                    NamedTextColor.GREEN));
+                });
     }
 
     private void persistConsumableFixture(Player player, UUID operationId) {
@@ -1374,7 +1511,9 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private static void consumableUsage(Player player) {
         player.sendMessage(
                 "Usage: /mmo consumable status | /mmo consumable persist [operation-uuid] | "
-                        + "/mmo consumable simulate <flask|timeline|ailment|category>");
+                        + "/mmo consumable checkpoint <capture|restore> <checkpoint-uuid> "
+                        + "[operation-uuid] | /mmo consumable simulate "
+                        + "<flask|timeline|ailment|category>");
     }
 
     private void recordProgressionEvidence(Player player, String scenario, UUID evidenceId) {

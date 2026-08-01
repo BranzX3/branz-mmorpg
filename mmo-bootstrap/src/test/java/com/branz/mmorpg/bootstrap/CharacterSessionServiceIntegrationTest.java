@@ -12,6 +12,7 @@ import com.branz.mmorpg.combat.crossbow.CrossbowPersistentState;
 import com.branz.mmorpg.combat.resource.FlaskAllocation;
 import com.branz.mmorpg.combat.resource.FlaskDose;
 import com.branz.mmorpg.combat.resource.FlaskState;
+import com.branz.mmorpg.combat.resource.PreparedFlaskSnapshot;
 import com.branz.mmorpg.combat.status.AilmentType;
 import com.branz.mmorpg.content.snapshot.ContentLoadFailure;
 import com.branz.mmorpg.content.snapshot.ContentSnapshot;
@@ -1026,6 +1027,7 @@ class CharacterSessionServiceIntegrationTest {
                         Duration.ofSeconds(10));
         UUID playerId = UUID.randomUUID();
         UUID operationId = UUID.randomUUID();
+        UUID checkpointInstanceId = UUID.randomUUID();
         PersistentExpeditionState desired =
                 new PersistentExpeditionState(
                         new FlaskState(
@@ -1045,7 +1047,11 @@ class CharacterSessionServiceIntegrationTest {
                                         false)),
                         Map.of(
                                 AilmentType.CORRUPTION,
-                                new PersistentAilmentState(AilmentType.CORRUPTION, 0, 0, 360, 2)));
+                                new PersistentAilmentState(AilmentType.CORRUPTION, 0, 0, 360, 2)),
+                        java.util.Optional.of(
+                                new PreparedFlaskSnapshot(
+                                        checkpointInstanceId,
+                                        FlaskState.full(FlaskAllocation.balanced()))));
 
         try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
             CharacterSessionService service = new CharacterSessionService(database);
@@ -1063,13 +1069,13 @@ class CharacterSessionServiceIntegrationTest {
             LoadedCharacterSession replayed =
                     success(
                             service.commitExpeditionState(
-                                    opened, desired, operationId, "content.test.1"));
+                                    committed, desired, operationId, "content.test.1"));
             assertEquals(desired, replayed.snapshot().expeditionState());
             assertEquals(1, replayed.snapshot().expeditionStateRecord().orElseThrow().version());
 
             Result<LoadedCharacterSession, CharacterSessionErrorCode> changedReplay =
                     service.commitExpeditionState(
-                            opened,
+                            committed,
                             PersistentExpeditionState.initial(),
                             operationId,
                             "content.test.1");

@@ -933,7 +933,7 @@ final class CharacterSessionService {
                         com.branz.mmorpg.persistence.transaction
                                 .JdbcCharacterExpeditionStateRepository
                                 .CHARACTER_EXPEDITION_STATE_COMMIT,
-                        "{\"expectedVersion\":" + expectedVersion + "}",
+                        "{\"stateGuard\":\"optimistic-version\"}",
                         payload,
                         contentVersion);
         Result<CharacterExpeditionStateCommitExecution, TransactionErrorCode> committed =

@@ -1955,6 +1955,40 @@ truth. Offline wall-clock time does not consume effect or ailment duration in V1
 Milestone status: **Milestone 6 remains in progress.** Live hotbar consumable use, Rest Context
 allocation/refill and boss Flask snapshot restore remain.
 
-Schema/config/migration impact: forward-only V0008 adds one table and one time index. The canonical
-JSON payload is schema version 1. No content-schema or configuration change is required; ADR 0022
-owns the persistence and restart-time boundary.
+Schema/config/migration impact: forward-only V0008 adds one table and one time index. This slice
+introduced canonical JSON schema version 1. No content-schema or configuration change is required;
+ADR 0022 owns the persistence and restart-time boundary.
+
+## Milestone 6 - durable boss Flask checkpoint boundary slice
+
+Implemented:
+
+- a pure capture/restore policy binds the prepared Flask allocation and charges to one concrete
+  checkpoint-instance UUID;
+- restore requires a confirmed full wipe and rejects ordinary death/retreat intent or a mismatched
+  checkpoint, preventing free stock creation;
+- expedition-state JSON schema version 2 stores the optional prepared snapshot while decoding all
+  existing schema-version-1 rows as `no checkpoint`;
+- capture and restore commit through the shared expedition-state journal and Player Session reload
+  path; exact same-session retry after a successful reload no longer changes the journal request's
+  version descriptor and therefore replays without a second version increment;
+- environment-gated checkpoint capture/restore commands expose reconnect and PostgreSQL restart
+  fixtures. The future encounter controller, not the command caller, owns the live party-wipe signal.
+
+Tests and completion evidence:
+
+- the pure kernel covers exact restoration, unconfirmed-wipe rejection and checkpoint mismatch;
+- codec tests cover schema-version-2 round-trip and schema-version-1 backward decoding;
+- Player Session integration persists the prepared snapshot across database restart and retries the
+  same operation from the reloaded snapshot, closing the previous replay regression.
+
+Failure/recovery behavior: an invalid checkpoint UUID/state fails closed during decode. Failed or
+stale restore leaves the current Flask active. A lost successful callback is recovered from normal
+Player Session reload; repeating the immutable same-session request returns the committed row.
+
+Milestone status: **Milestone 6 remains in progress.** Live hotbar Flask/consumable use and atomic
+Rest Context allocation/refill remain. The live confirmed party-wipe trigger is delivered with the
+Milestone 7 encounter controller against this completed persistence boundary.
+
+Schema/config/migration impact: expedition JSON advances from schema version 1 to 2 with backward
+decoding. No SQL, content-schema or configuration migration is required; ADR 0022 is updated.

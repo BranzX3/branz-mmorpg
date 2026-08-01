@@ -97,8 +97,11 @@ with an in-game simulation lab. The `.4` content bundle now authors all five con
 Infusion Stock and all six core ailments; startup compiles and requires the complete ailment set.
 V0008 persists one canonical restart-safe Flask/effect/ailment document through the shared
 transaction journal and reloads it with the Player Session; the environment-gated Consumable Lab
-can write and inspect the durable fixture. Live hotbar/Rest behavior and boss Flask snapshot restore
-remain before Milestone 6 completion.
+can write and inspect the durable fixture. The same document now carries a backward-compatible
+prepared boss Flask snapshot bound to one checkpoint-instance UUID; capture/confirmed-wipe restore
+is journaled and rejects ordinary death or checkpoint mismatch. The live party-wipe trigger belongs
+to the Milestone 7 encounter controller. Live hotbar and Rest preparation behavior remain before
+Milestone 6 completion.
 
 ## Milestone 7 — Encounters, rewards and party
 

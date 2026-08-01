@@ -525,6 +525,16 @@ live inventory, change Bukkit resources or write PostgreSQL.
      same embedded PostgreSQL directory, reconnect and verify the values and version remain. Use a
      new operation UUID for a deliberate later mutation; UUID reuse is reserved for retrying the
      same in-flight request.
+141. Run `/mmo consumable checkpoint capture <checkpoint-uuid> <operation-uuid>` and verify status
+     prints that checkpoint UUID. Spend or replace the current Flask fixture with a different fresh
+     operation UUID, then run `/mmo consumable checkpoint restore <checkpoint-uuid>
+     <operation-uuid>` and verify the exact captured allocation/charges return.
+142. Repeat the exact restore command after its successful Player Session reload. Verify the same
+     version and success replay rather than an idempotency conflict or another version increment.
+     Restore with another checkpoint UUID and verify `FLASK_CHECKPOINT_MISMATCH` with no mutation.
+143. Disconnect/reconnect and restart Paper. Verify the prepared checkpoint UUID and captured Flask
+     remain available. Ordinary respawn/death must not invoke this fixture or restore charges; the
+     live confirmed party-wipe signal is deferred to the encounter controller.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

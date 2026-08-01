@@ -122,6 +122,14 @@ Flask/effect/ailment fixture through this exact Player Session path. `/mmo consu
 the active reloaded snapshot and exposes its durable version and remaining values for restart
 acceptance testing. These commands are diagnostics, not production item-use sources.
 
+The durable document can also hold one prepared Flask snapshot bound to a concrete checkpoint
+instance UUID. Capture copies both allocation and remaining charges. Restore requires an explicitly
+confirmed full wipe and the same checkpoint instance; ordinary death and a mismatched checkpoint
+cannot mint charges. The environment-gated
+`/mmo consumable checkpoint <capture|restore> <checkpoint-uuid> [operation-uuid]` fixture exercises
+this journaled boundary. The Milestone 7 encounter controller will own the live full-party wipe
+signal; callers cannot select a different snapshot at restore time.
+
 ## Item freshness
 
 Finished potions and normal ingredients do not expire in real time. `Fresh`, `Pristine`, `Corrupted` and `Infused` are material states. Special Unstable Concoctions may expire at rest, death or expedition end and are always labeled.

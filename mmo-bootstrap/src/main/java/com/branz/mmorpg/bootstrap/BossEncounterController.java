@@ -184,6 +184,15 @@ final class BossEncounterController implements Listener {
         }
     }
 
+    boolean suppressesDeathPouch(Player player) {
+        if (!recoveryReady) {
+            return true;
+        }
+        BossEncounterRuntime runtime =
+                runtimeFor(characterId(Objects.requireNonNull(player, "player")));
+        return runtime != null && runtime.phase() != BossEncounterPhase.COMPLETED;
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         CharacterId characterId = characterId(event.getPlayer());

@@ -85,6 +85,10 @@ class JdbcCarriedWalletServiceIntegrationTest {
         assertEquals(900, debited.balance().balance());
         assertEquals(2, debited.balance().version());
         assertEquals(900, success(service.balance(character)).balance());
+        CarriedWalletOperation stored =
+                success(service.findOperation(debit.operationId())).orElseThrow();
+        assertTrue(stored.matches(debit));
+        assertEquals(900, stored.resultingBalance());
         assertEquals(2, auditCount());
     }
 

@@ -34,6 +34,17 @@ public final class JdbcCarriedWalletService implements CarriedWalletService {
     }
 
     @Override
+    public Result<Optional<CarriedWalletOperation>, TransactionErrorCode> findOperation(
+            UUID operationId) {
+        Objects.requireNonNull(operationId, "operationId");
+        try (Connection connection = dataSource.getConnection()) {
+            return Result.success(Optional.ofNullable(loadOperation(connection, operationId)));
+        } catch (SQLException exception) {
+            return JdbcTransactionJournalRepository.failure(exception);
+        }
+    }
+
+    @Override
     public Result<CarriedWalletAdjustmentExecution, TransactionErrorCode> adjust(
             TransactionRequest request, CarriedWalletAdjustment adjustment) {
         Objects.requireNonNull(request, "request");
@@ -76,7 +87,8 @@ public final class JdbcCarriedWalletService implements CarriedWalletService {
                                 TransactionErrorCode.TRANSACTION_INVALID_STATE,
                                 "Existing carried-wallet transaction is not committed.");
                     }
-                    WalletOperation operation = findOperation(connection, adjustment.operationId());
+                    CarriedWalletOperation operation =
+                            loadOperation(connection, adjustment.operationId());
                     if (operation == null || !operation.matches(adjustment)) {
                         connection.rollback();
                         return Result.failure(
@@ -257,22 +269,24 @@ public final class JdbcCarriedWalletService implements CarriedWalletService {
         }
     }
 
-    private static WalletOperation findOperation(Connection connection, UUID operationId)
+    private static CarriedWalletOperation loadOperation(Connection connection, UUID operationId)
             throws SQLException {
         try (PreparedStatement statement =
                 connection.prepareStatement(
                         """
-                        SELECT character_id, kind, amount, resulting_balance
+                        SELECT character_id, kind, amount, resulting_balance, transaction_id
                         FROM carried_wallet_operation WHERE operation_id = ?
                         """)) {
             statement.setObject(1, operationId);
             try (ResultSet row = statement.executeQuery()) {
                 return row.next()
-                        ? new WalletOperation(
+                        ? new CarriedWalletOperation(
+                                operationId,
                                 new CharacterId(row.getObject("character_id", UUID.class)),
                                 CarriedWalletOperationKind.valueOf(row.getString("kind")),
                                 row.getLong("amount"),
-                                row.getLong("resulting_balance"))
+                                row.getLong("resulting_balance"),
+                                new TransactionId(row.getObject("transaction_id", UUID.class)))
                         : null;
             }
         }
@@ -308,18 +322,6 @@ public final class JdbcCarriedWalletService implements CarriedWalletService {
                             + version
                             + "}");
             statement.executeUpdate();
-        }
-    }
-
-    private record WalletOperation(
-            CharacterId characterId,
-            CarriedWalletOperationKind kind,
-            long amount,
-            long resultingBalance) {
-        boolean matches(CarriedWalletAdjustment adjustment) {
-            return characterId.equals(adjustment.characterId())
-                    && kind == adjustment.kind()
-                    && amount == adjustment.amount();
         }
     }
 }

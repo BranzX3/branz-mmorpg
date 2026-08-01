@@ -776,6 +776,22 @@ live inventory, change Bukkit resources or write PostgreSQL.
 220. Attempt a stale version, identity/seed drift, ROLLED-to-FROZEN transition and changed reuse of a
      committed transaction UUID. Verify each fails closed without changing the latest payload, state,
      transaction journal or audit.
+221. Run `./gradlew :mmo-bootstrap:test --tests
+     com.branz.mmorpg.bootstrap.DeathPouchSagaServiceIntegrationTest` and verify activation/recovery,
+     crash-after-debit replay and both expired-intention cases pass against embedded PostgreSQL.
+222. Join local Paper with an operator/test account and run `/mmo pouch fund 1000`, then `/mmo pouch
+     wallet`. Stand at a memorable position and run `/mmo pouch simulate`; verify the balance is 900,
+     `/mmo pouch status` shows amount 100 and expiry without coordinates, and only the owner sees the
+     soul-flame marker.
+223. Move more than four blocks away and verify `/mmo pouch recover` fails. Return to the marker,
+     recover it and verify the carried wallet returns to 1000 exactly once; repeating recovery must
+     not add value.
+224. Create another simulated pouch, restart Paper against the same embedded PostgreSQL directory
+     and verify the marker and status return. A second account must neither see its particle nor
+     recover its UUID.
+225. Fund the wallet again and die outside a boss encounter; verify exactly 10% becomes one pouch at
+     the death site. Die while bound to the Boss Encounter Lab and from another player's killing
+     blow; verify neither path changes the wallet or creates a pouch.
 
 To use an external PostgreSQL, set `database.mode: EXTERNAL`, configure `database.jdbc-url`,
 `database.username` and `database.password`, and retain `database.run-migrations: true`. Embedded

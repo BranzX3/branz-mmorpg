@@ -54,6 +54,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private LiveTeachingSessionController liveTeachingSessionController;
     private KnowledgeAcquisitionController knowledgeAcquisitionController;
     private BossEncounterController bossEncounterController;
+    private DeathPouchController deathPouchController;
     private PartyController partyController;
     private LfgController lfgController;
     private DownedController downedController;
@@ -155,6 +156,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
         if (partyController != null) {
             partyController.shutdown();
             partyController = null;
+        }
+        if (deathPouchController != null) {
+            deathPouchController.shutdown();
+            deathPouchController = null;
         }
         if (bossEncounterController != null) {
             bossEncounterController.shutdown();
@@ -659,6 +664,14 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         databaseRuntime.values(),
                         activeEncounterRewardTables.get(),
                         snapshot.manifest().contentVersion());
+        deathPouchController =
+                new DeathPouchController(
+                        this,
+                        characterSessionController,
+                        bossEncounterController,
+                        databaseRuntime.deathPouches(),
+                        databaseRuntime.carriedWallet(),
+                        snapshot.manifest().contentVersion());
         partyController =
                 new PartyController(this, characterSessionController, bossEncounterController);
         lfgController = new LfgController(this, characterSessionController, partyController);
@@ -682,6 +695,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         characterSessionController.addReadyHandler(flaskHotbarController::onCharacterReady);
         characterSessionController.addReadyHandler(consumableHotbarController::onCharacterReady);
         characterSessionController.addReadyHandler(bossEncounterController::onCharacterReady);
+        characterSessionController.addReadyHandler(deathPouchController::onCharacterReady);
         characterSessionController.addReadyHandler(partyController::onCharacterReady);
         characterSessionController.addReadyHandler(downedController::onCharacterReady);
         resourcePackGate.setReadyHandler(characterSessionController::onPackReady);
@@ -711,6 +725,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         liveTeachingSessionController,
                         knowledgeAcquisitionController,
                         bossEncounterController,
+                        deathPouchController,
                         partyController,
                         lfgController,
                         downedController);
@@ -727,6 +742,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(consumableHotbarController, this);
         getServer().getPluginManager().registerEvents(liveTeachingSessionController, this);
         getServer().getPluginManager().registerEvents(bossEncounterController, this);
+        getServer().getPluginManager().registerEvents(deathPouchController, this);
         getServer().getPluginManager().registerEvents(partyController, this);
         getServer().getPluginManager().registerEvents(downedController, this);
         getServer().getPluginManager().registerEvents(sceneHubController, this);
@@ -738,6 +754,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         consumableHotbarController.start();
         liveTeachingSessionController.start();
         bossEncounterController.start();
+        deathPouchController.start();
         partyController.start();
         downedController.start();
         getLogger()

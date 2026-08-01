@@ -175,6 +175,11 @@ V0013 now supplies a durable local carried-wallet authority with atomic journal/
 exact debit/credit replay, insufficient-funds rejection and serialized concurrent first writes. It
 is the local acceptance boundary while the external wallet capability remains deferred; live death,
 owner-only rendering, recovery and expiry are next.
+The live Paper adapter now turns eligible open-world deaths into persist-before-debit pouches,
+renders markers only to their owner, requires proximity for recovery and reconciles debit, credit
+and expiry ambiguity across restart. Boss and player-killer deaths are suppressed, and local durable
+fund/simulate/status/recover commands make the complete Death Pouch slice ready for in-game
+acceptance. Milestone 7's remaining work is explicit duel/arena profile integration.
 
 ## Milestone 8 — Lifeskill kernel
 

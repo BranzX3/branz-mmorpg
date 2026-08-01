@@ -122,6 +122,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
     private final LiveTeachingSessionController liveTeaching;
     private final KnowledgeAcquisitionController knowledgeAcquisition;
     private final BossEncounterController bossEncounters;
+    private final DeathPouchController deathPouches;
     private final PartyController parties;
     private final LfgController lfg;
     private final DownedController downed;
@@ -145,6 +146,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
             LiveTeachingSessionController liveTeaching,
             KnowledgeAcquisitionController knowledgeAcquisition,
             BossEncounterController bossEncounters,
+            DeathPouchController deathPouches,
             PartyController parties,
             LfgController lfg,
             DownedController downed) {
@@ -163,6 +165,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
         this.knowledgeAcquisition =
                 Objects.requireNonNull(knowledgeAcquisition, "knowledgeAcquisition");
         this.bossEncounters = Objects.requireNonNull(bossEncounters, "bossEncounters");
+        this.deathPouches = Objects.requireNonNull(deathPouches, "deathPouches");
         this.parties = Objects.requireNonNull(parties, "parties");
         this.lfg = Objects.requireNonNull(lfg, "lfg");
         this.downed = Objects.requireNonNull(downed, "downed");
@@ -235,6 +238,14 @@ final class MmoCommandController implements CommandExecutor, Listener {
             }
             return true;
         }
+        if ("pouch".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Death Pouch commands require an in-game player.");
+            } else {
+                deathPouches.handleCommand(player, args, devToolsAllowed(player));
+            }
+            return true;
+        }
         if ("lfg".equalsIgnoreCase(args[0])) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("LFG commands require an in-game player.");
@@ -257,7 +268,7 @@ final class MmoCommandController implements CommandExecutor, Listener {
             return true;
         }
         sender.sendMessage(
-                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|party|lfg|encounter|downed>");
+                "Usage: /mmo <health|dev|combat|progression|teaching|renown|knowledge|consumable|party|lfg|encounter|downed|pouch>");
         return true;
     }
 

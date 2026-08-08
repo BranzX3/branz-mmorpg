@@ -1,0 +1,208 @@
+name: playable-v1 primary attack coordinator patch
+
+on:
+  push:
+    branches: [playable-v1]
+    paths:
+      - '.github/workflows/playable-v1-primary-coordinator-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-format-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: playable-v1
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+      - name: Apply guarded primary coordinator patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/CombatSessionController.java')
+          source = path.read_text(encoding='utf-8')
+
+          import_needle = 'import com.branz.mmorpg.combat.input.PrimaryAttackIngressPolicy;\n'
+          if source.count(import_needle) != 1:
+              raise SystemExit(f'import guard failed: {source.count(import_needle)}')
+          source = source.replace(
+              import_needle,
+              import_needle + 'import com.branz.mmorpg.combat.input.PrimaryAttackInputCoordinator;\n',
+              1,
+          )
+
+          old = '''        Result<CombatInputRequest, InputRejectionCode> observed =
+                session.input.observe(
+                        new InputObservation(
+                                plugin.getServer().getCurrentTick(),
+                                intent,
+                                DirectionSnapshot.NEUTRAL,
+                                primary.input().branch(),
+                                new InputDeduplicationKey("MAIN_HAND", "ATTACK")));
+        if (!(observed instanceof Result.Success<CombatInputRequest, InputRejectionCode> input)) {
+            return true;
+        }
+        Result<InputRouteOutcome, InputRejectionCode> routed =
+                session.input.routeFrame(List.of(input.value()), routingContext(player, session));
+        if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
+            handleRoute(player, session, success.value());
+        }
+'''
+          new = '''        Optional<InputRouteOutcome> routed =
+                PrimaryAttackInputCoordinator.route(
+                        session.input,
+                        plugin.getServer().getCurrentTick(),
+                        primary.input().branch(),
+                        routingContext(player, session));
+        routed.ifPresent(outcome -> handleRoute(player, session, outcome));
+'''
+          if source.count(old) != 1:
+              raise SystemExit(f'primary routing block guard failed: {source.count(old)}')
+          source = source.replace(old, new, 1)
+          path.write_text(source, encoding='utf-8')
+          PY
+
+          cat > mmo-combat/src/main/java/com/branz/mmorpg/combat/input/PrimaryAttackInputCoordinator.java <<'JAVA'
+          package com.branz.mmorpg.combat.input;
+
+          import com.branz.mmorpg.api.result.Result;
+          import java.util.List;
+          import java.util.Objects;
+          import java.util.Optional;
+
+          /**
+           * Owns observation deduplication and one-frame routing for the physical primary attack.
+           * Both Bukkit arm-swing and direct entity-hit ingress must converge here through the
+           * controller's single routePrimaryAttack path.
+           */
+          public final class PrimaryAttackInputCoordinator {
+              private static final InputDeduplicationKey PHYSICAL_ATTACK =
+                      new InputDeduplicationKey("MAIN_HAND", "ATTACK");
+
+              private PrimaryAttackInputCoordinator() {}
+
+              public static Optional<InputRouteOutcome> route(
+                      InputRouter router,
+                      long tick,
+                      String branchFamily,
+                      InputRoutingContext routingContext) {
+                  Objects.requireNonNull(router, "router");
+                  Objects.requireNonNull(branchFamily, "branchFamily");
+                  Objects.requireNonNull(routingContext, "routingContext");
+                  Result<CombatInputRequest, InputRejectionCode> observed =
+                          router.observe(
+                                  new InputObservation(
+                                          tick,
+                                          SemanticInput.PRIMARY,
+                                          DirectionSnapshot.NEUTRAL,
+                                          branchFamily,
+                                          PHYSICAL_ATTACK));
+                  if (!(observed
+                          instanceof Result.Success<CombatInputRequest, InputRejectionCode> input)) {
+                      return Optional.empty();
+                  }
+                  Result<InputRouteOutcome, InputRejectionCode> routed =
+                          router.routeFrame(List.of(input.value()), routingContext);
+                  if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
+                      return Optional.of(success.value());
+                  }
+                  return Optional.empty();
+              }
+          }
+          JAVA
+
+          cat > mmo-combat/src/test/java/com/branz/mmorpg/combat/input/PrimaryAttackInputCoordinatorTest.java <<'JAVA'
+          package com.branz.mmorpg.combat.input;
+
+          import static org.junit.jupiter.api.Assertions.assertEquals;
+          import static org.junit.jupiter.api.Assertions.assertTrue;
+
+          import java.util.Optional;
+          import java.util.Set;
+          import org.junit.jupiter.api.Test;
+
+          class PrimaryAttackInputCoordinatorTest {
+              @Test
+              void readyPrimaryExecutesImmediately() {
+                  InputRouter router = new InputRouter();
+                  Optional<InputRouteOutcome> routed =
+                          PrimaryAttackInputCoordinator.route(
+                                  router,
+                                  100,
+                                  "PRIMARY",
+                                  InputRoutingContext.legal(Set.of(SemanticInput.PRIMARY)));
+
+                  assertTrue(routed.isPresent());
+                  assertEquals(InputRouteDecision.EXECUTED, routed.orElseThrow().decision());
+                  assertEquals(SemanticInput.PRIMARY, routed.orElseThrow().request().input());
+              }
+
+              @Test
+              void drawingPrimaryUsesExistingOneSlotBuffer() {
+                  InputRouter router = new InputRouter();
+                  Optional<InputRouteOutcome> routed =
+                          PrimaryAttackInputCoordinator.route(
+                                  router,
+                                  200,
+                                  "PRIMARY",
+                                  new InputRoutingContext(Set.of(), true));
+
+                  assertTrue(routed.isPresent());
+                  assertEquals(InputRouteDecision.BUFFERED, routed.orElseThrow().decision());
+                  assertTrue(router.buffered().isPresent());
+                  assertEquals(SemanticInput.PRIMARY, router.buffered().orElseThrow().input());
+              }
+
+              @Test
+              void armSwingAndEntityHitEquivalentObservationsAreDeduplicated() {
+                  InputRouter router = new InputRouter();
+                  InputRoutingContext legal =
+                          InputRoutingContext.legal(Set.of(SemanticInput.PRIMARY));
+
+                  Optional<InputRouteOutcome> first =
+                          PrimaryAttackInputCoordinator.route(router, 300, "PRIMARY", legal);
+                  Optional<InputRouteOutcome> duplicate =
+                          PrimaryAttackInputCoordinator.route(router, 301, "PRIMARY", legal);
+                  Optional<InputRouteOutcome> afterWindow =
+                          PrimaryAttackInputCoordinator.route(router, 303, "PRIMARY", legal);
+
+                  assertTrue(first.isPresent());
+                  assertTrue(duplicate.isEmpty());
+                  assertTrue(afterWindow.isPresent());
+                  assertEquals(InputRouteDecision.EXECUTED, afterWindow.orElseThrow().decision());
+              }
+          }
+          JAVA
+
+          rm -f .github/workflows/playable-v1-primary-coordinator-patch.yml
+          git diff --check
+
+      - name: Apply repository formatting
+        run: bash ./gradlew spotlessApply
+
+      - name: Verify formatted diff
+        run: git diff --check
+
+      - name: Verify full repository
+        run: bash ./gradlew clean build
+
+      - name: Commit verified patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'playable-v1-bot'
+          git config user.email 'playable-v1-bot@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'test(combat): centralize primary attack input routing'
+          git push origin HEAD:playable-v1

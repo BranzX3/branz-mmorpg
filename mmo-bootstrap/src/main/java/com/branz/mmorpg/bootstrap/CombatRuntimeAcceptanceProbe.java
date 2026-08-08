@@ -12,7 +12,9 @@ import org.bukkit.World;
 import org.bukkit.entity.Zombie;
 import org.bukkit.plugin.java.JavaPlugin;
 
-/** Smoke-only Paper acceptance probe for authoritative melee feedback and lethal entity bridging. */
+/**
+ * Smoke-only Paper acceptance probe for authoritative melee feedback and lethal entity bridging.
+ */
 final class CombatRuntimeAcceptanceProbe {
     static final String ENABLE_PROPERTY = "mmo.bootstrap.combat-acceptance-test";
     static final String MARKER_PROPERTY = "mmo.bootstrap.combat-acceptance-marker";
@@ -40,8 +42,7 @@ final class CombatRuntimeAcceptanceProbe {
             target.setSilent(true);
             target.setRemoveWhenFarAway(false);
 
-            CombatHealthEngine health =
-                    new CombatHealthEngine(CombatHealthProfile.trainingEnemy());
+            CombatHealthEngine health = new CombatHealthEngine(CombatHealthProfile.trainingEnemy());
             CombatHealthRuntime full =
                     CombatHealthRuntime.full(health.profile(), plugin.getServer().getCurrentTick());
             MeleeTargetDamageCoordinator.MeleeTargetDamageResult damage =
@@ -79,7 +80,8 @@ final class CombatRuntimeAcceptanceProbe {
     private static void verifyAndMark(JavaPlugin plugin, Zombie target) {
         try {
             if (!target.isDead()) {
-                throw new IllegalStateException("Bukkit target was not dead after lethal MMO bridge");
+                throw new IllegalStateException(
+                        "Bukkit target was not dead after lethal MMO bridge");
             }
             writeMarker();
             plugin.getLogger().info(PASS_MARKER);
@@ -107,9 +109,6 @@ final class CombatRuntimeAcceptanceProbe {
         if (parent != null) {
             Files.createDirectories(parent);
         }
-        Files.writeString(
-                marker,
-                PASS_MARKER + System.lineSeparator(),
-                StandardCharsets.UTF_8);
+        Files.writeString(marker, PASS_MARKER + System.lineSeparator(), StandardCharsets.UTF_8);
     }
 }

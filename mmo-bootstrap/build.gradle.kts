@@ -59,7 +59,27 @@ tasks.runServer {
                 rootProject.layout.projectDirectory.dir("example-content/milestone-1").asFile
         }
     jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
-    if (providers.gradleProperty("smokeTest").orNull == "true") {
+    val combatAcceptance = providers.gradleProperty("combatAcceptance").orNull == "true"
+    if (combatAcceptance) {
+        val acceptanceMarker =
+            project.layout.buildDirectory.file("combat-runtime-acceptance.pass").get().asFile
+        jvmArgs(
+            "-Dmmo.bootstrap.smoke-test=true",
+            "-Dmmo.bootstrap.combat-acceptance-test=true",
+            "-Dmmo.bootstrap.combat-acceptance-marker=${acceptanceMarker.absolutePath}",
+        )
+        doFirst {
+            acceptanceMarker.delete()
+        }
+        doLast {
+            check(
+                acceptanceMarker.isFile &&
+                    acceptanceMarker.readText().trim() == "COMBAT_RUNTIME_ACCEPTANCE_PASS",
+            ) {
+                "Paper combat runtime acceptance marker was not produced."
+            }
+        }
+    } else if (providers.gradleProperty("smokeTest").orNull == "true") {
         jvmArgs(
             "-Dmmo.bootstrap.smoke-test=true",
         )

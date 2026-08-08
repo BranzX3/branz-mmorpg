@@ -266,6 +266,9 @@ public final class BranzMmoPlugin extends JavaPlugin {
                     .severe(
                             "Branz MMO entered safe maintenance mode; player sessions are blocked.");
         }
+        if (decision.acceptsSessions()) {
+            CombatRuntimeAcceptanceProbe.schedule(this);
+        }
         scheduleSmokeShutdown();
     }
 

@@ -10,8 +10,7 @@ import org.bukkit.entity.LivingEntity;
 final class MeleeHitFeedbackRenderer {
     private MeleeHitFeedbackRenderer() {}
 
-    static void render(
-            LivingEntity entity, MeleeHitFeedbackPolicy.MeleeHitFeedbackSpec feedback) {
+    static void render(LivingEntity entity, MeleeHitFeedbackPolicy.MeleeHitFeedbackSpec feedback) {
         Objects.requireNonNull(entity, "entity");
         Objects.requireNonNull(feedback, "feedback");
         entity.playHurtAnimation(0.0f);

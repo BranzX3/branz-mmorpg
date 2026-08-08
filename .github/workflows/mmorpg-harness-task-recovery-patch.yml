@@ -1,0 +1,44 @@
+name: MMORPG harness scheduled-task recovery patch
+
+on:
+  push:
+    branches: [HARNESS_MMORPG_CONTROL]
+    paths:
+      - '.github/workflows/mmorpg-harness-task-recovery-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: HARNESS_MMORPG_CONTROL
+          fetch-depth: 0
+      - name: Apply guarded recovery patch
+        run: python3 .mmorpg-harness/patch-task-recovery.py
+      - name: Parse PowerShell syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.mmorpg-harness/bootstrap.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+      - name: Clean staging helpers
+        shell: bash
+        run: |
+          rm -f .mmorpg-harness/patch-task-recovery.py
+          rm -f .github/workflows/mmorpg-harness-task-recovery-patch.yml
+          git diff --check
+      - name: Commit verified recovery policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'mmorpg-harness-bot'
+          git config user.email 'mmorpg-harness-bot@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix(harness): auto-recover daemon scheduled task'
+          git push origin HEAD:HARNESS_MMORPG_CONTROL

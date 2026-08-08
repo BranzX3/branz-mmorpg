@@ -35,13 +35,7 @@ class MeleeCombatAcceptanceTest {
                         1);
         TargetCollider zombieLikeTarget =
                 new TargetCollider(
-                        targetId,
-                        new CombatVector(0.0, 0.0, 1.5),
-                        0.3,
-                        1.8,
-                        true,
-                        true,
-                        false);
+                        targetId, new CombatVector(0.0, 0.0, 1.5), 0.3, 1.8, true, true, false);
 
         SweptArcResolution hitbox =
                 new SweptArcHitboxResolver()
@@ -76,13 +70,7 @@ class MeleeCombatAcceptanceTest {
                         1);
         TargetCollider behindAttacker =
                 new TargetCollider(
-                        targetId,
-                        new CombatVector(0.0, 0.0, -1.5),
-                        0.3,
-                        1.8,
-                        true,
-                        true,
-                        false);
+                        targetId, new CombatVector(0.0, 0.0, -1.5), 0.3, 1.8, true, true, false);
 
         SweptArcResolution hitbox =
                 new SweptArcHitboxResolver()

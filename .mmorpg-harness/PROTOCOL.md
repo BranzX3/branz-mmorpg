@@ -49,6 +49,7 @@ Initial allowlist:
 - `MMO_GRADLE_TEST_MARKET_V1`
 - `MMO_BOOTSTRAP_SHADOWJAR_V1`
 - `MMO_BOOTSTRAP_SMOKE_V1`
+- `MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1`
 - `MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1`
 - `MMO_CONTENT_VALIDATE_FIXTURE_V1`
 
@@ -105,6 +106,7 @@ The current implementation branch uses Gradle multi-project build `mmo-platform`
 The smoke actions use only the repository-authored fixed properties:
 
 - `:mmo-bootstrap:runServer -PsmokeTest=true`
+- `:mmo-bootstrap:runServer -PcombatAcceptance=true`
 - `:mmo-bootstrap:runServer -PsmokeTest=true -PsmokeInvalidContent=true`
 
 They never accept a remote content path or arbitrary Gradle arguments.

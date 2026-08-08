@@ -406,6 +406,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     "MMO_GRADLE_TEST_MARKET_V1": ActionSpec(make_gradle_action((":mmo-market:test",), 900, "GRADLE_TEST_MARKET"), "GRADLE_TEST_MARKET"),
     "MMO_BOOTSTRAP_SHADOWJAR_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:shadowJar",), 1200, "BOOTSTRAP_SHADOWJAR"), "BOOTSTRAP_SHADOWJAR"),
     "MMO_BOOTSTRAP_SMOKE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PsmokeTest=true"), 600, "BOOTSTRAP_SMOKE"), "BOOTSTRAP_SMOKE"),
+    "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PcombatAcceptance=true"), 600, "BOOTSTRAP_COMBAT_ACCEPTANCE"), "BOOTSTRAP_COMBAT_ACCEPTANCE"),
     "MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PsmokeTest=true", "-PsmokeInvalidContent=true"), 600, "BOOTSTRAP_INVALID_CONTENT_SMOKE"), "BOOTSTRAP_INVALID_CONTENT_SMOKE"),
     "MMO_CONTENT_VALIDATE_FIXTURE_V1": ActionSpec(action_content_validate_fixture, "CONTENT_VALIDATE_MILESTONE1"),
 }

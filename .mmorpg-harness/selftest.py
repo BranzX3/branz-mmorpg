@@ -50,6 +50,9 @@ def main() -> int:
         bad[key] = ["whoami"] if key in {"commands", "argv", "gradle_args"} else "whoami"
         expect_code("REMOTE_COMMANDS_FORBIDDEN", lambda b=bad: R.validate_manifest(b))
 
+    assert "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1" in R.ACTION_SPECS
+    assert R.ACTION_SPECS["MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1"].identity == "BOOTSTRAP_COMBAT_ACCEPTANCE"
+
     bad = manifest(action="NOT_REAL")
     expect_code("ACTION_NOT_ALLOWLISTED", lambda: R.validate_manifest(bad))
 

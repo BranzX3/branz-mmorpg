@@ -177,6 +177,7 @@ import org.bukkit.FluidCollisionMode;
 import org.bukkit.Input;
 import org.bukkit.Location;
 import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
@@ -2013,6 +2014,7 @@ final class CombatSessionController implements Listener {
             CombatHealthResolution healthResolution =
                     enemyHealth.damage(targetHealth, currentTick, resolvedDamage);
             trainingTargetHealth.put(target.entityId(), healthResolution.runtime());
+            renderMeleeHitFeedback(entity, healthResolution.appliedAmount());
             observeSuccessfulCombatAction(
                     player,
                     session,
@@ -3142,6 +3144,30 @@ final class CombatSessionController implements Listener {
         if (Double.compare(player.getHealth(), presented) != 0) {
             player.setHealth(presented);
         }
+    }
+
+    private void renderMeleeHitFeedback(LivingEntity entity, double appliedDamage) {
+        MeleeHitFeedbackPolicy.forAppliedDamage(appliedDamage)
+                .ifPresent(
+                        feedback -> {
+                            Location location =
+                                    entity.getLocation().add(0.0, entity.getHeight() * 0.6, 0.0);
+                            entity.getWorld()
+                                    .spawnParticle(
+                                            Particle.DAMAGE_INDICATOR,
+                                            location,
+                                            feedback.particleCount(),
+                                            0.18,
+                                            0.18,
+                                            0.18,
+                                            0.02);
+                            entity.getWorld()
+                                    .playSound(
+                                            location,
+                                            Sound.ENTITY_PLAYER_ATTACK_STRONG,
+                                            feedback.volume(),
+                                            feedback.pitch());
+                        });
     }
 
     private static double roundOne(double value) {

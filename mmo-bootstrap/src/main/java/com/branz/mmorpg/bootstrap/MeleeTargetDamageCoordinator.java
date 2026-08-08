@@ -39,8 +39,8 @@ final class MeleeTargetDamageCoordinator {
             if (!Double.isFinite(appliedDamage) || appliedDamage < 0.0) {
                 throw new IllegalArgumentException("appliedDamage must be finite and non-negative");
             }
-            if (lethalNow != runtime.dead()) {
-                throw new IllegalArgumentException("lethalNow must match the resulting runtime");
+            if (lethalNow && !runtime.dead()) {
+                throw new IllegalArgumentException("lethalNow requires a dead resulting runtime");
             }
             if ((appliedDamage > 0.0) != feedback.isPresent()) {
                 throw new IllegalArgumentException(

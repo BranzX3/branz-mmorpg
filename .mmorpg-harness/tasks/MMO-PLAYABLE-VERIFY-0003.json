@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PLAYABLE-VERIFY-0003",
+  "task_branch": "harness-task/MMO-PLAYABLE-VERIFY-0003",
+  "base_commit": "d3ae9562d54b0e89ffb32a0caa18d675b6eaf1d3",
+  "action_id": "MMO_GRADLE_VERIFY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PLAYABLE-VERIFY-0003/**"
+  ]
+}

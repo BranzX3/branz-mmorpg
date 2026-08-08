@@ -52,6 +52,7 @@ def main() -> int:
 
     assert "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1" in R.ACTION_SPECS
     assert R.ACTION_SPECS["MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1"].identity == "BOOTSTRAP_COMBAT_ACCEPTANCE"
+    assert R.ACTION_SPECS["MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1"].handler is R.action_bootstrap_combat_acceptance
 
     bad = manifest(action="NOT_REAL")
     expect_code("ACTION_NOT_ALLOWLISTED", lambda: R.validate_manifest(bad))

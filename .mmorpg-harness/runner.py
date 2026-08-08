@@ -377,6 +377,22 @@ def make_gradle_action(argv_tail: tuple[str, ...], timeout: int, identity: str) 
     return handler
 
 
+def action_bootstrap_combat_acceptance(
+    repo: Path, result_dir: Path, manifest: dict[str, Any]
+) -> tuple[int, str, str, dict[str, Any]]:
+    run_dir = repo / "mmo-bootstrap" / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "eula.txt").write_text("eula=true\n", encoding="utf-8")
+    return action_gradle(
+        repo,
+        result_dir,
+        manifest,
+        (":mmo-bootstrap:runServer", "-PcombatAcceptance=true"),
+        600,
+        "BOOTSTRAP_COMBAT_ACCEPTANCE",
+    )
+
+
 def action_content_validate_fixture(repo: Path, result_dir: Path, manifest: dict[str, Any]) -> tuple[int, str, str, dict[str, Any]]:
     fixture = (repo / "example-content" / "milestone-1").resolve()
     if not fixture.is_dir():
@@ -406,7 +422,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     "MMO_GRADLE_TEST_MARKET_V1": ActionSpec(make_gradle_action((":mmo-market:test",), 900, "GRADLE_TEST_MARKET"), "GRADLE_TEST_MARKET"),
     "MMO_BOOTSTRAP_SHADOWJAR_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:shadowJar",), 1200, "BOOTSTRAP_SHADOWJAR"), "BOOTSTRAP_SHADOWJAR"),
     "MMO_BOOTSTRAP_SMOKE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PsmokeTest=true"), 600, "BOOTSTRAP_SMOKE"), "BOOTSTRAP_SMOKE"),
-    "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PcombatAcceptance=true"), 600, "BOOTSTRAP_COMBAT_ACCEPTANCE"), "BOOTSTRAP_COMBAT_ACCEPTANCE"),
+    "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1": ActionSpec(action_bootstrap_combat_acceptance, "BOOTSTRAP_COMBAT_ACCEPTANCE"),
     "MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PsmokeTest=true", "-PsmokeInvalidContent=true"), 600, "BOOTSTRAP_INVALID_CONTENT_SMOKE"), "BOOTSTRAP_INVALID_CONTENT_SMOKE"),
     "MMO_CONTENT_VALIDATE_FIXTURE_V1": ActionSpec(action_content_validate_fixture, "CONTENT_VALIDATE_MILESTONE1"),
 }

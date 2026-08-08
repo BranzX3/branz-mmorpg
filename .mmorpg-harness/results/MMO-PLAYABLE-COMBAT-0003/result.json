@@ -1,0 +1,35 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_GRADLE_TEST_COMBAT_V1",
+  "action_identity": "GRADLE_TEST_COMBAT",
+  "action_record": {
+    "action_status": "PASS",
+    "argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-combat:test"
+    ],
+    "duration_seconds": 8.156,
+    "exit_code": 0,
+    "fixed_command_id": "GRADLE_TEST_COMBAT"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PLAYABLE-COMBAT-0003/**"
+  ],
+  "base_commit_expected": "3ef6370edca1f9f439fe0c63ecfde6c38a304d9c",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "cb08fa421415115e76349a361d3a8c39c0fa19eb",
+  "duration_seconds": 8.234,
+  "ending_commit_before_result_commit": "3ef6370edca1f9f439fe0c63ecfde6c38a304d9c",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-08T21:56:49.771216+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-08T21:56:41.532291+00:00",
+  "starting_commit_actual": "3ef6370edca1f9f439fe0c63ecfde6c38a304d9c",
+  "task_branch": "harness-task/MMO-PLAYABLE-COMBAT-0003",
+  "task_id": "MMO-PLAYABLE-COMBAT-0003",
+  "task_manifest_sha256": "7133cf5d0b5ebe1c273b9b0b0182f365518162b3fa76fcbc29ec4f9b20714581",
+  "unauthorized_writes": []
+}

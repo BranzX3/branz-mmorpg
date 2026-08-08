@@ -68,6 +68,7 @@ import com.branz.mmorpg.combat.input.ClientAction;
 import com.branz.mmorpg.combat.input.CombatInputPolicy;
 import com.branz.mmorpg.combat.input.CombatInputRequest;
 import com.branz.mmorpg.combat.input.DirectionSnapshot;
+import com.branz.mmorpg.combat.input.HostileAutoDrawPolicy;
 import com.branz.mmorpg.combat.input.InputBufferClearReason;
 import com.branz.mmorpg.combat.input.InputDeduplicationKey;
 import com.branz.mmorpg.combat.input.InputObservation;
@@ -1260,7 +1261,7 @@ final class CombatSessionController implements Listener {
             updateHealthPresentation(defender, defenderSession);
         }
         if (resolved.outcome() != CombatDefenseOutcome.DODGED) {
-            markHostile(defender, defenderSession);
+            markIncomingHostile(defender, defenderSession);
         }
         defenderSession.lastResolution =
                 resolved.outcome()
@@ -3228,6 +3229,18 @@ final class CombatSessionController implements Listener {
                 && session.engagement.state() == EngagementState.EXPLORATION) {
             completeOpenCombatEvidence(player, session, EncounterOutcome.RETREAT);
         }
+    }
+
+    private void markIncomingHostile(Player player, LiveSession session) {
+        markHostile(player, session);
+        SelectedHotbarSlot combatSlot = selectedSlot(player, 0);
+        boolean combatReady = combatReadinessFailure(player).isEmpty();
+        if (!HostileAutoDrawPolicy.shouldBeginDraw(
+                session.weapon.state(), combatSlot.kind(), combatReady, session.health.dead())) {
+            return;
+        }
+        player.getInventory().setHeldItemSlot(combatSlot.slot());
+        select(session, combatSlot);
     }
 
     private void markHostile(Player player, LiveSession session) {

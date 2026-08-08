@@ -36,7 +36,11 @@ jobs:
       - name: Verify full repository
         run: bash ./gradlew clean build
       - name: Run Paper combat runtime acceptance
-        run: bash ./gradlew :mmo-bootstrap:runServer -PcombatAcceptance=true --no-daemon --console=plain
+        shell: bash
+        run: |
+          mkdir -p mmo-bootstrap/run
+          printf 'eula=true\n' > mmo-bootstrap/run/eula.txt
+          bash ./gradlew :mmo-bootstrap:runServer -PcombatAcceptance=true --no-daemon --console=plain
       - name: Commit verified Paper acceptance
         shell: bash
         run: |

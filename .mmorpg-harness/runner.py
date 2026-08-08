@@ -12,6 +12,7 @@ import json
 import os
 import platform
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -87,7 +88,48 @@ def run(argv: list[str], *, cwd: Path, timeout: int | None = None, env: dict[str
             stdout = stdout.decode("utf-8", errors="replace")
         if isinstance(stderr, bytes):
             stderr = stderr.decode("utf-8", errors="replace")
-        raise HarnessError("ACTION_TIMEOUT", f"timeout={timeout}s argv={argv!r}\n{stdout}\n{stderr}") from exc
+        raise HarnessError("COMMAND_TIMEOUT", f"timeout={timeout}s argv={argv!r}\n{stdout}\n{stderr}") from exc
+
+
+def run_action(argv: list[str], *, cwd: Path, timeout: int, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    kwargs: dict[str, Any] = {
+        "cwd": cwd,
+        "text": True,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "env": env,
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        kwargs["start_new_session"] = True
+    proc = subprocess.Popen(argv, **kwargs)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                text=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        else:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        try:
+            stdout, stderr = proc.communicate(timeout=15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, stderr = proc.communicate()
+        raise HarnessError(
+            "ACTION_TIMEOUT",
+            f"timeout={timeout}s argv={argv!r}\n{stdout}\n{stderr}",
+        ) from exc
+    return subprocess.CompletedProcess(argv, proc.returncode, stdout, stderr)
 
 
 def git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -241,6 +283,7 @@ def environment_fingerprint(repo: Path) -> dict[str, Any]:
             return {"error": exc.code, "detail": exc.message}
 
     wrapper = repo / ("gradlew.bat" if os.name == "nt" else "gradlew")
+    java_home = os.environ.get("JAVA_HOME")
     fp: dict[str, Any] = {
         "captured_at_utc": utc_now(),
         "platform": platform.platform(),
@@ -249,7 +292,7 @@ def environment_fingerprint(repo: Path) -> dict[str, Any]:
         "python_executable": sys.executable,
         "git": probe(["git", "--version"]),
         "java": probe(["java", "-version"]),
-        "java_home_present": bool(os.environ.get("JAVA_HOME")),
+        "java_home": java_home,
         "cpu_count": os.cpu_count(),
         "repo_remote": sanitized_remote(repo),
         "repo_head": git(repo, "rev-parse", "HEAD").stdout.strip(),
@@ -276,7 +319,9 @@ def gradle_env(repo: Path) -> dict[str, str]:
     env = dict(os.environ)
     env["CI"] = "true"
     env["GRADLE_USER_HOME"] = str((repo.parent / "gradle-home").resolve())
-    env.pop("GRADLE_OPTS", None)
+    for key in list(env):
+        if key in {"GRADLE_OPTS", "JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS", "JDK_JAVA_OPTIONS"} or key.startswith("ORG_GRADLE_PROJECT_"):
+            env.pop(key, None)
     return env
 
 
@@ -315,11 +360,12 @@ def action_canary(repo: Path, result_dir: Path, manifest: dict[str, Any]) -> tup
 def action_gradle(repo: Path, result_dir: Path, manifest: dict[str, Any], argv_tail: tuple[str, ...], timeout: int, identity: str) -> tuple[int, str, str, dict[str, Any]]:
     argv = [gradle_wrapper(repo), "--no-daemon", "--console=plain", *argv_tail]
     started = time.monotonic()
-    cp = run(argv, cwd=repo, timeout=timeout, env=gradle_env(repo))
+    cp = run_action(argv, cwd=repo, timeout=timeout, env=gradle_env(repo))
     elapsed = round(time.monotonic() - started, 3)
     return cp.returncode, cp.stdout, cp.stderr, {
         "action_status": "PASS" if cp.returncode == 0 else "FAIL",
         "fixed_command_id": identity,
+        "argv": argv,
         "exit_code": cp.returncode,
         "duration_seconds": elapsed,
     }
@@ -561,9 +607,12 @@ def command_run(repo: Path) -> int:
     if state != "ACTIVE":
         raise HarnessError("INVALID_ACTIVE_STATE", repr(state))
     task_path = active.get("task_path")
-    if not isinstance(task_path, str) or not task_path.startswith(TASK_PREFIX) or not task_path.endswith(".json"):
+    if not isinstance(task_path, str) or not task_path.startswith(TASK_PREFIX) or not task_path.endswith(".json") or ".." in Path(task_path).parts:
         raise HarnessError("ACTIVE_TASK_PATH_INVALID", repr(task_path))
     manifest, manifest_sha = load_remote_json(repo, task_path)
+    manifest_task_id = manifest.get("task_id")
+    if not isinstance(manifest_task_id, str) or task_path != f"{TASK_PREFIX}{manifest_task_id}.json":
+        raise HarnessError("ACTIVE_TASK_MANIFEST_PATH_MISMATCH", repr({"path": task_path, "task_id": manifest_task_id}))
     control_commit = git(repo, "rev-parse", f"{REMOTE}/{CONTROL_BRANCH}").stdout.strip()
     return execute_task(repo, manifest, manifest_sha, control_commit)
 

@@ -1,0 +1,302 @@
+name: playable-v1 combat patch
+
+on:
+  push:
+    branches: [playable-v1]
+    paths:
+      - '.github/workflows/playable-v1-combat-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: playable-v1
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+      - name: Apply guarded combat ingress patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/CombatSessionController.java')
+          source = path.read_text(encoding='utf-8')
+
+          import_needle = 'import com.branz.mmorpg.combat.input.CombatInputPolicy;\n'
+          if source.count(import_needle) != 1:
+              raise SystemExit(f'expected exactly one CombatInputPolicy import, got {source.count(import_needle)}')
+          source = source.replace(
+              import_needle,
+              import_needle
+              + 'import com.branz.mmorpg.combat.input.PrimaryAttackIngressDecision;\n'
+              + 'import com.branz.mmorpg.combat.input.PrimaryAttackIngressPolicy;\n',
+              1,
+          )
+
+          arm_start = (
+              '    @EventHandler(priority = EventPriority.HIGHEST)\n'
+              '    public void onArmSwing(PlayerAnimationEvent event) {'
+          )
+          damage_start = (
+              '\n    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)\n'
+              '    public void onVanillaCombatDamage(EntityDamageByEntityEvent event) {'
+          )
+          if source.count(arm_start) != 1:
+              raise SystemExit(f'expected exactly one onArmSwing marker, got {source.count(arm_start)}')
+          if source.count(damage_start) != 1:
+              raise SystemExit(f'expected exactly one onVanillaCombatDamage marker, got {source.count(damage_start)}')
+          start = source.index(arm_start)
+          end = source.index(damage_start, start)
+          replacement = '''    @EventHandler(priority = EventPriority.HIGHEST)
+              public void onArmSwing(PlayerAnimationEvent event) {
+                  if (event.getAnimationType() != PlayerAnimationType.ARM_SWING) {
+                      return;
+                  }
+                  Player player = event.getPlayer();
+                  LiveSession session = sessions.get(player.getUniqueId());
+                  if (session == null || !characters.ready(player)) {
+                      return;
+                  }
+                  if (routePrimaryAttack(player, session)) {
+                      event.setCancelled(true);
+                  }
+              }
+
+              /**
+               * Converges arm-swing and direct entity-hit ingress into the same semantic PRIMARY
+               * request. Returning true means the MMO owns this physical attack and vanilla damage
+               * must not leak through, including duplicate observations and action-locked states.
+               */
+              private boolean routePrimaryAttack(Player player, LiveSession session) {
+                  SelectedHotbarSlot selected =
+                          selectedSlot(player, player.getInventory().getHeldItemSlot());
+                  PrimaryAttackIngressDecision ingress =
+                          PrimaryAttackIngressPolicy.decide(
+                                  session.weapon.state(), selected.kind(), session.timeline != null);
+                  if (!ingress.mmoOwned()) {
+                      return false;
+                  }
+                  if (!ingress.routePrimary()) {
+                      return true;
+                  }
+                  if (ingress.beginDraw()) {
+                      select(session, selected);
+                  }
+                  MoveDefinition primary = primaryMove(player).orElse(null);
+                  if (primary == null) {
+                      return true;
+                  }
+                  SemanticInput intent =
+                          resolvedIntent(player, session, ClientAction.ATTACK).orElse(null);
+                  if (intent != SemanticInput.PRIMARY) {
+                      return true;
+                  }
+                  Result<CombatInputRequest, InputRejectionCode> observed =
+                          session.input.observe(
+                                  new InputObservation(
+                                          plugin.getServer().getCurrentTick(),
+                                          intent,
+                                          DirectionSnapshot.NEUTRAL,
+                                          primary.input().branch(),
+                                          new InputDeduplicationKey("MAIN_HAND", "ATTACK")));
+                  if (!(observed
+                          instanceof Result.Success<CombatInputRequest, InputRejectionCode> input)) {
+                      return true;
+                  }
+                  Result<InputRouteOutcome, InputRejectionCode> routed =
+                          session.input.routeFrame(
+                                  List.of(input.value()), routingContext(player, session));
+                  if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
+                      handleRoute(player, session, success.value());
+                  }
+                  return true;
+              }
+          '''
+          # The triple-quoted block is indented with 14 workflow-script spaces. Strip exactly those
+          # while preserving Java indentation.
+          replacement = '\n'.join(
+              line[14:] if line.startswith('              ') else line
+              for line in replacement.splitlines()
+          ) + '\n'
+          source = source[:start] + replacement + source[end:]
+
+          attacker_pattern = re.compile(
+              r'(    @EventHandler\(priority = EventPriority\.HIGHEST, ignoreCancelled = true\)\n'
+              r'    public void onVanillaCombatDamage\(EntityDamageByEntityEvent event\) \{\n)'
+              r'        if \(event\.getDamageSource\(\)\.getCausingEntity\(\) instanceof Player attacker\) \{\n'
+              r'            LiveSession attackerSession = sessions\.get\(attacker\.getUniqueId\(\)\);\n'
+              r'            if \(attackerSession != null\n'
+              r'                    && \(attackerSession\.weapon\.state\(\) == WeaponState\.READY\n'
+              r'                            \|\| attackerSession\.timeline != null\)\) \{\n'
+              r'                event\.setCancelled\(true\);\n'
+              r'                return;\n'
+              r'            \}\n'
+              r'        \}\n'
+          )
+          source, count = attacker_pattern.subn(
+              r'''\1        if (event.getDamageSource().getCausingEntity() instanceof Player attacker) {
+                      LiveSession attackerSession = sessions.get(attacker.getUniqueId());
+                      if (attackerSession != null
+                              && characters.ready(attacker)
+                              && routePrimaryAttack(attacker, attackerSession)) {
+                          event.setCancelled(true);
+                          return;
+                      }
+                  }
+          '''.replace('                  ', ''),
+              source,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'expected exactly one vanilla-attacker preamble, got {count}')
+
+          path.write_text(source, encoding='utf-8')
+          PY
+
+          mkdir -p mmo-combat/src/main/java/com/branz/mmorpg/combat/input
+          cat > mmo-combat/src/main/java/com/branz/mmorpg/combat/input/PrimaryAttackIngressDecision.java <<'JAVA'
+          package com.branz.mmorpg.combat.input;
+
+          /** Ownership decision for one physical primary-attack ingress observation. */
+          public record PrimaryAttackIngressDecision(
+                  boolean mmoOwned, boolean beginDraw, boolean routePrimary) {
+              public PrimaryAttackIngressDecision {
+                  if (beginDraw && !routePrimary) {
+                      throw new IllegalArgumentException("beginDraw requires routePrimary");
+                  }
+                  if (routePrimary && !mmoOwned) {
+                      throw new IllegalArgumentException("routePrimary requires MMO ownership");
+                  }
+              }
+          }
+          JAVA
+
+          cat > mmo-combat/src/main/java/com/branz/mmorpg/combat/input/PrimaryAttackIngressPolicy.java <<'JAVA'
+          package com.branz.mmorpg.combat.input;
+
+          import com.branz.mmorpg.combat.state.WeaponState;
+          import com.branz.mmorpg.combat.weapon.SelectedSlotKind;
+          import java.util.Objects;
+
+          /** Decides whether a physical LMB observation belongs to MMO combat before Bukkit damage. */
+          public final class PrimaryAttackIngressPolicy {
+              private static final PrimaryAttackIngressDecision VANILLA =
+                      new PrimaryAttackIngressDecision(false, false, false);
+              private static final PrimaryAttackIngressDecision OWNED_LOCKED =
+                      new PrimaryAttackIngressDecision(true, false, false);
+              private static final PrimaryAttackIngressDecision ROUTE =
+                      new PrimaryAttackIngressDecision(true, false, true);
+              private static final PrimaryAttackIngressDecision DRAW_AND_ROUTE =
+                      new PrimaryAttackIngressDecision(true, true, true);
+
+              private PrimaryAttackIngressPolicy() {}
+
+              public static PrimaryAttackIngressDecision decide(
+                      WeaponState weapon, SelectedSlotKind selectedSlot, boolean actionActive) {
+                  Objects.requireNonNull(weapon, "weapon");
+                  Objects.requireNonNull(selectedSlot, "selectedSlot");
+                  if (actionActive) {
+                      return OWNED_LOCKED;
+                  }
+                  return switch (weapon) {
+                      case READY, DRAWING -> ROUTE;
+                      case SHEATHED ->
+                              selectedSlot == SelectedSlotKind.COMBAT_WEAPON ? DRAW_AND_ROUTE : VANILLA;
+                      case SHEATHING, DISABLED ->
+                              selectedSlot == SelectedSlotKind.COMBAT_WEAPON ? OWNED_LOCKED : VANILLA;
+                  };
+              }
+          }
+          JAVA
+
+          mkdir -p mmo-combat/src/test/java/com/branz/mmorpg/combat/input
+          cat > mmo-combat/src/test/java/com/branz/mmorpg/combat/input/PrimaryAttackIngressPolicyTest.java <<'JAVA'
+          package com.branz.mmorpg.combat.input;
+
+          import static org.junit.jupiter.api.Assertions.assertEquals;
+
+          import com.branz.mmorpg.combat.state.WeaponState;
+          import com.branz.mmorpg.combat.weapon.SelectedSlotKind;
+          import org.junit.jupiter.api.Test;
+
+          class PrimaryAttackIngressPolicyTest {
+              @Test
+              void readyAndDrawingRoutePrimaryWithoutRequiringEngagement() {
+                  assertEquals(
+                          new PrimaryAttackIngressDecision(true, false, true),
+                          PrimaryAttackIngressPolicy.decide(
+                                  WeaponState.READY, SelectedSlotKind.COMBAT_WEAPON, false));
+                  assertEquals(
+                          new PrimaryAttackIngressDecision(true, false, true),
+                          PrimaryAttackIngressPolicy.decide(
+                                  WeaponState.DRAWING, SelectedSlotKind.COMBAT_WEAPON, false));
+              }
+
+              @Test
+              void sheathedCombatWeaponBeginsDrawAndRoutesBufferedOpener() {
+                  assertEquals(
+                          new PrimaryAttackIngressDecision(true, true, true),
+                          PrimaryAttackIngressPolicy.decide(
+                                  WeaponState.SHEATHED, SelectedSlotKind.COMBAT_WEAPON, false));
+              }
+
+              @Test
+              void sheathedNonCombatSlotsRemainVanillaOwned() {
+                  for (SelectedSlotKind kind :
+                          new SelectedSlotKind[] {
+                              SelectedSlotKind.CONSUMABLE,
+                              SelectedSlotKind.TOOL_OR_BLOCK,
+                              SelectedSlotKind.EMPTY,
+                              SelectedSlotKind.CHRONICLE
+                          }) {
+                      assertEquals(
+                              new PrimaryAttackIngressDecision(false, false, false),
+                              PrimaryAttackIngressPolicy.decide(WeaponState.SHEATHED, kind, false));
+                  }
+              }
+
+              @Test
+              void activeTimelineAndLockedCombatStatesNeverLeakVanillaDamage() {
+                  assertEquals(
+                          new PrimaryAttackIngressDecision(true, false, false),
+                          PrimaryAttackIngressPolicy.decide(
+                                  WeaponState.READY, SelectedSlotKind.COMBAT_WEAPON, true));
+                  assertEquals(
+                          new PrimaryAttackIngressDecision(true, false, false),
+                          PrimaryAttackIngressPolicy.decide(
+                                  WeaponState.SHEATHING, SelectedSlotKind.COMBAT_WEAPON, false));
+                  assertEquals(
+                          new PrimaryAttackIngressDecision(true, false, false),
+                          PrimaryAttackIngressPolicy.decide(
+                                  WeaponState.DISABLED, SelectedSlotKind.COMBAT_WEAPON, false));
+              }
+          }
+          JAVA
+
+          rm .github/workflows/playable-v1-combat-patch.yml
+          git diff --check
+
+      - name: Verify full repository
+        run: ./gradlew clean build
+
+      - name: Commit verified patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'playable-v1-bot'
+          git config user.email 'playable-v1-bot@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix(combat): route primary attacks through MMO ingress'
+          git push origin HEAD:playable-v1

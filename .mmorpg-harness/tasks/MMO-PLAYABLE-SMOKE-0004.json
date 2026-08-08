@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PLAYABLE-SMOKE-0004",
+  "task_branch": "harness-task/MMO-PLAYABLE-SMOKE-0004",
+  "base_commit": "a2d831c8cb13cba8a812014775405abcbb4cfe4e",
+  "action_id": "MMO_BOOTSTRAP_SMOKE_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PLAYABLE-SMOKE-0004/**"
+  ]
+}

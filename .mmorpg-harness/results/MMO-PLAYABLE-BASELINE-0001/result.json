@@ -1,0 +1,36 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_GRADLE_VERIFY_V1",
+  "action_identity": "GRADLE_CLEAN_BUILD",
+  "action_record": {
+    "action_status": "PASS",
+    "argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "clean",
+      "build"
+    ],
+    "duration_seconds": 366.579,
+    "exit_code": 0,
+    "fixed_command_id": "GRADLE_CLEAN_BUILD"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PLAYABLE-BASELINE-0001/**"
+  ],
+  "base_commit_expected": "5d1b13bd934c27c76dd3f56d32e956864b478bd8",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "43ab50a40f78bf9af887af1fe06d13eac7e31824",
+  "duration_seconds": 366.657,
+  "ending_commit_before_result_commit": "5d1b13bd934c27c76dd3f56d32e956864b478bd8",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-08T20:54:14.075326+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-08T20:48:07.416895+00:00",
+  "starting_commit_actual": "5d1b13bd934c27c76dd3f56d32e956864b478bd8",
+  "task_branch": "harness-task/MMO-PLAYABLE-BASELINE-0001",
+  "task_id": "MMO-PLAYABLE-BASELINE-0001",
+  "task_manifest_sha256": "ec117bbd526f40af354108624cc33ac280a550ec1053448babac59fe70e653ed",
+  "unauthorized_writes": []
+}

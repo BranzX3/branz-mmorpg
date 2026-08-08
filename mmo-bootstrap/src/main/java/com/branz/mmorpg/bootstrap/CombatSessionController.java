@@ -647,6 +647,23 @@ final class CombatSessionController implements Listener {
         restoreEquippedCrossbow(player, session, tick);
     }
 
+    void onEquipmentChanged(Player player) {
+        LiveSession session = sessions.get(Objects.requireNonNull(player, "player").getUniqueId());
+        if (session == null || !characters.ready(player)) {
+            return;
+        }
+        cancelAction(session, "EQUIPMENT_CHANGE");
+        cancelBow(session, "EQUIPMENT_CHANGE");
+        cancelCrossbow(session, "EQUIPMENT_CHANGE");
+        cancelSpell(session, "EQUIPMENT_CHANGE");
+        session.imbuement = null;
+        releaseGuard(session);
+        session.input.clearBuffer(InputBufferClearReason.WEAPON_SWAP);
+        session.weapon = weapons.resetTransient();
+        select(session, selectedSlot(player, player.getInventory().getHeldItemSlot()));
+        restoreEquippedCrossbow(player, session, plugin.getServer().getCurrentTick());
+    }
+
     Optional<CombatSessionStatus> status(Player player) {
         LiveSession session = sessions.get(Objects.requireNonNull(player, "player").getUniqueId());
         if (session == null) {

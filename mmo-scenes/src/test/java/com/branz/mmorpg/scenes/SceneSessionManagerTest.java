@@ -25,6 +25,7 @@ class SceneSessionManagerTest {
         SceneSessionManager manager = new SceneSessionManager(CLOCK);
         UUID playerId = UUID.randomUUID();
         SceneSession opened = success(manager.open(playerId, EquipmentLoadout.empty()));
+        success(manager.changeMode(playerId, opened.sessionId(), SceneMode.EQUIPMENT));
         ItemId previewItem = new ItemId(UUID.randomUUID());
         SceneSession previewed =
                 success(
@@ -48,6 +49,7 @@ class SceneSessionManagerTest {
         SceneSessionManager manager = new SceneSessionManager(CLOCK);
         UUID playerId = UUID.randomUUID();
         SceneSession opened = success(manager.open(playerId, EquipmentLoadout.empty()));
+        success(manager.changeMode(playerId, opened.sessionId(), SceneMode.EQUIPMENT));
         ItemId itemId = new ItemId(UUID.randomUUID());
         success(
                 manager.previewEquipment(
@@ -101,6 +103,7 @@ class SceneSessionManagerTest {
         SceneSessionManager manager = new SceneSessionManager(CLOCK);
         UUID playerId = UUID.randomUUID();
         SceneSession opened = success(manager.open(playerId, EquipmentLoadout.empty()));
+        success(manager.changeMode(playerId, opened.sessionId(), SceneMode.EQUIPMENT));
         QuiverPreparation prepared =
                 QuiverPreparation.empty()
                         .toggle(
@@ -132,6 +135,7 @@ class SceneSessionManagerTest {
         SceneSessionManager manager = new SceneSessionManager(CLOCK);
         UUID playerId = UUID.randomUUID();
         SceneSession opened = success(manager.open(playerId, EquipmentLoadout.empty()));
+        success(manager.changeMode(playerId, opened.sessionId(), SceneMode.EQUIPMENT));
         QuiverAmmoTransferPreview transfer =
                 new QuiverAmmoTransferPreview(UUID.randomUUID(), 64, QuiverTransferDirection.STORE);
 

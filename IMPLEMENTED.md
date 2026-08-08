@@ -1,5 +1,10 @@
 # Implementation Map
 
+> This file inventories code and test coverage; it is not completion evidence. A player-facing
+> feature is `COMPLETE` only after the feature-completion gate in
+> `docs/42-ai-coding-handoff.md`, including a recorded real local Paper client acceptance pass.
+> Kernel, scaffold, lab and automated-test coverage alone are `AUTOMATED_VERIFIED` at most.
+
 ## Milestone 0 — first bounded task
 
 Implemented:
@@ -421,18 +426,26 @@ Implemented contracts from `docs/14-items-equipment-durability.md`,
   projection handoff;
 - atomic multi-item location moves ordered by UUID for native/virtual equipment swaps; any stale
   owner, location or version rolls the whole transaction and journal back;
-- preview-only `SceneSessionManager` with stale-session tokens, modes, back/discard, explicit
-  commit boundary and close reasons;
-- compact 2D preview provider used when no packet preview actor is available;
+- profile-driven `SceneSessionManager` with stale-session tokens, interaction models,
+  back/discard, explicit commit boundaries and close reasons;
+- provider-neutral `SceneEngine` coordinating environment, preview actor, viewpoint, control
+  overlay and idempotent reverse-order recovery;
+- canonical Local Character, Fixed Private and Narrative profiles with `READ_ONLY`,
+  `PREVIEW_COMMIT`, `IMMEDIATE_ACTION`, `DIALOGUE` and `CINEMATIC` semantics;
+- owner-only Paper Mannequin preview actor using the player's profile and current/preview equipment;
 - permanent Chronicle system-item marker and hotbar slot 9 reconciliation;
 - protection against click, number-key swap, drag, drop, off-hand swap and consume paths;
 - death/respawn restoration and duplicate Chronicle cleanup;
 - a pure placement planner that refuses to overwrite a full inventory and can swap a displaced
   value into an existing Chronicle slot without deleting it;
 - resource-pack admission states with URL/SHA-256 validation against the active manifest;
-- inventory-based Scene Hub shell with all V1 root pages and protected synthetic buttons;
-- Scene interruption on damage, movement, teleport, world change, death, disconnect and plugin
-  disable;
+- Inventory control overlay layered over the world-backed Local Character Scene, with protected
+  synthetic buttons and Equipment, Combat Arts, Forms, Magic/Attunement and Character Information
+  pages; Wardrobe/Dye remains a visible shell until its authoritative cosmetic state is implemented;
+- the Local Character Scene keeps the player at the original world position, frames an owner-only
+  actor in front of them and locks normal movement input without closing;
+- Scene interruption and recovery on damage, forced movement, teleport, world change, death,
+  disconnect, actor invalidation, provider failure and plugin disable;
 - environment/permission-gated `/mmo dev`, item Content Browser, safe test-projection spawner and
   Scene/UI tester shell;
 - non-authoritative dev projections with explicit test provenance; all transfer/use paths are
@@ -461,7 +474,10 @@ validated snapshot
   -> enable player admission
   -> pack ready/disabled-local
   -> safely reconcile Chronicle slot 9
-  -> Chronicle right-click opens compact Local Scene Hub
+  -> Chronicle right-click opens the world-backed Local Character Scene Hub
+  -> lease current environment without teleporting
+  -> spawn and frame owner-only preview actor
+  -> open the control overlay
 
 PostgreSQL character-owned rows
   -> signed expected projections
@@ -510,7 +526,8 @@ Failure/recovery behavior:
   sessions are accepted;
 - local development may explicitly disable pack delivery; enabled environments require a manifest
   SHA-256 match;
-- missing packet preview features degrade to compact 2D Scene rather than disabling ownership;
+- an unavailable environment, actor, viewpoint or overlay refuses the Scene and cleans up every
+  provider already acquired; there is no inventory-only Scene fallback;
 - the player remains locked while its resource-pack and PostgreSQL character session load;
 - database startup/migration failure enters maintenance and admits no MMO session;
 - Scene Cancel/Back/disconnect discards preview state without a database write;

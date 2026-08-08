@@ -745,6 +745,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         characterSessionController.addReadyHandler(chronicleController::reconcile);
         characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);
+        characterSessionController.addEquipmentMutationHandler(
+                combatSessionController::onEquipmentChanged);
         characterSessionController.addReadyHandler(flaskHotbarController::onCharacterReady);
         characterSessionController.addReadyHandler(consumableHotbarController::onCharacterReady);
         characterSessionController.addReadyHandler(bossEncounterController::onCharacterReady);
@@ -837,7 +839,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                                 + activeAilmentEngine.get().all().size()
                                 + ", encounter reward definitions="
                                 + activeEncounterRewardTables.get().size()
-                                + ", Scene preview=COMPACT_2D");
+                                + ", Scene presentation=WORLD_BACKED");
     }
 
     private void scheduleSmokeShutdown() {

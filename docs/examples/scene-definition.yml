@@ -1,25 +1,47 @@
-definition_id: scene.character.hub
+definition_id: scene.character.local_hub
 schema_version: 1
+topology: LOCAL_CHARACTER
 open_requirements:
-  engagement: EXPLORATION
+  engagement_forbidden:
+    - ENGAGED
   grounded: true
   mounted: false
-preview:
+environment:
+  provider: LOCAL_WORLD
+actor:
+  provider: OWNER_ONLY_MANNEQUIN
   preferred_distance: 2.75
-  fallback: COMPACT_BUST
+viewpoint:
+  provider: LOCAL_FRAME
+  teleport_player: false
+overlay:
+  provider: INVENTORY
+  viewport_reservation: CENTER
+movement:
+  normal_input: LOCK
 modes:
-  - HUB
-  - EQUIPMENT
-  - WARDROBE
-  - COMBAT_ARTS
-  - MAGIC
-  - JOURNAL
-  - RENOWN
-  - SETTINGS
+  HUB:
+    interaction: READ_ONLY
+  EQUIPMENT:
+    interaction: PREVIEW_COMMIT
+  WARDROBE_DYE:
+    interaction: PREVIEW_COMMIT
+  COMBAT_ARTS:
+    interaction: PREVIEW_COMMIT
+  FORMS:
+    interaction: PREVIEW_COMMIT
+    confirm_requires_rest_context: true
+  MAGIC_ATTUNEMENT:
+    interaction: PREVIEW_COMMIT
+    confirm_requires_rest_context: true
+  CHARACTER_INFORMATION:
+    interaction: READ_ONLY
 close_triggers:
   - DAMAGE
-  - HOSTILE_ALERT
-  - KNOCKBACK
+  - FORCED_MOVEMENT
   - TELEPORT
   - DEATH
   - WORLD_CHANGE
+  - DISCONNECT
+  - ACTOR_INVALIDATED
+  - SESSION_INVALIDATED

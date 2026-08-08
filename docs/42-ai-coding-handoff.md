@@ -1,5 +1,35 @@
 # AI Coding Handoff
 
+## Feature-completion workflow
+
+Milestones are planning groups, not delivery units. Development must complete one player-facing
+feature at a time as a vertical slice. Only one feature may be `IN_PROGRESS`; do not begin an
+adjacent feature merely because its kernel, schema or interface can be scaffolded cheaply.
+
+A feature may be marked `COMPLETE` only when all of the following are true:
+
+1. A player can enter, use and finish the primary flow through supported gameplay UI/input. A dev
+   command may prepare test data, but it must not substitute for a missing runtime path.
+2. Domain rules, the Paper adapter, content definitions and provider boundaries are connected. A
+   headless kernel or placeholder UI alone is not a completed feature.
+3. Authoritative state survives disconnect and server restart. Value-changing flows also pass
+   idempotency, rollback and relevant crash-point tests.
+4. Success, rejection, unavailable-state and recovery feedback are visible and actionable to the
+   player and operator. Default configuration upgrades must not silently disable the flow.
+5. Unit and integration tests pass, followed by a real local Paper client acceptance pass covering
+   the happy path, important rejection paths and restart/reconnect behavior.
+6. The implementation documents the acceptance evidence and has no known blocker that prevents the
+   primary flow from being used as designed.
+
+Use these status labels: `NOT_STARTED`, `IN_PROGRESS`, `AUTOMATED_VERIFIED`, `LIVE_ACCEPTED` and
+`COMPLETE`. Automated tests can advance a feature only to `AUTOMATED_VERIFIED`. A failed live check
+returns it to `IN_PROGRESS`, and the next feature remains blocked until the failure is fixed and the
+full feature acceptance is rerun.
+
+Scaffolding is allowed only as an internal step of the active feature. Never describe a scaffold,
+kernel, lab, adapter skeleton or “ready for acceptance” state as complete. Historical milestone
+status text and `IMPLEMENTED.md` list code coverage; they do not override this completion gate.
+
 ## Required first read
 
 Every coding session must read:
@@ -15,7 +45,7 @@ Every coding session must read:
 ## Prompt template
 
 ```text
-Implement Milestone <N>, task <bounded task name>.
+Complete feature <player-facing feature name> as one vertical slice within Milestone <N>.
 
 Authoritative docs:
 - docs/02-system-invariants.md
@@ -25,10 +55,12 @@ Authoritative docs:
 - docs/43-content-authoring-tools.md (when authoring/dev tooling is in scope)
 
 Do not implement adjacent future milestones.
+Keep exactly one feature IN_PROGRESS and do not stop at kernel/scaffold readiness.
 List the invariants this change enforces.
 Use typed result/error codes.
 All ownership/currency changes must use TransactionService.
 Add unit, integration and crash-point tests.
+Run and record local Paper client acceptance before marking the feature COMPLETE.
 Document schema/config/content changes and migration impact.
 Do not use Bukkit /reload assumptions.
 ```

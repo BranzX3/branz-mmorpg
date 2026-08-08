@@ -92,5 +92,5 @@ Reward eligibility freezes at `VICTORY_PENDING`; reward grants are idempotent. R
 | ENGAGED + SCENE | No |
 | DRAWING + DODGE | Yes |
 | KNOCKED_DOWN + DRAWING | No; draw cancels |
-| ALERT + Local Scene | No if hostile proximity rule triggers |
+| ALERT + Local Scene | Profile-dependent; `ENGAGED` is always rejected |
 | READY + world interaction | Yes outside ENGAGED under interaction priority |

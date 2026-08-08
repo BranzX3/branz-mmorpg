@@ -42,8 +42,8 @@
     },
     {
       "path": "docs/05-combat-state-machine.md",
-      "bytes": 2744,
-      "sha256": "e92e8e68832b8153dfdbd1d91f079f394baca9fa75139077c62dd35ee07411ae"
+      "bytes": 2849,
+      "sha256": "d3ea82a396c5b37f0e2efd04b7be4d5ada92c2a5fa69a8ce076667bdc73ddb1e"
     },
     {
       "path": "docs/06-input-resolution.md",
@@ -182,8 +182,8 @@
     },
     {
       "path": "docs/33-scene-ui-hud-accessibility.md",
-      "bytes": 2584,
-      "sha256": "829b8cad0bd8a6d383b2fa2d34f0b0c822fa2680f880a7f8a1a9679072b47204"
+      "bytes": 5945,
+      "sha256": "1f421523fb50b8f6ad910f2bc59ca2af00b6bf7e738d1aec5fdf5a9ce1dd6ee1"
     },
     {
       "path": "docs/34-onboarding-player-journey.md",
@@ -212,8 +212,8 @@
     },
     {
       "path": "docs/39-implementation-roadmap.md",
-      "bytes": 5362,
-      "sha256": "dfa0f4299979e6655d41773a3c090765fe242e4e6e83a8ce16caf7609f8614c9"
+      "bytes": 18834,
+      "sha256": "7cbce61057b915d73608ae1c0db0004439adc9be52d416054ae06254fae2c4b1"
     },
     {
       "path": "docs/40-spec-status.md",
@@ -227,8 +227,8 @@
     },
     {
       "path": "docs/42-ai-coding-handoff.md",
-      "bytes": 3041,
-      "sha256": "294f9492439372814b9ca17c3ee12496f9cea79fa8f7d78a2d9410479baf15f9"
+      "bytes": 5352,
+      "sha256": "963ce5ce8a912f265918427acb061377f81465ee6894f6e5d571101e61901129"
     },
     {
       "path": "docs/43-content-authoring-tools.md",
@@ -242,8 +242,8 @@
     },
     {
       "path": "docs/adr/0002-slot9-local-scene.md",
-      "bytes": 539,
-      "sha256": "e0b7687e97a880f51fc1bb281a317e6ba80259c06fde67193ca4a97ee8542f10"
+      "bytes": 889,
+      "sha256": "41adec7a4a61f5824c9597303d2750c59a19fc23425f1103a65e26b6dae680ba"
     },
     {
       "path": "docs/adr/0003-personal-rewards.md",
@@ -312,8 +312,8 @@
     },
     {
       "path": "docs/examples/scene-definition.yml",
-      "bytes": 396,
-      "sha256": "a3df39d4d1a4ad05c75491f84dcb246a2282082769a62d8b915a1e2c9db9a0af"
+      "bytes": 987,
+      "sha256": "880d167f1011a2e0febb23ef8d7e3f0eb7a9e15bb81224351aa2717154220bbc"
     },
     {
       "path": "docs/examples/spell-definition.yml",

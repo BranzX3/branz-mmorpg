@@ -15,13 +15,13 @@ Hotbar slot 9 is permanently reserved for the `Adventurer's Chronicle` system it
 Scene opens only when:
 
 - character session is active,
-- not Engaged/Alert,
+- not `ENGAGED`, with the remaining status checked by the Scene admission profile,
 - action state is Idle,
 - grounded and not falling/swimming/flying/mounted/in portal,
 - not in exclusive dialogue/cutscene/transaction,
 - region permits Scene,
 - no hostile entity currently has aggro within 16 blocks,
-- preview provider or compact fallback is available.
+- world actor, viewpoint and control-overlay providers are available.
 
 Selecting slot 9 triggers weapon sheathing. RMB opens only after sheathing completes.
 
@@ -29,16 +29,18 @@ Selecting slot 9 triggers weapon sheathing. RMB opens only after sheathing compl
 
 The everyday Scene Hub does not teleport the real player.
 
-1. Freeze combat inputs; inventory UI naturally captures controls.
+1. Lock normal movement and combat inputs without closing the Scene.
 2. Save return UI/slot/camera presentation state.
 3. Find an owner-visible preview location 2.75 blocks in front.
 4. If blocked, test candidate yaw offsets: `0, +35, -35, +70, -70, 180` degrees.
 5. Validate floor, headroom and line of sight.
 6. Spawn owner-only preview actor facing the viewer.
 7. Apply soft local presentation light/particles where supported.
-8. Open the custom inventory UI.
+8. Open the Inventory control overlay while preserving the central actor viewport.
 
-If no full-body location exists, use Compact Preview at 1.6 blocks with upper-body framing. If even compact mode is invalid, reject opening with a short message. V1 never teleports to a Scene Pod for the normal Chronicle menu.
+If no valid actor location exists, reject opening with a short message and recover every acquired
+presentation handle. V1 never substitutes an inventory-only preview and never teleports to a Scene
+Pod for the normal Chronicle menu.
 
 ## Preview actor
 
@@ -57,8 +59,8 @@ It has no collision, AI, hitbox, persistence or visibility to other players. Pre
 Close and discard uncommitted preview on:
 
 - damage or hostile effect,
-- Engagement/Alert transition,
-- movement/teleport/world change,
+- transition to a profile-forbidden hostile state,
+- forced movement/teleport/world change,
 - knockback/fall/mount/swim/portal,
 - inventory close/Exit,
 - disconnect/plugin disable/provider failure.
@@ -72,18 +74,18 @@ V1 root menu:
 - Character & Equipment
 - Wardrobe & Dye
 - Combat Arts
+- Forms
 - Magic & Attunement
-- Journal & Pending Rewards
-- Settings & Help
+- Character information
 - Exit
 
-Contextual services remain world-bound:
+The following are not mandatory V1 Scene workflows:
 
-- Rest preparation
-- Blacksmith
-- Alchemy
-- Bank/trade
-- Teaching
+- Crafting
+- Market
+- Bank
+- Stable
+- Party
 
 ### Character & Equipment
 
@@ -107,7 +109,14 @@ Contextual services remain world-bound:
 - Known techniques.
 - Active moveset preview.
 - Mastery qualitative bands.
-- Changes disabled outside Rest Context with explanation.
+- Preview is allowed outside Rest Context; unrestricted Combat Art confirmation is not globally
+  rest-locked.
+
+### Forms
+
+- Known Forms and active Form preview.
+- Preview remains available anywhere the Scene can open.
+- Confirm validates Rest Context when the Form policy requires it.
 
 ### Magic & Attunement
 
@@ -116,12 +125,10 @@ Contextual services remain world-bound:
 - Resonance/conflict explanation.
 - Commit requires Rest Context.
 
-### Journal & Pending Rewards
+### Character information
 
-- Quest journal.
-- Knowledge/Codex entries.
-- Pending reward claims.
-- Renown/titles may be a subpage.
+- Read-only character identity and combat/build summary.
+- It has no Preview/Confirm transaction.
 
 ## Inventory UI implementation
 
@@ -186,11 +193,8 @@ The pack is required for normal play. On decline or download failure:
 
 Pack version and SHA must match the active content manifest. Enhanced EMF/ETF features are optional and never required for mechanics.
 
-## Presentation fallback
+## Provider failure
 
-If advanced packet/preview features fail:
-
-- Scene opens in compact 2D equipment UI.
-- Gameplay remains available.
-- Admin health status records provider failure.
-- No transaction is attempted from an invalid preview session.
+If actor, viewpoint or overlay presentation cannot open, Scene recovery closes every partial handle,
+records provider failure and refuses the Scene. Inventory-only Compact 2D is not a replacement for
+the world-backed Scene.

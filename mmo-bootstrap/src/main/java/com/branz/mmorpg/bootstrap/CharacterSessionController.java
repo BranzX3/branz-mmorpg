@@ -61,6 +61,7 @@ final class CharacterSessionController implements Listener {
     private final Set<UUID> projected = new HashSet<>();
     private final Set<UUID> valueMutationInFlight = new HashSet<>();
     private final List<Consumer<Player>> readyHandlers = new ArrayList<>();
+    private final List<Consumer<Player>> equipmentMutationHandlers = new ArrayList<>();
     private int heartbeatTaskId = -1;
 
     CharacterSessionController(
@@ -88,6 +89,11 @@ final class CharacterSessionController implements Listener {
 
     void addReadyHandler(Consumer<Player> readyHandler) {
         readyHandlers.add(Objects.requireNonNull(readyHandler, "readyHandler"));
+    }
+
+    void addEquipmentMutationHandler(Consumer<Player> equipmentMutationHandler) {
+        equipmentMutationHandlers.add(
+                Objects.requireNonNull(equipmentMutationHandler, "equipmentMutationHandler"));
     }
 
     void onPackReady(Player player) {
@@ -1173,11 +1179,16 @@ final class CharacterSessionController implements Listener {
                 ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result)
                         .value();
         LoadedCharacterSession updated = current.withSnapshot(mutationResult.snapshot());
+        boolean equipmentChanged =
+                !current.snapshot().equipment().equals(updated.snapshot().equipment());
         active.put(playerId, updated);
         projected.remove(playerId);
         Player player = plugin.getServer().getPlayer(playerId);
         if (player != null && player.isOnline()) {
             applyProjectionIfReady(player, false);
+            if (equipmentChanged && ready(player)) {
+                equipmentMutationHandlers.forEach(handler -> handler.accept(player));
+            }
         }
         completion.accept(Result.success(updated));
     }

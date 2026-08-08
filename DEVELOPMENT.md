@@ -368,10 +368,14 @@ To test resource-pack admission, set `resource-pack.enabled: true`, configure an
 the exact 64-character SHA-256 from the active `content-manifest.json` in
 `resource-pack.sha256`. A mismatch enters maintenance before new MMO sessions.
 
-The current Scene uses the compact 2D fallback. The dev spawner creates signed PostgreSQL-backed
-item/lot rows with test provenance and an audit journal. Their Bukkit projections are removed at
-session end and rebuilt from database truth on the next session. Transfer and gameplay use remain
-blocked for test-provenance values.
+The current Local Character Scene keeps the player in place, spawns an owner-only Paper Mannequin
+in front of them, frames the viewpoint and layers the Inventory control overlay over that world
+presentation. Normal directional input is locked without closing; damage, forced movement,
+teleport, world change, death, disconnect or preview-actor invalidation must close the Scene and
+restore viewpoint/input ownership. The dev spawner creates signed PostgreSQL-backed item/lot rows
+with test provenance and an audit journal. Their Bukkit projections are removed at session end and
+rebuilt from database truth on the next session. Transfer and gameplay use remain blocked for
+test-provenance values.
 
 Paper uses the verified Minecraft player UUID as `CharacterId` for V1. Proxy authentication is
 therefore expected to complete before the backend connection; this repository does not duplicate

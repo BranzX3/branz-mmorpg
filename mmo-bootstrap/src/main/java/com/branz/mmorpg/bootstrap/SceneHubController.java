@@ -30,14 +30,16 @@ import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
 import com.branz.mmorpg.scenes.QuiverAmmoTransferPreview;
 import com.branz.mmorpg.scenes.QuiverTransferDirection;
 import com.branz.mmorpg.scenes.SceneCloseReason;
+import com.branz.mmorpg.scenes.SceneEngine;
 import com.branz.mmorpg.scenes.SceneErrorCode;
 import com.branz.mmorpg.scenes.SceneMode;
 import com.branz.mmorpg.scenes.ScenePreviewState;
+import com.branz.mmorpg.scenes.SceneProfiles;
+import com.branz.mmorpg.scenes.SceneRecovery;
 import com.branz.mmorpg.scenes.SceneSession;
 import com.branz.mmorpg.scenes.SceneSessionManager;
-import com.branz.mmorpg.scenes.preview.CompactScenePreviewProvider;
-import com.branz.mmorpg.scenes.preview.ScenePreviewHandle;
-import com.branz.mmorpg.scenes.preview.ScenePreviewProvider;
+import com.branz.mmorpg.scenes.overlay.MenuOverlay;
+import com.branz.mmorpg.scenes.overlay.MenuOverlayHandle;
 import java.time.Clock;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -53,26 +55,30 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Mannequin;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerVelocityEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
-final class SceneHubController implements Listener {
+final class SceneHubController implements Listener, MenuOverlay {
     private static final int INVENTORY_SIZE = 54;
     private static final Map<SceneMode, ButtonSpec> HUB_BUTTONS = hubButtons();
 
@@ -87,12 +93,14 @@ final class SceneHubController implements Listener {
     private final double restContextSpawnRadiusSquared;
     private final String contentVersion;
     private final SceneSessionManager sessions = new SceneSessionManager(Clock.systemUTC());
-    private final ScenePreviewProvider previewProvider = new CompactScenePreviewProvider();
+    private final BukkitPreviewActorProvider previewActors;
+    private final SceneEngine sceneEngine;
     private final NamespacedKey actionKey;
-    private final Map<UUID, ScenePreviewHandle> previewHandles = new HashMap<>();
     private final Map<UUID, FlaskAllocation> flaskPreviews = new HashMap<>();
     private final Set<UUID> navigating = new HashSet<>();
     private final Set<UUID> committing = new HashSet<>();
+    private final Set<UUID> recovering = new HashSet<>();
+    private final int validityTaskId;
 
     SceneHubController(
             JavaPlugin plugin,
@@ -120,6 +128,19 @@ final class SceneHubController implements Listener {
         restContextSpawnRadiusSquared = restRadius * restRadius;
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
         actionKey = new NamespacedKey(plugin, "scene_action");
+        previewActors = new BukkitPreviewActorProvider(plugin, this::updatePreviewActor);
+        sceneEngine =
+                new SceneEngine(
+                        new BukkitLocalSceneEnvironmentProvider(plugin),
+                        previewActors,
+                        new BukkitLocalSceneViewpointProvider(plugin),
+                        this,
+                        new SceneRecovery());
+        validityTaskId =
+                plugin.getServer()
+                        .getScheduler()
+                        .runTaskTimer(plugin, this::validateActiveSessions, 5L, 5L)
+                        .getTaskId();
     }
 
     Result<SceneSession, SceneErrorCode> open(Player player) {
@@ -135,6 +156,7 @@ final class SceneHubController implements Listener {
         Result<SceneSession, SceneErrorCode> opened =
                 sessions.open(
                         player.getUniqueId(),
+                        SceneProfiles.localCharacterHub(),
                         characterSessions
                                 .active(player)
                                 .map(session -> session.snapshot().equipment())
@@ -148,27 +170,109 @@ final class SceneHubController implements Listener {
             return opened;
         }
         SceneSession session = ((Result.Success<SceneSession, SceneErrorCode>) opened).value();
-        Result<ScenePreviewHandle, SceneErrorCode> preview = previewProvider.open(session);
-        if (preview instanceof Result.Failure<ScenePreviewHandle, SceneErrorCode> failure) {
+        Result<com.branz.mmorpg.scenes.ScenePresentation, SceneErrorCode> presentation =
+                sceneEngine.open(session);
+        if (presentation
+                instanceof
+                Result.Failure<com.branz.mmorpg.scenes.ScenePresentation, SceneErrorCode> failure) {
             sessions.closeCurrent(player.getUniqueId(), SceneCloseReason.PROVIDER_FAILURE);
+            player.sendActionBar(Component.text(failure.detail(), NamedTextColor.RED));
             return Result.failure(failure.error(), failure.detail());
         }
-        previewHandles.put(
-                player.getUniqueId(),
-                ((Result.Success<ScenePreviewHandle, SceneErrorCode>) preview).value());
-        openPage(player, session);
         return Result.success(session);
     }
 
     void shutdown() {
-        for (ScenePreviewHandle handle : previewHandles.values()) {
-            previewProvider.close(handle);
+        plugin.getServer().getScheduler().cancelTask(validityTaskId);
+        try {
+            sceneEngine.closeAll();
+        } catch (RuntimeException exception) {
+            plugin.getLogger()
+                    .warning("Scene provider recovery failed during shutdown: " + exception);
+        } finally {
+            flaskPreviews.clear();
+            navigating.clear();
+            committing.clear();
+            recovering.clear();
+            sessions.closeAll(SceneCloseReason.PLUGIN_DISABLE);
         }
-        previewHandles.clear();
-        flaskPreviews.clear();
-        navigating.clear();
-        committing.clear();
-        sessions.closeAll(SceneCloseReason.PLUGIN_DISABLE);
+    }
+
+    private void validateActiveSessions() {
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            if (sessions.find(player.getUniqueId()).isEmpty()) {
+                continue;
+            }
+            if (!characterSessions.ready(player) || !packGate.ready(player)) {
+                interrupt(player, SceneCloseReason.SESSION_INVALIDATED, true);
+                continue;
+            }
+            CombatSessionStatus status = combat.status(player).orElse(null);
+            if (status == null) {
+                interrupt(player, SceneCloseReason.SESSION_INVALIDATED, true);
+            } else if (status.engagementState()
+                    == com.branz.mmorpg.combat.state.EngagementState.ENGAGED) {
+                interrupt(player, SceneCloseReason.HOSTILE_STATE, true);
+            }
+        }
+    }
+
+    @Override
+    public Result<MenuOverlayHandle, SceneErrorCode> open(SceneSession session) {
+        Player player = plugin.getServer().getPlayer(session.playerId());
+        if (player == null || !player.isOnline()) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_PROVIDER_FAILURE,
+                    "Inventory control overlay requires a live player.");
+        }
+        openPage(player, session);
+        return Result.success(
+                new MenuOverlayHandle(session.sessionId(), session.playerId(), "bukkit-inventory"));
+    }
+
+    @Override
+    public Result<MenuOverlayHandle, SceneErrorCode> update(
+            MenuOverlayHandle handle, SceneSession session) {
+        if (!handle.sessionId().equals(session.sessionId())
+                || !handle.viewerId().equals(session.playerId())) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_STALE_SESSION,
+                    "Menu overlay belongs to another Scene session.");
+        }
+        Player player = plugin.getServer().getPlayer(session.playerId());
+        if (player == null || !player.isOnline()) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_PROVIDER_FAILURE,
+                    "Inventory control overlay lost its player.");
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTask(
+                        plugin,
+                        () -> {
+                            SceneSession current = sessions.find(player.getUniqueId()).orElse(null);
+                            if (current == null
+                                    || !current.sessionId().equals(session.sessionId())
+                                    || current.revision() != session.revision()) {
+                                navigating.remove(player.getUniqueId());
+                                return;
+                            }
+                            navigating.add(player.getUniqueId());
+                            openPage(player, session);
+                        });
+        return Result.success(handle);
+    }
+
+    @Override
+    public void close(MenuOverlayHandle handle) {
+        Player player = plugin.getServer().getPlayer(handle.viewerId());
+        if (player != null
+                && player.isOnline()
+                && player.getOpenInventory().getTopInventory().getHolder()
+                        instanceof SceneInventoryHolder holder
+                && holder.sessionId().equals(handle.sessionId())) {
+            player.closeInventory();
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -306,7 +410,7 @@ final class SceneHubController implements Listener {
         if (navigating.remove(player.getUniqueId())) {
             return;
         }
-        closeState(player, SceneCloseReason.INVENTORY_CLOSED);
+        interrupt(player, SceneCloseReason.INVENTORY_CLOSED, false);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -316,15 +420,32 @@ final class SceneHubController implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         if (event instanceof PlayerTeleportEvent) {
             return;
         }
         Location from = event.getFrom();
         Location to = event.getTo();
-        if (from.getX() != to.getX() || from.getY() != to.getY() || from.getZ() != to.getZ()) {
-            interrupt(event.getPlayer(), SceneCloseReason.MOVEMENT, true);
+        if (from.getX() == to.getX() && from.getY() == to.getY() && from.getZ() == to.getZ()) {
+            return;
+        }
+        SceneSession session = sessions.find(event.getPlayer().getUniqueId()).orElse(null);
+        if (session == null || !session.profile().locksNormalMovement()) {
+            return;
+        }
+        org.bukkit.Input input = event.getPlayer().getCurrentInput();
+        boolean normalInput =
+                input.isForward()
+                        || input.isBackward()
+                        || input.isLeft()
+                        || input.isRight()
+                        || input.isJump()
+                        || input.isSneak();
+        if (normalInput) {
+            event.setCancelled(true);
+        } else {
+            interrupt(event.getPlayer(), SceneCloseReason.FORCED_MOVEMENT, true);
         }
     }
 
@@ -346,6 +467,26 @@ final class SceneHubController implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         interrupt(event.getPlayer(), SceneCloseReason.DISCONNECT, false);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onJoin(PlayerJoinEvent event) {
+        previewActors.hideActiveActorsFrom(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPreviewActorRemoved(EntityRemoveEvent event) {
+        if (!(event.getEntity() instanceof Mannequin)
+                || !event.getEntity()
+                        .getScoreboardTags()
+                        .contains(BukkitPreviewActorProvider.ACTOR_TAG)) {
+            return;
+        }
+        previewActors
+                .viewerForActor(event.getEntity().getUniqueId())
+                .map(plugin.getServer()::getPlayer)
+                .filter(Objects::nonNull)
+                .ifPresent(player -> interrupt(player, SceneCloseReason.ACTOR_INVALIDATED, true));
     }
 
     private Result<EligibilityAccepted, SceneErrorCode> checkEligibility(Player player) {
@@ -373,12 +514,54 @@ final class SceneHubController implements Listener {
                     SceneErrorCode.SCENE_NOT_ELIGIBLE,
                     "Stand still on safe ground to open the Scene Hub.");
         }
+        CombatSessionStatus combatStatus = combat.status(player).orElse(null);
+        if (combatStatus == null) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_NOT_ELIGIBLE, "Combat session is not ready.");
+        }
+        if (combatStatus.engagementState()
+                == com.branz.mmorpg.combat.state.EngagementState.ENGAGED) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_NOT_ELIGIBLE,
+                    "Local Character Scene is unavailable while ENGAGED.");
+        }
+        if (combatStatus.dead()
+                || combatStatus.weaponState() != com.branz.mmorpg.combat.state.WeaponState.SHEATHED
+                || combatStatus.actionPhase().isPresent()
+                || combatStatus.bowDrawPhase().isPresent()
+                || combatStatus.bowRecoveryTicksRemaining() > 0
+                || combatStatus.crossbowRecoveryTicksRemaining() > 0
+                || combatStatus.crossbowCheckpointCommitPending()
+                || combatStatus.spellCastPhase().isPresent()
+                || combatStatus.spellCommitPending()
+                || combatStatus.bowAmmoCommitPending()
+                || combatStatus.ammoSwitchHandlingTicksRemaining() > 0
+                || combatStatus.dodgePhase().isPresent()
+                || combatStatus.guardPhase() != com.branz.mmorpg.combat.guard.GuardPhase.INACTIVE
+                || combatStatus.crowdControl().isPresent()) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_NOT_ELIGIBLE,
+                    "Finish the current action and sheathe the weapon before opening the Scene.");
+        }
         return Result.success(EligibilityAccepted.INSTANCE);
     }
 
     private void navigate(Player player, SceneSession session) {
-        navigating.add(player.getUniqueId());
-        plugin.getServer().getScheduler().runTask(plugin, () -> openPage(player, session));
+        Result<com.branz.mmorpg.scenes.ScenePresentation, SceneErrorCode> updated =
+                sceneEngine.update(session);
+        if (updated
+                instanceof
+                Result.Failure<com.branz.mmorpg.scenes.ScenePresentation, SceneErrorCode> failure) {
+            player.sendActionBar(Component.text(failure.detail(), NamedTextColor.RED));
+            interrupt(player, SceneCloseReason.PROVIDER_FAILURE, true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onVelocity(PlayerVelocityEvent event) {
+        if (event.getVelocity().lengthSquared() > 0.0001) {
+            interrupt(event.getPlayer(), SceneCloseReason.FORCED_MOVEMENT, true);
+        }
     }
 
     private void openPage(Player player, SceneSession session) {
@@ -401,8 +584,12 @@ final class SceneHubController implements Listener {
                 populateEquipmentPage(player, inventory, session);
             } else if (session.mode() == SceneMode.COMBAT_ARTS) {
                 populateCombatArtsPage(player, inventory, session);
+            } else if (session.mode() == SceneMode.FORMS) {
+                populateFormsPage(player, inventory, session);
             } else if (session.mode() == SceneMode.MAGIC_ATTUNEMENT) {
                 populateMagicAttunementPage(player, inventory, session);
+            } else if (session.mode() == SceneMode.CHARACTER_INFORMATION) {
+                populateCharacterInformationPage(player, inventory, session);
             } else if (session.mode() == SceneMode.FLASK_PREPARATION) {
                 populateFlaskPreparationPage(player, inventory);
             } else {
@@ -680,9 +867,23 @@ final class SceneHubController implements Listener {
                                     + "]",
                             "technique:" + technique.id().value()));
         }
-        slot = 28;
+        populateBuildCommitStatus(player, inventory, sceneSession, family);
+    }
+
+    private void populateFormsPage(Player player, Inventory inventory, SceneSession sceneSession) {
+        String family = previewWeaponFamily(player, sceneSession).orElse(null);
+        if (family == null) {
+            inventory.setItem(
+                    22,
+                    button(
+                            Material.BARRIER,
+                            "Equip a supported weapon before selecting a Form",
+                            "noop"));
+            return;
+        }
+        int slot = 10;
         for (FormDefinition form : buildEngine.forms()) {
-            if (!form.supports(family) || slot > 34) {
+            if (!form.supports(family) || slot > 25) {
                 continue;
             }
             boolean selected =
@@ -702,8 +903,37 @@ final class SceneHubController implements Listener {
                                     + form.tradeoff(),
                             "form:" + form.id().value()));
         }
-        inventory.setItem(37, button(Material.GRAY_DYE, "Clear active form", "clear-form"));
+        inventory.setItem(37, button(Material.GRAY_DYE, "Clear active Form", "clear-form"));
         populateBuildCommitStatus(player, inventory, sceneSession, family);
+    }
+
+    private void populateCharacterInformationPage(
+            Player player, Inventory inventory, SceneSession sceneSession) {
+        LoadedCharacterSession character = characterSessions.active(player).orElse(null);
+        if (character == null) {
+            inventory.setItem(22, button(Material.BARRIER, "Character unavailable", "noop"));
+            return;
+        }
+        inventory.setItem(
+                20,
+                button(
+                        Material.PLAYER_HEAD,
+                        "Character " + character.characterId().value().toString().substring(0, 8),
+                        "noop"));
+        inventory.setItem(
+                22,
+                button(
+                        Material.IRON_SWORD,
+                        "Weapon family: "
+                                + previewWeaponFamily(player, sceneSession).orElse("UNARMED"),
+                        "noop"));
+        inventory.setItem(
+                24,
+                button(
+                        Material.ENCHANTED_BOOK,
+                        "Attunement capacity: "
+                                + sceneSession.previewState().build().attunementCapacity(),
+                        "noop"));
     }
 
     private void populateMagicAttunementPage(
@@ -761,10 +991,15 @@ final class SceneHubController implements Listener {
         inventory.setItem(
                 40,
                 button(
-                        restContext(player) ? Material.CAMPFIRE : Material.REDSTONE_TORCH,
-                        restContext(player)
-                                ? "Rest Context ready"
-                                : "Return to spawn sanctuary outside combat",
+                        !sceneSession.modeProfile().restContextRequiredForConfirm()
+                                        || restContext(player)
+                                ? Material.CAMPFIRE
+                                : Material.REDSTONE_TORCH,
+                        sceneSession.modeProfile().restContextRequiredForConfirm()
+                                ? restContext(player)
+                                        ? "Rest Context ready"
+                                        : "Confirm requires Rest Context"
+                                : "May confirm outside Rest Context",
                         "noop"));
         inventory.setItem(
                 41,
@@ -780,7 +1015,6 @@ final class SceneHubController implements Listener {
 
     private void previewTechnique(Player player, SceneInventoryHolder holder, String definitionId) {
         try {
-            requireRestContext(player);
             TechniqueDefinition technique =
                     buildEngine
                             .technique(DefinitionId.of(definitionId))
@@ -807,7 +1041,6 @@ final class SceneHubController implements Listener {
 
     private void previewForm(Player player, SceneInventoryHolder holder, String definitionId) {
         try {
-            requireRestContext(player);
             Optional<DefinitionId> form =
                     definitionId == null
                             ? Optional.empty()
@@ -829,7 +1062,6 @@ final class SceneHubController implements Listener {
     private void previewAttunement(
             Player player, SceneInventoryHolder holder, String definitionId) {
         try {
-            requireRestContext(player);
             DefinitionId effectId = DefinitionId.of(definitionId);
             if (buildEngine.attunableEffects().stream()
                     .noneMatch(effect -> effect.id().equals(effectId))) {
@@ -870,12 +1102,14 @@ final class SceneHubController implements Listener {
             committing.remove(player.getUniqueId());
             return;
         }
-        try {
-            requireRestContext(player);
-        } catch (IllegalArgumentException exception) {
-            committing.remove(player.getUniqueId());
-            player.sendActionBar(Component.text(exception.getMessage(), NamedTextColor.RED));
-            return;
+        if (sceneSession.modeProfile().restContextRequiredForConfirm()) {
+            try {
+                requireRestContext(player);
+            } catch (IllegalArgumentException exception) {
+                committing.remove(player.getUniqueId());
+                player.sendActionBar(Component.text(exception.getMessage(), NamedTextColor.RED));
+                return;
+            }
         }
         String family = previewWeaponFamily(player, sceneSession).orElse(null);
         Result<BuildResolution, BuildErrorCode> validation =
@@ -922,7 +1156,10 @@ final class SceneHubController implements Listener {
                     if (confirmed instanceof Result.Success<SceneSession, SceneErrorCode> success) {
                         player.sendActionBar(
                                 Component.text(
-                                        "Build committed at Rest Context.", NamedTextColor.GREEN));
+                                        sceneSession.modeProfile().restContextRequiredForConfirm()
+                                                ? "Build committed at Rest Context."
+                                                : "Build committed.",
+                                        NamedTextColor.GREEN));
                         navigate(player, success.value());
                     }
                 });
@@ -1543,6 +1780,52 @@ final class SceneHubController implements Listener {
                 .orElse(null);
     }
 
+    private void updatePreviewActor(Mannequin actor, SceneSession sceneSession) {
+        Player player = plugin.getServer().getPlayer(sceneSession.playerId());
+        LoadedCharacterSession character =
+                player == null ? null : characterSessions.active(player).orElse(null);
+        if (player == null || character == null) {
+            return;
+        }
+        org.bukkit.inventory.EntityEquipment equipment = actor.getEquipment();
+        equipment.setArmorContents(player.getInventory().getArmorContents());
+        equipment.setItemInMainHand(
+                previewActorItem(player, character, sceneSession, EquipmentSlot.MAIN_HAND));
+        equipment.setItemInOffHand(
+                previewActorItem(player, character, sceneSession, EquipmentSlot.OFF_HAND));
+    }
+
+    private ItemStack previewActorItem(
+            Player player,
+            LoadedCharacterSession character,
+            SceneSession sceneSession,
+            EquipmentSlot slot) {
+        ItemId desired = sceneSession.previewState().equipment().item(slot).orElse(null);
+        if (desired == null) {
+            return new ItemStack(Material.AIR);
+        }
+        ItemId committed = character.snapshot().equipment().item(slot).orElse(null);
+        if (desired.equals(committed)) {
+            ItemStack current =
+                    slot == EquipmentSlot.MAIN_HAND
+                            ? player.getInventory().getItem(0)
+                            : player.getInventory().getItemInOffHand();
+            return current == null ? new ItemStack(Material.AIR) : current.clone();
+        }
+        ItemDefinition definition =
+                equipmentDefinition(character, sceneSession.previewState().equipment(), slot);
+        if (definition == null) {
+            return new ItemStack(Material.BARRIER);
+        }
+        ItemStack preview = new ItemStack(BukkitItemProjectionCodec.fallbackMaterial(definition));
+        preview.editMeta(
+                meta ->
+                        meta.displayName(
+                                Component.text(
+                                        definition.id().value(), NamedTextColor.LIGHT_PURPLE)));
+        return preview;
+    }
+
     private ItemStack button(Material material, String label, String action) {
         ItemStack item = new ItemStack(material);
         item.editMeta(
@@ -1564,22 +1847,37 @@ final class SceneHubController implements Listener {
     }
 
     private void interrupt(Player player, SceneCloseReason reason, boolean closeInventory) {
-        if (sessions.find(player.getUniqueId()).isEmpty()) {
+        SceneSession session = sessions.find(player.getUniqueId()).orElse(null);
+        if (session == null || !recovering.add(player.getUniqueId())) {
             return;
         }
-        closeState(player, reason);
-        if (closeInventory
-                && player.getOpenInventory().getTopInventory().getHolder()
-                        instanceof SceneInventoryHolder) {
-            player.closeInventory();
+        RuntimeException providerFailure = null;
+        try {
+            try {
+                sceneEngine.close(session.sessionId());
+            } catch (RuntimeException exception) {
+                providerFailure = exception;
+            }
+            closeState(player, reason);
+            if (closeInventory
+                    && player.getOpenInventory().getTopInventory().getHolder()
+                            instanceof SceneInventoryHolder) {
+                player.closeInventory();
+            }
+        } finally {
+            recovering.remove(player.getUniqueId());
+        }
+        if (providerFailure != null) {
+            plugin.getLogger()
+                    .warning(
+                            "Scene provider recovery failed for "
+                                    + player.getUniqueId()
+                                    + ": "
+                                    + providerFailure);
         }
     }
 
     private void closeState(Player player, SceneCloseReason reason) {
-        ScenePreviewHandle handle = previewHandles.remove(player.getUniqueId());
-        if (handle != null) {
-            previewProvider.close(handle);
-        }
         navigating.remove(player.getUniqueId());
         committing.remove(player.getUniqueId());
         flaskPreviews.remove(player.getUniqueId());
@@ -1592,7 +1890,13 @@ final class SceneHubController implements Listener {
             case EQUIPMENT -> "Character & Equipment";
             case WARDROBE_DYE -> "Wardrobe & Dye";
             case COMBAT_ARTS -> "Combat Arts";
+            case FORMS -> "Forms";
             case MAGIC_ATTUNEMENT -> "Magic & Attunement";
+            case CHARACTER_INFORMATION -> "Character Information";
+            case CHARACTER_CREATION -> "Character Creation";
+            case APPEARANCE_PREVIEW -> "Appearance Preview";
+            case IMPORTANT_DIALOGUE -> "Important Dialogue";
+            case CUTSCENE -> "Cutscene";
             case FLASK_PREPARATION -> "Expedition Flask";
             case JOURNAL_PENDING_REWARDS -> "Journal & Pending Rewards";
             case SETTINGS_HELP -> "Settings & Help";
@@ -1611,6 +1915,7 @@ final class SceneHubController implements Listener {
         buttons.put(
                 SceneMode.MAGIC_ATTUNEMENT,
                 new ButtonSpec(16, Material.ENCHANTED_BOOK, "Magic & Attunement"));
+        buttons.put(SceneMode.FORMS, new ButtonSpec(28, Material.BLAZE_POWDER, "Forms"));
         buttons.put(
                 SceneMode.JOURNAL_PENDING_REWARDS,
                 new ButtonSpec(29, Material.CHEST, "Journal & Pending Rewards"));
@@ -1620,6 +1925,9 @@ final class SceneHubController implements Listener {
         buttons.put(
                 SceneMode.SETTINGS_HELP,
                 new ButtonSpec(33, Material.COMPARATOR, "Settings & Help"));
+        buttons.put(
+                SceneMode.CHARACTER_INFORMATION,
+                new ButtonSpec(34, Material.PLAYER_HEAD, "Character Information"));
         return Map.copyOf(buttons);
     }
 

@@ -2,6 +2,28 @@
 
 The coding order prioritizes identity and recovery before gameplay breadth.
 
+Milestones below are planning groups only. Their historical implementation notes describe code
+coverage, not delivery completion. Work proceeds as a single active player-facing vertical slice,
+and a feature is complete only after the full gate in `42-ai-coding-handoff.md`: usable runtime
+entry/exit, connected Paper/content/persistence paths, actionable failure handling, automated tests
+and a real local client acceptance pass including reconnect/restart. Until that evidence exists,
+the feature remains `IN_PROGRESS` or `AUTOMATED_VERIFIED` even when a note below says its
+implementation is complete or ready for acceptance.
+
+## Current single-feature delivery queue
+
+1. **Local Character Scene and equipment transaction — `IN_PROGRESS`.** Finish the world-backed
+   Scene, preview/commit/cancel, input and interruption ownership, authoritative inventory
+   projection, configuration upgrade behavior and reconnect/restart acceptance. The current
+   uncommitted Scene work belongs only to this feature.
+2. **Training Sword combat loop — `NOT_STARTED` (blocked by feature 1).** A player with an owned and
+   equipped sword must draw, attack, hit/miss, defend, take MMO damage, die/respawn and reconnect
+   without using a command as the combat runtime. Dev tooling may grant the test-owned sword.
+3. **Additional weapon families, magic, progression, consumables, encounters/social and
+   lifeskills — `NOT_STARTED` for delivery purposes.** Existing kernels and automated coverage will
+   be audited and completed one player-facing feature at a time; historical Milestone 0–8 labels
+   do not waive live acceptance.
+
 ## Milestone 0 — Repository and quality gate
 
 - Gradle multi-module project.

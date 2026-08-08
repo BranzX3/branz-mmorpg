@@ -87,7 +87,7 @@ final class BukkitItemProjectionCodec {
         return item;
     }
 
-    private static Material fallbackMaterial(ItemDefinition definition) {
+    static Material fallbackMaterial(ItemDefinition definition) {
         if (definition.consumableProfile().isPresent()) {
             return switch (definition.consumableProfile().orElseThrow().category()) {
                 case BODY_TONIC -> Material.POTION;

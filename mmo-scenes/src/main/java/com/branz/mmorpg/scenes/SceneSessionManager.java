@@ -41,7 +41,22 @@ public final class SceneSessionManager {
             EquipmentLoadout committedEquipment,
             QuiverPreparation committedQuiverPreparation,
             CharacterBuild committedBuild) {
+        return open(
+                playerId,
+                SceneProfiles.localCharacterHub(),
+                committedEquipment,
+                committedQuiverPreparation,
+                committedBuild);
+    }
+
+    public synchronized Result<SceneSession, SceneErrorCode> open(
+            UUID playerId,
+            SceneProfile profile,
+            EquipmentLoadout committedEquipment,
+            QuiverPreparation committedQuiverPreparation,
+            CharacterBuild committedBuild) {
         Objects.requireNonNull(playerId, "playerId");
+        Objects.requireNonNull(profile, "profile");
         Objects.requireNonNull(committedEquipment, "committedEquipment");
         Objects.requireNonNull(committedQuiverPreparation, "committedQuiverPreparation");
         Objects.requireNonNull(committedBuild, "committedBuild");
@@ -56,7 +71,9 @@ public final class SceneSessionManager {
                 new SceneSession(
                         SceneSessionId.random(),
                         playerId,
-                        SceneMode.HUB,
+                        profile,
+                        profile.entryMode(),
+                        SceneLifecyclePhase.ACTIVE,
                         initial,
                         initial,
                         0,
@@ -72,6 +89,15 @@ public final class SceneSessionManager {
     public synchronized Result<SceneSession, SceneErrorCode> changeMode(
             UUID playerId, SceneSessionId sessionId, SceneMode mode) {
         Objects.requireNonNull(mode, "mode");
+        Result<SceneSession, SceneErrorCode> current = current(playerId, sessionId);
+        if (!(current instanceof Result.Success<SceneSession, SceneErrorCode> success)) {
+            return current;
+        }
+        if (success.value().profile().mode(mode).isEmpty()) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_MODE_UNAVAILABLE,
+                    mode + " is not available in " + success.value().profile().id());
+        }
         return replace(playerId, sessionId, session -> session.withMode(mode));
     }
 
@@ -79,7 +105,7 @@ public final class SceneSessionManager {
             UUID playerId, SceneSessionId sessionId, EquipmentSlot slot, Optional<ItemId> itemId) {
         Objects.requireNonNull(slot, "slot");
         Objects.requireNonNull(itemId, "itemId");
-        return replace(
+        return replacePreview(
                 playerId,
                 sessionId,
                 session ->
@@ -94,7 +120,7 @@ public final class SceneSessionManager {
     public synchronized Result<SceneSession, SceneErrorCode> previewQuiverPreparation(
             UUID playerId, SceneSessionId sessionId, QuiverPreparation quiverPreparation) {
         Objects.requireNonNull(quiverPreparation, "quiverPreparation");
-        return replace(
+        return replacePreview(
                 playerId,
                 sessionId,
                 session ->
@@ -109,7 +135,7 @@ public final class SceneSessionManager {
     public synchronized Result<SceneSession, SceneErrorCode> previewQuiverTransfer(
             UUID playerId, SceneSessionId sessionId, QuiverAmmoTransferPreview transfer) {
         Objects.requireNonNull(transfer, "transfer");
-        return replace(
+        return replacePreview(
                 playerId,
                 sessionId,
                 session ->
@@ -124,7 +150,7 @@ public final class SceneSessionManager {
     public synchronized Result<SceneSession, SceneErrorCode> previewBuild(
             UUID playerId, SceneSessionId sessionId, CharacterBuild build) {
         Objects.requireNonNull(build, "build");
-        return replace(
+        return replacePreview(
                 playerId,
                 sessionId,
                 session ->
@@ -149,6 +175,11 @@ public final class SceneSessionManager {
             return current;
         }
         SceneSession session = ((Result.Success<SceneSession, SceneErrorCode>) current).value();
+        if (session.modeProfile().interactionModel() != SceneInteractionModel.PREVIEW_COMMIT) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_INTERACTION_MODEL_MISMATCH,
+                    session.mode() + " does not use preview/commit semantics.");
+        }
         Result<ScenePreviewState, SceneErrorCode> committed = committer.commit(session);
         if (committed instanceof Result.Failure<ScenePreviewState, SceneErrorCode> failure) {
             return Result.failure(failure.error(), failure.detail());
@@ -200,6 +231,25 @@ public final class SceneSessionManager {
         }
         SceneSession updated =
                 update.apply(((Result.Success<SceneSession, SceneErrorCode>) current).value());
+        sessions.put(playerId, updated);
+        return Result.success(updated);
+    }
+
+    private Result<SceneSession, SceneErrorCode> replacePreview(
+            UUID playerId,
+            SceneSessionId sessionId,
+            java.util.function.UnaryOperator<SceneSession> update) {
+        Result<SceneSession, SceneErrorCode> current = current(playerId, sessionId);
+        if (!(current instanceof Result.Success<SceneSession, SceneErrorCode> success)) {
+            return current;
+        }
+        if (success.value().modeProfile().interactionModel()
+                != SceneInteractionModel.PREVIEW_COMMIT) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_INTERACTION_MODEL_MISMATCH,
+                    success.value().mode() + " does not support preview state.");
+        }
+        SceneSession updated = update.apply(success.value());
         sessions.put(playerId, updated);
         return Result.success(updated);
     }

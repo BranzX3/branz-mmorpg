@@ -33,6 +33,10 @@ tasks.processResources {
     }
 }
 
+tasks.jar {
+    archiveClassifier.set("plain")
+}
+
 tasks.shadowJar {
     archiveClassifier.set("")
 }

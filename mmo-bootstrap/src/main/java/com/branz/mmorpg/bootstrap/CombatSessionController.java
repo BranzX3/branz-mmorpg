@@ -2011,10 +2011,11 @@ final class CombatSessionController implements Listener {
                             target.entityId(),
                             ignored ->
                                     CombatHealthRuntime.full(enemyHealth.profile(), currentTick));
-            CombatHealthResolution healthResolution =
-                    enemyHealth.damage(targetHealth, currentTick, resolvedDamage);
-            trainingTargetHealth.put(target.entityId(), healthResolution.runtime());
-            renderMeleeHitFeedback(entity, healthResolution.appliedAmount());
+            MeleeTargetDamageCoordinator.MeleeTargetDamageResult targetDamage =
+                    MeleeTargetDamageCoordinator.apply(
+                            enemyHealth, targetHealth, currentTick, resolvedDamage);
+            trainingTargetHealth.put(target.entityId(), targetDamage.runtime());
+            targetDamage.feedback().ifPresent(feedback -> renderMeleeHitFeedback(entity, feedback));
             observeSuccessfulCombatAction(
                     player,
                     session,
@@ -2023,7 +2024,7 @@ final class CombatSessionController implements Listener {
                     Objects.requireNonNull(session.activeMoveEvidenceActionId),
                     activeMove.id(),
                     meleePower(activeMove.family()));
-            totalDamage += healthResolution.appliedAmount();
+            totalDamage += targetDamage.appliedDamage();
             PostureResolution postureResolution =
                     postures.damage(posture, currentTick, resolvedPosture);
             trainingTargetPosture.put(target.entityId(), postureResolution.runtime());
@@ -2035,11 +2036,11 @@ final class CombatSessionController implements Listener {
             }
             if (firstHealth == null) {
                 firstHealth =
-                        roundOne(healthResolution.runtime().current())
+                        roundOne(targetDamage.runtime().current())
                                 + "/"
                                 + roundOne(enemyHealth.profile().maximum());
             }
-            if (healthResolution.lethalNow()) {
+            if (targetDamage.lethalNow()) {
                 deaths++;
                 completeCombatTarget(player, session, entity, EncounterOutcome.VICTORY);
                 entity.setHealth(0);
@@ -3146,29 +3147,25 @@ final class CombatSessionController implements Listener {
         }
     }
 
-    private void renderMeleeHitFeedback(LivingEntity entity, double appliedDamage) {
-        MeleeHitFeedbackPolicy.forAppliedDamage(appliedDamage)
-                .ifPresent(
-                        feedback -> {
-                            entity.playHurtAnimation(0.0f);
-                            Location location =
-                                    entity.getLocation().add(0.0, entity.getHeight() * 0.6, 0.0);
-                            entity.getWorld()
-                                    .spawnParticle(
-                                            Particle.DAMAGE_INDICATOR,
-                                            location,
-                                            feedback.particleCount(),
-                                            0.18,
-                                            0.18,
-                                            0.18,
-                                            0.02);
-                            entity.getWorld()
-                                    .playSound(
-                                            location,
-                                            Sound.ENTITY_PLAYER_ATTACK_STRONG,
-                                            feedback.volume(),
-                                            feedback.pitch());
-                        });
+    private void renderMeleeHitFeedback(
+            LivingEntity entity, MeleeHitFeedbackPolicy.MeleeHitFeedbackSpec feedback) {
+        entity.playHurtAnimation(0.0f);
+        Location location = entity.getLocation().add(0.0, entity.getHeight() * 0.6, 0.0);
+        entity.getWorld()
+                .spawnParticle(
+                        Particle.DAMAGE_INDICATOR,
+                        location,
+                        feedback.particleCount(),
+                        0.18,
+                        0.18,
+                        0.18,
+                        0.02);
+        entity.getWorld()
+                .playSound(
+                        location,
+                        Sound.ENTITY_PLAYER_ATTACK_STRONG,
+                        feedback.volume(),
+                        feedback.pitch());
     }
 
     private static double roundOne(double value) {

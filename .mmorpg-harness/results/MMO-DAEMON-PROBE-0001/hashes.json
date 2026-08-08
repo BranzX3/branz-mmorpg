@@ -1,0 +1,8 @@
+{
+  ".mmorpg-harness/results/MMO-DAEMON-PROBE-0001/canary.json": "664b6411f389ed155209c9597c6b7b77a57bc0d32b3ab6f0d11ed4f6cc0e49df",
+  ".mmorpg-harness/results/MMO-DAEMON-PROBE-0001/dirty_manifest.json": "7e53471096ecd7a31cca69924e39e5758b769be871f085d4bd6c3421bfe67f05",
+  ".mmorpg-harness/results/MMO-DAEMON-PROBE-0001/environment.json": "18f7747421c92ae7a34c10f53430104d4586a08cd7e71a62317a15b48cfd8965",
+  ".mmorpg-harness/results/MMO-DAEMON-PROBE-0001/result.json": "7265df7d2b2100e078d65e39dfdeaa318b2a0246c314c531d0a2e5eb7210bcac",
+  ".mmorpg-harness/results/MMO-DAEMON-PROBE-0001/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  ".mmorpg-harness/results/MMO-DAEMON-PROBE-0001/stdout.log": "b466c05a6d81f0095e02b8639991e805bbec0f23e0901534c6fcb055ad95c632"
+}

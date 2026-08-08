@@ -1,0 +1,29 @@
+{
+  "action_exit_code": 0,
+  "action_id": "HARNESS_CANARY_V1",
+  "action_identity": "HARNESS_CANARY_V1",
+  "action_record": {
+    "head": "5d1b13bd934c27c76dd3f56d32e956864b478bd8",
+    "missing": [],
+    "mmo_platform_detected": true,
+    "status": "PASS"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-DAEMON-PROBE-0001/**"
+  ],
+  "base_commit_expected": "5d1b13bd934c27c76dd3f56d32e956864b478bd8",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "2169ff9ad32f9cb69fcc99bc2e46ddb4248244ef",
+  "duration_seconds": 0.109,
+  "ending_commit_before_result_commit": "5d1b13bd934c27c76dd3f56d32e956864b478bd8",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-08T20:39:01.309827+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-08T20:39:01.211144+00:00",
+  "starting_commit_actual": "5d1b13bd934c27c76dd3f56d32e956864b478bd8",
+  "task_branch": "harness-task/MMO-DAEMON-PROBE-0001",
+  "task_id": "MMO-DAEMON-PROBE-0001",
+  "task_manifest_sha256": "f17c0b4da7e6cbcbf5910162d7bd0c325dd6e11c63aae4fe1544a666d93645c5",
+  "unauthorized_writes": []
+}

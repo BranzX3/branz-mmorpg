@@ -9,6 +9,16 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+if ($TaskName -ne 'BranzMMORPGHarnessDaemon') {
+    throw "MMORPG Harness Scheduled Task name is fixed to BranzMMORPGHarnessDaemon; got $TaskName"
+}
+if ($ControlBranch -ne 'HARNESS_MMORPG_CONTROL') {
+    throw "MMORPG Harness control branch is fixed to HARNESS_MMORPG_CONTROL; got $ControlBranch"
+}
+if ($RepositoryUrl -notmatch '(?i)^https://github\.com/BranzX3/branz-mmorpg(?:\.git)?$') {
+    throw "MMORPG Harness repository is fixed to BranzX3/branz-mmorpg; got $RepositoryUrl"
+}
+
 function Get-FullPath([string]$Path) {
     return [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($Path)).TrimEnd('\')
 }
@@ -26,7 +36,7 @@ function Assert-IsolatedRoot([string]$Path) {
 
 function Is-Administrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
@@ -73,7 +83,7 @@ $bootstrapLog = Join-Path $logs 'bootstrap.log'
 
 if (-not (Is-Administrator)) {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
-    $args = @(
+    $elevationArgs = @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $PSCommandPath + '"'),
         '-WorkerRoot', ('"' + $WorkerRoot + '"'),
         '-TaskName', ('"' + $TaskName + '"'),
@@ -82,7 +92,7 @@ if (-not (Is-Administrator)) {
         '-Elevated'
     ) -join ' '
     Write-Host 'Approve the one-time Windows UAC prompt for the Branz MMORPG Harness Scheduled Task.'
-    $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $args -Wait -PassThru
+    $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $elevationArgs -Wait -PassThru
     if ($proc.ExitCode -ne 0) {
         Write-Host "Bootstrap failed with exit code $($proc.ExitCode)."
         Write-Host "Bootstrap log: $bootstrapLog"

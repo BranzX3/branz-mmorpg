@@ -76,6 +76,8 @@ import com.branz.mmorpg.combat.input.InputRejectionCode;
 import com.branz.mmorpg.combat.input.InputRouteOutcome;
 import com.branz.mmorpg.combat.input.InputRouter;
 import com.branz.mmorpg.combat.input.InputRoutingContext;
+import com.branz.mmorpg.combat.input.PrimaryAttackIngressDecision;
+import com.branz.mmorpg.combat.input.PrimaryAttackIngressPolicy;
 import com.branz.mmorpg.combat.input.SemanticInput;
 import com.branz.mmorpg.combat.input.SneakPressDecision;
 import com.branz.mmorpg.combat.input.SneakPressResolver;
@@ -1120,20 +1122,43 @@ final class CombatSessionController implements Listener {
         if (event.getAnimationType() != PlayerAnimationType.ARM_SWING) {
             return;
         }
-        LiveSession session = sessions.get(event.getPlayer().getUniqueId());
-        if (session == null || !characters.ready(event.getPlayer())) {
+        Player player = event.getPlayer();
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session == null || !characters.ready(player)) {
             return;
         }
-        MoveDefinition primary = primaryMove(event.getPlayer()).orElse(null);
+        if (routePrimaryAttack(player, session)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Converges arm-swing and direct entity-hit ingress into one semantic PRIMARY path. Returning
+     * true means MMO combat owns the physical attack and vanilla damage must never leak through,
+     * including duplicate observations and action-locked states.
+     */
+    private boolean routePrimaryAttack(Player player, LiveSession session) {
+        SelectedHotbarSlot selected = selectedSlot(player, player.getInventory().getHeldItemSlot());
+        PrimaryAttackIngressDecision ingress =
+                PrimaryAttackIngressPolicy.decide(
+                        session.weapon.state(), selected.kind(), session.timeline != null);
+        if (!ingress.mmoOwned()) {
+            return false;
+        }
+        if (!ingress.routePrimary()) {
+            return true;
+        }
+        if (ingress.beginDraw()) {
+            select(session, selected);
+        }
+        MoveDefinition primary = primaryMove(player).orElse(null);
         if (primary == null) {
-            return;
+            return true;
         }
-        SemanticInput intent =
-                resolvedIntent(event.getPlayer(), session, ClientAction.ATTACK).orElse(null);
+        SemanticInput intent = resolvedIntent(player, session, ClientAction.ATTACK).orElse(null);
         if (intent != SemanticInput.PRIMARY) {
-            return;
+            return true;
         }
-        event.setCancelled(true);
         Result<CombatInputRequest, InputRejectionCode> observed =
                 session.input.observe(
                         new InputObservation(
@@ -1142,17 +1167,15 @@ final class CombatSessionController implements Listener {
                                 DirectionSnapshot.NEUTRAL,
                                 primary.input().branch(),
                                 new InputDeduplicationKey("MAIN_HAND", "ATTACK")));
-        if (observed instanceof Result.Failure<CombatInputRequest, InputRejectionCode>) {
-            return;
+        if (!(observed instanceof Result.Success<CombatInputRequest, InputRejectionCode> input)) {
+            return true;
         }
-        CombatInputRequest request =
-                ((Result.Success<CombatInputRequest, InputRejectionCode>) observed).value();
-        InputRoutingContext context = routingContext(event.getPlayer(), session);
         Result<InputRouteOutcome, InputRejectionCode> routed =
-                session.input.routeFrame(List.of(request), context);
+                session.input.routeFrame(List.of(input.value()), routingContext(player, session));
         if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
-            handleRoute(event.getPlayer(), session, success.value());
+            handleRoute(player, session, success.value());
         }
+        return true;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -1160,8 +1183,8 @@ final class CombatSessionController implements Listener {
         if (event.getDamageSource().getCausingEntity() instanceof Player attacker) {
             LiveSession attackerSession = sessions.get(attacker.getUniqueId());
             if (attackerSession != null
-                    && (attackerSession.weapon.state() == WeaponState.READY
-                            || attackerSession.timeline != null)) {
+                    && characters.ready(attacker)
+                    && routePrimaryAttack(attacker, attackerSession)) {
                 event.setCancelled(true);
                 return;
             }

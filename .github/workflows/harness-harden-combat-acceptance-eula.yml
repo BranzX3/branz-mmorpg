@@ -1,0 +1,46 @@
+name: harness harden combat acceptance eula
+
+on:
+  push:
+    branches: [HARNESS_MMORPG_CONTROL]
+    paths:
+      - '.github/workflows/harness-harden-combat-acceptance-eula.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: HARNESS_MMORPG_CONTROL
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Apply guarded deterministic EULA patch
+        run: python3 .github/scripts/harness-harden-combat-acceptance-eula.py
+      - name: Verify harness core
+        shell: bash
+        run: |
+          python3 -m py_compile .mmorpg-harness/runner.py .mmorpg-harness/selftest.py
+          python3 .mmorpg-harness/selftest.py
+      - name: Clean staging helpers
+        shell: bash
+        run: |
+          rm -f .github/scripts/harness-harden-combat-acceptance-eula.py
+          rm -f .github/workflows/harness-harden-combat-acceptance-eula.yml
+          git diff --check
+      - name: Commit verified deterministic action
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'mmorpg-harness-bot'
+          git config user.email 'mmorpg-harness-bot@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix(harness): make combat acceptance self-contained'
+          git push origin HEAD:HARNESS_MMORPG_CONTROL

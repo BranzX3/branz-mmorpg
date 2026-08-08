@@ -79,6 +79,7 @@ import com.branz.mmorpg.combat.input.InputRouter;
 import com.branz.mmorpg.combat.input.InputRoutingContext;
 import com.branz.mmorpg.combat.input.PrimaryAttackIngressDecision;
 import com.branz.mmorpg.combat.input.PrimaryAttackIngressPolicy;
+import com.branz.mmorpg.combat.input.PrimaryAttackInputCoordinator;
 import com.branz.mmorpg.combat.input.SemanticInput;
 import com.branz.mmorpg.combat.input.SneakPressDecision;
 import com.branz.mmorpg.combat.input.SneakPressResolver;
@@ -1160,22 +1161,13 @@ final class CombatSessionController implements Listener {
         if (intent != SemanticInput.PRIMARY) {
             return true;
         }
-        Result<CombatInputRequest, InputRejectionCode> observed =
-                session.input.observe(
-                        new InputObservation(
-                                plugin.getServer().getCurrentTick(),
-                                intent,
-                                DirectionSnapshot.NEUTRAL,
-                                primary.input().branch(),
-                                new InputDeduplicationKey("MAIN_HAND", "ATTACK")));
-        if (!(observed instanceof Result.Success<CombatInputRequest, InputRejectionCode> input)) {
-            return true;
-        }
-        Result<InputRouteOutcome, InputRejectionCode> routed =
-                session.input.routeFrame(List.of(input.value()), routingContext(player, session));
-        if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
-            handleRoute(player, session, success.value());
-        }
+        Optional<InputRouteOutcome> routed =
+                PrimaryAttackInputCoordinator.route(
+                        session.input,
+                        plugin.getServer().getCurrentTick(),
+                        primary.input().branch(),
+                        routingContext(player, session));
+        routed.ifPresent(outcome -> handleRoute(player, session, outcome));
         return true;
     }
 

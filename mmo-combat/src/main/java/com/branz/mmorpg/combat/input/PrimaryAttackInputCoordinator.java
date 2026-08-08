@@ -6,8 +6,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Owns observation deduplication and one-frame routing for the physical primary attack. Both
- * Bukkit arm-swing and direct entity-hit ingress converge here through the controller's single
+ * Owns observation deduplication and one-frame routing for the physical primary attack. Both Bukkit
+ * arm-swing and direct entity-hit ingress converge here through the controller's single
  * routePrimaryAttack path.
  */
 public final class PrimaryAttackInputCoordinator {

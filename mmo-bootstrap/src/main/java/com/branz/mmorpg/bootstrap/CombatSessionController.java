@@ -3150,6 +3150,7 @@ final class CombatSessionController implements Listener {
         MeleeHitFeedbackPolicy.forAppliedDamage(appliedDamage)
                 .ifPresent(
                         feedback -> {
+                            entity.playHurtAnimation(0.0f);
                             Location location =
                                     entity.getLocation().add(0.0, entity.getHeight() * 0.6, 0.0);
                             entity.getWorld()

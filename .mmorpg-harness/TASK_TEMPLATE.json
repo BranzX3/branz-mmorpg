@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-EXAMPLE-0001",
+  "task_branch": "harness-task/MMO-EXAMPLE-0001",
+  "base_commit": "0000000000000000000000000000000000000000",
+  "action_id": "MMO_GRADLE_VERIFY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-EXAMPLE-0001/**"
+  ]
+}

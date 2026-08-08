@@ -52,9 +52,9 @@ jobs:
               '        }',
           ])
           incoming_count = source.count(incoming)
-          if incoming_count != 2:
-              raise SystemExit(f'incoming-hostile guard failed: expected 2, got {incoming_count}')
-          source = source.replace(incoming, incoming_replacement)
+          if incoming_count != 1:
+              raise SystemExit(f'incoming-hostile guard failed: expected 1, got {incoming_count}')
+          source = source.replace(incoming, incoming_replacement, 1)
 
           mark_hostile_marker = '    private void markHostile(Player player, LiveSession session) {'
           if source.count(mark_hostile_marker) != 1:

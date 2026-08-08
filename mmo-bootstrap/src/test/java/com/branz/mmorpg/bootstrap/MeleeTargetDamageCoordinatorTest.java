@@ -51,4 +51,17 @@ class MeleeTargetDamageCoordinatorTest {
         assertFalse(result.lethalNow());
         assertTrue(result.feedback().isEmpty());
     }
+
+    @Test
+    void staleHitOnAlreadyDeadTargetDoesNotBecomeNewLethalOrEmitFeedback() {
+        CombatHealthRuntime dead = new CombatHealthRuntime(0.0, 10, 10);
+
+        MeleeTargetDamageCoordinator.MeleeTargetDamageResult result =
+                MeleeTargetDamageCoordinator.apply(health, dead, 11, 25.0);
+
+        assertEquals(0.0, result.runtime().current());
+        assertEquals(0.0, result.appliedDamage());
+        assertFalse(result.lethalNow());
+        assertTrue(result.feedback().isEmpty());
+    }
 }

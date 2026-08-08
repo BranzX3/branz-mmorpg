@@ -3,7 +3,8 @@ param(
     [string]$TaskName = 'BranzMMORPGHarnessDaemon',
     [string]$RepositoryUrl = 'https://github.com/BranzX3/branz-mmorpg.git',
     [string]$ControlBranch = 'HARNESS_MMORPG_CONTROL',
-    [switch]$Elevated
+    [switch]$RegisterOnly,
+    [string]$RunAsUser = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,12 +33,6 @@ function Assert-IsolatedRoot([string]$Path) {
         throw "Refusing WorkerRoot inside TradebotHarness: $candidate"
     }
     return $candidate
-}
-
-function Is-Administrator {
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
-    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
 function Invoke-NativeCaptured {
@@ -77,59 +72,106 @@ function Write-Utf8NoBom([string]$Path, [string]$Text) {
     [IO.File]::WriteAllText($Path, (Normalize-Text $Text), [Text.UTF8Encoding]::new($false))
 }
 
-$WorkerRoot = Assert-IsolatedRoot $WorkerRoot
-$logs = Join-Path $WorkerRoot 'logs'
-$bootstrapLog = Join-Path $logs 'bootstrap.log'
-
-if (-not (Is-Administrator)) {
-    New-Item -ItemType Directory -Force -Path $logs | Out-Null
-    $elevationArgs = @(
-        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $PSCommandPath + '"'),
-        '-WorkerRoot', ('"' + $WorkerRoot + '"'),
-        '-TaskName', ('"' + $TaskName + '"'),
-        '-RepositoryUrl', ('"' + $RepositoryUrl + '"'),
-        '-ControlBranch', ('"' + $ControlBranch + '"'),
-        '-Elevated'
-    ) -join ' '
-    Write-Host 'Approve the one-time Windows UAC prompt for the Branz MMORPG Harness Scheduled Task.'
-    $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $elevationArgs -Wait -PassThru
-    if ($proc.ExitCode -ne 0) {
-        Write-Host "Bootstrap failed with exit code $($proc.ExitCode)."
-        Write-Host "Bootstrap log: $bootstrapLog"
-        exit $proc.ExitCode
+function Resolve-Application([string]$Name) {
+    $cmd = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $cmd -or [string]::IsNullOrWhiteSpace($cmd.Source)) {
+        throw "$Name executable is required."
     }
-    Write-Host 'BRANZ_MMORPG_HARNESS_BOOTSTRAP_COMPLETE'
-    Write-Host "WorkerRoot: $WorkerRoot"
-    Write-Host "Bootstrap log: $bootstrapLog"
-    exit 0
+    return (Resolve-Path -LiteralPath $cmd.Source).Path
 }
 
-New-Item -ItemType Directory -Force -Path $WorkerRoot,$logs | Out-Null
+$WorkerRoot = Assert-IsolatedRoot $WorkerRoot
+$logs = Join-Path $WorkerRoot 'logs'
+$runtime = Join-Path $WorkerRoot 'runtime'
+$repo = Join-Path $WorkerRoot 'repo'
+$gradleHome = Join-Path $WorkerRoot 'gradle-home'
+$bootstrapLog = Join-Path $logs 'bootstrap.log'
+$registerLog = Join-Path $logs 'register-task.log'
+$daemonInstalled = Join-Path $WorkerRoot 'daemon.ps1'
+$toolchainFile = Join-Path $runtime 'bootstrap-environment.json'
+New-Item -ItemType Directory -Force -Path $WorkerRoot,$logs,$runtime,$gradleHome | Out-Null
+
+function Register-DaemonTask([string]$Account) {
+    if ([string]::IsNullOrWhiteSpace($Account)) { throw 'RunAsUser is required for task registration.' }
+    if (-not (Test-Path -LiteralPath $daemonInstalled -PathType Leaf)) {
+        throw "Installed daemon is missing: $daemonInstalled"
+    }
+    $psExe = Join-Path $PSHOME 'powershell.exe'
+    if (-not (Test-Path -LiteralPath $psExe -PathType Leaf)) {
+        $psExe = (Get-Process -Id $PID).Path
+    }
+    $actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$daemonInstalled`" -WorkerRoot `"$WorkerRoot`" -RepositoryUrl `"$RepositoryUrl`" -ControlBranch `"$ControlBranch`""
+    $action = New-ScheduledTaskAction -Execute $psExe -Argument $actionArgs -WorkingDirectory $WorkerRoot
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $Account
+    $principal = New-ScheduledTaskPrincipal -UserId $Account -LogonType Interactive -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+    $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($existing) { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue }
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+    Start-ScheduledTask -TaskName $TaskName
+}
+
+if ($RegisterOnly) {
+    try {
+        Register-DaemonTask -Account $RunAsUser
+        Add-Content -Encoding UTF8 -Path $registerLog -Value "[$((Get-Date).ToUniversalTime().ToString('o'))] REGISTER_ONLY_PASS user=$RunAsUser"
+        exit 0
+    }
+    catch {
+        $message = $_ | Out-String
+        Add-Content -Encoding UTF8 -Path $registerLog -Value $message
+        Write-Error $message
+        exit 1
+    }
+}
+
 Start-Transcript -Path $bootstrapLog -Append | Out-Null
 try {
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'git is required.' }
-    if (-not (Get-Command python -ErrorAction SilentlyContinue)) { throw 'python is required.' }
-    if (-not (Get-Command java -ErrorAction SilentlyContinue)) { throw 'JDK 25 is required.' }
+    # Resolve tools before any elevation. Git credentials and the developer-selected
+    # JDK/Python context must remain the normal interactive user's context.
+    $gitExe = Resolve-Application 'git'
+    $pythonExe = Resolve-Application 'python'
+    $javaExe = Resolve-Application 'java'
 
-    $java = Invoke-NativeCaptured -FilePath 'java' -Arguments @('-version')
-    $javaText = ($java.Lines -join "`n")
-    if ($java.ExitCode -ne 0 -or $javaText -notmatch '(?m)(?:java|openjdk) version "25(?:\.|\")') {
-        throw "Harness requires JDK 25 on PATH/JAVA_HOME. Detected:`n$javaText"
+    $javaVersion = Invoke-NativeCaptured -FilePath $javaExe -Arguments @('-version')
+    $javaText = ($javaVersion.Lines -join "`n")
+    if ($javaVersion.ExitCode -ne 0 -or $javaText -notmatch '(?m)(?:java|openjdk) version "25(?:\.|\")') {
+        throw "Harness requires JDK 25 in this PowerShell user context. Detected:`n$javaText"
     }
+    $javaProps = Invoke-NativeCaptured -FilePath $javaExe -Arguments @('-XshowSettings:properties','-version')
+    $propsText = ($javaProps.Lines -join "`n")
+    $homeMatch = [regex]::Match($propsText, '(?m)^\s*java\.home\s*=\s*(.+?)\s*$')
+    if (-not $homeMatch.Success) { throw "Could not resolve java.home from JDK 25.`n$propsText" }
+    $javaHome = (Resolve-Path -LiteralPath $homeMatch.Groups[1].Value.Trim()).Path
+    $pinnedJava = Join-Path $javaHome 'bin\java.exe'
+    if (-not (Test-Path -LiteralPath $pinnedJava -PathType Leaf)) { throw "Resolved java.home has no java.exe: $javaHome" }
 
-    $repo = Join-Path $WorkerRoot 'repo'
-    $runtime = Join-Path $WorkerRoot 'runtime'
-    $gradleHome = Join-Path $WorkerRoot 'gradle-home'
-    New-Item -ItemType Directory -Force -Path $runtime,$gradleHome | Out-Null
+    $pythonProbe = Invoke-NativeCaptured -FilePath $pythonExe -Arguments @('--version')
+    if ($pythonProbe.ExitCode -ne 0) { throw 'Pinned Python executable failed --version.' }
+    $gitProbe = Invoke-NativeCaptured -FilePath $gitExe -Arguments @('--version')
+    if ($gitProbe.ExitCode -ne 0) { throw 'Pinned Git executable failed --version.' }
+
+    $toolchain = [ordered]@{
+        schema_version = 1
+        captured_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+        git_exe = $gitExe
+        python_exe = $pythonExe
+        java_home = $javaHome
+    } | ConvertTo-Json -Depth 3
+    Write-Utf8NoBom -Path $toolchainFile -Text $toolchain
+
+    # Make the runner resolve the exact same toolchain in this process too.
+    $env:JAVA_HOME = $javaHome
+    $env:PATH = "$(Split-Path -Parent $gitExe);$(Split-Path -Parent $pythonExe);$(Join-Path $javaHome 'bin');$env:PATH"
 
     if (Test-Path (Join-Path $repo '.git')) {
-        $origin = Invoke-NativeCaptured -FilePath 'git' -Arguments @('-C', $repo, 'remote', 'get-url', 'origin')
+        $origin = Invoke-NativeCaptured -FilePath $gitExe -Arguments @('-C', $repo, 'remote', 'get-url', 'origin')
         if ($origin.ExitCode -ne 0) { throw 'Existing worker clone has no readable origin.' }
         $originUrl = ($origin.Lines -join '').Trim()
         if ($originUrl -notmatch '(?i)(github\.com[/:])BranzX3/branz-mmorpg(?:\.git)?$') {
             throw "Existing WorkerRoot belongs to another repository: $originUrl"
         }
-        $dirty = Invoke-NativeCaptured -FilePath 'git' -Arguments @('-C', $repo, 'status', '--porcelain=v1', '--untracked-files=all')
+        $dirty = Invoke-NativeCaptured -FilePath $gitExe -Arguments @('-C', $repo, 'status', '--porcelain=v1', '--untracked-files=all')
         if ($dirty.ExitCode -ne 0) { throw 'Could not inspect existing worker clone.' }
         if (-not [string]::IsNullOrWhiteSpace(($dirty.Lines -join "`n"))) {
             throw 'Existing worker clone is dirty. Refusing destructive bootstrap recovery.'
@@ -140,7 +182,7 @@ try {
     }
     else {
         Write-Host 'Creating dedicated Branz MMORPG worker clone...'
-        $clone = Invoke-NativeCaptured -FilePath 'git' -Arguments @('clone', '--no-tags', $RepositoryUrl, $repo)
+        $clone = Invoke-NativeCaptured -FilePath $gitExe -Arguments @('clone', '--no-tags', $RepositoryUrl, $repo)
         if ($clone.ExitCode -ne 0) { throw "git clone failed:`n$($clone.Lines -join "`n")" }
     }
 
@@ -150,25 +192,24 @@ try {
         @('core.autocrlf','false'),
         @('fetch.prune','true')
     )) {
-        $cfg = Invoke-NativeCaptured -FilePath 'git' -Arguments @('-C', $repo, 'config', $pair[0], $pair[1])
+        $cfg = Invoke-NativeCaptured -FilePath $gitExe -Arguments @('-C', $repo, 'config', $pair[0], $pair[1])
         if ($cfg.ExitCode -ne 0) { throw "git config failed for $($pair[0])" }
     }
 
-    $fetch = Invoke-NativeCaptured -FilePath 'git' -Arguments @('-C', $repo, 'fetch', 'origin', '--prune', '--no-tags')
+    $fetch = Invoke-NativeCaptured -FilePath $gitExe -Arguments @('-C', $repo, 'fetch', 'origin', '--prune', '--no-tags')
     if ($fetch.ExitCode -ne 0) { throw "Worker clone cannot fetch origin:`n$($fetch.Lines -join "`n")" }
 
     function Read-RemoteFile([string]$Path) {
-        $show = Invoke-NativeCaptured -FilePath 'git' -Arguments @('-C', $repo, 'show', "origin/$ControlBranch`:$Path")
+        $show = Invoke-NativeCaptured -FilePath $gitExe -Arguments @('-C', $repo, 'show', "origin/$ControlBranch`:$Path")
         if ($show.ExitCode -ne 0) { throw "Cannot read $Path from origin/$ControlBranch." }
         return (Normalize-Text ($show.Lines -join "`n"))
     }
 
-    $control = Invoke-NativeCaptured -FilePath 'git' -Arguments @('-C', $repo, 'rev-parse', "origin/$ControlBranch")
+    $control = Invoke-NativeCaptured -FilePath $gitExe -Arguments @('-C', $repo, 'rev-parse', "origin/$ControlBranch")
     if ($control.ExitCode -ne 0) { throw "Control branch does not exist: $ControlBranch" }
     $controlCommit = ($control.Lines -join '').Trim()
     if ($controlCommit -notmatch '^[0-9a-f]{40}$') { throw "Invalid control commit: $controlCommit" }
 
-    $daemonInstalled = Join-Path $WorkerRoot 'daemon.ps1'
     $runnerInstalled = Join-Path $runtime 'runner.py'
     $selftestInstalled = Join-Path $runtime 'selftest.py'
     Write-Utf8NoBom $daemonInstalled (Read-RemoteFile '.mmorpg-harness/daemon.ps1')
@@ -176,43 +217,52 @@ try {
     Write-Utf8NoBom $selftestInstalled (Read-RemoteFile '.mmorpg-harness/selftest.py')
 
     Write-Host 'Running offline protocol selftest...'
-    $self = Invoke-NativeCaptured -FilePath 'python' -Arguments @($selftestInstalled) -WorkingDirectory $runtime
+    $self = Invoke-NativeCaptured -FilePath $pythonExe -Arguments @($selftestInstalled) -WorkingDirectory $runtime
     foreach ($line in $self.Lines) { Write-Host $line }
     if ($self.ExitCode -ne 0 -or ($self.Lines -join "`n") -notmatch 'MMORPG_HARNESS_SELFTEST_PASS') {
         throw 'Harness offline selftest failed.'
     }
 
-    $oldControl = $env:BRANZ_MMO_CONTROL_COMMIT
-    $oldGradle = $env:GRADLE_USER_HOME
+    $oldControl = [Environment]::GetEnvironmentVariable('BRANZ_MMO_CONTROL_COMMIT','Process')
+    $oldGradle = [Environment]::GetEnvironmentVariable('GRADLE_USER_HOME','Process')
     try {
         $env:BRANZ_MMO_CONTROL_COMMIT = $controlCommit
         $env:GRADLE_USER_HOME = $gradleHome
-        Write-Host 'Running GitHub-controlled bootstrap canary...'
-        $canary = Invoke-NativeCaptured -FilePath 'python' -Arguments @($runnerInstalled, 'run') -WorkingDirectory $repo
+        Write-Host 'Running GitHub-controlled bootstrap canary in normal user context...'
+        $canary = Invoke-NativeCaptured -FilePath $pythonExe -Arguments @($runnerInstalled, 'run') -WorkingDirectory $repo
         foreach ($line in $canary.Lines) { Write-Host $line }
         if ($canary.ExitCode -ne 0) {
             throw "Bootstrap canary did not complete successfully. Exit=$($canary.ExitCode)"
         }
     }
     finally {
-        $env:BRANZ_MMO_CONTROL_COMMIT = $oldControl
-        $env:GRADLE_USER_HOME = $oldGradle
+        [Environment]::SetEnvironmentVariable('BRANZ_MMO_CONTROL_COMMIT',$oldControl,'Process')
+        [Environment]::SetEnvironmentVariable('GRADLE_USER_HOME',$oldGradle,'Process')
     }
 
     $account = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $psExe = (Get-Process -Id $PID).Path
-    $actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$daemonInstalled`" -WorkerRoot `"$WorkerRoot`" -RepositoryUrl `"$RepositoryUrl`" -ControlBranch `"$ControlBranch`""
-    $action = New-ScheduledTaskAction -Execute $psExe -Argument $actionArgs -WorkingDirectory $WorkerRoot
-    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $account
-    $principal = New-ScheduledTaskPrincipal -UserId $account -LogonType Interactive -RunLevel Highest
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+    try {
+        Register-DaemonTask -Account $account
+    }
+    catch {
+        # The daemon itself must stay non-elevated. If this Windows installation
+        # requires elevation to register a task, elevate registration only.
+        Write-Host 'Scheduled Task registration requires elevation; requesting UAC for registration only.'
+        $argLine = @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $PSCommandPath + '"'),
+            '-WorkerRoot', ('"' + $WorkerRoot + '"'),
+            '-TaskName', ('"' + $TaskName + '"'),
+            '-RepositoryUrl', ('"' + $RepositoryUrl + '"'),
+            '-ControlBranch', ('"' + $ControlBranch + '"'),
+            '-RegisterOnly', '-RunAsUser', ('"' + $account + '"')
+        ) -join ' '
+        $reg = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $argLine -Wait -PassThru
+        if ($reg.ExitCode -ne 0) {
+            throw "Elevated Scheduled Task registration failed. Exit=$($reg.ExitCode); log=$registerLog"
+        }
+    }
 
-    $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-    if ($existing) { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue }
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
-    Start-ScheduledTask -TaskName $TaskName
     Start-Sleep -Seconds 3
-
     $task = Get-ScheduledTask -TaskName $TaskName
     $info = Get-ScheduledTaskInfo -TaskName $TaskName
     Write-Host ''
@@ -220,6 +270,7 @@ try {
     Write-Host "Control commit: $controlCommit"
     Write-Host "Worker clone: $repo"
     Write-Host "Runtime root: $WorkerRoot"
+    Write-Host "Pinned Java home: $javaHome"
     Write-Host "Scheduled task: $($task.TaskName) / $($task.State)"
     Write-Host "LastTaskResult: $($info.LastTaskResult)"
     Write-Host "Daemon log: $(Join-Path $logs 'daemon.log')"

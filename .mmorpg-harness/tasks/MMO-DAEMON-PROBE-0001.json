@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-DAEMON-PROBE-0001",
+  "task_branch": "harness-task/MMO-DAEMON-PROBE-0001",
+  "base_commit": "5d1b13bd934c27c76dd3f56d32e956864b478bd8",
+  "action_id": "HARNESS_CANARY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-DAEMON-PROBE-0001/**"
+  ]
+}

@@ -8,6 +8,16 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+if ($ControlBranch -ne 'HARNESS_MMORPG_CONTROL') {
+    throw "MMORPG Harness control branch is fixed to HARNESS_MMORPG_CONTROL; got $ControlBranch"
+}
+if ($RepositoryUrl -notmatch '(?i)^https://github\.com/BranzX3/branz-mmorpg(?:\.git)?$') {
+    throw "MMORPG Harness repository is fixed to BranzX3/branz-mmorpg; got $RepositoryUrl"
+}
+if ($PollSeconds -lt 10 -or $PollSeconds -gt 3600) {
+    throw "PollSeconds must be between 10 and 3600; got $PollSeconds"
+}
+
 function Get-FullPath([string]$Path) {
     return [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($Path)).TrimEnd('\')
 }

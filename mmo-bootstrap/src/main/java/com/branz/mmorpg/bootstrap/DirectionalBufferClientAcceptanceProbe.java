@@ -39,7 +39,7 @@ final class DirectionalBufferClientAcceptanceProbe implements Listener {
     private static final String FOLLOWUP_BRANCH = "PRIMARY_2";
     private static final String TRAINING_DUMMY_TAG = "branzmmo.directional_buffer_dummy";
     private static final int QUEUE_WINDOW_ARMED_LEVEL = 6;
-    private static final long QUEUE_WINDOW_ARM_DELAY_TICKS = 10L;
+    private static final long QUEUE_WINDOW_ARM_DELAY_TICKS = 12L;
 
     private final JavaPlugin plugin;
     private final CombatSessionController combat;

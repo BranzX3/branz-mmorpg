@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Player;
@@ -32,6 +33,8 @@ final class OnboardingClientAcceptanceProbe {
     private static final String FIRST_COMBAT_MARKER = "ONBOARDING_FIRST_COMBAT_GATE_PASS";
     private static final String DEFENSE_DODGE_MARKER = "ONBOARDING_DEFENSE_DODGE_GATE_PASS";
     private static final String TRAINING_DUMMY_TAG = "branzmmo.training_dummy";
+    private static final int STARTER_HOTBAR_SLOT = 0;
+    private static final int CHRONICLE_HOTBAR_SLOT = 8;
     private static final DefinitionId GREATSWORD = DefinitionId.of("weapon.training_greatsword");
     private static final DefinitionId GREATSWORD_MOVE =
             DefinitionId.of("move.training_greatsword.committed_cleave");
@@ -42,6 +45,8 @@ final class OnboardingClientAcceptanceProbe {
     private UUID trainingDummyId;
     private int readyCount;
     private boolean checking;
+    private boolean chronicleSelected;
+    private boolean combatStagingReady;
     private boolean awaitingDodge;
     private boolean completed;
 
@@ -135,8 +140,37 @@ final class OnboardingClientAcceptanceProbe {
             fail("foundation ready observer fired too many times");
             return;
         }
-        spawnTrainingDummy(player);
         plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_RECONNECT_READY");
+        plugin.getServer().getScheduler().runTaskLater(plugin, this::pollCombatStaging, 1L);
+    }
+
+    private void pollCombatStaging() {
+        if (completed || combatStagingReady) {
+            return;
+        }
+        Player player = playerId == null ? null : plugin.getServer().getPlayer(playerId);
+        if (player == null || !player.isOnline()) {
+            fail("player disconnected before combat staging completed");
+            return;
+        }
+        if (!chronicleSelected) {
+            if (player.getInventory().getHeldItemSlot() == CHRONICLE_HOTBAR_SLOT
+                    && player.getInventory().getItemInMainHand().getType() == Material.WRITTEN_BOOK) {
+                chronicleSelected = true;
+                plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_CHRONICLE_HELD");
+            }
+            plugin.getServer().getScheduler().runTaskLater(plugin, this::pollCombatStaging, 1L);
+            return;
+        }
+        if (player.getInventory().getHeldItemSlot() != STARTER_HOTBAR_SLOT
+                || player.getInventory().getItemInMainHand().getType().isAir()
+                || player.getInventory().getItemInMainHand().getType() == Material.WRITTEN_BOOK) {
+            plugin.getServer().getScheduler().runTaskLater(plugin, this::pollCombatStaging, 1L);
+            return;
+        }
+        combatStagingReady = true;
+        spawnTrainingDummy(player);
+        plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_COMBAT_STAGING_READY");
     }
 
     private void spawnTrainingDummy(Player player) {
@@ -168,6 +202,7 @@ final class OnboardingClientAcceptanceProbe {
             CharacterId actorId, UUID actionId, DefinitionId moveId, long currentTick) {
         if (completed
                 || awaitingDodge
+                || !combatStagingReady
                 || readyCount != 2
                 || playerId == null
                 || !actorId.value().equals(playerId)) {

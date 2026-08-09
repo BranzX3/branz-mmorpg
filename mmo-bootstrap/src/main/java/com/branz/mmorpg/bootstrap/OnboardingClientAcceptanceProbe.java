@@ -133,7 +133,11 @@ final class OnboardingClientAcceptanceProbe {
             return;
         }
         if (!GREATSWORD_MOVE.equals(moveId)) {
-            fail("expected first committed move " + GREATSWORD_MOVE.value() + ", got " + moveId.value());
+            fail(
+                    "expected first committed move "
+                            + GREATSWORD_MOVE.value()
+                            + ", got "
+                            + moveId.value());
             return;
         }
         try {

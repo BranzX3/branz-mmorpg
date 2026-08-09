@@ -119,6 +119,7 @@ final class OnboardingClientAcceptanceProbe {
             fail("foundation ready observer fired too many times");
             return;
         }
+        plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_RECONNECT_READY");
         try {
             writeMarker();
             completed = true;
@@ -127,7 +128,9 @@ final class OnboardingClientAcceptanceProbe {
             fail("marker write failed: " + exception.getMessage());
             return;
         }
-        plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 20L);
+        // Keep the accepted reconnect alive long enough for the external real client to select the
+        // Chronicle physically and prove that its RMB path opens the production Scene Hub.
+        plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 100L);
     }
 
     private void validateGreatswordProjection(Player player) {

@@ -14,6 +14,7 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
     private static final int GREATSWORD_SLOT = 10;
     private static final int CHRONICLE_HOTBAR_SLOT = 8;
     private static final int SCENE_HUB_MENU_SLOTS = 54 + 36;
+    private static final int BUFFER_CONFIRMED_LEVEL = 7;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -119,9 +120,15 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         context.getInput().pressMouse(0);
         System.out.println("DIRECTIONAL_BUFFER_FOLLOWUP_BUFFER_INPUT_CLIENT");
 
-        // pressMouse already waits one client tick. Issue the refresh immediately afterward so it
-        // remains inside the same authored server window instead of allowing the buffered action to
-        // start first.
+        // The acceptance-only server probe replicates this vanilla XP level only after it has
+        // observed BUFFERED PRIMARY_2. Wait for that server-confirmed state, then issue another real
+        // physical LMB so the refresh assertion does not depend on guessing headless tick ratios.
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player.experienceLevel == BUFFER_CONFIRMED_LEVEL,
+                20 * 5);
+        System.out.println("DIRECTIONAL_BUFFER_BUFFER_CONFIRMED_CLIENT");
         context.getInput().pressMouse(0);
         System.out.println("DIRECTIONAL_BUFFER_FOLLOWUP_REFRESH_INPUT_CLIENT");
 

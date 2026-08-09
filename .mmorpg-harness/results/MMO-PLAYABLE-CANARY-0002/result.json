@@ -1,0 +1,29 @@
+{
+  "action_exit_code": 0,
+  "action_id": "HARNESS_CANARY_V1",
+  "action_identity": "HARNESS_CANARY_V1",
+  "action_record": {
+    "head": "ca234fb95630ef6095f957ba8631894e6fa5e99d",
+    "missing": [],
+    "mmo_platform_detected": true,
+    "status": "PASS"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PLAYABLE-CANARY-0002/**"
+  ],
+  "base_commit_expected": "ca234fb95630ef6095f957ba8631894e6fa5e99d",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "1347886ae4c645f8659882da31727ce85b946c44",
+  "duration_seconds": 0.094,
+  "ending_commit_before_result_commit": "ca234fb95630ef6095f957ba8631894e6fa5e99d",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-09T07:59:38.710242+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-09T07:59:38.605398+00:00",
+  "starting_commit_actual": "ca234fb95630ef6095f957ba8631894e6fa5e99d",
+  "task_branch": "harness-task/MMO-PLAYABLE-CANARY-0002",
+  "task_id": "MMO-PLAYABLE-CANARY-0002",
+  "task_manifest_sha256": "19cf87d6c1fe35de13e21f108408d8b48524ea6808cb473cc286223c2e4c1301",
+  "unauthorized_writes": []
+}

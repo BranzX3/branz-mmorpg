@@ -83,13 +83,7 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
                     }
                 });
 
-        // Let normal join motion settle before exercising a Scene path whose production contract
-        // deliberately requires safe ground and low velocity.
         context.waitTicks(20);
-
-        // Exercise the normal-player path instead of calling Bukkit or Minecraft internals:
-        // physically select hotbar slot 9, verify the selected main hand is the visible Chronicle,
-        // then physically right-click it.
         context.getInput().pressKey(GLFW.GLFW_KEY_9);
         context.waitFor(
                 client ->
@@ -99,6 +93,14 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         System.out.println("ONBOARDING_CHRONICLE_SELECTED_CLIENT");
         context.waitTicks(10);
         context.getInput().pressMouse(1);
+        context.waitTicks(5);
+        context.runOnClient(
+                client -> {
+                    Object screen = client.gui.screen();
+                    System.out.println(
+                            "ONBOARDING_CHRONICLE_AFTER_RMB_SCREEN="
+                                    + (screen == null ? "null" : screen.getClass().getName()));
+                });
         context.waitFor(
                 client -> client.gui.screen() instanceof AbstractContainerScreen<?>, 20 * 10);
         context.runOnClient(

@@ -17,11 +17,10 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.attribute.Attribute;
+import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Zombie;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.RegisteredListener;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -295,14 +294,10 @@ final class OnboardingClientAcceptanceProbe {
 
     private void spawnHostileTarget(Player player) {
         removeHostileTarget();
-        Zombie hostile = player.getWorld().spawn(targetLocation(player, 1.75), Zombie.class);
+        Creeper hostile = player.getWorld().spawn(targetLocation(player, 1.75), Creeper.class);
         hostile.setAI(false);
         hostile.setSilent(true);
         hostile.setRemoveWhenFarAway(false);
-        hostile.getEquipment().clear();
-        if (hostile.getAttribute(Attribute.ARMOR) != null) {
-            Objects.requireNonNull(hostile.getAttribute(Attribute.ARMOR)).setBaseValue(0);
-        }
         hostile.addScoreboardTag(HOSTILE_ACCEPTANCE_TAG);
         hostileTargetId = hostile.getUniqueId();
         plugin.getLogger()

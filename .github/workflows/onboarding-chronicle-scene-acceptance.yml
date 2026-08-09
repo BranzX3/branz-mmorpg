@@ -26,6 +26,21 @@ jobs:
           gradle-version: '9.5.0'
           cache-disabled: true
 
+      - name: Instrument Chronicle Scene diagnostic in runner only
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/SceneHubController.java")
+          text = path.read_text(encoding="utf-8")
+          old = """        event.setCancelled(true);\n        open(event.getPlayer());\n"""
+          new = """        event.setCancelled(true);\n        plugin.getLogger()\n                .info(\n                        \"ONBOARDING_CHRONICLE_RMB_SERVER action=\"\n                                + event.getAction()\n                                + \" hand=\"\n                                + event.getHand()\n                                + \" item=\"\n                                + event.getItem().getType());\n        Result<SceneSession, SceneErrorCode> onboardingAcceptanceOpen = open(event.getPlayer());\n        if (onboardingAcceptanceOpen\n                instanceof Result.Failure<SceneSession, SceneErrorCode> failure) {\n            plugin.getLogger()\n                    .info(\n                            \"ONBOARDING_CHRONICLE_SCENE_SERVER_FAIL error=\"\n                                    + failure.error().code()\n                                    + \" detail=\"\n                                    + failure.detail());\n        } else {\n            plugin.getLogger().info(\"ONBOARDING_CHRONICLE_SCENE_SERVER_SUCCESS\");\n        }\n"""
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one Chronicle open call, found {text.count(old)}")
+          path.write_text(text.replace(old, new), encoding="utf-8")
+          PY
+
       - name: Verify full repository
         run: bash ./gradlew clean build --no-daemon --console=plain
 

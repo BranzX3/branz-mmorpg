@@ -4,6 +4,7 @@ import com.branz.mmorpg.api.identity.CharacterId;
 import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.result.Result;
+import com.branz.mmorpg.combat.dodge.DodgePhase;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.persistence.transaction.CharacterOnboardingStateRecord;
 import java.io.IOException;
@@ -18,14 +19,18 @@ import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Player;
+import org.bukkit.event.HandlerList;
+import org.bukkit.plugin.RegisteredListener;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
 
-/** Real-client acceptance for first choice -> durable kit -> reconnect -> first combat hit. */
+/** Real-client acceptance for first choice -> durable kit -> reconnect -> combat -> dodge. */
 final class OnboardingClientAcceptanceProbe {
     static final String ENABLE_PROPERTY = "mmo.bootstrap.onboarding-acceptance-test";
     static final String MARKER_PROPERTY = "mmo.bootstrap.onboarding-acceptance-marker";
     static final String PASS_MARKER = "ONBOARDING_CLIENT_ACCEPTANCE_PASS";
+    private static final String FIRST_COMBAT_MARKER = "ONBOARDING_FIRST_COMBAT_GATE_PASS";
+    private static final String DEFENSE_DODGE_MARKER = "ONBOARDING_DEFENSE_DODGE_GATE_PASS";
     private static final String TRAINING_DUMMY_TAG = "branzmmo.training_dummy";
     private static final DefinitionId GREATSWORD = DefinitionId.of("weapon.training_greatsword");
     private static final DefinitionId GREATSWORD_MOVE =
@@ -37,6 +42,7 @@ final class OnboardingClientAcceptanceProbe {
     private UUID trainingDummyId;
     private int readyCount;
     private boolean checking;
+    private boolean awaitingDodge;
     private boolean completed;
 
     private OnboardingClientAcceptanceProbe(
@@ -160,7 +166,11 @@ final class OnboardingClientAcceptanceProbe {
 
     private void onSuccessfulCombatAction(
             CharacterId actorId, UUID actionId, DefinitionId moveId, long currentTick) {
-        if (completed || readyCount != 2 || playerId == null || !actorId.value().equals(playerId)) {
+        if (completed
+                || awaitingDodge
+                || readyCount != 2
+                || playerId == null
+                || !actorId.value().equals(playerId)) {
             return;
         }
         if (!GREATSWORD_MOVE.equals(moveId)) {
@@ -171,24 +181,75 @@ final class OnboardingClientAcceptanceProbe {
                             + moveId.value());
             return;
         }
+        awaitingDodge = true;
+        removeTrainingDummy();
+        plugin.getLogger()
+                .info(
+                        FIRST_COMBAT_MARKER
+                                + " move="
+                                + moveId.value()
+                                + " action="
+                                + actionId
+                                + " tick="
+                                + currentTick);
+        plugin.getServer().getScheduler().runTaskLater(plugin, this::pollDodge, 1L);
+    }
+
+    private void pollDodge() {
+        if (completed || !awaitingDodge) {
+            return;
+        }
+        Player player = playerId == null ? null : plugin.getServer().getPlayer(playerId);
+        if (player == null || !player.isOnline()) {
+            fail("player disconnected before authoritative dodge was observed");
+            return;
+        }
+        CombatSessionController combat = combatController();
+        if (combat == null) {
+            fail("combat controller listener is not registered");
+            return;
+        }
+        Optional<DodgePhase> dodgePhase =
+                combat.status(player).flatMap(CombatSessionStatus::dodgePhase);
+        if (dodgePhase.isEmpty() || dodgePhase.orElseThrow() == DodgePhase.COMPLETE) {
+            plugin.getServer().getScheduler().runTaskLater(plugin, this::pollDodge, 1L);
+            return;
+        }
         try {
             writeMarker();
             completed = true;
+            DodgePhase phase = dodgePhase.orElseThrow();
+            long currentTick = plugin.getServer().getCurrentTick();
+            plugin.getLogger()
+                    .info(
+                            DEFENSE_DODGE_MARKER
+                                    + " phase="
+                                    + phase
+                                    + " tick="
+                                    + currentTick);
             plugin.getLogger()
                     .info(
                             PASS_MARKER
                                     + " move="
-                                    + moveId.value()
-                                    + " action="
-                                    + actionId
+                                    + GREATSWORD_MOVE.value()
+                                    + " dodgePhase="
+                                    + phase
                                     + " tick="
                                     + currentTick);
         } catch (IOException exception) {
             fail("marker write failed: " + exception.getMessage());
             return;
         }
-        removeTrainingDummy();
         plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 2L);
+    }
+
+    private CombatSessionController combatController() {
+        for (RegisteredListener registration : HandlerList.getRegisteredListeners(plugin)) {
+            if (registration.getListener() instanceof CombatSessionController combat) {
+                return combat;
+            }
+        }
+        return null;
     }
 
     private void validateGreatswordProjection(Player player) {
@@ -226,7 +287,7 @@ final class OnboardingClientAcceptanceProbe {
 
     private void timeout() {
         if (!completed) {
-            fail("timed out before onboarding landed the first successful combat action");
+            fail("timed out before onboarding completed first combat and directional dodge");
         }
     }
 

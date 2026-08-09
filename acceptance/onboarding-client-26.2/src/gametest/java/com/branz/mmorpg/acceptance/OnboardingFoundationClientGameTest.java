@@ -16,6 +16,8 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
     private static final int SCENE_HUB_MENU_SLOTS = 54 + 36;
     private static final int QUEUE_WINDOW_ARMED_LEVEL = 6;
     private static final int HOSTILE_TARGET_READY_LEVEL = 18;
+    private static final int CHRONICLE_RMB_ATTEMPTS = 3;
+    private static final int CHRONICLE_RMB_SETTLE_TICKS = 20;
     private static final int HOSTILE_KILL_ATTACK_ATTEMPTS = 16;
     private static final int HOSTILE_KILL_ATTACK_INTERVAL_TICKS = 35;
 
@@ -147,9 +149,7 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
                 20 * 2);
         System.out.println("ONBOARDING_CHRONICLE_SELECTED_CLIENT");
         context.waitTicks(10);
-        context.getInput().pressMouse(1);
-        context.waitFor(
-                client -> client.gui.screen() instanceof AbstractContainerScreen<?>, 20 * 10);
+        openChronicleScene(context);
         context.runOnClient(
                 client -> {
                     if (!(client.gui.screen() instanceof AbstractContainerScreen<?> screen)) {
@@ -209,6 +209,30 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
             context.waitTicks(HOSTILE_KILL_ATTACK_INTERVAL_TICKS);
         }
         finishAfterServerShutdown(context);
+    }
+
+    private static void openChronicleScene(ClientGameTestContext context) {
+        for (int attempt = 1; attempt <= CHRONICLE_RMB_ATTEMPTS; attempt++) {
+            context.getInput().pressMouse(1);
+            System.out.println("ONBOARDING_CHRONICLE_RMB_INPUT_CLIENT attempt=" + attempt);
+            for (int tick = 0; tick < CHRONICLE_RMB_SETTLE_TICKS; tick++) {
+                boolean opened =
+                        context.computeOnClient(
+                                client ->
+                                        client.gui.screen()
+                                                instanceof AbstractContainerScreen<?>);
+                if (opened) {
+                    System.out.println(
+                            "ONBOARDING_CHRONICLE_RMB_ACCEPTED_CLIENT attempt=" + attempt);
+                    return;
+                }
+                context.waitTick();
+            }
+        }
+        throw new IllegalStateException(
+                "Chronicle physical RMB was not accepted after "
+                        + CHRONICLE_RMB_ATTEMPTS
+                        + " attempts");
     }
 
     private static void finishAfterServerShutdown(ClientGameTestContext context) {

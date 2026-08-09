@@ -30,17 +30,22 @@ jobs:
           cache-disabled: true
 
       - name: Apply guarded real-client onboarding acceptance
-        run: python3 .github/scripts/playable-onboarding-real-client-acceptance.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/playable-onboarding-real-client-acceptance.py
+          python3 .github/scripts/playable-onboarding-client-click-fix.py
 
       - name: Apply repository formatting
         run: bash ./gradlew spotlessApply
 
-      - name: Restore permanent CI and remove staging helper
+      - name: Restore permanent CI and remove staging helpers
         shell: bash
         run: |
           set -euo pipefail
           git show 6f363d4370ca63dc3420e248962cf6418b6c09b7:.github/workflows/build.yml > .github/workflows/build.yml
           rm -f .github/scripts/playable-onboarding-real-client-acceptance.py
+          rm -f .github/scripts/playable-onboarding-client-click-fix.py
           git diff --check
 
       - name: Verify full repository

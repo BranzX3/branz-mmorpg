@@ -758,6 +758,12 @@ public final class BranzMmoPlugin extends JavaPlugin {
         characterSessionController.addReadyHandler(downedController::onCharacterReady);
         characterSessionController.addReadyHandler(pvpController::onCharacterReady);
         resourcePackGate.setReadyHandler(characterSessionController::onPackReady);
+        PhysicalClientIngressAcceptanceProbe.install(
+                this,
+                characterSessionController,
+                combatSessionController,
+                activeItemEngine.get(),
+                snapshot.manifest().contentVersion());
         sceneHubController =
                 new SceneHubController(
                         this,

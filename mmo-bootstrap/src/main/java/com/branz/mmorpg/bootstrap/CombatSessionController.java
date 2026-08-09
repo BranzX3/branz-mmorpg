@@ -309,6 +309,7 @@ final class CombatSessionController implements Listener {
     private final CombatHealthEngine enemyHealth =
             new CombatHealthEngine(CombatHealthProfile.trainingEnemy());
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
+    private BiConsumer<Player, InputRouteOutcome> primaryRouteObserver = (player, outcome) -> {};
     private final Map<UUID, CombatHealthRuntime> trainingTargetHealth = new HashMap<>();
     private final Map<UUID, PostureRuntime> trainingTargetPosture = new HashMap<>();
     private final Map<UUID, LiveProjectile> activeProjectiles = new HashMap<>();
@@ -1139,6 +1140,10 @@ final class CombatSessionController implements Listener {
      * true means MMO combat owns the physical attack and vanilla damage must never leak through,
      * including duplicate observations and action-locked states.
      */
+    void setPrimaryRouteObserver(BiConsumer<Player, InputRouteOutcome> observer) {
+        primaryRouteObserver = Objects.requireNonNull(observer, "observer");
+    }
+
     private boolean routePrimaryAttack(Player player, LiveSession session) {
         SelectedHotbarSlot selected = selectedSlot(player, player.getInventory().getHeldItemSlot());
         PrimaryAttackIngressDecision ingress =
@@ -1167,7 +1172,11 @@ final class CombatSessionController implements Listener {
                         plugin.getServer().getCurrentTick(),
                         primary.input().branch(),
                         routingContext(player, session));
-        routed.ifPresent(outcome -> handleRoute(player, session, outcome));
+        routed.ifPresent(
+                outcome -> {
+                    handleRoute(player, session, outcome);
+                    primaryRouteObserver.accept(player, outcome);
+                });
         return true;
     }
 

@@ -60,7 +60,26 @@ tasks.runServer {
         }
     jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
     val combatAcceptance = providers.gradleProperty("combatAcceptance").orNull == "true"
-    if (combatAcceptance) {
+    val physicalLmbAcceptance = providers.gradleProperty("physicalLmbAcceptance").orNull == "true"
+    if (physicalLmbAcceptance) {
+        val acceptanceMarker =
+            project.layout.buildDirectory.file("physical-lmb-ingress-acceptance.pass").get().asFile
+        jvmArgs(
+            "-Dmmo.bootstrap.physical-lmb-acceptance-test=true",
+            "-Dmmo.bootstrap.physical-lmb-acceptance-marker=${acceptanceMarker.absolutePath}",
+        )
+        doFirst {
+            acceptanceMarker.delete()
+        }
+        doLast {
+            check(
+                acceptanceMarker.isFile &&
+                    acceptanceMarker.readText().trim() == "PHYSICAL_LMB_INGRESS_ACCEPTANCE_PASS",
+            ) {
+                "Physical LMB ingress acceptance marker was not produced."
+            }
+        }
+    } else if (combatAcceptance) {
         val acceptanceMarker =
             project.layout.buildDirectory.file("combat-runtime-acceptance.pass").get().asFile
         jvmArgs(

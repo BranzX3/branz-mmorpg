@@ -221,12 +221,7 @@ final class OnboardingClientAcceptanceProbe {
             DodgePhase phase = dodgePhase.orElseThrow();
             long currentTick = plugin.getServer().getCurrentTick();
             plugin.getLogger()
-                    .info(
-                            DEFENSE_DODGE_MARKER
-                                    + " phase="
-                                    + phase
-                                    + " tick="
-                                    + currentTick);
+                    .info(DEFENSE_DODGE_MARKER + " phase=" + phase + " tick=" + currentTick);
             plugin.getLogger()
                     .info(
                             PASS_MARKER

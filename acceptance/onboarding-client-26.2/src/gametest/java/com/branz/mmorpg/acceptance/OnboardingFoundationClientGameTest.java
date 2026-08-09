@@ -7,10 +7,12 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
+import net.minecraft.world.item.Items;
 import org.lwjgl.glfw.GLFW;
 
 public final class OnboardingFoundationClientGameTest implements FabricClientGameTest {
     private static final int GREATSWORD_SLOT = 10;
+    private static final int CHRONICLE_HOTBAR_SLOT = 8;
     private static final int SCENE_HUB_MENU_SLOTS = 54 + 36;
 
     @Override
@@ -64,7 +66,15 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
 
         connect(context, address);
         context.waitFor(client -> client.level != null && client.player != null, 20 * 30);
-        context.waitTicks(5);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player
+                                        .getInventory()
+                                        .getItem(CHRONICLE_HOTBAR_SLOT)
+                                        .is(Items.WRITTEN_BOOK),
+                20 * 10);
+        System.out.println("ONBOARDING_CHRONICLE_VISIBLE_CLIENT");
         context.runOnClient(
                 client -> {
                     if (client.gui.screen() instanceof AbstractContainerScreen<?>) {
@@ -73,9 +83,21 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
                     }
                 });
 
+        // Let normal join motion settle before exercising a Scene path whose production contract
+        // deliberately requires safe ground and low velocity.
+        context.waitTicks(20);
+
         // Exercise the normal-player path instead of calling Bukkit or Minecraft internals:
-        // physically select hotbar slot 9, then physically right-click the Chronicle.
+        // physically select hotbar slot 9, verify the selected main hand is the visible Chronicle,
+        // then physically right-click it.
         context.getInput().pressKey(GLFW.GLFW_KEY_9);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player.getMainHandItem().is(Items.WRITTEN_BOOK),
+                20 * 2);
+        System.out.println("ONBOARDING_CHRONICLE_SELECTED_CLIENT");
+        context.waitTicks(10);
         context.getInput().pressMouse(1);
         context.waitFor(
                 client -> client.gui.screen() instanceof AbstractContainerScreen<?>, 20 * 10);

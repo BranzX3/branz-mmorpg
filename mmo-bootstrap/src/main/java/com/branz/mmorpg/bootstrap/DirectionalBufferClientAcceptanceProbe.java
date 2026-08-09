@@ -155,7 +155,8 @@ final class DirectionalBufferClientAcceptanceProbe {
                                 + bufferedSequence
                                 + " observedTick="
                                 + outcome.request().observedTick());
-        // Acceptance-only handshake. The exact client waits for this replicated vanilla state before
+        // Acceptance-only handshake. The exact client waits for this replicated vanilla state
+        // before
         // issuing the physical refresh LMB, removing headless client/server tick-rate guessing from
         // the one-slot refresh assertion without changing combat timing or routing semantics.
         player.setLevel(BUFFER_CONFIRMED_LEVEL);

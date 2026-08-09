@@ -14,7 +14,7 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
     private static final int GREATSWORD_SLOT = 10;
     private static final int CHRONICLE_HOTBAR_SLOT = 8;
     private static final int SCENE_HUB_MENU_SLOTS = 54 + 36;
-    private static final int BUFFER_CONFIRMED_LEVEL = 7;
+    private static final int QUEUE_WINDOW_ARMED_LEVEL = 6;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -114,23 +114,17 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         context.waitTick();
         context.getInput().releaseKey(GLFW.GLFW_KEY_W);
 
-        // Headless client ticks can advance much slower than Paper ticks. This delay places the
-        // second physical LMB at the authored PRIMARY_2 queue window on the server.
-        context.waitTicks(4);
-        context.getInput().pressMouse(0);
-        System.out.println("DIRECTIONAL_BUFFER_FOLLOWUP_BUFFER_INPUT_CLIENT");
-
-        // The acceptance-only server probe replicates this vanilla XP level only after it has
-        // observed BUFFERED PRIMARY_2. Wait for that server-confirmed state, then issue another real
-        // physical LMB so the refresh assertion does not depend on guessing headless tick ratios.
+        // Paper replicates this vanilla XP level shortly before the authored PRIMARY_2 chain window.
+        // Waiting on server state removes headless client/server tick-rate guessing while the input
+        // itself remains a real physical LMB through the Minecraft 26.2 client.
         context.waitFor(
                 client ->
                         client.player != null
-                                && client.player.experienceLevel == BUFFER_CONFIRMED_LEVEL,
+                                && client.player.experienceLevel == QUEUE_WINDOW_ARMED_LEVEL,
                 20 * 5);
-        System.out.println("DIRECTIONAL_BUFFER_BUFFER_CONFIRMED_CLIENT");
+        System.out.println("DIRECTIONAL_BUFFER_QUEUE_WINDOW_ARMED_CLIENT");
         context.getInput().pressMouse(0);
-        System.out.println("DIRECTIONAL_BUFFER_FOLLOWUP_REFRESH_INPUT_CLIENT");
+        System.out.println("DIRECTIONAL_BUFFER_FOLLOWUP_BUFFER_INPUT_CLIENT");
 
         finishAfterServerShutdown(context);
     }

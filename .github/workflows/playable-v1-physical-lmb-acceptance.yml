@@ -26,6 +26,12 @@ jobs:
           java-version: '25'
           cache: gradle
 
+      - name: Setup standalone Gradle 9.5
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.5.0'
+          cache-disabled: true
+
       - name: Apply guarded physical LMB acceptance wiring
         shell: bash
         run: |
@@ -60,7 +66,7 @@ jobs:
         run: bash ./gradlew clean build --no-daemon --console=plain
 
       - name: Compile exact 26.2 client gametest
-        run: bash ./gradlew -p acceptance/minecraft-client-26.2 compileGametestJava processGametestResources --no-daemon --console=plain
+        run: gradle -p acceptance/minecraft-client-26.2 compileGametestJava processGametestResources --no-daemon --console=plain
 
       - name: Run real Minecraft 26.2 physical LMB acceptance
         shell: bash
@@ -98,7 +104,7 @@ jobs:
           fi
 
           set +e
-          xvfb-run -a bash ./gradlew -p acceptance/minecraft-client-26.2 runClientGameTest --no-daemon --console=plain > physical-client.log 2>&1
+          xvfb-run -a gradle -p acceptance/minecraft-client-26.2 runClientGameTest --no-daemon --console=plain > physical-client.log 2>&1
           CLIENT_RC=$?
           set -e
 

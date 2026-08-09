@@ -39,20 +39,19 @@ final class OnboardingClientAcceptanceProbe {
         this.characters = Objects.requireNonNull(characters, "characters");
     }
 
-    static void install(
+    static SuccessfulCombatActionObserver install(
             JavaPlugin plugin,
             StartingFoundationController foundations,
-            CharacterSessionController characters,
-            CombatSessionController combat) {
+            CharacterSessionController characters) {
         if (!Boolean.getBoolean(ENABLE_PROPERTY)) {
-            return;
+            return SuccessfulCombatActionObserver.NONE;
         }
         OnboardingClientAcceptanceProbe probe =
                 new OnboardingClientAcceptanceProbe(plugin, characters);
         foundations.setFoundationReadyObserver(probe::onFoundationReady);
-        combat.setSuccessfulActionObserver(probe::onSuccessfulCombatAction);
         plugin.getServer().getScheduler().runTaskLater(plugin, probe::timeout, 20L * 120L);
         plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_ARMED");
+        return probe::onSuccessfulCombatAction;
     }
 
     private void onFoundationReady(Player player, StartingFoundation foundation) {

@@ -280,9 +280,7 @@ final class OnboardingClientAcceptanceProbe {
         plugin.getLogger().info(DEFENSE_DODGE_MARKER + " phase=" + phase + " tick=" + currentTick);
         if (hostileKillMode) {
             awaitingDodge = false;
-            plugin.getServer()
-                    .getScheduler()
-                    .runTaskLater(plugin, this::pollDodgeCompletion, 1L);
+            plugin.getServer().getScheduler().runTaskLater(plugin, this::pollDodgeCompletion, 1L);
             return;
         }
         pass("move=" + GREATSWORD_MOVE.value() + " dodgePhase=" + phase + " tick=" + currentTick);
@@ -305,9 +303,7 @@ final class OnboardingClientAcceptanceProbe {
         Optional<DodgePhase> dodgePhase =
                 combat.status(player).flatMap(CombatSessionStatus::dodgePhase);
         if (dodgePhase.isPresent() && dodgePhase.orElseThrow() != DodgePhase.COMPLETE) {
-            plugin.getServer()
-                    .getScheduler()
-                    .runTaskLater(plugin, this::pollDodgeCompletion, 1L);
+            plugin.getServer().getScheduler().runTaskLater(plugin, this::pollDodgeCompletion, 1L);
             return;
         }
         awaitingHostileKill = true;

@@ -155,7 +155,8 @@ final class OnboardingClientAcceptanceProbe {
         }
         if (!chronicleSelected) {
             if (player.getInventory().getHeldItemSlot() == CHRONICLE_HOTBAR_SLOT
-                    && player.getInventory().getItemInMainHand().getType() == Material.WRITTEN_BOOK) {
+                    && player.getInventory().getItemInMainHand().getType()
+                            == Material.WRITTEN_BOOK) {
                 chronicleSelected = true;
                 plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_CHRONICLE_HELD");
             }

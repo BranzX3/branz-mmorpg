@@ -7,9 +7,11 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
+import org.lwjgl.glfw.GLFW;
 
 public final class OnboardingFoundationClientGameTest implements FabricClientGameTest {
     private static final int GREATSWORD_SLOT = 10;
+    private static final int SCENE_HUB_MENU_SLOTS = 54 + 36;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -66,9 +68,29 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         context.runOnClient(
                 client -> {
                     if (client.gui.screen() instanceof AbstractContainerScreen<?>) {
-                        throw new IllegalStateException("foundation inventory reopened after durable reconnect");
+                        throw new IllegalStateException(
+                                "foundation inventory reopened after durable reconnect");
                     }
                 });
+
+        // Exercise the normal-player path instead of calling Bukkit or Minecraft internals:
+        // physically select hotbar slot 9, then physically right-click the Chronicle.
+        context.getInput().pressKey(GLFW.GLFW_KEY_9);
+        context.getInput().pressMouse(1);
+        context.waitFor(
+                client -> client.gui.screen() instanceof AbstractContainerScreen<?>, 20 * 10);
+        context.runOnClient(
+                client -> {
+                    if (!(client.gui.screen() instanceof AbstractContainerScreen<?> screen)) {
+                        throw new IllegalStateException("Chronicle RMB did not open a container");
+                    }
+                    int menuSlots = screen.getMenu().slots.size();
+                    if (menuSlots != SCENE_HUB_MENU_SLOTS) {
+                        throw new IllegalStateException(
+                                "Chronicle RMB opened an unexpected menu: " + menuSlots + " slots");
+                    }
+                });
+
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);
         context.setScreen(TitleScreen::new);
         context.waitForScreen(TitleScreen.class);

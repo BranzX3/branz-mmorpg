@@ -755,7 +755,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 new StartingFoundationController(
                         this, characterSessionController, snapshot.manifest().contentVersion());
         OnboardingClientAcceptanceProbe.install(
-                this, startingFoundationController, characterSessionController);
+                this,
+                startingFoundationController,
+                characterSessionController,
+                combatSessionController);
         characterSessionController.addReadyHandler(chronicleController::reconcile);
         characterSessionController.addReadyHandler(startingFoundationController::onCharacterReady);
         characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);

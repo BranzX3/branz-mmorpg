@@ -93,7 +93,9 @@ final class DirectionalBufferClientAcceptanceProbe {
                             plugin,
                             () -> {
                                 if (player.isOnline()) {
-                                    player.kick(Component.text("DIRECTIONAL_BUFFER_ACCEPTANCE_RECONNECT"));
+                                    player.kick(
+                                            Component.text(
+                                                    "DIRECTIONAL_BUFFER_ACCEPTANCE_RECONNECT"));
                                 }
                             },
                             2L);
@@ -174,10 +176,7 @@ final class DirectionalBufferClientAcceptanceProbe {
 
     private void onSuccessfulCombatAction(
             CharacterId actorId, UUID actionId, DefinitionId moveId, long currentTick) {
-        if (completed
-                || playerId == null
-                || !actorId.value().equals(playerId)
-                || readyCount != 2) {
+        if (completed || playerId == null || !actorId.value().equals(playerId) || readyCount != 2) {
             return;
         }
         if (moveId.equals(FORWARD_MOVE)) {
@@ -245,7 +244,8 @@ final class DirectionalBufferClientAcceptanceProbe {
                         "DIRECTIONAL_BUFFER_CLIENT_ACCEPTANCE_DUMMY_READY id="
                                 + trainingDummyId
                                 + " distance="
-                                + Math.sqrt(dummy.getLocation().distanceSquared(player.getLocation())));
+                                + Math.sqrt(
+                                        dummy.getLocation().distanceSquared(player.getLocation())));
     }
 
     private void removeTrainingDummy() {

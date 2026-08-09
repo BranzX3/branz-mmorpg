@@ -23,8 +23,7 @@ class PrimaryAttackInputCoordinatorTest {
         assertEquals(InputRouteDecision.EXECUTED, routed.orElseThrow().decision());
         assertEquals(SemanticInput.PRIMARY, routed.orElseThrow().request().input());
         assertEquals(DirectionSnapshot.FORWARD, routed.orElseThrow().request().direction());
-        assertEquals(
-                "PRIMARY_DIRECTIONAL_FORWARD", routed.orElseThrow().request().branchFamily());
+        assertEquals("PRIMARY_DIRECTIONAL_FORWARD", routed.orElseThrow().request().branchFamily());
     }
 
     @Test

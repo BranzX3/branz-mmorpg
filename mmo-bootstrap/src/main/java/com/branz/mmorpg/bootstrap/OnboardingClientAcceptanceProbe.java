@@ -280,16 +280,43 @@ final class OnboardingClientAcceptanceProbe {
         plugin.getLogger().info(DEFENSE_DODGE_MARKER + " phase=" + phase + " tick=" + currentTick);
         if (hostileKillMode) {
             awaitingDodge = false;
-            awaitingHostileKill = true;
-            spawnHostileTarget(player);
-            player.setLevel(HOSTILE_TARGET_READY_LEVEL);
-            plugin.getLogger()
-                    .info(
-                            "ONBOARDING_FIRST_HOSTILE_KILL_STAGING_READY level="
-                                    + HOSTILE_TARGET_READY_LEVEL);
+            plugin.getServer()
+                    .getScheduler()
+                    .runTaskLater(plugin, this::pollDodgeCompletion, 1L);
             return;
         }
         pass("move=" + GREATSWORD_MOVE.value() + " dodgePhase=" + phase + " tick=" + currentTick);
+    }
+
+    private void pollDodgeCompletion() {
+        if (completed || awaitingHostileKill) {
+            return;
+        }
+        Player player = playerId == null ? null : plugin.getServer().getPlayer(playerId);
+        if (player == null || !player.isOnline()) {
+            fail("player disconnected before dodge recovery completed");
+            return;
+        }
+        CombatSessionController combat = combatController();
+        if (combat == null) {
+            fail("combat controller listener is not registered");
+            return;
+        }
+        Optional<DodgePhase> dodgePhase =
+                combat.status(player).flatMap(CombatSessionStatus::dodgePhase);
+        if (dodgePhase.isPresent() && dodgePhase.orElseThrow() != DodgePhase.COMPLETE) {
+            plugin.getServer()
+                    .getScheduler()
+                    .runTaskLater(plugin, this::pollDodgeCompletion, 1L);
+            return;
+        }
+        awaitingHostileKill = true;
+        spawnHostileTarget(player);
+        player.setLevel(HOSTILE_TARGET_READY_LEVEL);
+        plugin.getLogger()
+                .info(
+                        "ONBOARDING_FIRST_HOSTILE_KILL_STAGING_READY level="
+                                + HOSTILE_TARGET_READY_LEVEL);
     }
 
     private void spawnHostileTarget(Player player) {

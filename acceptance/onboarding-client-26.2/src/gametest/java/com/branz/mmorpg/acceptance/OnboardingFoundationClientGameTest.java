@@ -125,6 +125,17 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         context.getInput().pressMouse(0);
         System.out.println("ONBOARDING_FIRST_COMBAT_INPUT_CLIENT");
 
+        // The same physical client now exercises the authored directional Shift dodge. Movement is
+        // held before Shift so the server-side sneak resolver snapshots a non-neutral direction.
+        context.waitTicks(12);
+        context.getInput().holdKey(GLFW.GLFW_KEY_W);
+        context.waitTick();
+        context.getInput().holdKey(GLFW.GLFW_KEY_LEFT_SHIFT);
+        context.waitTicks(3);
+        context.getInput().releaseKey(GLFW.GLFW_KEY_LEFT_SHIFT);
+        context.getInput().releaseKey(GLFW.GLFW_KEY_W);
+        System.out.println("ONBOARDING_DIRECTIONAL_DODGE_INPUT_CLIENT");
+
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);
         context.setScreen(TitleScreen::new);
         context.waitForScreen(TitleScreen.class);

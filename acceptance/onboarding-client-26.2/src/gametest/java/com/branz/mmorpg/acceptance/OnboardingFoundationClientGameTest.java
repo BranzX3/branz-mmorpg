@@ -110,13 +110,16 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         context.waitTick();
         context.getInput().pressMouse(0);
         System.out.println("DIRECTIONAL_BUFFER_FORWARD_PRIMARY_INPUT_CLIENT");
-        context.waitTicks(2);
+        context.waitTick();
         context.getInput().releaseKey(GLFW.GLFW_KEY_W);
 
-        context.waitTicks(10);
+        // Headless client ticks can advance much slower than Paper ticks. The previous 12-client-tick
+        // delay reached the server 28 ticks later, after the authored 12-17 chain window. Five client
+        // ticks total from the opener targets the start of that server-authored window instead.
+        context.waitTicks(4);
         context.getInput().pressMouse(0);
         System.out.println("DIRECTIONAL_BUFFER_FOLLOWUP_BUFFER_INPUT_CLIENT");
-        context.waitTicks(3);
+        context.waitTicks(2);
         context.getInput().pressMouse(0);
         System.out.println("DIRECTIONAL_BUFFER_FOLLOWUP_REFRESH_INPUT_CLIENT");
 

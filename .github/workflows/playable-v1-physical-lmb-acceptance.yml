@@ -43,19 +43,41 @@ jobs:
           mv acceptance/minecraft-client-26.2/src/clientGametest acceptance/minecraft-client-26.2/src/gametest
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/PhysicalClientIngressAcceptanceProbe.java')
-          text = p.read_text(encoding='utf-8')
+
+          probe = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/PhysicalClientIngressAcceptanceProbe.java')
+          probe_text = probe.read_text(encoding='utf-8')
           shutdown_expected = 'plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 2L);'
           deadline_old = 'plugin.getServer().getScheduler().runTaskLater(plugin, probe::timeout, 20L * 45L);'
-          if text.count(shutdown_expected) != 1:
+          if probe_text.count(shutdown_expected) != 1:
               raise SystemExit('shutdown-delay guard failed')
-          if text.count(deadline_old) != 1:
+          if probe_text.count(deadline_old) != 1:
               raise SystemExit('acceptance-deadline guard failed')
-          text = text.replace(
+          probe_text = probe_text.replace(
               deadline_old,
               'plugin.getServer().getScheduler().runTaskLater(plugin, probe::timeout, 20L * 120L);',
           )
-          p.write_text(text, encoding='utf-8')
+          probe.write_text(probe_text, encoding='utf-8')
+
+          client = Path('acceptance/minecraft-client-26.2/src/gametest/java/com/branz/mmorpg/acceptance/PhysicalLmbClientGameTest.java')
+          client_text = client.read_text(encoding='utf-8')
+          import_old = 'import net.minecraft.client.gui.screens.ConnectScreen;\n'
+          import_new = import_old + 'import net.minecraft.client.gui.screens.TitleScreen;\n'
+          if client_text.count(import_old) != 1:
+              raise SystemExit('title-screen import guard failed')
+          client_text = client_text.replace(import_old, import_new)
+          tail_old = '''        context.getInput().pressMouse(0);
+                  context.waitTicks(80);
+                  context.getInput().pressMouse(0);
+                  context.waitTicks(40);
+          '''
+          tail_new = '''        context.getInput().pressMouse(0);
+                  context.waitFor(client -> client.level == null && client.player == null, 20 * 20);
+                  context.setScreen(TitleScreen::new);
+                  context.waitForScreen(TitleScreen.class);
+          '''
+          if client_text.count(tail_old) != 1:
+              raise SystemExit('client teardown guard failed')
+          client.write_text(client_text.replace(tail_old, tail_new), encoding='utf-8')
           PY
 
       - name: Apply repository formatting

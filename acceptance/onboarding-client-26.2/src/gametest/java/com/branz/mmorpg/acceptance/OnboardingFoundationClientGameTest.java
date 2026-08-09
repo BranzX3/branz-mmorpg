@@ -18,6 +18,7 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
     @Override
     public void runTest(ClientGameTestContext context) {
         String address = System.getProperty("branz.acceptance.server", "localhost:25565");
+        String mode = System.getProperty("branz.acceptance.mode", "defense");
         connect(context, address);
         context.waitFor(client -> client.level != null && client.player != null, 20 * 30);
         context.waitFor(client -> client.gui.screen() instanceof AbstractContainerScreen<?>, 20 * 30);
@@ -83,6 +84,46 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
                     }
                 });
 
+        if (mode.equals("directional-buffer")) {
+            runDirectionalBuffer(context);
+            return;
+        }
+        if (!mode.equals("defense")) {
+            throw new IllegalStateException("unsupported acceptance mode: " + mode);
+        }
+        runDefense(context);
+    }
+
+    private static void runDirectionalBuffer(ClientGameTestContext context) {
+        context.waitTicks(5);
+        context.getInput().pressKey(GLFW.GLFW_KEY_1);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && !client.player.getMainHandItem().isEmpty()
+                                && !client.player.getMainHandItem().is(Items.WRITTEN_BOOK),
+                20 * 5);
+        System.out.println("DIRECTIONAL_BUFFER_STARTER_WEAPON_SELECTED_CLIENT");
+
+        context.waitTicks(20);
+        context.getInput().holdKey(GLFW.GLFW_KEY_W);
+        context.waitTick();
+        context.getInput().pressMouse(0);
+        System.out.println("DIRECTIONAL_BUFFER_FORWARD_PRIMARY_INPUT_CLIENT");
+        context.waitTicks(2);
+        context.getInput().releaseKey(GLFW.GLFW_KEY_W);
+
+        context.waitTicks(10);
+        context.getInput().pressMouse(0);
+        System.out.println("DIRECTIONAL_BUFFER_FOLLOWUP_BUFFER_INPUT_CLIENT");
+        context.waitTicks(3);
+        context.getInput().pressMouse(0);
+        System.out.println("DIRECTIONAL_BUFFER_FOLLOWUP_REFRESH_INPUT_CLIENT");
+
+        finishAfterServerShutdown(context);
+    }
+
+    private static void runDefense(ClientGameTestContext context) {
         context.waitTicks(20);
         context.getInput().pressKey(GLFW.GLFW_KEY_9);
         context.waitFor(
@@ -108,8 +149,6 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
                 });
         System.out.println("ONBOARDING_CHRONICLE_SCENE_CLIENT_PASS");
 
-        // Return to the world through normal client input, select the starter weapon in slot 1,
-        // let the authoritative draw transition complete, then send a real LMB.
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitFor(client -> client.gui.screen() == null, 20 * 5);
         context.waitTicks(5);
@@ -125,8 +164,6 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         context.getInput().pressMouse(0);
         System.out.println("ONBOARDING_FIRST_COMBAT_INPUT_CLIENT");
 
-        // The same physical client now exercises the authored directional Shift dodge. Movement is
-        // held before Shift so the server-side sneak resolver snapshots a non-neutral direction.
         context.waitTicks(12);
         context.getInput().holdKey(GLFW.GLFW_KEY_W);
         context.waitTick();
@@ -136,6 +173,10 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         context.getInput().releaseKey(GLFW.GLFW_KEY_W);
         System.out.println("ONBOARDING_DIRECTIONAL_DODGE_INPUT_CLIENT");
 
+        finishAfterServerShutdown(context);
+    }
+
+    private static void finishAfterServerShutdown(ClientGameTestContext context) {
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);
         context.setScreen(TitleScreen::new);
         context.waitForScreen(TitleScreen.class);

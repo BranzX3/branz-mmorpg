@@ -747,18 +747,20 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 });
         combatSessionController.setDamageImmunityObserver(downedController::protectedFromDamage);
         combatSessionController.setHostileActionObserver(downedController::observeHostileAction);
-        combatSessionController.setSuccessfulActionObserver(
-                liveTeachingSessionController::observeSuccessfulAction);
         ChronicleController chronicleController =
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         startingFoundationController =
                 new StartingFoundationController(
                         this, characterSessionController, snapshot.manifest().contentVersion());
-        OnboardingClientAcceptanceProbe.install(
-                this,
-                startingFoundationController,
-                characterSessionController,
-                combatSessionController);
+        SuccessfulCombatActionObserver onboardingAcceptanceObserver =
+                OnboardingClientAcceptanceProbe.install(
+                        this, startingFoundationController, characterSessionController);
+        combatSessionController.setSuccessfulActionObserver(
+                (actorId, actionId, moveId, currentTick) -> {
+                    liveTeachingSessionController.observeSuccessfulAction(
+                            actorId, actionId, moveId, currentTick);
+                    onboardingAcceptanceObserver.observe(actorId, actionId, moveId, currentTick);
+                });
         characterSessionController.addReadyHandler(chronicleController::reconcile);
         characterSessionController.addReadyHandler(startingFoundationController::onCharacterReady);
         characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);

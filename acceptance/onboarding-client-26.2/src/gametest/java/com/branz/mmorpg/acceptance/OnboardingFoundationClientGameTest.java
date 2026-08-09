@@ -15,6 +15,9 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
     private static final int CHRONICLE_HOTBAR_SLOT = 8;
     private static final int SCENE_HUB_MENU_SLOTS = 54 + 36;
     private static final int QUEUE_WINDOW_ARMED_LEVEL = 6;
+    private static final int HOSTILE_TARGET_READY_LEVEL = 18;
+    private static final int HOSTILE_KILL_ATTACK_ATTEMPTS = 16;
+    private static final int HOSTILE_KILL_ATTACK_INTERVAL_TICKS = 35;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -89,10 +92,15 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
             runDirectionalBuffer(context);
             return;
         }
-        if (!mode.equals("defense")) {
-            throw new IllegalStateException("unsupported acceptance mode: " + mode);
+        if (mode.equals("defense")) {
+            runDefense(context, false);
+            return;
         }
-        runDefense(context);
+        if (mode.equals("hostile-kill")) {
+            runDefense(context, true);
+            return;
+        }
+        throw new IllegalStateException("unsupported acceptance mode: " + mode);
     }
 
     private static void runDirectionalBuffer(ClientGameTestContext context) {
@@ -129,7 +137,7 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         finishAfterServerShutdown(context);
     }
 
-    private static void runDefense(ClientGameTestContext context) {
+    private static void runDefense(ClientGameTestContext context, boolean continueToHostileKill) {
         context.waitTicks(20);
         context.getInput().pressKey(GLFW.GLFW_KEY_9);
         context.waitFor(
@@ -179,6 +187,27 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         context.getInput().releaseKey(GLFW.GLFW_KEY_W);
         System.out.println("ONBOARDING_DIRECTIONAL_DODGE_INPUT_CLIENT");
 
+        if (!continueToHostileKill) {
+            finishAfterServerShutdown(context);
+            return;
+        }
+
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player.experienceLevel == HOSTILE_TARGET_READY_LEVEL,
+                20 * 10);
+        System.out.println("ONBOARDING_FIRST_HOSTILE_KILL_TARGET_READY_CLIENT");
+        for (int attempt = 1; attempt <= HOSTILE_KILL_ATTACK_ATTEMPTS; attempt++) {
+            boolean disconnected =
+                    context.computeOnClient(client -> client.level == null || client.player == null);
+            if (disconnected) {
+                break;
+            }
+            context.getInput().pressMouse(0);
+            System.out.println("ONBOARDING_HOSTILE_PRIMARY_INPUT_CLIENT attempt=" + attempt);
+            context.waitTicks(HOSTILE_KILL_ATTACK_INTERVAL_TICKS);
+        }
         finishAfterServerShutdown(context);
     }
 

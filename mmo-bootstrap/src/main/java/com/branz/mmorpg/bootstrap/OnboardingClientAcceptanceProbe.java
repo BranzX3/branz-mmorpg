@@ -14,14 +14,19 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Location;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Pig;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.Vector;
 
-/** Real-client acceptance for first choice -> durable kit -> reconnect -> first combat action. */
+/** Real-client acceptance for first choice -> durable kit -> reconnect -> first combat hit. */
 final class OnboardingClientAcceptanceProbe {
     static final String ENABLE_PROPERTY = "mmo.bootstrap.onboarding-acceptance-test";
     static final String MARKER_PROPERTY = "mmo.bootstrap.onboarding-acceptance-marker";
     static final String PASS_MARKER = "ONBOARDING_CLIENT_ACCEPTANCE_PASS";
+    private static final String TRAINING_DUMMY_TAG = "branzmmo.training_dummy";
     private static final DefinitionId GREATSWORD = DefinitionId.of("weapon.training_greatsword");
     private static final DefinitionId GREATSWORD_MOVE =
             DefinitionId.of("move.training_greatsword.committed_cleave");
@@ -29,6 +34,7 @@ final class OnboardingClientAcceptanceProbe {
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
     private UUID playerId;
+    private UUID trainingDummyId;
     private int readyCount;
     private boolean checking;
     private boolean completed;
@@ -123,7 +129,32 @@ final class OnboardingClientAcceptanceProbe {
             fail("foundation ready observer fired too many times");
             return;
         }
+        spawnTrainingDummy(player);
         plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_RECONNECT_READY");
+    }
+
+    private void spawnTrainingDummy(Player player) {
+        removeTrainingDummy();
+        Location origin = player.getLocation().clone();
+        Vector forward = origin.getDirection().setY(0);
+        if (forward.lengthSquared() < 1.0e-6) {
+            forward = new Vector(0, 0, 1);
+        } else {
+            forward.normalize();
+        }
+        Location target = origin.add(forward.multiply(1.75));
+        Pig dummy = player.getWorld().spawn(target, Pig.class);
+        dummy.setAI(false);
+        dummy.setSilent(true);
+        dummy.setRemoveWhenFarAway(false);
+        dummy.addScoreboardTag(TRAINING_DUMMY_TAG);
+        trainingDummyId = dummy.getUniqueId();
+        plugin.getLogger()
+                .info(
+                        "ONBOARDING_CLIENT_ACCEPTANCE_DUMMY_READY id="
+                                + trainingDummyId
+                                + " distance="
+                                + Math.sqrt(dummy.getLocation().distanceSquared(player.getLocation())));
     }
 
     private void onSuccessfulCombatAction(
@@ -133,7 +164,7 @@ final class OnboardingClientAcceptanceProbe {
         }
         if (!GREATSWORD_MOVE.equals(moveId)) {
             fail(
-                    "expected first committed move "
+                    "expected first successful move "
                             + GREATSWORD_MOVE.value()
                             + ", got "
                             + moveId.value());
@@ -155,6 +186,7 @@ final class OnboardingClientAcceptanceProbe {
             fail("marker write failed: " + exception.getMessage());
             return;
         }
+        removeTrainingDummy();
         plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 2L);
     }
 
@@ -180,9 +212,20 @@ final class OnboardingClientAcceptanceProbe {
         }
     }
 
+    private void removeTrainingDummy() {
+        if (trainingDummyId == null) {
+            return;
+        }
+        Entity dummy = plugin.getServer().getEntity(trainingDummyId);
+        if (dummy != null) {
+            dummy.remove();
+        }
+        trainingDummyId = null;
+    }
+
     private void timeout() {
         if (!completed) {
-            fail("timed out before onboarding reached the first committed combat action");
+            fail("timed out before onboarding landed the first successful combat action");
         }
     }
 
@@ -191,6 +234,7 @@ final class OnboardingClientAcceptanceProbe {
             return;
         }
         completed = true;
+        removeTrainingDummy();
         plugin.getLogger().severe("ONBOARDING_CLIENT_ACCEPTANCE_FAIL " + detail);
         plugin.getServer().getScheduler().runTask(plugin, plugin.getServer()::shutdown);
     }

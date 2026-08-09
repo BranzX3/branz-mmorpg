@@ -17,11 +17,16 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerAnimationEvent;
+import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
 
 /** Real-client acceptance for directional PRIMARY resolution and the authored one-slot buffer. */
-final class DirectionalBufferClientAcceptanceProbe {
+final class DirectionalBufferClientAcceptanceProbe implements Listener {
     static final String ENABLE_PROPERTY = "mmo.bootstrap.directional-buffer-acceptance-test";
     static final String MARKER_PROPERTY = "mmo.bootstrap.directional-buffer-acceptance-marker";
     static final String PASS_MARKER = "DIRECTIONAL_BUFFER_CLIENT_ACCEPTANCE_PASS";
@@ -66,9 +71,27 @@ final class DirectionalBufferClientAcceptanceProbe {
                 new DirectionalBufferClientAcceptanceProbe(plugin, combat);
         foundations.setFoundationReadyObserver(probe::onFoundationReady);
         combat.setPrimaryRouteObserver(probe::onPrimaryRoute);
+        plugin.getServer().getPluginManager().registerEvents(probe, plugin);
         plugin.getServer().getScheduler().runTaskLater(plugin, probe::timeout, 20L * 120L);
         plugin.getLogger().info("DIRECTIONAL_BUFFER_CLIENT_ACCEPTANCE_ARMED");
         return probe::onSuccessfulCombatAction;
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onArmSwingObserved(PlayerAnimationEvent event) {
+        if (event.getAnimationType() != PlayerAnimationType.ARM_SWING
+                || playerId == null
+                || !playerId.equals(event.getPlayer().getUniqueId())) {
+            return;
+        }
+        plugin.getLogger()
+                .info(
+                        "DIRECTIONAL_BUFFER_ARM_SWING_OBSERVED stage="
+                                + routeStage
+                                + " tick="
+                                + plugin.getServer().getCurrentTick()
+                                + " cancelled="
+                                + event.isCancelled());
     }
 
     private void onFoundationReady(Player player, StartingFoundation foundation) {

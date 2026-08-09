@@ -49,6 +49,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private TestItemProjectionController testItemProjectionController;
     private DatabaseRuntime databaseRuntime;
     private CharacterSessionController characterSessionController;
+    private StartingFoundationController startingFoundationController;
     private CombatSessionController combatSessionController;
     private FlaskHotbarController flaskHotbarController;
     private ConsumableHotbarController consumableHotbarController;
@@ -183,6 +184,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
         if (consumableHotbarController != null) {
             consumableHotbarController.shutdown();
             consumableHotbarController = null;
+        }
+        if (startingFoundationController != null) {
+            startingFoundationController.shutdown();
+            startingFoundationController = null;
         }
         if (combatSessionController != null) {
             combatSessionController.shutdown();
@@ -746,7 +751,11 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 liveTeachingSessionController::observeSuccessfulAction);
         ChronicleController chronicleController =
                 new ChronicleController(this, chronicle, characterSessionController::ready);
+        startingFoundationController =
+                new StartingFoundationController(
+                        this, characterSessionController, snapshot.manifest().contentVersion());
         characterSessionController.addReadyHandler(chronicleController::reconcile);
+        characterSessionController.addReadyHandler(startingFoundationController::onCharacterReady);
         characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);
         characterSessionController.addEquipmentMutationHandler(
                 combatSessionController::onEquipmentChanged);
@@ -804,6 +813,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(testItemProjectionController, this);
         getServer().getPluginManager().registerEvents(resourcePackGate, this);
         getServer().getPluginManager().registerEvents(characterSessionController, this);
+        getServer().getPluginManager().registerEvents(startingFoundationController, this);
         getServer().getPluginManager().registerEvents(combatSessionController, this);
         getServer().getPluginManager().registerEvents(flaskHotbarController, this);
         getServer().getPluginManager().registerEvents(consumableHotbarController, this);

@@ -16,12 +16,14 @@ import com.branz.mmorpg.persistence.transaction.BossEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.CarriedWalletService;
 import com.branz.mmorpg.persistence.transaction.CharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRepository;
+import com.branz.mmorpg.persistence.transaction.CharacterOnboardingStateRepository;
 import com.branz.mmorpg.persistence.transaction.DeathPouchRepository;
 import com.branz.mmorpg.persistence.transaction.DownedEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcBossEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcCarriedWalletService;
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterBuildRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcCharacterExpeditionStateRepository;
+import com.branz.mmorpg.persistence.transaction.JdbcCharacterOnboardingStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcDeathPouchRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcDownedEncounterStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcPersonalRewardGrantRepository;
@@ -48,6 +50,7 @@ final class DatabaseRuntime implements AutoCloseable {
     private final CharacterLeaseRepository leases;
     private final ValueTransactionService values;
     private final CharacterBuildRepository builds;
+    private final CharacterOnboardingStateRepository onboarding;
     private final CharacterExpeditionStateRepository expeditionStates;
     private final BossEncounterStateRepository bossEncounters;
     private final DownedEncounterStateRepository downedEncounters;
@@ -71,6 +74,7 @@ final class DatabaseRuntime implements AutoCloseable {
         leases = new JdbcCharacterLeaseRepository(dataSource);
         values = new JdbcValueTransactionService(dataSource);
         builds = new JdbcCharacterBuildRepository(dataSource);
+        onboarding = new JdbcCharacterOnboardingStateRepository(dataSource);
         expeditionStates = new JdbcCharacterExpeditionStateRepository(dataSource);
         bossEncounters = new JdbcBossEncounterStateRepository(dataSource);
         downedEncounters = new JdbcDownedEncounterStateRepository(dataSource);
@@ -140,6 +144,10 @@ final class DatabaseRuntime implements AutoCloseable {
 
     CharacterBuildRepository builds() {
         return builds;
+    }
+
+    CharacterOnboardingStateRepository onboarding() {
+        return onboarding;
     }
 
     CharacterExpeditionStateRepository expeditionStates() {

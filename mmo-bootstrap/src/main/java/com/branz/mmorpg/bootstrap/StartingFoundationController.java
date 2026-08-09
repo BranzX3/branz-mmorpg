@@ -109,8 +109,7 @@ final class StartingFoundationController implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     void onDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player player
-                && locked.contains(player.getUniqueId())) {
+        if (event.getEntity() instanceof Player player && locked.contains(player.getUniqueId())) {
             event.setCancelled(true);
         }
     }
@@ -216,7 +215,9 @@ final class StartingFoundationController implements Listener {
             return;
         }
         Optional<CharacterOnboardingStateRecord> state =
-                ((Result.Success<Optional<CharacterOnboardingStateRecord>, CharacterSessionErrorCode>)
+                ((Result.Success<
+                                        Optional<CharacterOnboardingStateRecord>,
+                                        CharacterSessionErrorCode>)
                                 result)
                         .value();
         if (state.isEmpty()) {
@@ -250,8 +251,7 @@ final class StartingFoundationController implements Listener {
             return;
         }
         provisioning.add(playerId);
-        player.sendActionBar(
-                Component.text("Restoring your starter kit...", NamedTextColor.GOLD));
+        player.sendActionBar(Component.text("Restoring your starter kit...", NamedTextColor.GOLD));
         provision(player, foundation);
     }
 

@@ -45,10 +45,13 @@ import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateCommitEx
 import com.branz.mmorpg.persistence.transaction.CharacterExpeditionStateRecord;
 import com.branz.mmorpg.persistence.transaction.CharacterFlaskPreparationCommit;
 import com.branz.mmorpg.persistence.transaction.CharacterFlaskPreparationCommitExecution;
+import com.branz.mmorpg.persistence.transaction.CharacterOnboardingStateCommitExecution;
+import com.branz.mmorpg.persistence.transaction.CharacterOnboardingStateRecord;
 import com.branz.mmorpg.persistence.transaction.CrossbowBoltBinding;
 import com.branz.mmorpg.persistence.transaction.ItemLocationMove;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.ItemPayloadUpdate;
+import com.branz.mmorpg.persistence.transaction.JdbcCharacterOnboardingStateRepository;
 import com.branz.mmorpg.persistence.transaction.JdbcValueTransactionService;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotQuantityConsumption;
@@ -67,6 +70,7 @@ import com.branz.mmorpg.progression.build.CharacterBuild;
 import com.branz.mmorpg.progression.build.CharacterBuildJsonCodec;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
 import com.branz.mmorpg.progression.knowledge.KnowledgeKey;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -1392,6 +1396,219 @@ final class CharacterSessionService {
                                                 KnowledgePersistenceErrorCode>)
                                         committed)
                                 .value()));
+    }
+
+    Result<Optional<CharacterOnboardingStateRecord>, CharacterSessionErrorCode>
+            startingFoundationState(LoadedCharacterSession session) {
+        Objects.requireNonNull(session, "session");
+        Result<Optional<CharacterOnboardingStateRecord>, TransactionErrorCode> state =
+                database.onboarding().find(session.characterId());
+        if (state
+                instanceof
+                Result.Failure<Optional<CharacterOnboardingStateRecord>, TransactionErrorCode>
+                        failure) {
+            return persistenceFailure(failure.error(), failure.detail());
+        }
+        return Result.success(
+                ((Result.Success<Optional<CharacterOnboardingStateRecord>, TransactionErrorCode>)
+                                state)
+                        .value());
+    }
+
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> provisionStartingFoundation(
+            LoadedCharacterSession session, StartingFoundation foundation, String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(foundation, "foundation");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+
+        Result<Optional<CharacterOnboardingStateRecord>, TransactionErrorCode> stateResult =
+                database.onboarding().find(session.characterId());
+        if (stateResult
+                instanceof
+                Result.Failure<Optional<CharacterOnboardingStateRecord>, TransactionErrorCode>
+                        failure) {
+            return persistenceFailure(failure.error(), failure.detail());
+        }
+        Optional<CharacterOnboardingStateRecord> existing =
+                ((Result.Success<Optional<CharacterOnboardingStateRecord>, TransactionErrorCode>)
+                                stateResult)
+                        .value();
+        CharacterOnboardingStateRecord state;
+        if (existing.isEmpty()) {
+            if (!session.snapshot().itemRecords().isEmpty()
+                    || !session.snapshot().lotRecords().isEmpty()) {
+                return Result.failure(
+                        CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                        "Starting foundation can only be chosen on a fresh character.");
+            }
+            UUID operationId = starterUuid(session.characterId(), foundation, "foundation-choice");
+            TransactionRequest request =
+                    TransactionRequest.forCharacter(
+                            new TransactionId(operationId),
+                            "starter-foundation-choice:" + session.characterId().value(),
+                            session.characterId(),
+                            session.sessionId(),
+                            JdbcCharacterOnboardingStateRepository.FOUNDATION_CHOOSE,
+                            "{\"foundationState\":\"ABSENT\"}",
+                            "{\"foundation\":\"" + foundation.name() + "\"}",
+                            contentVersion);
+            Result<CharacterOnboardingStateCommitExecution, TransactionErrorCode> chosen =
+                    database.onboarding()
+                            .chooseFoundation(request, session.characterId(), foundation.name());
+            if (chosen
+                    instanceof
+                    Result.Failure<CharacterOnboardingStateCommitExecution, TransactionErrorCode>
+                            failure) {
+                return transactionFailure(failure);
+            }
+            state =
+                    ((Result.Success<CharacterOnboardingStateCommitExecution, TransactionErrorCode>)
+                                    chosen)
+                            .value()
+                            .record();
+        } else {
+            state = existing.orElseThrow();
+            if (!state.foundationId().equals(foundation.name())) {
+                return Result.failure(
+                        CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                        "Starting foundation was already chosen as " + state.foundationId() + ".");
+            }
+            if (state.kitReady()) {
+                return reload(session);
+            }
+        }
+
+        for (StartingFoundation.StarterItem item : foundation.items()) {
+            ItemId itemId =
+                    new ItemId(
+                            starterUuid(
+                                    session.characterId(),
+                                    foundation,
+                                    "item:" + item.definitionId().value()));
+            UUID operationId =
+                    starterUuid(
+                            session.characterId(),
+                            foundation,
+                            "grant-item:" + item.definitionId().value());
+            TransactionRequest request =
+                    TransactionRequest.forCharacter(
+                            new TransactionId(operationId),
+                            "starter-item:" + itemId.value(),
+                            session.characterId(),
+                            session.sessionId(),
+                            JdbcValueTransactionService.ITEM_GRANT,
+                            "{\"foundation\":\"" + foundation.name() + "\"}",
+                            "{\"itemId\":\""
+                                    + itemId.value()
+                                    + "\",\"definitionId\":\""
+                                    + item.definitionId().value()
+                                    + "\",\"slot\":\""
+                                    + item.slot().name()
+                                    + "\"}",
+                            contentVersion);
+            Result<TransactionExecution, TransactionErrorCode> granted =
+                    database.values()
+                            .grantItem(
+                                    request,
+                                    new NewItemLocation(
+                                            itemId,
+                                            item.definitionId(),
+                                            Optional.of(session.characterId()),
+                                            equippedLocation(item.slot()),
+                                            foundation.uniquePayload(item)));
+            if (granted
+                    instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+                return transactionFailure(failure);
+            }
+        }
+
+        if (foundation.lot().isPresent()) {
+            StartingFoundation.StarterLot lot = foundation.lot().orElseThrow();
+            DefinitionId quiverDefinition = foundation.quiverDefinitionId().orElseThrow();
+            ItemId quiverId =
+                    new ItemId(
+                            starterUuid(
+                                    session.characterId(),
+                                    foundation,
+                                    "item:" + quiverDefinition.value()));
+            LotId lotId =
+                    new LotId(
+                            starterUuid(
+                                    session.characterId(),
+                                    foundation,
+                                    "lot:" + lot.definitionId().value()));
+            UUID operationId =
+                    starterUuid(
+                            session.characterId(),
+                            foundation,
+                            "grant-lot:" + lot.definitionId().value());
+            TransactionRequest request =
+                    TransactionRequest.forCharacter(
+                            new TransactionId(operationId),
+                            "starter-lot:" + lotId.value(),
+                            session.characterId(),
+                            session.sessionId(),
+                            JdbcValueTransactionService.LOT_GRANT,
+                            "{\"foundation\":\"" + foundation.name() + "\"}",
+                            "{\"lotId\":\""
+                                    + lotId.value()
+                                    + "\",\"definitionId\":\""
+                                    + lot.definitionId().value()
+                                    + "\",\"quantity\":"
+                                    + lot.quantity()
+                                    + "}",
+                            contentVersion);
+            Result<TransactionExecution, TransactionErrorCode> granted =
+                    database.values()
+                            .grantLot(
+                                    request,
+                                    new NewLotLocation(
+                                            lotId,
+                                            lot.definitionId(),
+                                            "starter",
+                                            lot.quantity(),
+                                            Optional.of(session.characterId()),
+                                            ValueLocation.quiver(quiverId),
+                                            foundation.lotLineage()));
+            if (granted
+                    instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+                return transactionFailure(failure);
+            }
+        }
+
+        UUID readyOperation = starterUuid(session.characterId(), foundation, "kit-ready");
+        TransactionRequest readyRequest =
+                TransactionRequest.forCharacter(
+                        new TransactionId(readyOperation),
+                        "starter-kit-ready:" + session.characterId().value(),
+                        session.characterId(),
+                        session.sessionId(),
+                        JdbcCharacterOnboardingStateRepository.KIT_READY,
+                        "{\"version\":" + state.version() + "}",
+                        "{\"kitReady\":true}",
+                        contentVersion);
+        Result<CharacterOnboardingStateCommitExecution, TransactionErrorCode> ready =
+                database.onboarding()
+                        .markKitReady(readyRequest, session.characterId(), state.version());
+        if (ready
+                instanceof
+                Result.Failure<CharacterOnboardingStateCommitExecution, TransactionErrorCode>
+                        failure) {
+            return transactionFailure(failure);
+        }
+        return reload(session);
+    }
+
+    private static UUID starterUuid(
+            CharacterId characterId, StartingFoundation foundation, String purpose) {
+        String value =
+                "branz-mmo:starter:v1:"
+                        + characterId.value()
+                        + ":"
+                        + foundation.name()
+                        + ":"
+                        + purpose;
+        return UUID.nameUUIDFromBytes(value.getBytes(StandardCharsets.UTF_8));
     }
 
     void close(LoadedCharacterSession session) {

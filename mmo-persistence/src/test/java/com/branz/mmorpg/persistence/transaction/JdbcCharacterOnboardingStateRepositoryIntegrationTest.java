@@ -126,7 +126,8 @@ class JdbcCharacterOnboardingStateRepositoryIntegrationTest {
 
         JdbcCharacterOnboardingStateRepository restarted =
                 new JdbcCharacterOnboardingStateRepository(dataSource);
-        CharacterOnboardingStateRecord restored = success(restarted.find(characterId)).orElseThrow();
+        CharacterOnboardingStateRecord restored =
+                success(restarted.find(characterId)).orElseThrow();
         assertEquals("GREATSWORD", restored.foundationId());
         assertTrue(restored.kitReady());
         assertEquals(2, restored.version());

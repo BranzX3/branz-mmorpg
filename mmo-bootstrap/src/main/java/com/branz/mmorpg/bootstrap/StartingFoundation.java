@@ -77,7 +77,8 @@ enum StartingFoundation {
         Objects.requireNonNull(itemEngine, "itemEngine");
         for (StarterItem item : items) {
             if (itemEngine.find(item.definitionId()).isEmpty()) {
-                return Optional.of("Missing starter item definition " + item.definitionId().value());
+                return Optional.of(
+                        "Missing starter item definition " + item.definitionId().value());
             }
         }
         if (lot.isPresent() && itemEngine.find(lot.orElseThrow().definitionId()).isEmpty()) {

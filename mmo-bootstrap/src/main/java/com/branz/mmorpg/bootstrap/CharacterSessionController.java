@@ -15,6 +15,7 @@ import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.progression.KnowledgeAcquisitionRequest;
 import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
+import com.branz.mmorpg.persistence.transaction.CharacterOnboardingStateRecord;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.progression.build.CharacterBuild;
@@ -113,6 +114,59 @@ final class CharacterSessionController implements Listener {
     Optional<LoadedCharacterSession> active(Player player) {
         return Optional.ofNullable(
                 active.get(Objects.requireNonNull(player, "player").getUniqueId()));
+    }
+
+    void startingFoundationState(
+            Player player,
+            Consumer<Result<Optional<CharacterOnboardingStateRecord>, CharacterSessionErrorCode>>
+                    completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<
+                                            Optional<CharacterOnboardingStateRecord>,
+                                            CharacterSessionErrorCode>
+                                    result = sessions.startingFoundationState(session);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(plugin, () -> completion.accept(result));
+                        });
+    }
+
+    void chooseStartingFoundation(
+            Player player,
+            StartingFoundation foundation,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(foundation, "foundation");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        Optional<String> unavailable = foundation.availabilityFailure(itemEngine);
+        if (unavailable.isPresent()) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            unavailable.orElseThrow()));
+            return;
+        }
+        runDurableSnapshotMutation(
+                player,
+                session ->
+                        sessions.provisionStartingFoundation(session, foundation, contentVersion),
+                completion);
     }
 
     Optional<LoadedCharacterSession> beginExternalValueMutation(Player player) {

@@ -46,11 +46,11 @@ public final class JdbcCharacterOnboardingStateRepository
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(characterId, "characterId");
         foundationId = requireFoundation(foundationId);
-        Result<Void, TransactionErrorCode> requestCheck =
+        Result<Boolean, TransactionErrorCode> requestCheck =
                 validateRequest(request, characterId, FOUNDATION_CHOOSE);
         if (!requestCheck.isSuccess()) {
-            Result.Failure<Void, TransactionErrorCode> failure =
-                    (Result.Failure<Void, TransactionErrorCode>) requestCheck;
+            Result.Failure<Boolean, TransactionErrorCode> failure =
+                    (Result.Failure<Boolean, TransactionErrorCode>) requestCheck;
             return Result.failure(failure.error(), failure.detail());
         }
         final String chosenFoundation = foundationId;
@@ -70,11 +70,11 @@ public final class JdbcCharacterOnboardingStateRepository
                     TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
                     "Onboarding version must be positive.");
         }
-        Result<Void, TransactionErrorCode> requestCheck =
+        Result<Boolean, TransactionErrorCode> requestCheck =
                 validateRequest(request, characterId, KIT_READY);
         if (!requestCheck.isSuccess()) {
-            Result.Failure<Void, TransactionErrorCode> failure =
-                    (Result.Failure<Void, TransactionErrorCode>) requestCheck;
+            Result.Failure<Boolean, TransactionErrorCode> failure =
+                    (Result.Failure<Boolean, TransactionErrorCode>) requestCheck;
             return Result.failure(failure.error(), failure.detail());
         }
         return execute(
@@ -98,7 +98,8 @@ public final class JdbcCharacterOnboardingStateRepository
                     return Result.failure(failure.error(), failure.detail());
                 }
                 JournalPrepareOutcome prepared =
-                        ((Result.Success<JournalPrepareOutcome, TransactionErrorCode>) preparedResult)
+                        ((Result.Success<JournalPrepareOutcome, TransactionErrorCode>)
+                                        preparedResult)
                                 .value();
                 if (!prepared.newlyPrepared()) {
                     if (prepared.entry().state() != TransactionState.COMMITTED) {
@@ -137,7 +138,8 @@ public final class JdbcCharacterOnboardingStateRepository
                     return Result.failure(failure.error(), failure.detail());
                 }
                 TransactionJournalEntry journal =
-                        ((Result.Success<JournalTransitionOutcome, TransactionErrorCode>) transition)
+                        ((Result.Success<JournalTransitionOutcome, TransactionErrorCode>)
+                                        transition)
                                 .value()
                                 .entry();
                 connection.commit();
@@ -238,7 +240,7 @@ public final class JdbcCharacterOnboardingStateRepository
                 row.getObject("updated_at", OffsetDateTime.class).toInstant());
     }
 
-    private static Result<Void, TransactionErrorCode> validateRequest(
+    private static Result<Boolean, TransactionErrorCode> validateRequest(
             TransactionRequest request, CharacterId characterId, String operation) {
         if (!request.operationType().equals(operation)) {
             return Result.failure(
@@ -250,7 +252,7 @@ public final class JdbcCharacterOnboardingStateRepository
                     TransactionErrorCode.VALUE_EXPECTATION_MISMATCH,
                     "Transaction character does not match onboarding owner.");
         }
-        return Result.success(null);
+        return Result.success(Boolean.TRUE);
     }
 
     private static void appendAudit(

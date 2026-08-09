@@ -1,0 +1,36 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1",
+  "action_identity": "BOOTSTRAP_COMBAT_ACCEPTANCE",
+  "action_record": {
+    "action_status": "PASS",
+    "argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PcombatAcceptance=true"
+    ],
+    "duration_seconds": 18.954,
+    "exit_code": 0,
+    "fixed_command_id": "BOOTSTRAP_COMBAT_ACCEPTANCE"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-ONBOARD-FINAL-COMBAT-0001/**"
+  ],
+  "base_commit_expected": "56f668221618c9c492a20a8f7568587ff14d9491",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "3683cf11257302f4940d343ff4f08816bb0ff4b7",
+  "duration_seconds": 19.032,
+  "ending_commit_before_result_commit": "56f668221618c9c492a20a8f7568587ff14d9491",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-09T09:35:50.710430+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-09T09:35:31.673997+00:00",
+  "starting_commit_actual": "56f668221618c9c492a20a8f7568587ff14d9491",
+  "task_branch": "harness-task/MMO-ONBOARD-FINAL-COMBAT-0001",
+  "task_id": "MMO-ONBOARD-FINAL-COMBAT-0001",
+  "task_manifest_sha256": "10030723b2516cd014d47104106fdf652a33f9feafb031e131d86d48fa37124a",
+  "unauthorized_writes": []
+}

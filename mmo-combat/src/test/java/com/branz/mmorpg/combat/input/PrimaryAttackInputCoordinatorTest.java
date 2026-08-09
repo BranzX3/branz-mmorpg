@@ -9,31 +9,40 @@ import org.junit.jupiter.api.Test;
 
 class PrimaryAttackInputCoordinatorTest {
     @Test
-    void readyPrimaryExecutesImmediately() {
+    void readyPrimaryExecutesImmediatelyWithCapturedDirection() {
         InputRouter router = new InputRouter();
         Optional<InputRouteOutcome> routed =
                 PrimaryAttackInputCoordinator.route(
                         router,
                         100,
-                        "PRIMARY",
+                        DirectionSnapshot.FORWARD,
+                        "PRIMARY_DIRECTIONAL_FORWARD",
                         InputRoutingContext.legal(Set.of(SemanticInput.PRIMARY)));
 
         assertTrue(routed.isPresent());
         assertEquals(InputRouteDecision.EXECUTED, routed.orElseThrow().decision());
         assertEquals(SemanticInput.PRIMARY, routed.orElseThrow().request().input());
+        assertEquals(DirectionSnapshot.FORWARD, routed.orElseThrow().request().direction());
+        assertEquals(
+                "PRIMARY_DIRECTIONAL_FORWARD", routed.orElseThrow().request().branchFamily());
     }
 
     @Test
-    void drawingPrimaryUsesExistingOneSlotBuffer() {
+    void activePrimaryUsesExistingOneSlotBuffer() {
         InputRouter router = new InputRouter();
         Optional<InputRouteOutcome> routed =
                 PrimaryAttackInputCoordinator.route(
-                        router, 200, "PRIMARY", new InputRoutingContext(Set.of(), true));
+                        router,
+                        200,
+                        DirectionSnapshot.NEUTRAL,
+                        "PRIMARY_2",
+                        new InputRoutingContext(Set.of(), true));
 
         assertTrue(routed.isPresent());
         assertEquals(InputRouteDecision.BUFFERED, routed.orElseThrow().decision());
         assertTrue(router.buffered().isPresent());
         assertEquals(SemanticInput.PRIMARY, router.buffered().orElseThrow().input());
+        assertEquals("PRIMARY_2", router.buffered().orElseThrow().branchFamily());
     }
 
     @Test
@@ -42,11 +51,14 @@ class PrimaryAttackInputCoordinatorTest {
         InputRoutingContext legal = InputRoutingContext.legal(Set.of(SemanticInput.PRIMARY));
 
         Optional<InputRouteOutcome> first =
-                PrimaryAttackInputCoordinator.route(router, 300, "PRIMARY", legal);
+                PrimaryAttackInputCoordinator.route(
+                        router, 300, DirectionSnapshot.LEFT, "PRIMARY", legal);
         Optional<InputRouteOutcome> duplicate =
-                PrimaryAttackInputCoordinator.route(router, 301, "PRIMARY", legal);
+                PrimaryAttackInputCoordinator.route(
+                        router, 301, DirectionSnapshot.LEFT, "PRIMARY", legal);
         Optional<InputRouteOutcome> afterWindow =
-                PrimaryAttackInputCoordinator.route(router, 303, "PRIMARY", legal);
+                PrimaryAttackInputCoordinator.route(
+                        router, 303, DirectionSnapshot.LEFT, "PRIMARY", legal);
 
         assertTrue(first.isPresent());
         assertTrue(duplicate.isEmpty());

@@ -275,7 +275,7 @@ final class SceneHubController implements Listener, MenuOverlay {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onChronicleUse(PlayerInteractEvent event) {
         if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND
                 || !event.getAction().isRightClick()

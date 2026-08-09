@@ -226,14 +226,14 @@ replace_once(
                                                                                     .get(branch))
                                                                     .flatMap(moves::find));
                             Optional<MoveDefinition> fallback = starterPrimaryMove(family, branch);
-                            if (authored.isEmpty()
-                                    && fallback.isEmpty()
+                            if (fallback.isEmpty()
                                     && (branch == MovesetBranch.PRIMARY_DIRECTIONAL_FORWARD
                                             || branch == MovesetBranch.PRIMARY_DIRECTIONAL_BACK)) {
                                 fallback = starterPrimaryMove(family, MovesetBranch.PRIMARY_1);
                             }
-                            return authored.or(() -> fallback)
-                                    .filter(
+                            Optional<MoveDefinition> selected =
+                                    authored.isPresent() ? authored : fallback;
+                            return selected.filter(
                                             move ->
                                                     move.input().direction()
                                                                     == DirectionSnapshot.NEUTRAL

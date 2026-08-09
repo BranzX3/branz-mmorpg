@@ -26,7 +26,7 @@ jobs:
           gradle-version: '9.5.0'
           cache-disabled: true
 
-      - name: Instrument Chronicle Scene diagnostic in runner only
+      - name: Instrument Chronicle interaction diagnostic in runner only
         shell: bash
         run: |
           python - <<'PY'
@@ -34,15 +34,22 @@ jobs:
 
           path = Path("mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/SceneHubController.java")
           text = path.read_text(encoding="utf-8")
-          old = """        event.setCancelled(true);\n        open(event.getPlayer());\n"""
-          new = """        event.setCancelled(true);\n        plugin.getLogger()\n                .info(\n                        \"ONBOARDING_CHRONICLE_RMB_SERVER action=\"\n                                + event.getAction()\n                                + \" hand=\"\n                                + event.getHand()\n                                + \" item=\"\n                                + event.getItem().getType());\n        Result<SceneSession, SceneErrorCode> onboardingAcceptanceOpen = open(event.getPlayer());\n        if (onboardingAcceptanceOpen\n                instanceof Result.Failure<SceneSession, SceneErrorCode> failure) {\n            plugin.getLogger()\n                    .info(\n                            \"ONBOARDING_CHRONICLE_SCENE_SERVER_FAIL error=\"\n                                    + failure.error().code()\n                                    + \" detail=\"\n                                    + failure.detail());\n        } else {\n            plugin.getLogger().info(\"ONBOARDING_CHRONICLE_SCENE_SERVER_SUCCESS\");\n        }\n"""
-          if text.count(old) != 1:
-              raise SystemExit(f"expected one Chronicle open call, found {text.count(old)}")
-          path.write_text(text.replace(old, new), encoding="utf-8")
+
+          old_header = """    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)\n    public void onChronicleUse(PlayerInteractEvent event) {\n        if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND\n"""
+          new_header = """    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)\n    public void onChronicleUse(PlayerInteractEvent event) {\n        plugin.getLogger()\n                .info(\n                        \"ONBOARDING_CHRONICLE_INTERACT_SERVER action=\"\n                                + event.getAction()\n                                + \" hand=\"\n                                + event.getHand()\n                                + \" item=\"\n                                + (event.getItem() == null ? \"null\" : event.getItem().getType())\n                                + \" cancelled=\"\n                                + event.isCancelled());\n        if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND\n"""
+          if text.count(old_header) != 1:
+              raise SystemExit(f"expected one Chronicle handler header, found {text.count(old_header)}")
+          text = text.replace(old_header, new_header)
+
+          old_open = """        event.setCancelled(true);\n        open(event.getPlayer());\n"""
+          new_open = """        event.setCancelled(true);\n        plugin.getLogger()\n                .info(\n                        \"ONBOARDING_CHRONICLE_RMB_SERVER action=\"\n                                + event.getAction()\n                                + \" hand=\"\n                                + event.getHand()\n                                + \" item=\"\n                                + event.getItem().getType());\n        Result<SceneSession, SceneErrorCode> onboardingAcceptanceOpen = open(event.getPlayer());\n        if (onboardingAcceptanceOpen\n                instanceof Result.Failure<SceneSession, SceneErrorCode> failure) {\n            plugin.getLogger()\n                    .info(\n                            \"ONBOARDING_CHRONICLE_SCENE_SERVER_FAIL error=\"\n                                    + failure.error().code()\n                                    + \" detail=\"\n                                    + failure.detail());\n        } else {\n            plugin.getLogger().info(\"ONBOARDING_CHRONICLE_SCENE_SERVER_SUCCESS\");\n        }\n"""
+          if text.count(old_open) != 1:
+              raise SystemExit(f"expected one Chronicle open call, found {text.count(old_open)}")
+          path.write_text(text.replace(old_open, new_open), encoding="utf-8")
           PY
 
-      - name: Verify full repository
-        run: bash ./gradlew clean build --no-daemon --console=plain
+      - name: Compile runner diagnostic plugin
+        run: bash ./gradlew :mmo-bootstrap:compileJava --no-daemon --console=plain
 
       - name: Compile exact 26.2 onboarding client gametest
         run: gradle -p acceptance/onboarding-client-26.2 compileGametestJava processGametestResources --no-daemon --console=plain

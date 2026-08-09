@@ -17,9 +17,11 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Zombie;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.RegisteredListener;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -29,10 +31,15 @@ import org.bukkit.util.Vector;
 final class OnboardingClientAcceptanceProbe {
     static final String ENABLE_PROPERTY = "mmo.bootstrap.onboarding-acceptance-test";
     static final String MARKER_PROPERTY = "mmo.bootstrap.onboarding-acceptance-marker";
+    static final String MODE_PROPERTY = "mmo.bootstrap.onboarding-acceptance-mode";
     static final String PASS_MARKER = "ONBOARDING_CLIENT_ACCEPTANCE_PASS";
     private static final String FIRST_COMBAT_MARKER = "ONBOARDING_FIRST_COMBAT_GATE_PASS";
     private static final String DEFENSE_DODGE_MARKER = "ONBOARDING_DEFENSE_DODGE_GATE_PASS";
+    private static final String FIRST_HOSTILE_KILL_MARKER =
+            "ONBOARDING_FIRST_HOSTILE_KILL_GATE_PASS";
     private static final String TRAINING_DUMMY_TAG = "branzmmo.training_dummy";
+    private static final String HOSTILE_ACCEPTANCE_TAG = "branzmmo.hostile_kill_acceptance";
+    private static final int HOSTILE_TARGET_READY_LEVEL = 18;
     private static final int STARTER_HOTBAR_SLOT = 0;
     private static final int CHRONICLE_HOTBAR_SLOT = 8;
     private static final DefinitionId GREATSWORD = DefinitionId.of("weapon.training_greatsword");
@@ -41,19 +48,26 @@ final class OnboardingClientAcceptanceProbe {
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
+    private final boolean hostileKillMode;
     private UUID playerId;
     private UUID trainingDummyId;
+    private UUID hostileTargetId;
     private int readyCount;
+    private int hostileSuccessfulActions;
     private boolean checking;
     private boolean chronicleSelected;
     private boolean combatStagingReady;
     private boolean awaitingDodge;
+    private boolean awaitingHostileKill;
     private boolean completed;
 
     private OnboardingClientAcceptanceProbe(
             JavaPlugin plugin, CharacterSessionController characters) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
+        this.hostileKillMode =
+                "hostile-kill"
+                        .equalsIgnoreCase(System.getProperty(MODE_PROPERTY, "defense").trim());
     }
 
     static SuccessfulCombatActionObserver install(
@@ -67,7 +81,10 @@ final class OnboardingClientAcceptanceProbe {
                 new OnboardingClientAcceptanceProbe(plugin, characters);
         foundations.setFoundationReadyObserver(probe::onFoundationReady);
         plugin.getServer().getScheduler().runTaskLater(plugin, probe::timeout, 20L * 120L);
-        plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_ARMED");
+        plugin.getLogger()
+                .info(
+                        "ONBOARDING_CLIENT_ACCEPTANCE_ARMED mode="
+                                + (probe.hostileKillMode ? "hostile-kill" : "defense"));
         return probe::onSuccessfulCombatAction;
     }
 
@@ -176,14 +193,7 @@ final class OnboardingClientAcceptanceProbe {
 
     private void spawnTrainingDummy(Player player) {
         removeTrainingDummy();
-        Location origin = player.getLocation().clone();
-        Vector forward = origin.getDirection().setY(0);
-        if (forward.lengthSquared() < 1.0e-6) {
-            forward = new Vector(0, 0, 1);
-        } else {
-            forward.normalize();
-        }
-        Location target = origin.add(forward.multiply(1.75));
+        Location target = targetLocation(player, 1.75);
         Pig dummy = player.getWorld().spawn(target, Pig.class);
         dummy.setAI(false);
         dummy.setSilent(true);
@@ -202,11 +212,26 @@ final class OnboardingClientAcceptanceProbe {
     private void onSuccessfulCombatAction(
             CharacterId actorId, UUID actionId, DefinitionId moveId, long currentTick) {
         if (completed
-                || awaitingDodge
                 || !combatStagingReady
                 || readyCount != 2
                 || playerId == null
                 || !actorId.value().equals(playerId)) {
+            return;
+        }
+        if (awaitingHostileKill) {
+            hostileSuccessfulActions++;
+            plugin.getLogger()
+                    .info(
+                            "ONBOARDING_HOSTILE_COMBAT_ACTION move="
+                                    + moveId.value()
+                                    + " action="
+                                    + actionId
+                                    + " count="
+                                    + hostileSuccessfulActions);
+            plugin.getServer().getScheduler().runTaskLater(plugin, this::pollHostileKill, 1L);
+            return;
+        }
+        if (awaitingDodge) {
             return;
         }
         if (!GREATSWORD_MOVE.equals(moveId)) {
@@ -251,22 +276,81 @@ final class OnboardingClientAcceptanceProbe {
             plugin.getServer().getScheduler().runTaskLater(plugin, this::pollDodge, 1L);
             return;
         }
+        DodgePhase phase = dodgePhase.orElseThrow();
+        long currentTick = plugin.getServer().getCurrentTick();
+        plugin.getLogger().info(DEFENSE_DODGE_MARKER + " phase=" + phase + " tick=" + currentTick);
+        if (hostileKillMode) {
+            awaitingDodge = false;
+            awaitingHostileKill = true;
+            spawnHostileTarget(player);
+            player.setLevel(HOSTILE_TARGET_READY_LEVEL);
+            plugin.getLogger()
+                    .info(
+                            "ONBOARDING_FIRST_HOSTILE_KILL_STAGING_READY level="
+                                    + HOSTILE_TARGET_READY_LEVEL);
+            return;
+        }
+        pass(
+                "move="
+                        + GREATSWORD_MOVE.value()
+                        + " dodgePhase="
+                        + phase
+                        + " tick="
+                        + currentTick);
+    }
+
+    private void spawnHostileTarget(Player player) {
+        removeHostileTarget();
+        Zombie hostile = player.getWorld().spawn(targetLocation(player, 1.75), Zombie.class);
+        hostile.setAI(false);
+        hostile.setSilent(true);
+        hostile.setRemoveWhenFarAway(false);
+        hostile.getEquipment().clear();
+        if (hostile.getAttribute(Attribute.ARMOR) != null) {
+            Objects.requireNonNull(hostile.getAttribute(Attribute.ARMOR)).setBaseValue(0);
+        }
+        hostile.addScoreboardTag(HOSTILE_ACCEPTANCE_TAG);
+        hostileTargetId = hostile.getUniqueId();
+        plugin.getLogger()
+                .info(
+                        "ONBOARDING_FIRST_HOSTILE_KILL_TARGET_READY id="
+                                + hostileTargetId
+                                + " type="
+                                + hostile.getType()
+                                + " distance="
+                                + Math.sqrt(
+                                        hostile.getLocation().distanceSquared(player.getLocation())));
+    }
+
+    private void pollHostileKill() {
+        if (completed || !awaitingHostileKill || hostileTargetId == null) {
+            return;
+        }
+        Entity target = plugin.getServer().getEntity(hostileTargetId);
+        if (target != null && !target.isDead()) {
+            return;
+        }
+        if (hostileSuccessfulActions < 1) {
+            fail("hostile target died without a successful MMO combat action");
+            return;
+        }
+        long currentTick = plugin.getServer().getCurrentTick();
+        plugin.getLogger()
+                .info(
+                        FIRST_HOSTILE_KILL_MARKER
+                                + " actions="
+                                + hostileSuccessfulActions
+                                + " tick="
+                                + currentTick);
+        hostileTargetId = null;
+        pass("hostileKill=true actions=" + hostileSuccessfulActions + " tick=" + currentTick);
+    }
+
+    private void pass(String detail) {
         try {
             writeMarker();
             completed = true;
-            DodgePhase phase = dodgePhase.orElseThrow();
-            long currentTick = plugin.getServer().getCurrentTick();
-            plugin.getLogger()
-                    .info(DEFENSE_DODGE_MARKER + " phase=" + phase + " tick=" + currentTick);
-            plugin.getLogger()
-                    .info(
-                            PASS_MARKER
-                                    + " move="
-                                    + GREATSWORD_MOVE.value()
-                                    + " dodgePhase="
-                                    + phase
-                                    + " tick="
-                                    + currentTick);
+            plugin.getLogger().info(PASS_MARKER + " " + detail);
         } catch (IOException exception) {
             fail("marker write failed: " + exception.getMessage());
             return;
@@ -316,9 +400,34 @@ final class OnboardingClientAcceptanceProbe {
         trainingDummyId = null;
     }
 
+    private void removeHostileTarget() {
+        if (hostileTargetId == null) {
+            return;
+        }
+        Entity hostile = plugin.getServer().getEntity(hostileTargetId);
+        if (hostile != null) {
+            hostile.remove();
+        }
+        hostileTargetId = null;
+    }
+
+    private static Location targetLocation(Player player, double distance) {
+        Location origin = player.getLocation().clone();
+        Vector forward = origin.getDirection().setY(0);
+        if (forward.lengthSquared() < 1.0e-6) {
+            forward = new Vector(0, 0, 1);
+        } else {
+            forward.normalize();
+        }
+        return origin.add(forward.multiply(distance));
+    }
+
     private void timeout() {
         if (!completed) {
-            fail("timed out before onboarding completed first combat and directional dodge");
+            fail(
+                    hostileKillMode
+                            ? "timed out before the first hostile kill completed"
+                            : "timed out before onboarding completed first combat and directional dodge");
         }
     }
 
@@ -328,6 +437,7 @@ final class OnboardingClientAcceptanceProbe {
         }
         completed = true;
         removeTrainingDummy();
+        removeHostileTarget();
         plugin.getLogger().severe("ONBOARDING_CLIENT_ACCEPTANCE_FAIL " + detail);
         plugin.getServer().getScheduler().runTask(plugin, plugin.getServer()::shutdown);
     }

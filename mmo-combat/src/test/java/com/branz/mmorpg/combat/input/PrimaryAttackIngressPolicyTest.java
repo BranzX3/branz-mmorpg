@@ -43,11 +43,23 @@ class PrimaryAttackIngressPolicyTest {
     }
 
     @Test
-    void activeTimelineAndLockedCombatStatesNeverLeakVanillaDamage() {
+    void activeReadyTimelineRoutesIntoServerBufferWithoutLeakingVanillaDamage() {
+        assertEquals(
+                new PrimaryAttackIngressDecision(true, false, true),
+                PrimaryAttackIngressPolicy.decide(
+                        WeaponState.READY, SelectedSlotKind.COMBAT_WEAPON, true));
+        assertEquals(
+                new PrimaryAttackIngressDecision(true, false, true),
+                PrimaryAttackIngressPolicy.decide(
+                        WeaponState.DRAWING, SelectedSlotKind.COMBAT_WEAPON, true));
+    }
+
+    @Test
+    void lockedCombatStatesNeverLeakVanillaDamage() {
         assertEquals(
                 new PrimaryAttackIngressDecision(true, false, false),
                 PrimaryAttackIngressPolicy.decide(
-                        WeaponState.READY, SelectedSlotKind.COMBAT_WEAPON, true));
+                        WeaponState.SHEATHING, SelectedSlotKind.COMBAT_WEAPON, true));
         assertEquals(
                 new PrimaryAttackIngressDecision(true, false, false),
                 PrimaryAttackIngressPolicy.decide(

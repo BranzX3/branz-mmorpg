@@ -1,0 +1,43 @@
+definition_id: move.training_greatsword.followup_crosscut
+schema_version: 1
+family: GREATSWORD
+input:
+  action: PRIMARY
+  direction: NEUTRAL
+  branch: PRIMARY_2
+phases:
+  windup_ticks: 5
+  active_ticks: 3
+  recovery_ticks: 9
+commit_tick: 3
+costs:
+  stamina: 18
+  mana: 0
+  health: 0
+  setup_stamina: 1
+movement:
+  curve: CROSS_STEP
+  facing_turn_degrees: 12
+hitboxes:
+  - tick: 5
+    shape: ARC
+    range: 3.2
+    angle_degrees: 105
+    height: 2.2
+    max_targets: 5
+    hit_group: PRIMARY
+outputs:
+  health:
+    physical_type: SLASH
+    move_coefficient: 0.95
+  posture: 22
+  guard_pressure: 18
+cancels:
+  dodge_from_tick: 11
+  chain_windows: []
+interrupt_resistance: LIGHT
+presentation:
+  archetype: GREATSWORD_FOLLOWUP_CROSSCUT
+profiles:
+  pve_multiplier: 1.0
+  pvp_multiplier: 0.65

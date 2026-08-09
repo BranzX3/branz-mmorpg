@@ -22,7 +22,9 @@ public final class PrimaryAttackIngressPolicy {
         Objects.requireNonNull(weapon, "weapon");
         Objects.requireNonNull(selectedSlot, "selectedSlot");
         if (actionActive) {
-            return OWNED_LOCKED;
+            return weapon == WeaponState.READY || weapon == WeaponState.DRAWING
+                    ? ROUTE
+                    : OWNED_LOCKED;
         }
         return switch (weapon) {
             case READY, DRAWING -> ROUTE;

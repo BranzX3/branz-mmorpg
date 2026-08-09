@@ -59,10 +59,30 @@ tasks.runServer {
                 rootProject.layout.projectDirectory.dir("example-content/milestone-1").asFile
         }
     jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
+    val directionalBufferAcceptance =
+        providers.gradleProperty("directionalBufferAcceptance").orNull == "true"
     val onboardingAcceptance = providers.gradleProperty("onboardingAcceptance").orNull == "true"
     val combatAcceptance = providers.gradleProperty("combatAcceptance").orNull == "true"
     val physicalLmbAcceptance = providers.gradleProperty("physicalLmbAcceptance").orNull == "true"
-    if (onboardingAcceptance) {
+    if (directionalBufferAcceptance) {
+        val acceptanceMarker =
+            project.layout.buildDirectory.file("directional-buffer-client-acceptance.pass").get().asFile
+        jvmArgs(
+            "-Dmmo.bootstrap.directional-buffer-acceptance-test=true",
+            "-Dmmo.bootstrap.directional-buffer-acceptance-marker=${acceptanceMarker.absolutePath}",
+        )
+        doFirst {
+            acceptanceMarker.delete()
+        }
+        doLast {
+            check(
+                acceptanceMarker.isFile &&
+                    acceptanceMarker.readText().trim() == "DIRECTIONAL_BUFFER_CLIENT_ACCEPTANCE_PASS",
+            ) {
+                "Directional buffer client acceptance marker was not produced."
+            }
+        }
+    } else if (onboardingAcceptance) {
         val acceptanceMarker =
             project.layout.buildDirectory.file("onboarding-client-acceptance.pass").get().asFile
         jvmArgs(

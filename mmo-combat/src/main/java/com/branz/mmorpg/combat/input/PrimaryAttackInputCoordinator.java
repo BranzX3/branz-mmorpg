@@ -19,9 +19,11 @@ public final class PrimaryAttackInputCoordinator {
     public static Optional<InputRouteOutcome> route(
             InputRouter router,
             long tick,
+            DirectionSnapshot direction,
             String branchFamily,
             InputRoutingContext routingContext) {
         Objects.requireNonNull(router, "router");
+        Objects.requireNonNull(direction, "direction");
         Objects.requireNonNull(branchFamily, "branchFamily");
         Objects.requireNonNull(routingContext, "routingContext");
         Result<CombatInputRequest, InputRejectionCode> observed =
@@ -29,7 +31,7 @@ public final class PrimaryAttackInputCoordinator {
                         new InputObservation(
                                 tick,
                                 SemanticInput.PRIMARY,
-                                DirectionSnapshot.NEUTRAL,
+                                direction,
                                 branchFamily,
                                 PHYSICAL_ATTACK));
         if (!(observed instanceof Result.Success<CombatInputRequest, InputRejectionCode> input)) {

@@ -755,11 +755,16 @@ public final class BranzMmoPlugin extends JavaPlugin {
         SuccessfulCombatActionObserver onboardingAcceptanceObserver =
                 OnboardingClientAcceptanceProbe.install(
                         this, startingFoundationController, characterSessionController);
+        SuccessfulCombatActionObserver directionalBufferAcceptanceObserver =
+                DirectionalBufferClientAcceptanceProbe.install(
+                        this, startingFoundationController, combatSessionController);
         combatSessionController.setSuccessfulActionObserver(
                 (actorId, actionId, moveId, currentTick) -> {
                     liveTeachingSessionController.observeSuccessfulAction(
                             actorId, actionId, moveId, currentTick);
                     onboardingAcceptanceObserver.observe(actorId, actionId, moveId, currentTick);
+                    directionalBufferAcceptanceObserver.observe(
+                            actorId, actionId, moveId, currentTick);
                 });
         characterSessionController.addReadyHandler(chronicleController::reconcile);
         characterSessionController.addReadyHandler(startingFoundationController::onCharacterReady);

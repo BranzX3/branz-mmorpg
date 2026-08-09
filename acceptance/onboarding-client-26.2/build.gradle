@@ -21,6 +21,11 @@ tasks.withType(JavaCompile).configureEach {
     options.release = 25
 }
 
+tasks.named('runClientGameTest') {
+    def acceptanceMode = providers.gradleProperty('acceptanceMode').orElse('defense')
+    jvmArgs "-Dbranz.acceptance.mode=${acceptanceMode.get()}"
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_25
     targetCompatibility = JavaVersion.VERSION_25

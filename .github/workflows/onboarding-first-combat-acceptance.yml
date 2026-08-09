@@ -105,3 +105,4 @@ jobs:
           grep -q 'ONBOARDING_CHRONICLE_SCENE_CLIENT_PASS' onboarding-client.log
           grep -q 'ONBOARDING_STARTER_WEAPON_SELECTED_CLIENT' onboarding-client.log
           grep -q 'ONBOARDING_FIRST_COMBAT_INPUT_CLIENT' onboarding-client.log
+          echo 'ONBOARDING_FIRST_COMBAT_GATE_PASS'

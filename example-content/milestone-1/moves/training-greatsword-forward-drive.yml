@@ -1,0 +1,46 @@
+definition_id: move.training_greatsword.forward_drive
+schema_version: 1
+family: GREATSWORD
+input:
+  action: PRIMARY
+  direction: FORWARD
+  branch: PRIMARY_DIRECTIONAL_FORWARD
+phases:
+  windup_ticks: 6
+  active_ticks: 4
+  recovery_ticks: 10
+commit_tick: 4
+costs:
+  stamina: 20
+  mana: 0
+  health: 0
+  setup_stamina: 2
+movement:
+  curve: FORWARD_DRIVE
+  facing_turn_degrees: 10
+hitboxes:
+  - tick: 6
+    shape: ARC
+    range: 3.6
+    angle_degrees: 90
+    height: 2.2
+    max_targets: 5
+    hit_group: PRIMARY
+outputs:
+  health:
+    physical_type: SLASH
+    move_coefficient: 1.0
+  posture: 24
+  guard_pressure: 20
+cancels:
+  dodge_from_tick: 14
+  chain_windows:
+    - from_tick: 12
+      to_tick: 17
+      branch: PRIMARY_2
+interrupt_resistance: LIGHT
+presentation:
+  archetype: GREATSWORD_FORWARD_DRIVE
+profiles:
+  pve_multiplier: 1.0
+  pvp_multiplier: 0.65

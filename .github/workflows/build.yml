@@ -18,4 +18,4 @@ jobs:
           java-version: '25'
           cache: gradle
       - name: Verify
-        run: ./gradlew clean build
+        run: bash ./gradlew clean build

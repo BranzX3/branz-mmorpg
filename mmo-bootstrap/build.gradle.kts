@@ -59,7 +59,85 @@ tasks.runServer {
                 rootProject.layout.projectDirectory.dir("example-content/milestone-1").asFile
         }
     jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
-    if (providers.gradleProperty("smokeTest").orNull == "true") {
+    val directionalBufferAcceptance =
+        providers.gradleProperty("directionalBufferAcceptance").orNull == "true"
+    val onboardingAcceptance = providers.gradleProperty("onboardingAcceptance").orNull == "true"
+    val combatAcceptance = providers.gradleProperty("combatAcceptance").orNull == "true"
+    val physicalLmbAcceptance = providers.gradleProperty("physicalLmbAcceptance").orNull == "true"
+    if (directionalBufferAcceptance) {
+        val acceptanceMarker =
+            project.layout.buildDirectory.file("directional-buffer-client-acceptance.pass").get().asFile
+        jvmArgs(
+            "-Dmmo.bootstrap.directional-buffer-acceptance-test=true",
+            "-Dmmo.bootstrap.directional-buffer-acceptance-marker=${acceptanceMarker.absolutePath}",
+        )
+        doFirst {
+            acceptanceMarker.delete()
+        }
+        doLast {
+            check(
+                acceptanceMarker.isFile &&
+                    acceptanceMarker.readText().trim() == "DIRECTIONAL_BUFFER_CLIENT_ACCEPTANCE_PASS",
+            ) {
+                "Directional buffer client acceptance marker was not produced."
+            }
+        }
+    } else if (onboardingAcceptance) {
+        val acceptanceMarker =
+            project.layout.buildDirectory.file("onboarding-client-acceptance.pass").get().asFile
+        jvmArgs(
+            "-Dmmo.bootstrap.onboarding-acceptance-test=true",
+            "-Dmmo.bootstrap.onboarding-acceptance-marker=${acceptanceMarker.absolutePath}",
+        )
+        doFirst {
+            acceptanceMarker.delete()
+        }
+        doLast {
+            check(
+                acceptanceMarker.isFile &&
+                    acceptanceMarker.readText().trim() == "ONBOARDING_CLIENT_ACCEPTANCE_PASS",
+            ) {
+                "Onboarding client acceptance marker was not produced."
+            }
+        }
+    } else if (physicalLmbAcceptance) {
+        val acceptanceMarker =
+            project.layout.buildDirectory.file("physical-lmb-ingress-acceptance.pass").get().asFile
+        jvmArgs(
+            "-Dmmo.bootstrap.physical-lmb-acceptance-test=true",
+            "-Dmmo.bootstrap.physical-lmb-acceptance-marker=${acceptanceMarker.absolutePath}",
+        )
+        doFirst {
+            acceptanceMarker.delete()
+        }
+        doLast {
+            check(
+                acceptanceMarker.isFile &&
+                    acceptanceMarker.readText().trim() == "PHYSICAL_LMB_INGRESS_ACCEPTANCE_PASS",
+            ) {
+                "Physical LMB ingress acceptance marker was not produced."
+            }
+        }
+    } else if (combatAcceptance) {
+        val acceptanceMarker =
+            project.layout.buildDirectory.file("combat-runtime-acceptance.pass").get().asFile
+        jvmArgs(
+            "-Dmmo.bootstrap.smoke-test=true",
+            "-Dmmo.bootstrap.combat-acceptance-test=true",
+            "-Dmmo.bootstrap.combat-acceptance-marker=${acceptanceMarker.absolutePath}",
+        )
+        doFirst {
+            acceptanceMarker.delete()
+        }
+        doLast {
+            check(
+                acceptanceMarker.isFile &&
+                    acceptanceMarker.readText().trim() == "COMBAT_RUNTIME_ACCEPTANCE_PASS",
+            ) {
+                "Paper combat runtime acceptance marker was not produced."
+            }
+        }
+    } else if (providers.gradleProperty("smokeTest").orNull == "true") {
         jvmArgs(
             "-Dmmo.bootstrap.smoke-test=true",
         )

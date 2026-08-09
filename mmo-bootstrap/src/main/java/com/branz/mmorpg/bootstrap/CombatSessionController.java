@@ -68,6 +68,7 @@ import com.branz.mmorpg.combat.input.ClientAction;
 import com.branz.mmorpg.combat.input.CombatInputPolicy;
 import com.branz.mmorpg.combat.input.CombatInputRequest;
 import com.branz.mmorpg.combat.input.DirectionSnapshot;
+import com.branz.mmorpg.combat.input.HostileAutoDrawPolicy;
 import com.branz.mmorpg.combat.input.InputBufferClearReason;
 import com.branz.mmorpg.combat.input.InputDeduplicationKey;
 import com.branz.mmorpg.combat.input.InputObservation;
@@ -76,6 +77,9 @@ import com.branz.mmorpg.combat.input.InputRejectionCode;
 import com.branz.mmorpg.combat.input.InputRouteOutcome;
 import com.branz.mmorpg.combat.input.InputRouter;
 import com.branz.mmorpg.combat.input.InputRoutingContext;
+import com.branz.mmorpg.combat.input.PrimaryAttackIngressDecision;
+import com.branz.mmorpg.combat.input.PrimaryAttackIngressPolicy;
+import com.branz.mmorpg.combat.input.PrimaryAttackInputCoordinator;
 import com.branz.mmorpg.combat.input.SemanticInput;
 import com.branz.mmorpg.combat.input.SneakPressDecision;
 import com.branz.mmorpg.combat.input.SneakPressResolver;
@@ -305,6 +309,7 @@ final class CombatSessionController implements Listener {
     private final CombatHealthEngine enemyHealth =
             new CombatHealthEngine(CombatHealthProfile.trainingEnemy());
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
+    private BiConsumer<Player, InputRouteOutcome> primaryRouteObserver = (player, outcome) -> {};
     private final Map<UUID, CombatHealthRuntime> trainingTargetHealth = new HashMap<>();
     private final Map<UUID, PostureRuntime> trainingTargetPosture = new HashMap<>();
     private final Map<UUID, LiveProjectile> activeProjectiles = new HashMap<>();
@@ -1120,39 +1125,62 @@ final class CombatSessionController implements Listener {
         if (event.getAnimationType() != PlayerAnimationType.ARM_SWING) {
             return;
         }
-        LiveSession session = sessions.get(event.getPlayer().getUniqueId());
-        if (session == null || !characters.ready(event.getPlayer())) {
+        Player player = event.getPlayer();
+        LiveSession session = sessions.get(player.getUniqueId());
+        if (session == null || !characters.ready(player)) {
             return;
         }
-        MoveDefinition primary = primaryMove(event.getPlayer()).orElse(null);
+        if (routePrimaryAttack(player, session)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Converges arm-swing and direct entity-hit ingress into one semantic PRIMARY path. Returning
+     * true means MMO combat owns the physical attack and vanilla damage must never leak through,
+     * including duplicate observations and action-locked states.
+     */
+    void setPrimaryRouteObserver(BiConsumer<Player, InputRouteOutcome> observer) {
+        primaryRouteObserver = Objects.requireNonNull(observer, "observer");
+    }
+
+    private boolean routePrimaryAttack(Player player, LiveSession session) {
+        SelectedHotbarSlot selected = selectedSlot(player, player.getInventory().getHeldItemSlot());
+        PrimaryAttackIngressDecision ingress =
+                PrimaryAttackIngressPolicy.decide(
+                        session.weapon.state(), selected.kind(), session.timeline != null);
+        if (!ingress.mmoOwned()) {
+            return false;
+        }
+        if (!ingress.routePrimary()) {
+            return true;
+        }
+        if (ingress.beginDraw()) {
+            select(session, selected);
+        }
+        DirectionSnapshot attackDirection = direction(player.getCurrentInput());
+        MovesetBranch attackBranch = primaryBranch(session, attackDirection);
+        MoveDefinition primary = primaryMove(player, attackBranch, attackDirection).orElse(null);
         if (primary == null) {
-            return;
+            return true;
         }
-        SemanticInput intent =
-                resolvedIntent(event.getPlayer(), session, ClientAction.ATTACK).orElse(null);
+        SemanticInput intent = resolvedIntent(player, session, ClientAction.ATTACK).orElse(null);
         if (intent != SemanticInput.PRIMARY) {
-            return;
+            return true;
         }
-        event.setCancelled(true);
-        Result<CombatInputRequest, InputRejectionCode> observed =
-                session.input.observe(
-                        new InputObservation(
-                                plugin.getServer().getCurrentTick(),
-                                intent,
-                                DirectionSnapshot.NEUTRAL,
-                                primary.input().branch(),
-                                new InputDeduplicationKey("MAIN_HAND", "ATTACK")));
-        if (observed instanceof Result.Failure<CombatInputRequest, InputRejectionCode>) {
-            return;
-        }
-        CombatInputRequest request =
-                ((Result.Success<CombatInputRequest, InputRejectionCode>) observed).value();
-        InputRoutingContext context = routingContext(event.getPlayer(), session);
-        Result<InputRouteOutcome, InputRejectionCode> routed =
-                session.input.routeFrame(List.of(request), context);
-        if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
-            handleRoute(event.getPlayer(), session, success.value());
-        }
+        Optional<InputRouteOutcome> routed =
+                PrimaryAttackInputCoordinator.route(
+                        session.input,
+                        plugin.getServer().getCurrentTick(),
+                        attackDirection,
+                        attackBranch.name(),
+                        routingContext(player, session, attackBranch));
+        routed.ifPresent(
+                outcome -> {
+                    handleRoute(player, session, outcome);
+                    primaryRouteObserver.accept(player, outcome);
+                });
+        return true;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -1160,8 +1188,8 @@ final class CombatSessionController implements Listener {
         if (event.getDamageSource().getCausingEntity() instanceof Player attacker) {
             LiveSession attackerSession = sessions.get(attacker.getUniqueId());
             if (attackerSession != null
-                    && (attackerSession.weapon.state() == WeaponState.READY
-                            || attackerSession.timeline != null)) {
+                    && characters.ready(attacker)
+                    && routePrimaryAttack(attacker, attackerSession)) {
                 event.setCancelled(true);
                 return;
             }
@@ -1237,7 +1265,7 @@ final class CombatSessionController implements Listener {
             updateHealthPresentation(defender, defenderSession);
         }
         if (resolved.outcome() != CombatDefenseOutcome.DODGED) {
-            markHostile(defender, defenderSession);
+            markIncomingHostile(defender, defenderSession);
         }
         defenderSession.lastResolution =
                 resolved.outcome()
@@ -1813,6 +1841,7 @@ final class CombatSessionController implements Listener {
             session.previousActionTransform = null;
             session.activeMoveEvidenceActionId = null;
             session.action = ActionState.IDLE;
+            pollBuffered(player, session);
         } else {
             session.action = actionState(session.timeline.phase());
         }
@@ -1994,9 +2023,11 @@ final class CombatSessionController implements Listener {
                             target.entityId(),
                             ignored ->
                                     CombatHealthRuntime.full(enemyHealth.profile(), currentTick));
-            CombatHealthResolution healthResolution =
-                    enemyHealth.damage(targetHealth, currentTick, resolvedDamage);
-            trainingTargetHealth.put(target.entityId(), healthResolution.runtime());
+            MeleeTargetDamageCoordinator.MeleeTargetDamageResult targetDamage =
+                    MeleeTargetDamageCoordinator.apply(
+                            enemyHealth, targetHealth, currentTick, resolvedDamage);
+            trainingTargetHealth.put(target.entityId(), targetDamage.runtime());
+            targetDamage.feedback().ifPresent(feedback -> renderMeleeHitFeedback(entity, feedback));
             observeSuccessfulCombatAction(
                     player,
                     session,
@@ -2005,7 +2036,7 @@ final class CombatSessionController implements Listener {
                     Objects.requireNonNull(session.activeMoveEvidenceActionId),
                     activeMove.id(),
                     meleePower(activeMove.family()));
-            totalDamage += healthResolution.appliedAmount();
+            totalDamage += targetDamage.appliedDamage();
             PostureResolution postureResolution =
                     postures.damage(posture, currentTick, resolvedPosture);
             trainingTargetPosture.put(target.entityId(), postureResolution.runtime());
@@ -2017,11 +2048,11 @@ final class CombatSessionController implements Listener {
             }
             if (firstHealth == null) {
                 firstHealth =
-                        roundOne(healthResolution.runtime().current())
+                        roundOne(targetDamage.runtime().current())
                                 + "/"
                                 + roundOne(enemyHealth.profile().maximum());
             }
-            if (healthResolution.lethalNow()) {
+            if (targetDamage.lethalNow()) {
                 deaths++;
                 completeCombatTarget(player, session, entity, EncounterOutcome.VICTORY);
                 entity.setHealth(0);
@@ -3128,6 +3159,11 @@ final class CombatSessionController implements Listener {
         }
     }
 
+    private void renderMeleeHitFeedback(
+            LivingEntity entity, MeleeHitFeedbackPolicy.MeleeHitFeedbackSpec feedback) {
+        MeleeHitFeedbackRenderer.render(entity, feedback);
+    }
+
     private static double roundOne(double value) {
         return Math.round(value * 10.0) / 10.0;
     }
@@ -3205,6 +3241,18 @@ final class CombatSessionController implements Listener {
                 && session.engagement.state() == EngagementState.EXPLORATION) {
             completeOpenCombatEvidence(player, session, EncounterOutcome.RETREAT);
         }
+    }
+
+    private void markIncomingHostile(Player player, LiveSession session) {
+        markHostile(player, session);
+        SelectedHotbarSlot combatSlot = selectedSlot(player, 0);
+        boolean combatReady = combatReadinessFailure(player).isEmpty();
+        if (!HostileAutoDrawPolicy.shouldBeginDraw(
+                session.weapon.state(), combatSlot.kind(), combatReady, session.health.dead())) {
+            return;
+        }
+        player.getInventory().setHeldItemSlot(combatSlot.slot());
+        select(session, combatSlot);
     }
 
     private void markHostile(Player player, LiveSession session) {
@@ -3436,14 +3484,35 @@ final class CombatSessionController implements Listener {
 
     private void handleRoute(Player player, LiveSession session, InputRouteOutcome outcome) {
         if (outcome.decision() == com.branz.mmorpg.combat.input.InputRouteDecision.EXECUTED) {
-            startMove(player, session);
+            startMove(player, session, outcome.request());
         } else {
-            player.sendActionBar(Component.text("Primary opener buffered.", NamedTextColor.YELLOW));
+            player.sendActionBar(
+                    Component.text("Primary follow-up buffered.", NamedTextColor.YELLOW));
         }
     }
 
     private void startMove(Player player, LiveSession session) {
-        MoveDefinition activeMove = primaryMove(player).orElse(null);
+        startMove(
+                player,
+                session,
+                new CombatInputRequest(
+                        1,
+                        plugin.getServer().getCurrentTick(),
+                        SemanticInput.PRIMARY,
+                        DirectionSnapshot.NEUTRAL,
+                        MovesetBranch.PRIMARY_1.name()));
+    }
+
+    private void startMove(Player player, LiveSession session, CombatInputRequest request) {
+        MovesetBranch branch;
+        try {
+            branch = MovesetBranch.valueOf(request.branchFamily());
+        } catch (IllegalArgumentException exception) {
+            player.sendActionBar(
+                    Component.text("Primary branch is unavailable.", NamedTextColor.RED));
+            return;
+        }
+        MoveDefinition activeMove = primaryMove(player, branch, request.direction()).orElse(null);
         if (activeMove == null) {
             player.sendActionBar(
                     Component.text(
@@ -3536,12 +3605,42 @@ final class CombatSessionController implements Listener {
     }
 
     private InputRoutingContext routingContext(Player player, LiveSession session) {
+        return routingContext(player, session, null);
+    }
+
+    private InputRoutingContext routingContext(
+            Player player, LiveSession session, MovesetBranch requestedBranch) {
         if (session.dodge != null) {
             return InputRoutingContext.legal(
                     java.util.EnumSet.of(
                             SemanticInput.FORCED_INTERRUPT, SemanticInput.UI_DANGER_CLOSE));
         }
-        return inputPolicy.routingContext(policyContext(player, session), false);
+        boolean authoredQueueWindowOpen =
+                session.timeline != null
+                        && requestedBranch != null
+                        && session.timeline.chainWindowOpen(requestedBranch.name());
+        return inputPolicy.routingContext(policyContext(player, session), authoredQueueWindowOpen);
+    }
+
+    private static MovesetBranch primaryBranch(LiveSession session, DirectionSnapshot direction) {
+        if (session.timeline != null) {
+            for (MoveDefinition.ChainWindow window :
+                    session.timeline.move().cancels().chainWindows()) {
+                if (!session.timeline.chainWindowOpen(window.branch())) {
+                    continue;
+                }
+                try {
+                    return MovesetBranch.valueOf(window.branch());
+                } catch (IllegalArgumentException ignored) {
+                    // Invalid authored branch cannot become a server-owned combat request.
+                }
+            }
+        }
+        return switch (direction) {
+            case FORWARD -> MovesetBranch.PRIMARY_DIRECTIONAL_FORWARD;
+            case BACK -> MovesetBranch.PRIMARY_DIRECTIONAL_BACK;
+            case LEFT, RIGHT, NEUTRAL -> MovesetBranch.PRIMARY_1;
+        };
     }
 
     private InputPolicyContext policyContext(Player player, LiveSession session) {
@@ -3733,36 +3832,69 @@ final class CombatSessionController implements Listener {
     }
 
     private Optional<MoveDefinition> primaryMove(Player player) {
+        return primaryMove(player, MovesetBranch.PRIMARY_1, DirectionSnapshot.NEUTRAL);
+    }
+
+    private Optional<MoveDefinition> primaryMove(
+            Player player, MovesetBranch branch, DirectionSnapshot direction) {
         if (combatReadinessFailure(player).isPresent()) {
             return Optional.empty();
         }
         return equippedWeaponFamily(player)
                 .flatMap(
                         family -> {
-                            MoveDefinition fallback =
-                                    switch (family) {
-                                        case "SWORD" -> trainingMove;
-                                        case "GREATSWORD" -> trainingGreatswordMove;
-                                        case "SWORD_SHIELD" -> trainingSwordShieldMove;
-                                        case "STAFF" -> trainingStaffMove;
-                                        default -> null;
-                                    };
-                            if (fallback == null) {
-                                return Optional.empty();
+                            Optional<MoveDefinition> authored =
+                                    buildResolution(player, family)
+                                            .flatMap(
+                                                    resolution ->
+                                                            Optional.ofNullable(
+                                                                            resolution
+                                                                                    .resolvedMoves()
+                                                                                    .get(branch))
+                                                                    .flatMap(moves::find));
+                            Optional<MoveDefinition> fallback = starterPrimaryMove(family, branch);
+                            if (fallback.isEmpty()
+                                    && (branch == MovesetBranch.PRIMARY_DIRECTIONAL_FORWARD
+                                            || branch == MovesetBranch.PRIMARY_DIRECTIONAL_BACK)) {
+                                fallback = starterPrimaryMove(family, MovesetBranch.PRIMARY_1);
                             }
-                            return buildResolution(player, family)
-                                    .flatMap(
-                                            resolution ->
-                                                    Optional.ofNullable(
-                                                                    resolution
-                                                                            .resolvedMoves()
-                                                                            .get(
-                                                                                    MovesetBranch
-                                                                                            .PRIMARY_1))
-                                                            .flatMap(moves::find)
-                                                            .or(() -> Optional.of(fallback)))
+                            Optional<MoveDefinition> selected =
+                                    authored.isPresent() ? authored : fallback;
+                            return selected.filter(
+                                            move ->
+                                                    move.input().direction()
+                                                                    == DirectionSnapshot.NEUTRAL
+                                                            || move.input().direction()
+                                                                    == direction)
                                     .map(move -> moveWithBuildCosts(player, family, move));
                         });
+    }
+
+    private Optional<MoveDefinition> starterPrimaryMove(String family, MovesetBranch branch) {
+        MoveDefinition move =
+                switch (family) {
+                    case "SWORD" -> branch == MovesetBranch.PRIMARY_1 ? trainingMove : null;
+                    case "GREATSWORD" ->
+                            switch (branch) {
+                                case PRIMARY_1 -> trainingGreatswordMove;
+                                case PRIMARY_DIRECTIONAL_FORWARD ->
+                                        moves.find(
+                                                        DefinitionId.of(
+                                                                "move.training_greatsword.forward_drive"))
+                                                .orElse(null);
+                                case PRIMARY_2 ->
+                                        moves.find(
+                                                        DefinitionId.of(
+                                                                "move.training_greatsword.followup_crosscut"))
+                                                .orElse(null);
+                                default -> null;
+                            };
+                    case "SWORD_SHIELD" ->
+                            branch == MovesetBranch.PRIMARY_1 ? trainingSwordShieldMove : null;
+                    case "STAFF" -> branch == MovesetBranch.PRIMARY_1 ? trainingStaffMove : null;
+                    default -> null;
+                };
+        return Optional.ofNullable(move);
     }
 
     private Optional<BuildResolution> buildResolution(Player player, String family) {

@@ -290,13 +290,7 @@ final class OnboardingClientAcceptanceProbe {
                                     + HOSTILE_TARGET_READY_LEVEL);
             return;
         }
-        pass(
-                "move="
-                        + GREATSWORD_MOVE.value()
-                        + " dodgePhase="
-                        + phase
-                        + " tick="
-                        + currentTick);
+        pass("move=" + GREATSWORD_MOVE.value() + " dodgePhase=" + phase + " tick=" + currentTick);
     }
 
     private void spawnHostileTarget(Player player) {
@@ -319,7 +313,8 @@ final class OnboardingClientAcceptanceProbe {
                                 + hostile.getType()
                                 + " distance="
                                 + Math.sqrt(
-                                        hostile.getLocation().distanceSquared(player.getLocation())));
+                                        hostile.getLocation()
+                                                .distanceSquared(player.getLocation())));
     }
 
     private void pollHostileKill() {

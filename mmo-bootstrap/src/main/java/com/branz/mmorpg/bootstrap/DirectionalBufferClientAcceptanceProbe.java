@@ -33,7 +33,8 @@ final class DirectionalBufferClientAcceptanceProbe {
     private static final String FORWARD_BRANCH = "PRIMARY_DIRECTIONAL_FORWARD";
     private static final String FOLLOWUP_BRANCH = "PRIMARY_2";
     private static final String TRAINING_DUMMY_TAG = "branzmmo.directional_buffer_dummy";
-    private static final int BUFFER_CONFIRMED_LEVEL = 7;
+    private static final int QUEUE_WINDOW_ARMED_LEVEL = 6;
+    private static final long QUEUE_WINDOW_ARM_DELAY_TICKS = 10L;
 
     private final JavaPlugin plugin;
     private final CombatSessionController combat;
@@ -41,7 +42,6 @@ final class DirectionalBufferClientAcceptanceProbe {
     private UUID trainingDummyId;
     private int readyCount;
     private int routeStage;
-    private long bufferedSequence = -1;
     private boolean forwardMoveHit;
     private boolean completed;
 
@@ -118,14 +118,13 @@ final class DirectionalBufferClientAcceptanceProbe {
             return;
         }
         switch (routeStage) {
-            case 0 -> verifyForwardExecution(outcome);
+            case 0 -> verifyForwardExecution(player, outcome);
             case 1 -> verifyInitialBuffer(player, outcome);
-            case 2 -> verifyBufferRefresh(player, outcome);
-            default -> fail("unexpected fourth primary route before follow-up resolved");
+            default -> fail("unexpected third primary route before buffered follow-up resolved");
         }
     }
 
-    private void verifyForwardExecution(InputRouteOutcome outcome) {
+    private void verifyForwardExecution(Player player, InputRouteOutcome outcome) {
         if (outcome.decision() != InputRouteDecision.EXECUTED
                 || outcome.request().direction() != DirectionSnapshot.FORWARD
                 || !outcome.request().branchFamily().equals(FORWARD_BRANCH)) {
@@ -139,6 +138,25 @@ final class DirectionalBufferClientAcceptanceProbe {
                                 + outcome.request().sequence()
                                 + " observedTick="
                                 + outcome.request().observedTick());
+        plugin.getServer()
+                .getScheduler()
+                .runTaskLater(
+                        plugin,
+                        () -> {
+                            if (completed
+                                    || routeStage != 1
+                                    || !player.isOnline()
+                                    || playerId == null
+                                    || !playerId.equals(player.getUniqueId())) {
+                                return;
+                            }
+                            player.setLevel(QUEUE_WINDOW_ARMED_LEVEL);
+                            plugin.getLogger()
+                                    .info(
+                                            "DIRECTIONAL_BUFFER_QUEUE_WINDOW_ARMED serverDelay="
+                                                    + QUEUE_WINDOW_ARM_DELAY_TICKS);
+                        },
+                        QUEUE_WINDOW_ARM_DELAY_TICKS);
     }
 
     private void verifyInitialBuffer(Player player, InputRouteOutcome outcome) {
@@ -147,35 +165,11 @@ final class DirectionalBufferClientAcceptanceProbe {
             fail("second route was not BUFFERED " + FOLLOWUP_BRANCH + ": " + outcome);
             return;
         }
-        bufferedSequence = outcome.request().sequence();
         routeStage = 2;
-        plugin.getLogger()
-                .info(
-                        "DIRECTIONAL_BUFFER_ONE_SLOT_BUFFERED_PASS sequence="
-                                + bufferedSequence
-                                + " observedTick="
-                                + outcome.request().observedTick());
-        // Acceptance-only handshake. The exact client waits for this replicated vanilla state
-        // before
-        // issuing the physical refresh LMB, removing headless client/server tick-rate guessing from
-        // the one-slot refresh assertion without changing combat timing or routing semantics.
-        player.setLevel(BUFFER_CONFIRMED_LEVEL);
-    }
-
-    private void verifyBufferRefresh(Player player, InputRouteOutcome outcome) {
-        if (outcome.decision() != InputRouteDecision.BUFFER_REFRESHED
-                || !outcome.request().branchFamily().equals(FOLLOWUP_BRANCH)
-                || outcome.request().sequence() <= bufferedSequence) {
-            fail("third route did not refresh the same one-slot follow-up: " + outcome);
-            return;
-        }
-        routeStage = 3;
         player.setLevel(0);
         plugin.getLogger()
                 .info(
-                        "DIRECTIONAL_BUFFER_ONE_SLOT_REFRESH_PASS oldSequence="
-                                + bufferedSequence
-                                + " newSequence="
+                        "DIRECTIONAL_BUFFER_ONE_SLOT_BUFFERED_PASS sequence="
                                 + outcome.request().sequence()
                                 + " observedTick="
                                 + outcome.request().observedTick());
@@ -203,7 +197,7 @@ final class DirectionalBufferClientAcceptanceProbe {
         if (!moveId.equals(FOLLOWUP_MOVE)) {
             return;
         }
-        if (!forwardMoveHit || routeStage != 3) {
+        if (!forwardMoveHit || routeStage != 2) {
             fail("follow-up move resolved before the one-slot buffer contract completed");
             return;
         }

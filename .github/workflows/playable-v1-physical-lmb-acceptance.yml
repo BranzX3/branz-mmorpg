@@ -45,16 +45,12 @@ jobs:
           from pathlib import Path
           p = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/PhysicalClientIngressAcceptanceProbe.java')
           text = p.read_text(encoding='utf-8')
-          shutdown_old = 'plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 2L);'
+          shutdown_expected = 'plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 2L);'
           deadline_old = 'plugin.getServer().getScheduler().runTaskLater(plugin, probe::timeout, 20L * 45L);'
-          if text.count(shutdown_old) != 1:
+          if text.count(shutdown_expected) != 1:
               raise SystemExit('shutdown-delay guard failed')
           if text.count(deadline_old) != 1:
               raise SystemExit('acceptance-deadline guard failed')
-          text = text.replace(
-              shutdown_old,
-              'plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 200L);',
-          )
           text = text.replace(
               deadline_old,
               'plugin.getServer().getScheduler().runTaskLater(plugin, probe::timeout, 20L * 120L);',

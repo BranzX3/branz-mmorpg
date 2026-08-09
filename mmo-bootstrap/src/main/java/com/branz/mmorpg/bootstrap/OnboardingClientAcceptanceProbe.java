@@ -154,7 +154,8 @@ final class OnboardingClientAcceptanceProbe {
                         "ONBOARDING_CLIENT_ACCEPTANCE_DUMMY_READY id="
                                 + trainingDummyId
                                 + " distance="
-                                + Math.sqrt(dummy.getLocation().distanceSquared(player.getLocation())));
+                                + Math.sqrt(
+                                        dummy.getLocation().distanceSquared(player.getLocation())));
     }
 
     private void onSuccessfulCombatAction(

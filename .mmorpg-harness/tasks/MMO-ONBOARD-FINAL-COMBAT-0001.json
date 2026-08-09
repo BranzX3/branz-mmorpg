@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-ONBOARD-FINAL-COMBAT-0001",
+  "task_branch": "harness-task/MMO-ONBOARD-FINAL-COMBAT-0001",
+  "base_commit": "56f668221618c9c492a20a8f7568587ff14d9491",
+  "action_id": "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-ONBOARD-FINAL-COMBAT-0001/**"
+  ]
+}

@@ -93,14 +93,6 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
         System.out.println("ONBOARDING_CHRONICLE_SELECTED_CLIENT");
         context.waitTicks(10);
         context.getInput().pressMouse(1);
-        context.waitTicks(5);
-        context.runOnClient(
-                client -> {
-                    Object screen = client.gui.screen();
-                    System.out.println(
-                            "ONBOARDING_CHRONICLE_AFTER_RMB_SCREEN="
-                                    + (screen == null ? "null" : screen.getClass().getName()));
-                });
         context.waitFor(
                 client -> client.gui.screen() instanceof AbstractContainerScreen<?>, 20 * 10);
         context.runOnClient(
@@ -115,6 +107,23 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
                     }
                 });
         System.out.println("ONBOARDING_CHRONICLE_SCENE_CLIENT_PASS");
+
+        // Return to the world through normal client input, select the starter weapon in slot 1,
+        // let the authoritative draw transition complete, then send a real LMB.
+        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+        context.waitFor(client -> client.gui.screen() == null, 20 * 5);
+        context.waitTicks(5);
+        context.getInput().pressKey(GLFW.GLFW_KEY_1);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && !client.player.getMainHandItem().isEmpty()
+                                && !client.player.getMainHandItem().is(Items.WRITTEN_BOOK),
+                20 * 5);
+        System.out.println("ONBOARDING_STARTER_WEAPON_SELECTED_CLIENT");
+        context.waitTicks(20);
+        context.getInput().pressMouse(0);
+        System.out.println("ONBOARDING_FIRST_COMBAT_INPUT_CLIENT");
 
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);
         context.setScreen(TitleScreen::new);

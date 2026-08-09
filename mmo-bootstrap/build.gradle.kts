@@ -85,9 +85,11 @@ tasks.runServer {
     } else if (onboardingAcceptance) {
         val acceptanceMarker =
             project.layout.buildDirectory.file("onboarding-client-acceptance.pass").get().asFile
+        val acceptanceMode = providers.gradleProperty("onboardingAcceptanceMode").orElse("defense")
         jvmArgs(
             "-Dmmo.bootstrap.onboarding-acceptance-test=true",
             "-Dmmo.bootstrap.onboarding-acceptance-marker=${acceptanceMarker.absolutePath}",
+            "-Dmmo.bootstrap.onboarding-acceptance-mode=${acceptanceMode.get()}",
         )
         doFirst {
             acceptanceMarker.delete()

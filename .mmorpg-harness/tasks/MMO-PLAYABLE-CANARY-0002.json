@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PLAYABLE-CANARY-0002",
+  "task_branch": "harness-task/MMO-PLAYABLE-CANARY-0002",
+  "base_commit": "ca234fb95630ef6095f957ba8631894e6fa5e99d",
+  "action_id": "HARNESS_CANARY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PLAYABLE-CANARY-0002/**"
+  ]
+}

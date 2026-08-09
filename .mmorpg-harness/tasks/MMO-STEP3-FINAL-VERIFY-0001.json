@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-STEP3-FINAL-VERIFY-0001",
+  "task_branch": "harness-task/MMO-STEP3-FINAL-VERIFY-0001",
+  "base_commit": "a2e6be239c09e777ebd18e8af33bf27a6d675a13",
+  "action_id": "MMO_GRADLE_VERIFY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-STEP3-FINAL-VERIFY-0001/**"
+  ]
+}

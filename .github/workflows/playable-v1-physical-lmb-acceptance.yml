@@ -1,0 +1,143 @@
+name: playable-v1 physical LMB acceptance
+
+on:
+  push:
+    branches: [playable-v1]
+    paths:
+      - '.github/scripts/playable-v1-physical-lmb-acceptance.py'
+      - '.github/workflows/playable-v1-physical-lmb-acceptance.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-physical-lmb-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: playable-v1
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Apply guarded physical LMB acceptance wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/scripts/playable-v1-physical-lmb-acceptance.py
+          test ! -e acceptance/minecraft-client-26.2
+          python3 .github/scripts/playable-v1-physical-lmb-acceptance.py
+          test -d acceptance/minecraft-client-26.2/src/clientGametest
+          mv acceptance/minecraft-client-26.2/src/clientGametest acceptance/minecraft-client-26.2/src/gametest
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/PhysicalClientIngressAcceptanceProbe.java')
+          text = p.read_text(encoding='utf-8')
+          old = 'plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 2L);'
+          if text.count(old) != 1:
+              raise SystemExit('shutdown-delay guard failed')
+          p.write_text(text.replace(old, 'plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 200L);'), encoding='utf-8')
+          PY
+
+      - name: Apply repository formatting
+        run: bash ./gradlew spotlessApply
+
+      - name: Clean staging helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/scripts/playable-v1-physical-lmb-acceptance.py
+          rm -f .github/workflows/playable-v1-physical-lmb-acceptance.yml
+          git diff --check
+
+      - name: Verify full repository
+        run: bash ./gradlew clean build --no-daemon --console=plain
+
+      - name: Compile exact 26.2 client gametest
+        run: bash ./gradlew -p acceptance/minecraft-client-26.2 compileGametestJava processGametestResources --no-daemon --console=plain
+
+      - name: Run real Minecraft 26.2 physical LMB acceptance
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p mmo-bootstrap/run
+          printf 'eula=true\n' > mmo-bootstrap/run/eula.txt
+          cat > mmo-bootstrap/run/server.properties <<'EOF'
+          online-mode=false
+          server-port=25565
+          spawn-protection=0
+          max-players=1
+          EOF
+          rm -f mmo-bootstrap/build/physical-lmb-ingress-acceptance.pass
+          bash ./gradlew :mmo-bootstrap:runServer -PphysicalLmbAcceptance=true --no-daemon --console=plain > physical-paper.log 2>&1 &
+          SERVER_PID=$!
+
+          READY=0
+          for _ in $(seq 1 180); do
+            if grep -q 'Done (' physical-paper.log 2>/dev/null; then
+              READY=1
+              break
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$READY" -ne 1 ]; then
+            echo 'Paper did not become ready.'
+            cat physical-paper.log || true
+            wait "$SERVER_PID" || true
+            exit 1
+          fi
+
+          set +e
+          xvfb-run -a bash ./gradlew -p acceptance/minecraft-client-26.2 runClientGameTest --no-daemon --console=plain > physical-client.log 2>&1
+          CLIENT_RC=$?
+          set -e
+
+          for _ in $(seq 1 30); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          SERVER_RC=0
+          if kill -0 "$SERVER_PID" 2>/dev/null; then
+            echo 'Paper did not shut down after acceptance; terminating failed run.'
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" || true
+            SERVER_RC=1
+          else
+            wait "$SERVER_PID" || SERVER_RC=$?
+          fi
+
+          echo '===== CLIENT LOG ====='
+          cat physical-client.log || true
+          echo '===== PAPER LOG ====='
+          cat physical-paper.log || true
+
+          test "$CLIENT_RC" -eq 0
+          test "$SERVER_RC" -eq 0
+          test -f mmo-bootstrap/build/physical-lmb-ingress-acceptance.pass
+          test "$(tr -d '\r\n' < mmo-bootstrap/build/physical-lmb-ingress-acceptance.pass)" = 'PHYSICAL_LMB_INGRESS_ACCEPTANCE_PASS'
+          grep -q 'PHYSICAL_LMB_INGRESS_ACCEPTANCE_PLAYER_READY' physical-paper.log
+          grep -q 'PHYSICAL_LMB_INGRESS_ACCEPTANCE_PASS' physical-paper.log
+
+      - name: Commit verified physical LMB acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'playable-v1-bot'
+          git config user.email 'playable-v1-bot@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'test(combat): prove physical LMB through real 26.2 client'
+          git push origin HEAD:playable-v1

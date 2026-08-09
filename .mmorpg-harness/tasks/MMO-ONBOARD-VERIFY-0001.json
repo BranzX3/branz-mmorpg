@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-ONBOARD-VERIFY-0001",
+  "task_branch": "harness-task/MMO-ONBOARD-VERIFY-0001",
+  "base_commit": "6f363d4370ca63dc3420e248962cf6418b6c09b7",
+  "action_id": "MMO_GRADLE_VERIFY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-ONBOARD-VERIFY-0001/**"
+  ]
+}

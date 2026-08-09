@@ -90,6 +90,7 @@ public final class OnboardingFoundationClientGameTest implements FabricClientGam
                                 "Chronicle RMB opened an unexpected menu: " + menuSlots + " slots");
                     }
                 });
+        System.out.println("ONBOARDING_CHRONICLE_SCENE_CLIENT_PASS");
 
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);
         context.setScreen(TitleScreen::new);

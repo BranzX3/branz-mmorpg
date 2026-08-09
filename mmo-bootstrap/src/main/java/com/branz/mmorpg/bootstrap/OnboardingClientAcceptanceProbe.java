@@ -1,5 +1,6 @@
 package com.branz.mmorpg.bootstrap;
 
+import com.branz.mmorpg.api.identity.CharacterId;
 import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.result.Result;
@@ -16,12 +17,14 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
-/** Real-client acceptance for first choice -> durable kit -> reconnect without reprompt. */
+/** Real-client acceptance for first choice -> durable kit -> reconnect -> first combat action. */
 final class OnboardingClientAcceptanceProbe {
     static final String ENABLE_PROPERTY = "mmo.bootstrap.onboarding-acceptance-test";
     static final String MARKER_PROPERTY = "mmo.bootstrap.onboarding-acceptance-marker";
     static final String PASS_MARKER = "ONBOARDING_CLIENT_ACCEPTANCE_PASS";
     private static final DefinitionId GREATSWORD = DefinitionId.of("weapon.training_greatsword");
+    private static final DefinitionId GREATSWORD_MOVE =
+            DefinitionId.of("move.training_greatsword.committed_cleave");
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
@@ -39,13 +42,15 @@ final class OnboardingClientAcceptanceProbe {
     static void install(
             JavaPlugin plugin,
             StartingFoundationController foundations,
-            CharacterSessionController characters) {
+            CharacterSessionController characters,
+            CombatSessionController combat) {
         if (!Boolean.getBoolean(ENABLE_PROPERTY)) {
             return;
         }
         OnboardingClientAcceptanceProbe probe =
                 new OnboardingClientAcceptanceProbe(plugin, characters);
         foundations.setFoundationReadyObserver(probe::onFoundationReady);
+        combat.setSuccessfulActionObserver(probe::onSuccessfulCombatAction);
         plugin.getServer().getScheduler().runTaskLater(plugin, probe::timeout, 20L * 120L);
         plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_ARMED");
     }
@@ -120,17 +125,34 @@ final class OnboardingClientAcceptanceProbe {
             return;
         }
         plugin.getLogger().info("ONBOARDING_CLIENT_ACCEPTANCE_RECONNECT_READY");
+    }
+
+    private void onSuccessfulCombatAction(
+            CharacterId actorId, UUID actionId, DefinitionId moveId, long currentTick) {
+        if (completed || readyCount != 2 || playerId == null || !actorId.value().equals(playerId)) {
+            return;
+        }
+        if (!GREATSWORD_MOVE.equals(moveId)) {
+            fail("expected first committed move " + GREATSWORD_MOVE.value() + ", got " + moveId.value());
+            return;
+        }
         try {
             writeMarker();
             completed = true;
-            plugin.getLogger().info(PASS_MARKER);
+            plugin.getLogger()
+                    .info(
+                            PASS_MARKER
+                                    + " move="
+                                    + moveId.value()
+                                    + " action="
+                                    + actionId
+                                    + " tick="
+                                    + currentTick);
         } catch (IOException exception) {
             fail("marker write failed: " + exception.getMessage());
             return;
         }
-        // Keep the accepted reconnect alive long enough for the exact client to observe the
-        // reconciled Chronicle, settle on safe ground, and exercise the production RMB Scene path.
-        plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 400L);
+        plugin.getServer().getScheduler().runTaskLater(plugin, plugin.getServer()::shutdown, 2L);
     }
 
     private void validateGreatswordProjection(Player player) {
@@ -157,7 +179,7 @@ final class OnboardingClientAcceptanceProbe {
 
     private void timeout() {
         if (!completed) {
-            fail("timed out before first-choice and reconnect proof completed");
+            fail("timed out before onboarding reached the first committed combat action");
         }
     }
 

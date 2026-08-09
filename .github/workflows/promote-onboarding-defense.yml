@@ -1,0 +1,83 @@
+name: promote-onboarding-defense
+
+on:
+  push:
+    branches: [feature/playable-onboarding-defense-v1]
+
+permissions:
+  contents: write
+
+jobs:
+  gate-and-promote:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Freeze final candidate without temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin playable-v1
+          git merge-base --is-ancestor origin/playable-v1 HEAD
+          git rm .github/workflows/promote-onboarding-defense.yml
+          git diff --check
+          git config user.name "playable-v1-bot"
+          git config user.email "playable-v1-bot@users.noreply.github.com"
+          git commit -m "ci(onboarding): remove temporary defense promotion gate"
+          echo "FINAL_CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Audit final slice diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin playable-v1
+          git diff --name-only origin/playable-v1...HEAD | sort > /tmp/final-files.txt
+          cat /tmp/final-files.txt
+          cat > /tmp/expected-files.txt <<'EOF'
+          acceptance/onboarding-client-26.2/src/gametest/java/com/branz/mmorpg/acceptance/OnboardingFoundationClientGameTest.java
+          mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/OnboardingClientAcceptanceProbe.java
+          EOF
+          sort -o /tmp/expected-files.txt /tmp/expected-files.txt
+          diff -u /tmp/expected-files.txt /tmp/final-files.txt
+
+      - name: Verify full repository on final candidate
+        run: bash ./gradlew clean build --no-daemon --console=plain
+
+      - name: Paper smoke on final candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mmo-bootstrap/run
+          printf 'eula=true\n' > mmo-bootstrap/run/eula.txt
+          bash ./gradlew :mmo-bootstrap:runServer -PsmokeTest=true --no-daemon --console=plain
+
+      - name: Combat runtime acceptance on final candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mmo-bootstrap/run
+          printf 'eula=true\n' > mmo-bootstrap/run/eula.txt
+          rm -f mmo-bootstrap/build/combat-runtime-acceptance.pass
+          bash ./gradlew :mmo-bootstrap:runServer -PcombatAcceptance=true --no-daemon --console=plain
+          test -f mmo-bootstrap/build/combat-runtime-acceptance.pass
+          test "$(tr -d '\r\n' < mmo-bootstrap/build/combat-runtime-acceptance.pass)" = 'COMBAT_RUNTIME_ACCEPTANCE_PASS'
+
+      - name: Publish final candidate and fast-forward playable-v1
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$FINAL_CANDIDATE_SHA"
+          git fetch origin playable-v1
+          git merge-base --is-ancestor origin/playable-v1 HEAD
+          git push origin HEAD:feature/playable-onboarding-defense-v1
+          git push origin HEAD:playable-v1
+          echo "PLAYABLE_V1_PROMOTED_SHA=$(git rev-parse HEAD)"

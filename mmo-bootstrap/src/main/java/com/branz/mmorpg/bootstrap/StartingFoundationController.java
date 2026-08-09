@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -48,6 +49,8 @@ final class StartingFoundationController implements Listener {
     private final Set<UUID> choiceRequired = new HashSet<>();
     private final Set<UUID> provisioning = new HashSet<>();
     private final Map<UUID, Inventory> choiceInventories = new HashMap<>();
+    private BiConsumer<Player, StartingFoundation> foundationReadyObserver =
+            (player, foundation) -> {};
 
     StartingFoundationController(
             JavaPlugin plugin, CharacterSessionController characters, String contentVersion) {
@@ -55,6 +58,10 @@ final class StartingFoundationController implements Listener {
         this.characters = Objects.requireNonNull(characters, "characters");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
         foundationKey = new NamespacedKey(plugin, "starting_foundation");
+    }
+
+    void setFoundationReadyObserver(BiConsumer<Player, StartingFoundation> observer) {
+        foundationReadyObserver = Objects.requireNonNull(observer, "observer");
     }
 
     void onCharacterReady(Player player) {
@@ -248,6 +255,7 @@ final class StartingFoundationController implements Listener {
         }
         if (record.kitReady()) {
             locked.remove(playerId);
+            foundationReadyObserver.accept(player, foundation);
             return;
         }
         provisioning.add(playerId);
@@ -286,6 +294,7 @@ final class StartingFoundationController implements Listener {
                             Component.text(
                                     "Your Chronicle is in slot 9. Draw your weapon and try LMB when ready.",
                                     NamedTextColor.GRAY));
+                    foundationReadyObserver.accept(player, foundation);
                 });
     }
 

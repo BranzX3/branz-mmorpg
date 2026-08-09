@@ -59,9 +59,28 @@ tasks.runServer {
                 rootProject.layout.projectDirectory.dir("example-content/milestone-1").asFile
         }
     jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
+    val onboardingAcceptance = providers.gradleProperty("onboardingAcceptance").orNull == "true"
     val combatAcceptance = providers.gradleProperty("combatAcceptance").orNull == "true"
     val physicalLmbAcceptance = providers.gradleProperty("physicalLmbAcceptance").orNull == "true"
-    if (physicalLmbAcceptance) {
+    if (onboardingAcceptance) {
+        val acceptanceMarker =
+            project.layout.buildDirectory.file("onboarding-client-acceptance.pass").get().asFile
+        jvmArgs(
+            "-Dmmo.bootstrap.onboarding-acceptance-test=true",
+            "-Dmmo.bootstrap.onboarding-acceptance-marker=${acceptanceMarker.absolutePath}",
+        )
+        doFirst {
+            acceptanceMarker.delete()
+        }
+        doLast {
+            check(
+                acceptanceMarker.isFile &&
+                    acceptanceMarker.readText().trim() == "ONBOARDING_CLIENT_ACCEPTANCE_PASS",
+            ) {
+                "Onboarding client acceptance marker was not produced."
+            }
+        }
+    } else if (physicalLmbAcceptance) {
         val acceptanceMarker =
             project.layout.buildDirectory.file("physical-lmb-ingress-acceptance.pass").get().asFile
         jvmArgs(

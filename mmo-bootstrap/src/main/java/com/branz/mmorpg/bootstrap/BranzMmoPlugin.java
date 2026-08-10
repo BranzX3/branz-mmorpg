@@ -566,6 +566,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         projectionCodec,
                         new PhysicalInventoryItemMoveService(
                                 databaseRuntime, characterSessionService),
+                        new PhysicalInventoryLotMoveService(
+                                databaseRuntime, characterSessionService),
                         snapshot.manifest().contentVersion());
         physicalOffHandInteractionController =
                 new PhysicalOffHandInteractionController(

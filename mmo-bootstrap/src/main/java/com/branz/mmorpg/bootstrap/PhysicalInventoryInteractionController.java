@@ -1,6 +1,7 @@
 package com.branz.mmorpg.bootstrap;
 
 import com.branz.mmorpg.api.identity.ItemId;
+import com.branz.mmorpg.api.identity.LotId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.projection.InventoryProjectionMovePlanner;
 import com.branz.mmorpg.items.projection.ObservedProjection;
@@ -30,7 +31,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * Owns the first physical-inventory slice: moving/swapping durable unique MMO items within player
+ * Owns physical inventory movement for durable unique items and whole stackable lots within player
  * storage slots 0-35 while database placement remains authoritative.
  */
 final class PhysicalInventoryInteractionController implements Listener {
@@ -41,6 +42,7 @@ final class PhysicalInventoryInteractionController implements Listener {
     private final CharacterSessionController characters;
     private final BukkitItemProjectionCodec codec;
     private final PhysicalInventoryItemMoveService moves;
+    private final PhysicalInventoryLotMoveService lotMoves;
     private final String contentVersion;
     private final Map<UUID, PendingInteraction> pending = new HashMap<>();
 
@@ -49,11 +51,13 @@ final class PhysicalInventoryInteractionController implements Listener {
             CharacterSessionController characters,
             BukkitItemProjectionCodec codec,
             PhysicalInventoryItemMoveService moves,
+            PhysicalInventoryLotMoveService lotMoves,
             String contentVersion) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
         this.codec = Objects.requireNonNull(codec, "codec");
         this.moves = Objects.requireNonNull(moves, "moves");
+        this.lotMoves = Objects.requireNonNull(lotMoves, "lotMoves");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
     }
 
@@ -251,13 +255,24 @@ final class PhysicalInventoryInteractionController implements Listener {
                         plugin,
                         () -> {
                             Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
-                                    moves.moveUniqueItem(
-                                            interaction.session(),
-                                            new ItemId(intent.valueId()),
-                                            intent.sourceSlot(),
-                                            intent.destinationSlot(),
-                                            interaction.operationId(),
-                                            contentVersion);
+                                    switch (intent.valueType()) {
+                                        case UNIQUE_ITEM ->
+                                                moves.moveUniqueItem(
+                                                        interaction.session(),
+                                                        new ItemId(intent.valueId()),
+                                                        intent.sourceSlot(),
+                                                        intent.destinationSlot(),
+                                                        interaction.operationId(),
+                                                        contentVersion);
+                                        case STACKABLE_LOT ->
+                                                lotMoves.moveFullLot(
+                                                        interaction.session(),
+                                                        new LotId(intent.valueId()),
+                                                        intent.sourceSlot(),
+                                                        intent.destinationSlot(),
+                                                        interaction.operationId(),
+                                                        contentVersion);
+                                    };
                             String originalFailure = null;
                             if (result
                                     instanceof

@@ -28,6 +28,7 @@ class InventoryProjectionMovePlannerTest {
         assertEquals(ProjectionMoveDisposition.READY_TO_COMMIT, plan.disposition());
         ProjectionMoveIntent intent = plan.intent().orElseThrow();
         assertEquals(sword.valueId(), intent.valueId());
+        assertEquals(ProjectionValueType.UNIQUE_ITEM, intent.valueType());
         assertEquals(12, intent.sourceSlot());
         assertEquals(3, intent.destinationSlot());
         assertFalse(intent.swap());
@@ -132,14 +133,63 @@ class InventoryProjectionMovePlannerTest {
     }
 
     @Test
-    void stackableLotMovementIsRejectedFromUniqueItemSlice() {
+    void plansFullStackableLotMoveToEmptySlot() {
         ExpectedProjection ore = lot(ORE, 14, 20, 4);
+
+        ProjectionMovePlan plan =
+                success(List.of(ore), List.of(observed(ore, 2)), Optional.empty());
+
+        ProjectionMoveIntent intent = plan.intent().orElseThrow();
+        assertEquals(ProjectionMoveDisposition.READY_TO_COMMIT, plan.disposition());
+        assertEquals(ProjectionValueType.STACKABLE_LOT, intent.valueType());
+        assertEquals(14, intent.sourceSlot());
+        assertEquals(2, intent.destinationSlot());
+        assertFalse(intent.swap());
+    }
+
+    @Test
+    void fullStackableLotPickupOntoCursorIsTransient() {
+        ExpectedProjection ore = lot(ORE, 14, 20, 4);
+
+        ProjectionMovePlan plan =
+                success(List.of(ore), List.of(), Optional.of(observed(ore, 1000)));
+
+        assertEquals(ProjectionMoveDisposition.TRANSIENT_CURSOR, plan.disposition());
+    }
+
+    @Test
+    void partialStackableLotCursorIdentityIsRejected() {
+        ExpectedProjection ore = lot(ORE, 14, 20, 4);
+        ObservedProjection partial =
+                new ObservedProjection(
+                        1000,
+                        ore.valueId(),
+                        ore.definitionId(),
+                        ore.valueType(),
+                        10,
+                        ore.authorityVersion(),
+                        ore.displayRevision(),
+                        ore.contentVersion(),
+                        ore.testProvenance(),
+                        true);
 
         assertFailure(
                 List.of(ore),
-                List.of(observed(ore, 2)),
+                List.of(),
+                Optional.of(partial),
+                ProjectionMoveErrorCode.PROJECTION_MOVE_INVALID);
+    }
+
+    @Test
+    void stackableLotCannotMergeIntoOccupiedAuthoritativeSlot() {
+        ExpectedProjection first = lot(ORE, 14, 20, 4);
+        ExpectedProjection second = lot(ORE, 2, 10, 5);
+
+        assertFailure(
+                List.of(first, second),
+                List.of(observed(first, 2), observed(second, 2)),
                 Optional.empty(),
-                ProjectionMoveErrorCode.PROJECTION_MOVE_STACKABLE_UNSUPPORTED);
+                ProjectionMoveErrorCode.PROJECTION_MOVE_DUPLICATE);
     }
 
     @Test

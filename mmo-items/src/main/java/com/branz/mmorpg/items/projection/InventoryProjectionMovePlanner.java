@@ -13,12 +13,15 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Interprets a post-inventory-action projection layout as an unchanged state, transient cursor
- * ownership, or one durable unique-item move/swap.
+ * Interprets a post-inventory-action projection layout as unchanged, transient cursor ownership,
+ * one durable move, or one exact two-unique-item swap.
  *
- * <p>This planner never treats signed placement as database truth. Signatures prove projection
- * identity; expected slots remain the authoritative pre-mutation state until the returned intent is
- * committed transactionally.
+ * <p>Unique items may move to an empty slot or exact-swap with another unique item. Stackable lots
+ * may move only as a whole stack to a database-empty slot. Split, merge and mixed swap remain
+ * fail-closed until their persistence contracts are explicitly owned.
+ *
+ * <p>Signed placement is never database truth. Signatures prove value identity/version while the
+ * expected layout remains authoritative until the returned intent commits transactionally.
  */
 public final class InventoryProjectionMovePlanner {
     private InventoryProjectionMovePlanner() {}
@@ -40,7 +43,9 @@ public final class InventoryProjectionMovePlanner {
         Map<Integer, ExpectedProjection> expectedBySlot = new HashMap<>();
         for (ExpectedProjection projection : expected) {
             Objects.requireNonNull(projection, "expected projection");
-            if (projection.slot() >= storageSize || projection.slot() == protectedSlot) {
+            if (projection.slot() < 0
+                    || projection.slot() >= storageSize
+                    || projection.slot() == protectedSlot) {
                 return Result.failure(
                         ProjectionMoveErrorCode.PROJECTION_MOVE_PROTECTED_SLOT,
                         "Authoritative projection occupies a non-gameplay/protected slot.");
@@ -57,7 +62,9 @@ public final class InventoryProjectionMovePlanner {
         Set<Integer> observedSlots = new HashSet<>();
         for (ObservedProjection projection : storageObserved) {
             Objects.requireNonNull(projection, "observed projection");
-            if (projection.slot() >= storageSize || projection.slot() == protectedSlot) {
+            if (projection.slot() < 0
+                    || projection.slot() >= storageSize
+                    || projection.slot() == protectedSlot) {
                 return Result.failure(
                         ProjectionMoveErrorCode.PROJECTION_MOVE_PROTECTED_SLOT,
                         "MMO projection moved into a non-gameplay/protected slot.");
@@ -107,16 +114,11 @@ public final class InventoryProjectionMovePlanner {
             if (!sameSignedIdentity(authoritative, cursor)) {
                 return Result.failure(
                         ProjectionMoveErrorCode.PROJECTION_MOVE_INVALID,
-                        "Cursor projection identity/version is stale or inconsistent.");
-            }
-            if (cursor.valueType() != ProjectionValueType.UNIQUE_ITEM) {
-                return Result.failure(
-                        ProjectionMoveErrorCode.PROJECTION_MOVE_STACKABLE_UNSUPPORTED,
-                        "Stackable lot cursor movement is not part of the unique-item slice.");
+                        "Cursor projection identity/version is stale or inconsistent. Partial stack movement is not supported.");
             }
         }
 
-        List<PlacementChange> changedUnique = new ArrayList<>();
+        List<PlacementChange> changed = new ArrayList<>();
         for (ExpectedProjection authoritative : expected) {
             ObservedProjection observed = storageById.get(authoritative.valueId());
             boolean onCursor = cursor != null && cursor.valueId().equals(authoritative.valueId());
@@ -125,71 +127,73 @@ public final class InventoryProjectionMovePlanner {
                         ProjectionMoveErrorCode.PROJECTION_MOVE_MISSING,
                         "Authoritative MMO value disappeared from storage/cursor observation.");
             }
-            if (authoritative.valueType() == ProjectionValueType.STACKABLE_LOT) {
-                if (onCursor || observed == null || observed.slot() != authoritative.slot()) {
-                    return Result.failure(
-                            ProjectionMoveErrorCode.PROJECTION_MOVE_STACKABLE_UNSUPPORTED,
-                            "Stackable lot movement is not part of the unique-item slice.");
-                }
-                continue;
-            }
             if (!onCursor && observed.slot() != authoritative.slot()) {
-                changedUnique.add(new PlacementChange(authoritative, observed.slot()));
+                changed.add(new PlacementChange(authoritative, observed.slot()));
             }
         }
 
         if (cursor != null) {
-            if (changedUnique.size() > 1) {
+            if (changed.size() > 1) {
                 return Result.failure(
                         ProjectionMoveErrorCode.PROJECTION_MOVE_PERMUTATION_UNSUPPORTED,
-                        "Cursor state contains more than one additional unique-item movement.");
+                        "Cursor state contains more than one additional MMO value movement.");
             }
             return Result.success(ProjectionMovePlan.transientCursor());
         }
-        if (changedUnique.isEmpty()) {
+        if (changed.isEmpty()) {
             return Result.success(ProjectionMovePlan.unchanged());
         }
-        if (changedUnique.size() == 1) {
-            PlacementChange change = changedUnique.getFirst();
+        if (changed.size() == 1) {
+            PlacementChange change = changed.getFirst();
             ExpectedProjection priorDestination = expectedBySlot.get(change.destinationSlot());
             if (priorDestination != null && !priorDestination.valueId().equals(change.valueId())) {
                 return Result.failure(
-                        priorDestination.valueType() == ProjectionValueType.STACKABLE_LOT
+                        change.valueType() == ProjectionValueType.STACKABLE_LOT
+                                        || priorDestination.valueType()
+                                                == ProjectionValueType.STACKABLE_LOT
                                 ? ProjectionMoveErrorCode.PROJECTION_MOVE_STACKABLE_UNSUPPORTED
                                 : ProjectionMoveErrorCode.PROJECTION_MOVE_PERMUTATION_UNSUPPORTED,
-                        "Destination was occupied by another authoritative value.");
+                        "Destination was occupied by another authoritative value. Lot merge/mixed swap is unsupported.");
             }
             return Result.success(
                     ProjectionMovePlan.ready(
                             new ProjectionMoveIntent(
                                     change.valueId(),
+                                    change.valueType(),
                                     change.sourceSlot(),
                                     change.destinationSlot(),
                                     false)));
         }
-        if (changedUnique.size() == 2) {
-            changedUnique.sort(Comparator.comparing(change -> change.valueId().toString()));
-            PlacementChange first = changedUnique.get(0);
-            PlacementChange second = changedUnique.get(1);
+        if (changed.size() == 2) {
+            changed.sort(Comparator.comparing(change -> change.valueId().toString()));
+            PlacementChange first = changed.get(0);
+            PlacementChange second = changed.get(1);
+            if (first.valueType() != ProjectionValueType.UNIQUE_ITEM
+                    || second.valueType() != ProjectionValueType.UNIQUE_ITEM) {
+                return Result.failure(
+                        ProjectionMoveErrorCode.PROJECTION_MOVE_STACKABLE_UNSUPPORTED,
+                        "Stackable lot swap, merge or mixed permutation is unsupported.");
+            }
             boolean exactSwap =
                     first.destinationSlot() == second.sourceSlot()
                             && second.destinationSlot() == first.sourceSlot();
             if (!exactSwap) {
                 return Result.failure(
                         ProjectionMoveErrorCode.PROJECTION_MOVE_PERMUTATION_UNSUPPORTED,
-                        "Only one unique-item move or an exact two-item swap is supported.");
+                        "Only one value move or an exact two-unique-item swap is supported.");
             }
             return Result.success(
                     ProjectionMovePlan.ready(
                             new ProjectionMoveIntent(
                                     first.valueId(),
+                                    ProjectionValueType.UNIQUE_ITEM,
                                     first.sourceSlot(),
                                     first.destinationSlot(),
                                     true)));
         }
         return Result.failure(
                 ProjectionMoveErrorCode.PROJECTION_MOVE_PERMUTATION_UNSUPPORTED,
-                "More than two unique-item placements changed in one observation.");
+                "More than two value placements changed in one observation.");
     }
 
     private static boolean sameSignedIdentity(
@@ -207,6 +211,10 @@ public final class InventoryProjectionMovePlanner {
     private record PlacementChange(ExpectedProjection authoritative, int destinationSlot) {
         private UUID valueId() {
             return authoritative.valueId();
+        }
+
+        private ProjectionValueType valueType() {
+            return authoritative.valueType();
         }
 
         private int sourceSlot() {

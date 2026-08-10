@@ -46,8 +46,7 @@ final class WeaponDurabilityService {
                     "Weapon durability profile must be positive.");
         }
 
-        ItemId equipped =
-                session.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElse(null);
+        ItemId equipped = session.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElse(null);
         ItemLocationRecord weapon =
                 session.snapshot().itemRecords().stream()
                         .filter(record -> record.itemId().equals(weaponItemId))
@@ -124,7 +123,8 @@ final class WeaponDurabilityService {
                         .filter(record -> record.itemId().equals(weaponItemId))
                         .filter(record -> record.definitionId().equals(expectedDefinitionId))
                         .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("weapon item is unavailable"));
+                        .orElseThrow(
+                                () -> new IllegalArgumentException("weapon item is unavailable"));
         return WeaponPayloadCodec.decode(weapon.payloadJson(), baseMaximumDurability);
     }
 }

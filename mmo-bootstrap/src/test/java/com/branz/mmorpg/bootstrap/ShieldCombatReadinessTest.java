@@ -56,15 +56,6 @@ class ShieldCombatReadinessTest {
                 Optional.empty(),
                 Optional.of(
                         new ShieldProfile(
-                                new GuardCombatProfile(
-                                        120,
-                                        0.8,
-                                        3,
-                                        100,
-                                        20,
-                                        10,
-                                        5,
-                                        30,
-                                        25))));
+                                new GuardCombatProfile(120, 0.8, 3, 100, 20, 10, 5, 30, 25))));
     }
 }

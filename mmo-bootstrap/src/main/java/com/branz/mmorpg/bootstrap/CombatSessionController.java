@@ -56,6 +56,8 @@ import com.branz.mmorpg.combat.health.CombatHealthEngine;
 import com.branz.mmorpg.combat.health.CombatHealthProfile;
 import com.branz.mmorpg.combat.health.CombatHealthResolution;
 import com.branz.mmorpg.combat.health.CombatHealthRuntime;
+import com.branz.mmorpg.combat.health.WorldHealthResolution;
+import com.branz.mmorpg.combat.health.WorldHealthResolver;
 import com.branz.mmorpg.combat.hitbox.ArcDebugGeometry;
 import com.branz.mmorpg.combat.hitbox.ArcHitboxQuery;
 import com.branz.mmorpg.combat.hitbox.CombatVector;
@@ -304,6 +306,7 @@ final class CombatSessionController implements Listener {
             new CombatHealthEngine(CombatHealthProfile.trainingPlayer());
     private final CombatHealthEngine enemyHealth =
             new CombatHealthEngine(CombatHealthProfile.trainingEnemy());
+    private final WorldHealthResolver worldHealth = new WorldHealthResolver();
     private final Map<UUID, LiveSession> sessions = new HashMap<>();
     private final Map<UUID, CombatHealthRuntime> trainingTargetHealth = new HashMap<>();
     private final Map<UUID, PostureRuntime> trainingTargetPosture = new HashMap<>();
@@ -2001,14 +2004,8 @@ final class CombatSessionController implements Listener {
                 }
                 continue;
             }
-            CombatHealthRuntime targetHealth =
-                    trainingTargetHealth.computeIfAbsent(
-                            target.entityId(),
-                            ignored ->
-                                    CombatHealthRuntime.full(enemyHealth.profile(), currentTick));
-            CombatHealthResolution healthResolution =
-                    enemyHealth.damage(targetHealth, currentTick, resolvedDamage);
-            trainingTargetHealth.put(target.entityId(), healthResolution.runtime());
+            WorldHealthResolution healthResolution =
+                    applyNonPlayerHealth(entity, currentTick, resolvedDamage);
             observeSuccessfulCombatAction(
                     player,
                     session,
@@ -2029,9 +2026,9 @@ final class CombatSessionController implements Listener {
             }
             if (firstHealth == null) {
                 firstHealth =
-                        roundOne(healthResolution.runtime().current())
+                        roundOne(healthResolution.current())
                                 + "/"
-                                + roundOne(enemyHealth.profile().maximum());
+                                + roundOne(healthResolution.maximum());
             }
             if (healthResolution.lethalNow()) {
                 deaths++;
@@ -2248,12 +2245,7 @@ final class CombatSessionController implements Listener {
                 }
                 continue;
             }
-            CombatHealthRuntime targetHealth =
-                    trainingTargetHealth.computeIfAbsent(
-                            hit.entityId(),
-                            ignored -> CombatHealthRuntime.full(enemyHealth.profile(), tick));
-            CombatHealthResolution health = enemyHealth.damage(targetHealth, tick, finalDamage);
-            trainingTargetHealth.put(hit.entityId(), health.runtime());
+            WorldHealthResolution health = applyNonPlayerHealth(entity, tick, finalDamage);
             PostureResolution postureResolution = postures.damage(posture, tick, postureDamage);
             trainingTargetPosture.put(hit.entityId(), postureResolution.runtime());
             if (ownerSession != null) {
@@ -2276,7 +2268,7 @@ final class CombatSessionController implements Listener {
                         "PROJECTILE HIT damage="
                                 + roundOne(health.appliedAmount())
                                 + " health="
-                                + roundOne(health.runtime().current())
+                                + roundOne(health.current())
                                 + " posture="
                                 + postureLabel(postureResolution.runtime(), tick);
                 owner.sendActionBar(
@@ -2423,6 +2415,35 @@ final class CombatSessionController implements Listener {
                 (first.x() + second.x()) / 2.0,
                 (first.y() + second.y()) / 2.0,
                 (first.z() + second.z()) / 2.0);
+    }
+
+    private WorldHealthResolution applyNonPlayerHealth(
+            LivingEntity target, long tick, double damageAmount) {
+        if (target.getScoreboardTags().contains(TRAINING_DUMMY_TAG)) {
+            CombatHealthRuntime previous =
+                    trainingTargetHealth.computeIfAbsent(
+                            target.getUniqueId(),
+                            ignored -> CombatHealthRuntime.full(enemyHealth.profile(), tick));
+            CombatHealthResolution hidden = enemyHealth.damage(previous, tick, damageAmount);
+            trainingTargetHealth.put(target.getUniqueId(), hidden.runtime());
+            return new WorldHealthResolution(
+                    previous.current(),
+                    hidden.runtime().current(),
+                    enemyHealth.profile().maximum(),
+                    hidden.appliedAmount(),
+                    hidden.lethalNow());
+        }
+        trainingTargetHealth.remove(target.getUniqueId());
+        double current = target.getHealth();
+        double maximum = Math.max(current, attributeValue(target, Attribute.MAX_HEALTH));
+        if (maximum <= 0) {
+            maximum = Math.max(1.0, current);
+        }
+        WorldHealthResolution resolved = worldHealth.damage(current, maximum, damageAmount);
+        if (!resolved.lethalNow()) {
+            target.setHealth(resolved.current());
+        }
+        return resolved;
     }
 
     private PostureRuntime postureAt(UUID entityId, long tick) {
@@ -4490,12 +4511,7 @@ final class CombatSessionController implements Listener {
                     spell.output().posture(),
                     spell.id().value());
         }
-        CombatHealthRuntime current =
-                trainingTargetHealth.computeIfAbsent(
-                        target.getUniqueId(),
-                        ignored -> CombatHealthRuntime.full(enemyHealth.profile(), tick));
-        CombatHealthResolution health = enemyHealth.damage(current, tick, breakdown.finalDamage());
-        trainingTargetHealth.put(target.getUniqueId(), health.runtime());
+        WorldHealthResolution health = applyNonPlayerHealth(target, tick, breakdown.finalDamage());
         PostureResolution postureResolution =
                 postures.damage(posture, tick, spell.output().posture());
         trainingTargetPosture.put(target.getUniqueId(), postureResolution.runtime());
@@ -4508,7 +4524,7 @@ final class CombatSessionController implements Listener {
                             + " HIT damage="
                             + roundOne(health.appliedAmount())
                             + " health="
-                            + roundOne(health.runtime().current())
+                            + roundOne(health.current())
                             + " posture="
                             + postureLabel(postureResolution.runtime(), tick);
             owner.sendActionBar(Component.text(session.lastResolution, NamedTextColor.GREEN));

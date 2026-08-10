@@ -21,8 +21,9 @@ class CrossbowBoltBindingTest {
         ValueLocation quiverLocation = ValueLocation.quiver(new ItemId(UUID.randomUUID()));
 
         assertDoesNotThrow(
-                () -> new CrossbowBoltBinding(
-                        update(crossbowLocation), consumption(quiverLocation), BOLT));
+                () ->
+                        new CrossbowBoltBinding(
+                                update(crossbowLocation), consumption(quiverLocation), BOLT));
     }
 
     @Test
@@ -31,10 +32,11 @@ class CrossbowBoltBindingTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new CrossbowBoltBinding(
-                        update(ValueLocation.nativeEquipped("MAIN_HAND")),
-                        consumption(quiverLocation),
-                        BOLT));
+                () ->
+                        new CrossbowBoltBinding(
+                                update(ValueLocation.nativeEquipped("MAIN_HAND")),
+                                consumption(quiverLocation),
+                                BOLT));
     }
 
     private static ItemPayloadUpdate update(ValueLocation location) {

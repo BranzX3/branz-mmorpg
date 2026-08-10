@@ -15,7 +15,6 @@ import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.quiver.QuiverPreparation;
 import com.branz.mmorpg.persistence.progression.KnowledgeAcquisitionRequest;
 import com.branz.mmorpg.persistence.progression.TeachingCommitRequest;
-import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.LotLocationRecord;
 import com.branz.mmorpg.progression.build.CharacterBuild;
 import com.branz.mmorpg.progression.evidence.EvidenceCandidate;
@@ -367,47 +366,22 @@ final class CharacterSessionController implements Listener {
     }
 
     Optional<ItemId> equippedMainHandItemId(Player player) {
-        return active(player)
-                .flatMap(session -> session.snapshot().equipment().item(EquipmentSlot.MAIN_HAND));
+        return selectedPhysicalItem(player)
+                .filter(selected -> selected.definition().weaponProfile().isPresent())
+                .map(selected -> selected.record().itemId());
     }
 
     Optional<CrossbowPersistentState> equippedCrossbowState(Player player) {
-        return active(player)
-                .flatMap(
-                        session ->
-                                session.snapshot()
-                                        .equipment()
-                                        .item(EquipmentSlot.MAIN_HAND)
-                                        .flatMap(
-                                                itemId ->
-                                                        session.snapshot().itemRecords().stream()
-                                                                .filter(
-                                                                        record ->
-                                                                                record.itemId()
-                                                                                        .equals(
-                                                                                                itemId))
-                                                                .findFirst()))
-                .map(ItemLocationRecord::payloadJson)
+        return selectedPhysicalItem(player)
+                .filter(selected -> selected.definition().weaponProfile().isPresent())
+                .map(selected -> selected.record().payloadJson())
                 .map(CrossbowPayloadCodec::decode);
     }
 
     Optional<CatalystDurability> equippedCatalystDurability(Player player, int baseMaximum) {
-        return active(player)
-                .flatMap(
-                        session ->
-                                session.snapshot()
-                                        .equipment()
-                                        .item(EquipmentSlot.MAIN_HAND)
-                                        .flatMap(
-                                                itemId ->
-                                                        session.snapshot().itemRecords().stream()
-                                                                .filter(
-                                                                        record ->
-                                                                                record.itemId()
-                                                                                        .equals(
-                                                                                                itemId))
-                                                                .findFirst()))
-                .map(ItemLocationRecord::payloadJson)
+        return selectedPhysicalItem(player)
+                .filter(selected -> selected.definition().weaponProfile().isPresent())
+                .map(selected -> selected.record().payloadJson())
                 .map(payload -> CatalystPayloadCodec.decode(payload, baseMaximum));
     }
 

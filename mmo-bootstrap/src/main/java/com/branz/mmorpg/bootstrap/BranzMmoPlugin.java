@@ -728,7 +728,6 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 new WeaponDurabilityController(
                         this,
                         characterSessionController,
-                        activeItemEngine.get(),
                         activeMoveEngine.get(),
                         new WeaponDurabilityService(databaseRuntime, characterSessionService),
                         pvpController,

@@ -7,9 +7,7 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.combat.move.MoveDefinition;
 import com.branz.mmorpg.combat.move.MoveEngine;
 import com.branz.mmorpg.items.definition.ItemDefinition;
-import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
-import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,11 +18,10 @@ import java.util.UUID;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
-/** Bridges committed successful combat actions to authoritative weapon durability wear. */
+/** Bridges committed successful combat actions to authoritative physical-weapon durability wear. */
 final class WeaponDurabilityController implements SuccessfulCombatActionObserver {
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
-    private final ItemEngine items;
     private final MoveEngine moves;
     private final WeaponDurabilityService durability;
     private final PvpCombatPolicy pvp;
@@ -37,14 +34,12 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
     WeaponDurabilityController(
             JavaPlugin plugin,
             CharacterSessionController characters,
-            ItemEngine items,
             MoveEngine moves,
             WeaponDurabilityService durability,
             PvpCombatPolicy pvp,
             String contentVersion) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
-        this.items = Objects.requireNonNull(items, "items");
         this.moves = Objects.requireNonNull(moves, "moves");
         this.durability = Objects.requireNonNull(durability, "durability");
         this.pvp = Objects.requireNonNull(pvp, "pvp");
@@ -77,22 +72,13 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
 
     private PendingWear resolvePendingWear(Player player, UUID actionId, DefinitionId moveId) {
         MoveDefinition move = moves.find(moveId).orElse(null);
-        LoadedCharacterSession session = characters.active(player).orElse(null);
-        ItemId itemId = characters.equippedMainHandItemId(player).orElse(null);
-        if (move == null || session == null || itemId == null) {
+        ResolvedPhysicalItem selected = characters.selectedPhysicalItem(player).orElse(null);
+        if (move == null || selected == null) {
             return null;
         }
-        ItemLocationRecord record =
-                session.snapshot().itemRecords().stream()
-                        .filter(candidate -> candidate.itemId().equals(itemId))
-                        .findFirst()
-                        .orElse(null);
-        ItemDefinition definition =
-                record == null ? null : items.find(record.definitionId()).orElse(null);
-        WeaponCombatProfile weapon =
-                definition == null ? null : definition.weaponProfile().orElse(null);
-        if (definition == null
-                || weapon == null
+        ItemDefinition definition = selected.definition();
+        WeaponCombatProfile weapon = definition.weaponProfile().orElse(null);
+        if (weapon == null
                 || definition.baseMaxDurability().isEmpty()
                 || !weapon.family().equals(move.family())) {
             return null;
@@ -100,7 +86,7 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
         return new PendingWear(
                 actionId,
                 moveId,
-                itemId,
+                selected.record().itemId(),
                 definition.id(),
                 definition.baseMaxDurability().getAsInt(),
                 weapon.durabilityCostPerSuccessfulAttack());

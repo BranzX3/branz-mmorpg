@@ -555,7 +555,8 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         this,
                         characterSessionController,
                         projectionCodec,
-                        new PhysicalInventoryItemMoveService(databaseRuntime, characterSessionService),
+                        new PhysicalInventoryItemMoveService(
+                                databaseRuntime, characterSessionService),
                         snapshot.manifest().contentVersion());
         int weaponDrawTicks = getConfig().getInt("combat.weapon-draw-ticks", 6);
         int weaponSheatheTicks = getConfig().getInt("combat.weapon-sheathe-ticks", 4);

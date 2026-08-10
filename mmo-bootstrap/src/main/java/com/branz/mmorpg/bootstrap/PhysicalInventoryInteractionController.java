@@ -114,7 +114,8 @@ final class PhysicalInventoryInteractionController implements Listener {
         event.setCancelled(true);
         player.sendActionBar(
                 Component.text(
-                        "Move MMO items with normal inventory clicks for now.", NamedTextColor.RED));
+                        "Move MMO items with normal inventory clicks for now.",
+                        NamedTextColor.RED));
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -175,7 +176,8 @@ final class PhysicalInventoryInteractionController implements Listener {
             return;
         }
         PhysicalInventoryObservation observed =
-                ((Result.Success<PhysicalInventoryObservation, ProjectionMoveErrorCode>) observation)
+                ((Result.Success<PhysicalInventoryObservation, ProjectionMoveErrorCode>)
+                                observation)
                         .value();
         Result<ProjectionMovePlan, ProjectionMoveErrorCode> planned =
                 InventoryProjectionMovePlanner.plan(
@@ -184,7 +186,8 @@ final class PhysicalInventoryInteractionController implements Listener {
                         observed.cursor(),
                         STORAGE_SIZE,
                         ChronicleService.HOTBAR_SLOT);
-        if (planned instanceof Result.Failure<ProjectionMovePlan, ProjectionMoveErrorCode> failure) {
+        if (planned
+                instanceof Result.Failure<ProjectionMovePlan, ProjectionMoveErrorCode> failure) {
             abortInteraction(playerId, failure.error().code() + ": " + failure.detail());
             return;
         }
@@ -237,7 +240,9 @@ final class PhysicalInventoryInteractionController implements Listener {
                 playerId,
                 interaction,
                 new PendingInteraction(
-                        interaction.session(), interaction.operationId(), PendingPhase.COMMITTING))) {
+                        interaction.session(),
+                        interaction.operationId(),
+                        PendingPhase.COMMITTING))) {
             return;
         }
         plugin.getServer()
@@ -256,10 +261,11 @@ final class PhysicalInventoryInteractionController implements Listener {
                             String originalFailure = null;
                             if (result
                                     instanceof
-                                    Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
+                                    Result.Failure<
+                                                    LoadedCharacterSession,
+                                                    CharacterSessionErrorCode>
                                             failure) {
-                                originalFailure =
-                                        failure.error().code() + ": " + failure.detail();
+                                originalFailure = failure.error().code() + ": " + failure.detail();
                                 result =
                                         characters.reloadExternalValueMutation(
                                                 interaction.session());
@@ -312,7 +318,8 @@ final class PhysicalInventoryInteractionController implements Listener {
                     if (originalFailure != null) {
                         player.sendActionBar(
                                 Component.text(
-                                        "Inventory move rejected and reconciled: " + originalFailure,
+                                        "Inventory move rejected and reconciled: "
+                                                + originalFailure,
                                         NamedTextColor.RED));
                     }
                 });
@@ -354,7 +361,8 @@ final class PhysicalInventoryInteractionController implements Listener {
                     PLACE_ALL,
                     PLACE_SOME,
                     PLACE_ONE,
-                    SWAP_WITH_CURSOR -> true;
+                    SWAP_WITH_CURSOR ->
+                    true;
             default -> false;
         };
     }

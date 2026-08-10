@@ -98,6 +98,31 @@ class PhysicalInventoryAuthorityTest {
     }
 
     @Test
+    void provenanceMismatchIsRejectedAsStaleProjection() {
+        CharacterId owner = new CharacterId(UUID.randomUUID());
+        ItemLocationRecord item = item(owner, 4, 6);
+        PersistentCharacterSnapshot snapshot =
+                PersistentCharacterSnapshotMapper.map(List.of(item), List.of());
+        ObservedProjection observed =
+                new ObservedProjection(
+                        4,
+                        item.itemId().value(),
+                        item.definitionId(),
+                        ProjectionValueType.UNIQUE_ITEM,
+                        1,
+                        item.version(),
+                        1,
+                        item.contentVersion(),
+                        Optional.of("tampered-provenance"),
+                        true);
+
+        Result<ItemLocationRecord, PhysicalItemResolutionErrorCode> result =
+                PhysicalInventoryAuthority.resolveUniqueItem(owner, 4, observed, snapshot);
+
+        assertFailure(result, PhysicalItemResolutionErrorCode.PHYSICAL_ITEM_PROJECTION_STALE);
+    }
+
+    @Test
     void nativeEquippedLegacyMainHandCannotMasqueradeAsPhysicalHotbarItem() {
         CharacterId owner = new CharacterId(UUID.randomUUID());
         ItemLocationRecord item =
@@ -142,10 +167,7 @@ class PhysicalInventoryAuthorityTest {
 
         Result<ItemLocationRecord, PhysicalItemResolutionErrorCode> result =
                 PhysicalInventoryAuthority.resolveUniqueItem(
-                        owner,
-                        ChronicleService.HOTBAR_SLOT,
-                        observed(item, 7, 1, true),
-                        snapshot);
+                        owner, ChronicleService.HOTBAR_SLOT, observed(item, 7, 1, true), snapshot);
 
         assertFailure(result, PhysicalItemResolutionErrorCode.PHYSICAL_ITEM_SLOT_NOT_GAMEPLAY);
     }

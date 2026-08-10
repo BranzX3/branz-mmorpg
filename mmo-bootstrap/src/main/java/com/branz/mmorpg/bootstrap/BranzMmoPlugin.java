@@ -49,6 +49,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private TestItemProjectionController testItemProjectionController;
     private DatabaseRuntime databaseRuntime;
     private CharacterSessionController characterSessionController;
+    private PhysicalInventoryInteractionController physicalInventoryInteractionController;
     private CombatSessionController combatSessionController;
     private FlaskHotbarController flaskHotbarController;
     private ConsumableHotbarController consumableHotbarController;
@@ -187,6 +188,10 @@ public final class BranzMmoPlugin extends JavaPlugin {
         if (combatSessionController != null) {
             combatSessionController.shutdown();
             combatSessionController = null;
+        }
+        if (physicalInventoryInteractionController != null) {
+            physicalInventoryInteractionController.shutdown();
+            physicalInventoryInteractionController = null;
         }
         if (characterSessionController != null) {
             characterSessionController.shutdown();
@@ -536,13 +541,23 @@ public final class BranzMmoPlugin extends JavaPlugin {
         testItemProjectionController = new TestItemProjectionController(testItemProjections);
         CharacterSessionService characterSessionService =
                 new CharacterSessionService(databaseRuntime, activeBuildEngine.get());
+        BukkitInventoryProjectionService inventoryProjectionService =
+                new BukkitInventoryProjectionService(projectionCodec);
         characterSessionController =
                 new CharacterSessionController(
                         this,
                         characterSessionService,
-                        new BukkitInventoryProjectionService(projectionCodec),
+                        inventoryProjectionService,
                         activeItemEngine.get(),
                         databaseRuntime.settings());
+        physicalInventoryInteractionController =
+                new PhysicalInventoryInteractionController(
+                        this,
+                        characterSessionController,
+                        projectionCodec,
+                        new PhysicalInventoryItemMoveService(
+                                databaseRuntime, characterSessionService),
+                        snapshot.manifest().contentVersion());
         int weaponDrawTicks = getConfig().getInt("combat.weapon-draw-ticks", 6);
         int weaponSheatheTicks = getConfig().getInt("combat.weapon-sheathe-ticks", 4);
         int engagementExitTicks = getConfig().getInt("combat.engagement-exit-ticks", 160);
@@ -819,6 +834,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(testItemProjectionController, this);
         getServer().getPluginManager().registerEvents(resourcePackGate, this);
         getServer().getPluginManager().registerEvents(characterSessionController, this);
+        getServer().getPluginManager().registerEvents(physicalInventoryInteractionController, this);
         getServer().getPluginManager().registerEvents(combatSessionController, this);
         getServer().getPluginManager().registerEvents(flaskHotbarController, this);
         getServer().getPluginManager().registerEvents(consumableHotbarController, this);

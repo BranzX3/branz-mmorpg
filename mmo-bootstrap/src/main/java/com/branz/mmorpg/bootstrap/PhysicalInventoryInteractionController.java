@@ -17,11 +17,11 @@ import java.util.Optional;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -138,16 +138,16 @@ final class PhysicalInventoryInteractionController implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onQuit(PlayerQuitEvent event) {
         PendingInteraction interaction = pending.remove(event.getPlayer().getUniqueId());
-        if (interaction != null && hasProjection(event.getPlayer().getItemOnCursor())) {
-            event.getPlayer().setItemOnCursor(null);
+        if (interaction != null) {
+            clearMmoCursor(event.getPlayer());
         }
     }
 
     void shutdown() {
         for (UUID playerId : List.copyOf(pending.keySet())) {
             Player player = plugin.getServer().getPlayer(playerId);
-            if (player != null && hasProjection(player.getItemOnCursor())) {
-                player.setItemOnCursor(null);
+            if (player != null) {
+                clearMmoCursor(player);
             }
         }
         pending.clear();
@@ -233,14 +233,11 @@ final class PhysicalInventoryInteractionController implements Listener {
     private void commit(
             Player player, PendingInteraction interaction, ProjectionMoveIntent intent) {
         UUID playerId = player.getUniqueId();
-        if (pending.replace(
-                        playerId,
-                        interaction,
-                        new PendingInteraction(
-                                interaction.session(),
-                                interaction.operationId(),
-                                PendingPhase.COMMITTING))
-                == null) {
+        if (!pending.replace(
+                playerId,
+                interaction,
+                new PendingInteraction(
+                        interaction.session(), interaction.operationId(), PendingPhase.COMMITTING))) {
             return;
         }
         plugin.getServer()
@@ -290,8 +287,8 @@ final class PhysicalInventoryInteractionController implements Listener {
             String originalFailure) {
         pending.remove(playerId);
         Player player = plugin.getServer().getPlayer(playerId);
-        if (player != null && hasProjection(player.getItemOnCursor())) {
-            player.setItemOnCursor(null);
+        if (player != null) {
+            clearMmoCursor(player);
         }
         characters.completeExternalValueMutation(
                 interaction.session(),
@@ -327,8 +324,8 @@ final class PhysicalInventoryInteractionController implements Listener {
             return;
         }
         Player player = plugin.getServer().getPlayer(playerId);
-        if (player != null && hasProjection(player.getItemOnCursor())) {
-            player.setItemOnCursor(null);
+        if (player != null) {
+            clearMmoCursor(player);
         }
         characters.completeExternalValueMutation(
                 interaction.session(),
@@ -364,6 +361,12 @@ final class PhysicalInventoryInteractionController implements Listener {
 
     private boolean hasProjection(ItemStack stack) {
         return codec.hasProjectionMarker(stack);
+    }
+
+    private void clearMmoCursor(Player player) {
+        if (hasProjection(player.getItemOnCursor())) {
+            player.setItemOnCursor(new ItemStack(Material.AIR));
+        }
     }
 
     private enum PendingPhase {

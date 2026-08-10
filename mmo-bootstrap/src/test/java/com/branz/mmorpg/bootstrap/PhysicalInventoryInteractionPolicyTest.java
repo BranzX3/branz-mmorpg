@@ -14,7 +14,13 @@ class PhysicalInventoryInteractionPolicyTest {
                         InventoryAction.PICKUP_ALL));
         assertTrue(
                 PhysicalInventoryInteractionPolicy.supportsStorageAction(
+                        InventoryAction.PICKUP_HALF));
+        assertTrue(
+                PhysicalInventoryInteractionPolicy.supportsStorageAction(
                         InventoryAction.PLACE_ALL));
+        assertTrue(
+                PhysicalInventoryInteractionPolicy.supportsStorageAction(
+                        InventoryAction.PLACE_ONE));
         assertTrue(
                 PhysicalInventoryInteractionPolicy.supportsStorageAction(
                         InventoryAction.SWAP_WITH_CURSOR));
@@ -28,6 +34,9 @@ class PhysicalInventoryInteractionPolicyTest {
         assertFalse(
                 PhysicalInventoryInteractionPolicy.supportsStorageAction(
                         InventoryAction.HOTBAR_SWAP));
+        assertFalse(
+                PhysicalInventoryInteractionPolicy.supportsStorageAction(
+                        InventoryAction.HOTBAR_MOVE_AND_READD));
         assertFalse(
                 PhysicalInventoryInteractionPolicy.supportsStorageAction(
                         InventoryAction.DROP_ALL_SLOT));

@@ -602,6 +602,27 @@ final class CharacterSessionController implements Listener {
                             "Character session is not ready."));
             return;
         }
+        boolean nativePhysicalChange =
+                java.util.stream.Stream.of(
+                                EquipmentSlot.MAIN_HAND,
+                                EquipmentSlot.OFF_HAND,
+                                EquipmentSlot.HEAD,
+                                EquipmentSlot.CHEST,
+                                EquipmentSlot.LEGS,
+                                EquipmentSlot.FEET)
+                        .anyMatch(
+                                slot ->
+                                        !session.snapshot()
+                                                .equipment()
+                                                .item(slot)
+                                                .equals(desired.item(slot)));
+        if (nativePhysicalChange) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                            "Native weapon, shield and armor slots are physical gameplay authority and cannot be changed from Chronicle."));
+            return;
+        }
         if (!valueMutationInFlight.add(player.getUniqueId())) {
             completion.accept(valueMutationBusy());
             return;

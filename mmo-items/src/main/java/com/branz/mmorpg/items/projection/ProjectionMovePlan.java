@@ -19,8 +19,7 @@ public record ProjectionMovePlan(
     }
 
     public static ProjectionMovePlan transientCursor() {
-        return new ProjectionMovePlan(
-                ProjectionMoveDisposition.TRANSIENT_CURSOR, Optional.empty());
+        return new ProjectionMovePlan(ProjectionMoveDisposition.TRANSIENT_CURSOR, Optional.empty());
     }
 
     public static ProjectionMovePlan ready(ProjectionMoveIntent intent) {

@@ -23,10 +23,7 @@ class InventoryProjectionMovePlannerTest {
         ExpectedProjection sword = unique(SWORD, 12, 3);
 
         ProjectionMovePlan plan =
-                success(
-                        List.of(sword),
-                        List.of(observed(sword, 3)),
-                        Optional.empty());
+                success(List.of(sword), List.of(observed(sword, 3)), Optional.empty());
 
         assertEquals(ProjectionMoveDisposition.READY_TO_COMMIT, plan.disposition());
         ProjectionMoveIntent intent = plan.intent().orElseThrow();
@@ -82,10 +79,7 @@ class InventoryProjectionMovePlannerTest {
         ExpectedProjection sword = unique(SWORD, 2, 4);
 
         ProjectionMovePlan plan =
-                success(
-                        List.of(sword),
-                        List.of(observed(sword, sword.slot())),
-                        Optional.empty());
+                success(List.of(sword), List.of(observed(sword, sword.slot())), Optional.empty());
 
         assertEquals(ProjectionMoveDisposition.UNCHANGED, plan.disposition());
         assertTrue(plan.intent().isEmpty());

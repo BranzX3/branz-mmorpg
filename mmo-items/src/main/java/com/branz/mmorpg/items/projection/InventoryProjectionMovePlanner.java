@@ -134,8 +134,7 @@ public final class InventoryProjectionMovePlanner {
                 continue;
             }
             if (!onCursor && observed.slot() != authoritative.slot()) {
-                changedUnique.add(
-                        new PlacementChange(authoritative, observed.slot()));
+                changedUnique.add(new PlacementChange(authoritative, observed.slot()));
             }
         }
 

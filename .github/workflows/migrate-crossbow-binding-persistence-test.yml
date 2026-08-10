@@ -1,12 +1,12 @@
 name: migrate-crossbow-binding-persistence-test
 on:
   push:
-    branches: [agent/physical-melee-weapon-bridge]
+    branches:
+      - agent/physical-melee-weapon-bridge
 permissions:
   contents: write
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,6 +17,7 @@ jobs:
           distribution: temurin
           java-version: '25'
       - name: Migrate persistence test
+        shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -35,6 +36,8 @@ jobs:
           if text.count(old) != 1:
               raise SystemExit(f'crossbow fixture expected once, found {text.count(old)}')
           text = text.replace(old, new, 1)
+          marker = 'void crossbowBoltBindingCommitsItemCheckpointAndQuiverConsumptionExactlyOnce()'
+          before, after = text.split(marker, 1)
           old_update = '''                                Optional.of(CHARACTER),
                                 mainHand,
                                 "{}",
@@ -45,10 +48,7 @@ jobs:
                                 "{}",
                                 placedPayload),
 '''
-          # Scope through first occurrence after this test's method marker.
-          marker = 'void crossbowBoltBindingCommitsItemCheckpointAndQuiverConsumptionExactlyOnce()'
-          before, after = text.split(marker, 1)
-          if after.count(old_update) < 1:
+          if old_update not in after:
               raise SystemExit('crossbow payload update location block not found')
           after = after.replace(old_update, new_update, 1)
           text = before + marker + after
@@ -61,15 +61,15 @@ jobs:
 '''
           if text.count(needle) != 1:
               raise SystemExit('crossbow result assertion block not found exactly once')
-          text = text.replace(needle, replacement, 1)
-          path.write_text(text)
+          path.write_text(text.replace(needle, replacement, 1))
           PY
           ./gradlew :mmo-persistence:spotlessApply
-      - name: Remove temporary workflow and commit
+      - name: Commit patch and remove workflow
+        shell: bash
         run: |
           rm .github/workflows/migrate-crossbow-binding-persistence-test.yml
           git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add mmo-persistence/src/test/java/com/branz/mmorpg/persistence/transaction/JdbcValueTransactionServiceIntegrationTest.java .github/workflows/migrate-crossbow-binding-persistence-test.yml
-          git commit -m "Test Crossbow binding from physical inventory"
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Test Crossbow binding from physical inventory'
           git push origin HEAD:agent/physical-melee-weapon-bridge

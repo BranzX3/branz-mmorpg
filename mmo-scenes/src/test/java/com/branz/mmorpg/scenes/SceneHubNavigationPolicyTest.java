@@ -29,6 +29,21 @@ class SceneHubNavigationPolicyTest {
                 SceneHubNavigationPolicy.restContextualModes());
         assertFalse(SceneHubNavigationPolicy.isPrimaryRootMode(SceneMode.FLASK_PREPARATION));
         assertTrue(SceneHubNavigationPolicy.isRestContextualMode(SceneMode.FLASK_PREPARATION));
+        assertFalse(SceneHubNavigationPolicy.canEnterFromHub(SceneMode.FLASK_PREPARATION, false));
+        assertTrue(SceneHubNavigationPolicy.canEnterFromHub(SceneMode.FLASK_PREPARATION, true));
+    }
+
+    @Test
+    void hubVisibilityAddsRestWorkflowOnlyInsideRestContext() {
+        List<SceneMode> outsideRest = SceneHubNavigationPolicy.visibleHubModes(false);
+        List<SceneMode> insideRest = SceneHubNavigationPolicy.visibleHubModes(true);
+
+        assertEquals(
+                SceneHubNavigationPolicy.primaryRootModes(),
+                outsideRest.subList(0, SceneHubNavigationPolicy.primaryRootModes().size()));
+        assertFalse(outsideRest.contains(SceneMode.FLASK_PREPARATION));
+        assertTrue(insideRest.contains(SceneMode.FLASK_PREPARATION));
+        assertTrue(outsideRest.containsAll(SceneHubNavigationPolicy.compatibilityOverlayModes()));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.branz.mmorpg.scenes;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -39,6 +40,20 @@ public final class SceneHubNavigationPolicy {
 
     public static Set<SceneMode> compatibilityOverlayModes() {
         return COMPATIBILITY_OVERLAY_MODES;
+    }
+
+    public static List<SceneMode> visibleHubModes(boolean restContextReady) {
+        ArrayList<SceneMode> visible = new ArrayList<>(PRIMARY_ROOT_MODES);
+        if (restContextReady) {
+            visible.addAll(REST_CONTEXTUAL_MODES);
+        }
+        visible.addAll(COMPATIBILITY_OVERLAY_MODES);
+        return List.copyOf(visible);
+    }
+
+    public static boolean canEnterFromHub(SceneMode mode, boolean restContextReady) {
+        Objects.requireNonNull(mode, "mode");
+        return !isRestContextualMode(mode) || restContextReady;
     }
 
     public static boolean isPrimaryRootMode(SceneMode mode) {

@@ -32,6 +32,7 @@ import com.branz.mmorpg.scenes.QuiverTransferDirection;
 import com.branz.mmorpg.scenes.SceneCloseReason;
 import com.branz.mmorpg.scenes.SceneEngine;
 import com.branz.mmorpg.scenes.SceneErrorCode;
+import com.branz.mmorpg.scenes.SceneHubNavigationPolicy;
 import com.branz.mmorpg.scenes.SceneMode;
 import com.branz.mmorpg.scenes.ScenePreviewState;
 import com.branz.mmorpg.scenes.SceneProfiles;
@@ -385,6 +386,13 @@ final class SceneHubController implements Listener, MenuOverlay {
         } catch (IllegalArgumentException exception) {
             return;
         }
+        if (!SceneHubNavigationPolicy.canEnterFromHub(mode, restContext(player))) {
+            player.sendActionBar(
+                    Component.text(
+                            "This Chronicle workflow is only available at Rest Context.",
+                            NamedTextColor.RED));
+            return;
+        }
         Result<SceneSession, SceneErrorCode> result =
                 sessions.changeMode(player.getUniqueId(), holder.sessionId(), mode);
         result.map(
@@ -503,6 +511,13 @@ final class SceneHubController implements Listener, MenuOverlay {
             return Result.failure(
                     SceneErrorCode.SCENE_NOT_ELIGIBLE, "Character database session is not ready.");
         }
+        Optional<String> mutationRejection =
+                SceneValueMutationAdmission.rejection(
+                        characterSessions.valueMutationInFlight(player));
+        if (mutationRejection.isPresent()) {
+            return Result.failure(
+                    SceneErrorCode.SCENE_NOT_ELIGIBLE, mutationRejection.orElseThrow());
+        }
         if (player.isDead()
                 || !player.wouldCollideUsing(player.getBoundingBox().shift(0.0, -0.05, 0.0))
                 || player.isFlying()
@@ -573,11 +588,16 @@ final class SceneHubController implements Listener, MenuOverlay {
         Inventory inventory = Bukkit.createInventory(holder, INVENTORY_SIZE, title);
         holder.attach(inventory);
         if (session.mode() == SceneMode.HUB) {
-            HUB_BUTTONS.forEach(
-                    (mode, spec) ->
-                            inventory.setItem(
-                                    spec.slot(),
-                                    button(spec.material(), spec.label(), mode.name())));
+            SceneHubNavigationPolicy.visibleHubModes(restContext(player))
+                    .forEach(
+                            mode -> {
+                                ButtonSpec spec = HUB_BUTTONS.get(mode);
+                                if (spec != null) {
+                                    inventory.setItem(
+                                            spec.slot(),
+                                            button(spec.material(), spec.label(), mode.name()));
+                                }
+                            });
             inventory.setItem(49, button(Material.BARRIER, "Exit Chronicle", "exit"));
         } else {
             if (session.mode() == SceneMode.EQUIPMENT) {

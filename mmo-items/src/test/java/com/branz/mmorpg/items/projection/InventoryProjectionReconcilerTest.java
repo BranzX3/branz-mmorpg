@@ -80,7 +80,7 @@ class InventoryProjectionReconcilerTest {
     }
 
     @Test
-    void signatureCoversSlotRevisionQuantityAndProvenance() {
+    void signatureAllowsSlotMoveButCoversRevisionQuantityAndProvenance() {
         ProjectionTokenSigner signer =
                 new ProjectionTokenSigner(
                         "0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8));
@@ -88,9 +88,51 @@ class InventoryProjectionReconcilerTest {
         byte[] signature = signer.sign(expected);
 
         assertTrue(signer.verify(observed(expected, 3, false), signature));
-        assertFalse(signer.verify(observed(expected, 4, false), signature));
+        assertTrue(signer.verify(observed(expected, 4, false), signature));
+        assertFalse(
+                signer.verify(
+                        new ObservedProjection(
+                                4,
+                                expected.valueId(),
+                                expected.definitionId(),
+                                expected.valueType(),
+                                expected.quantity() + 1,
+                                expected.authorityVersion(),
+                                expected.displayRevision(),
+                                expected.contentVersion(),
+                                expected.testProvenance(),
+                                false),
+                        signature));
+        assertFalse(
+                signer.verify(
+                        new ObservedProjection(
+                                4,
+                                expected.valueId(),
+                                expected.definitionId(),
+                                expected.valueType(),
+                                expected.quantity(),
+                                expected.authorityVersion() + 1,
+                                expected.displayRevision(),
+                                expected.contentVersion(),
+                                expected.testProvenance(),
+                                false),
+                        signature));
+        assertFalse(
+                signer.verify(
+                        new ObservedProjection(
+                                4,
+                                expected.valueId(),
+                                expected.definitionId(),
+                                expected.valueType(),
+                                expected.quantity(),
+                                expected.authorityVersion(),
+                                expected.displayRevision(),
+                                expected.contentVersion(),
+                                Optional.of("dev:other-run"),
+                                false),
+                        signature));
         signature[0] ^= 1;
-        assertFalse(signer.verify(observed(expected, 3, false), signature));
+        assertFalse(signer.verify(observed(expected, 4, false), signature));
     }
 
     private static ExpectedProjection expected(UUID valueId, int slot) {

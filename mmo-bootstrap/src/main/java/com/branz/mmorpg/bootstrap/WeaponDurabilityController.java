@@ -160,7 +160,8 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
                                                                 completeHead(playerId);
                                                                 Player current =
                                                                         plugin.getServer()
-                                                                                .getPlayer(playerId);
+                                                                                .getPlayer(
+                                                                                        playerId);
                                                                 if (current != null
                                                                         && current.isOnline()) {
                                                                     drain(current);

@@ -353,18 +353,7 @@ final class PhysicalInventoryInteractionController implements Listener {
                 || event.getSlot() == ChronicleService.HOTBAR_SLOT) {
             return false;
         }
-        return switch (event.getAction()) {
-            case PICKUP_ALL,
-                    PICKUP_SOME,
-                    PICKUP_HALF,
-                    PICKUP_ONE,
-                    PLACE_ALL,
-                    PLACE_SOME,
-                    PLACE_ONE,
-                    SWAP_WITH_CURSOR ->
-                    true;
-            default -> false;
-        };
+        return PhysicalInventoryInteractionPolicy.supportsStorageAction(event.getAction());
     }
 
     private boolean hasProjection(ItemStack stack) {

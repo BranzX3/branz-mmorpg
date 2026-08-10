@@ -353,7 +353,7 @@ final class PhysicalInventoryInteractionController implements Listener {
                 || event.getSlot() == ChronicleService.HOTBAR_SLOT) {
             return false;
         }
-        return PhysicalInventoryInteractionPolicy.supportsStorageAction(event.getAction());
+        return PhysicalInventoryInteractionPolicy.supportsStorageAction(event.getAction().name());
     }
 
     private boolean hasProjection(ItemStack stack) {

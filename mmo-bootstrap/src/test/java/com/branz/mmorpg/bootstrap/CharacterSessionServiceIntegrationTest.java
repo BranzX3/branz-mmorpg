@@ -662,7 +662,12 @@ class CharacterSessionServiceIntegrationTest {
                                     .orElseThrow()
                                     .valueId());
             assertEquals(
-                    ValueLocation.inventory("slot:0"), itemRecord(session, staffId).location());
+                    0,
+                    session.snapshot().inventory().stream()
+                            .filter(value -> value.valueId().equals(staffId.value()))
+                            .findFirst()
+                            .orElseThrow()
+                            .slot());
             LoadedCharacterSession beforeCommit = session;
             UUID operationId = UUID.randomUUID();
             LoadedCharacterSession committed =
@@ -782,7 +787,12 @@ class CharacterSessionServiceIntegrationTest {
                                     .orElseThrow()
                                     .valueId());
             assertEquals(
-                    ValueLocation.inventory("slot:0"), itemRecord(session, crossbowId).location());
+                    0,
+                    session.snapshot().inventory().stream()
+                            .filter(value -> value.valueId().equals(crossbowId.value()))
+                            .findFirst()
+                            .orElseThrow()
+                            .slot());
             session = success(service.grantTestValue(session, boltQuiver, 1, "content.test.1"));
             quiverId =
                     new ItemId(

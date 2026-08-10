@@ -71,6 +71,7 @@ final class FlaskHotbarController implements Listener {
         markerKey = new NamespacedKey(plugin, "expedition_flask");
         ownerKey = new NamespacedKey(plugin, "expedition_flask_owner");
         doseKey = new NamespacedKey(plugin, "expedition_flask_dose");
+        this.characters.addFlaskPreparationHandler(this::onCharacterReady);
     }
 
     void start() {

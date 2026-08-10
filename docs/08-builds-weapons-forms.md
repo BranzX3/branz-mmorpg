@@ -5,18 +5,18 @@
 A build is the combination of:
 
 ```text
-main-hand weapon
-optional off-hand style
-armor load
-accessories
+currently selected physical weapon from hotbar 1–8
+optional physical off-hand style
+native armor load
+virtual accessories
 active moveset
 active form
 attuned supernatural effects
 prepared ammunition
-consumables in hotbar 1–8
+physical consumables in hotbar 1–8
 ```
 
-There are no prepared weapon-set slots in V1. Any valid combat weapon placed in hotbar 1–8 may be selected, subject to sheathe/draw timing. This removes the earlier Weapon Set A/B concept.
+There are no prepared weapon-set slots in V1. Any valid combat weapon physically present in hotbar 1–8 may be selected, subject to sheathe/draw timing. The selected hotbar item plus its authoritative item UUID/definition/payload is the weapon authority; Chronicle does not equip an ordinary weapon into a persistent main-hand loadout.
 
 ## Weapon family
 
@@ -70,9 +70,23 @@ A named weapon may modify rules but must preserve at least two family invariants
 - RMB channels/casts according to active art.
 - Lower physical guard but strong arcane interaction.
 
+## Physical weapon selection
+
+Weapon selection is derived from the normal inventory/hotbar projection rather than a Scene equipment transaction.
+
+Authoritative resolution order:
+
+1. Read the selected gameplay hotbar slot, excluding Chronicle slot 9.
+2. Read the signed/reference token of the physical item projected in that slot.
+3. Resolve the exact authoritative owned `ItemInstance` and active `ItemDefinition`.
+4. Validate durability, family, handling requirements, off-hand compatibility and build state.
+5. Enter sheathe/draw timing before the new weapon becomes combat-ready.
+
+Moving the same item UUID to another hotbar position does not create an equip transaction or reset durable weapon state. Durability, enhancement, loaded crossbow state and other persistent payload remain attached to the item UUID.
+
 ## Off-hand style
 
-Off-hand changes family style rather than creating an independent button set.
+Off-hand changes family style rather than creating an independent button set. Off-hand is a physical native-equipment interaction: placing/removing an item through the normal inventory expresses equip intent and the server validates/commits the authoritative native equipment location before reconciling presentation.
 
 Examples:
 
@@ -82,7 +96,7 @@ Examples:
 - Greatsword requires compatible empty/off-hand charm.
 - Bow uses virtual quiver; the physical off-hand slot may contain a compatible charm but not a second weapon.
 
-Invalid combinations disable combat readiness and display a clear reason.
+Invalid combinations disable combat readiness and display a clear reason. Rejection restores/reconciles authoritative inventory/off-hand truth rather than leaving a ghost visual equip.
 
 ## Moveset branch map
 
@@ -119,9 +133,11 @@ Core family moves remain available even when no technique occupies a branch.
 
 ### Anywhere outside Engaged
 
-- Move items between inventory and hotbar.
-- Select another weapon.
-- Equip normal gear if not inside an exclusive transaction and the item is valid.
+- Move physical items between inventory and hotbar.
+- Select another physical weapon from hotbar 1–8.
+- Equip or remove valid native off-hand/armor through normal inventory interactions if not inside an exclusive transaction.
+- Use ordinary physical consumables from hotbar subject to their timelines.
+- Inspect physical equipment through Chronicle.
 - Change cosmetic appearance through Scene.
 
 ### Rest Context required
@@ -143,14 +159,15 @@ This preserves preparation while allowing ordinary inventory management in the f
 
 A preset stores references, not item ownership:
 
-- desired equipment UUIDs,
+- desired physical equipment UUID references where supported,
+- virtual accessory/quiver references,
 - moveset definition IDs,
 - form,
 - attunement,
 - Flask allocation,
 - prepared ammo categories.
 
-Applying validates every reference. Missing items remain unchanged and are reported. Preset application is atomic for virtual build state; physical inventory movement uses a transaction.
+Applying validates every reference. Missing physical items are reported rather than fabricated or teleported from an invalid location. Preset application is atomic for virtual build state; physical inventory/equipment movement uses the appropriate authoritative transaction/reconciliation boundary.
 
 ## Forms
 
@@ -181,12 +198,13 @@ Attunement is build capacity, not a combat bar.
 
 ## Weapon swapping in combat
 
-- Selecting another weapon begins sheathe/draw transition.
+- Selecting another physical weapon slot begins sheathe/draw transition.
 - Active chain, target assist and input buffer clear.
 - Dodge remains available if movement state permits.
 - Cross-weapon chain continuation exists only through an explicit technique.
-- Loaded crossbow state persists on the item instance.
+- Loaded crossbow state persists on the item instance UUID.
 - Switching to a consumable uses item transition and returns to the last weapon after use unless the player selected another slot.
+- Scroll spam cannot cause the runtime to use an item other than the authoritative item currently resolved from the selected slot after transition validation.
 
 ## Handling requirements
 

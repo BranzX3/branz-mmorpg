@@ -29,11 +29,27 @@ version
 
 The Minecraft `ItemStack` is a projection. Its PDC contains a signed/reference token and display cache, not the sole source of truth.
 
+## Physical inventory authority
+
+Normal gameplay items are manipulated through the ordinary Minecraft inventory surface while durable ownership/location remains server authoritative.
+
+- Weapons stay character-owned inventory items while stored in backpack/hotbar positions.
+- A weapon becomes active because its physical projection is in the selected hotbar slot and resolves to the authoritative item UUID; moving it between hotbar slots does not create a persistent equip record.
+- Normal consumables likewise remain physical inventory/lot projections and are used from hotbar 1–8.
+- Off-hand and armor use Minecraft's native equipment slots and therefore retain authoritative native-equipment locations.
+- Any authoritative value-changing move validates item/lot identity, ownership, version and destination before commit, then reconciles Bukkit inventory from database truth.
+- A failed or stale mutation never leaves a projection that implies ownership/equipment state the database did not commit.
+
+There is no persistent V1 `MAIN_HAND` weapon loadout authority. Legacy `MAIN_HAND` records may exist only as migration/compatibility input until they are reconciled back to character inventory.
+
 ## Equipment slots
+
+### Physical selected gameplay item
+
+- Selected hotbar weapon or consumable from gameplay slots 1–8 — derived from physical inventory projection, not persisted as an equipped slot.
 
 ### Native-visible gameplay slots
 
-- Main hand
 - Off hand
 - Head
 - Chest
@@ -60,18 +76,20 @@ Cosmetic slots never change combat calculations.
 
 ## Equip validation
 
-Validation order:
+For native or virtual equipment, validation order is:
 
 1. Item exists and belongs to the character/inventory transaction.
 2. Definition is compatible with current content version.
 3. Slot accepts category/tags.
-4. Main/off-hand combination is valid.
+4. Selected weapon/off-hand combination is valid where relevant.
 5. Requirements and handling minimum are met.
 6. Unique-equip constraints are satisfied.
 7. Region/action/transaction state allows the operation.
 8. Resulting load and attunement state is valid.
 
-Equip is transactional. The prior item is moved to a valid inventory slot or the operation fails without partial changes.
+Native off-hand/armor equip begins from a physical inventory action. The prior item is moved to a valid inventory location or the operation fails without partial changes. Virtual equipment is committed through its owning build/Scene workflow.
+
+Selecting or moving an ordinary weapon within hotbar 1–8 is not an equip transaction. Combat readiness resolves the selected physical item after validating its authoritative UUID, definition, payload and current build compatibility.
 
 ## Armor load
 
@@ -154,7 +172,7 @@ No affix soup. A V1 item has at most three variable numeric fields and one autho
 
 Gameplay equipment may have durability:
 
-- Weapon: loses durability on committed successful attacks/hits according to family profile.
+- Weapon: loses durability on committed successful attacks/hits according to family profile. The debit targets the exact active physical weapon UUID resolved from the selected hotbar slot/action snapshot, not a persistent `MAIN_HAND` slot.
 - Shield: loses durability on blocked impacts.
 - Armor: loses durability from PvE health damage received, distributed by hit profile.
 - Catalyst: loses durability on committed spell casts.

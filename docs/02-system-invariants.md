@@ -16,12 +16,15 @@ These rules are mandatory across all modules.
 3. Slot 9 cannot be moved, dropped, traded, stored, consumed, placed in off-hand or used as transaction value.
 4. Selecting slot 9 sheaths the current weapon; right-click opens the Local Scene Hub when allowed.
 5. Vanilla inventory remains usable during ENGAGED combat; the world continues while it is open.
+6. Any valid MMO weapon physically present in hotbar slots 1–8 may become the active weapon when selected; no persistent prepared `MAIN_HAND` weapon slot may override the selected physical item.
+7. Normal consumables are selected and used from their physical inventory/hotbar representation rather than from a Scene loadout.
 
 ## Server authority
 
 1. Client packets express intent only.
 2. Hit results, movement permissions, resources, rewards, market fills and ownership are resolved on the server.
 3. Animation/VFX timing may interpolate but cannot create an active frame or i-frame absent from the server timeline.
+4. Minecraft inventory, off-hand and armor interactions are player intent surfaces; durable ownership/location truth remains authoritative server state and must reconcile the Bukkit projection after value-changing commits.
 
 ## Items and currency
 
@@ -32,6 +35,7 @@ These rules are mandatory across all modules.
 5. No system deletes unresolved value after failure; it moves to Pending Rewards, Overflow Claim or Quarantine.
 6. Cosmetic items have no combat stats or durability.
 7. Enhancement never destroys an item and never downgrades its enhancement level.
+8. Moving an item between ordinary character inventory/hotbar positions does not transform it into a second logical item or discard its authoritative UUID/payload.
 
 ## Combat
 
@@ -41,6 +45,7 @@ These rules are mandatory across all modules.
 4. Enhancement never widens parry windows, perfect-guard windows or dodge i-frames.
 5. PvP never reduces item or mount-equipment durability.
 6. Weapon draw, swap and consumable use have explicit server timelines and cannot be bypassed through scroll spam.
+7. One committed attack resolves damage through exactly one authoritative health path; training health fixtures never become production world-mob health authority.
 
 ## Progression
 
@@ -63,6 +68,7 @@ These rules are mandatory across all modules.
 2. Scene Preview Actor is visible only to its owner.
 3. The real player remains vulnerable; hostile targeting, damage, knockback, teleport, death or world change closes the Scene.
 4. Preview changes commit only through explicit confirmation and transaction success.
+5. Chronicle owns character build, virtual equipment and cosmetics; it is not the primary equip/use surface for ordinary weapons, native armor, shields or consumables.
 
 ## Mounts and workers
 

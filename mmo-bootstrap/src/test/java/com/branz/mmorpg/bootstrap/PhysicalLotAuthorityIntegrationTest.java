@@ -33,7 +33,7 @@ class PhysicalLotAuthorityIntegrationTest {
                             .filter(projection -> projection.slot() == 3)
                             .findFirst()
                             .orElseThrow();
-            ObservedProjection exact = observed(expected, 3);
+            ObservedProjection exact = observed(expected, 3, expected.quantity());
 
             Result<LotLocationRecord, PhysicalLotResolutionErrorCode> resolved =
                     PhysicalLotAuthority.resolve(
@@ -48,23 +48,37 @@ class PhysicalLotAuthorityIntegrationTest {
 
             Result<LotLocationRecord, PhysicalLotResolutionErrorCode> wrongSlot =
                     PhysicalLotAuthority.resolve(
-                            granted.characterId(), 2, observed(expected, 2), granted.snapshot());
+                            granted.characterId(),
+                            2,
+                            observed(expected, 2, expected.quantity()),
+                            granted.snapshot());
             assertTrue(wrongSlot instanceof Result.Failure<?, ?>);
             assertEquals(
                     PhysicalLotResolutionErrorCode.PHYSICAL_LOT_PROJECTION_STALE,
                     ((Result.Failure<LotLocationRecord, PhysicalLotResolutionErrorCode>) wrongSlot)
                             .error());
+
+            Result<LotLocationRecord, PhysicalLotResolutionErrorCode> staleQuantity =
+                    PhysicalLotAuthority.resolve(
+                            granted.characterId(), 3, observed(expected, 3, 3), granted.snapshot());
+            assertTrue(staleQuantity instanceof Result.Failure<?, ?>);
+            assertEquals(
+                    PhysicalLotResolutionErrorCode.PHYSICAL_LOT_PROJECTION_STALE,
+                    ((Result.Failure<LotLocationRecord, PhysicalLotResolutionErrorCode>)
+                                    staleQuantity)
+                            .error());
             sessions.close(granted);
         }
     }
 
-    private static ObservedProjection observed(ExpectedProjection expected, int slot) {
+    private static ObservedProjection observed(
+            ExpectedProjection expected, int slot, int quantity) {
         return new ObservedProjection(
                 slot,
                 expected.valueId(),
                 expected.definitionId(),
                 expected.valueType(),
-                expected.quantity(),
+                quantity,
                 expected.authorityVersion(),
                 expected.displayRevision(),
                 expected.contentVersion(),

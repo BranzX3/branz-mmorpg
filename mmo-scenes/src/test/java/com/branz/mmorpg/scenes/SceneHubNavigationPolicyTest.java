@@ -36,7 +36,8 @@ class SceneHubNavigationPolicyTest {
         assertEquals(
                 Set.of(SceneMode.JOURNAL_PENDING_REWARDS, SceneMode.SETTINGS_HELP),
                 SceneHubNavigationPolicy.compatibilityOverlayModes());
-        assertFalse(SceneHubNavigationPolicy.isPrimaryRootMode(SceneMode.JOURNAL_PENDING_REWARDS));
+        assertFalse(
+                SceneHubNavigationPolicy.isPrimaryRootMode(SceneMode.JOURNAL_PENDING_REWARDS));
         assertFalse(SceneHubNavigationPolicy.isPrimaryRootMode(SceneMode.SETTINGS_HELP));
         assertTrue(
                 SceneHubNavigationPolicy.isCompatibilityOverlayMode(

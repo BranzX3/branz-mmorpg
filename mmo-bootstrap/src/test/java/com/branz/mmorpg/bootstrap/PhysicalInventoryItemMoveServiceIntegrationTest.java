@@ -129,9 +129,9 @@ class PhysicalInventoryItemMoveServiceIntegrationTest {
 
     private static LoadedCharacterSession success(
             Result<LoadedCharacterSession, CharacterSessionErrorCode> result) {
-        if (result
-                instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
-                        failure) {
+        if (!result.isSuccess()) {
+            Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure =
+                    (Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>) result;
             throw new AssertionError(failure.error().code() + ": " + failure.detail());
         }
         return ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result).value();

@@ -62,6 +62,7 @@ final class CharacterSessionController implements Listener {
     private final Set<UUID> valueMutationInFlight = new HashSet<>();
     private final List<Consumer<Player>> readyHandlers = new ArrayList<>();
     private final List<Consumer<Player>> equipmentMutationHandlers = new ArrayList<>();
+    private final List<Consumer<Player>> flaskPreparationHandlers = new ArrayList<>();
     private int heartbeatTaskId = -1;
 
     CharacterSessionController(
@@ -94,6 +95,11 @@ final class CharacterSessionController implements Listener {
     void addEquipmentMutationHandler(Consumer<Player> equipmentMutationHandler) {
         equipmentMutationHandlers.add(
                 Objects.requireNonNull(equipmentMutationHandler, "equipmentMutationHandler"));
+    }
+
+    void addFlaskPreparationHandler(Consumer<Player> flaskPreparationHandler) {
+        flaskPreparationHandlers.add(
+                Objects.requireNonNull(flaskPreparationHandler, "flaskPreparationHandler"));
     }
 
     void onPackReady(Player player) {
@@ -1254,6 +1260,9 @@ final class CharacterSessionController implements Listener {
         Player player = plugin.getServer().getPlayer(playerId);
         if (player != null && player.isOnline()) {
             applyProjectionIfReady(player, false);
+            if (ready(player)) {
+                flaskPreparationHandlers.forEach(handler -> handler.accept(player));
+            }
         }
         completion.accept(
                 Result.success(

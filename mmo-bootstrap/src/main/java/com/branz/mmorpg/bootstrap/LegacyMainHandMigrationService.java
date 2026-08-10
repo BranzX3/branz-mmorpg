@@ -81,7 +81,8 @@ final class LegacyMainHandMigrationService {
                                         legacy.location(),
                                         legacy.ownerCharacterId(),
                                         ValueLocation.inventory("slot:" + destinationSlot)));
-        if (migrated instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+        if (migrated
+                instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
                     failure.error().code() + ": " + failure.detail());

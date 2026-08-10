@@ -1,0 +1,30 @@
+name: format-physical-inventory-adapter
+on:
+  push:
+    branches:
+      - agent/physical-inventory-paper-adapter
+    paths:
+      - .github/workflows/format-physical-inventory-adapter.yml
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/physical-inventory-paper-adapter
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Format mmo-bootstrap
+        run: ./gradlew :mmo-bootstrap:spotlessApply
+      - name: Remove temporary workflow and commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/format-physical-inventory-adapter.yml
+          git add mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/BranzMmoPlugin.java mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/PhysicalInventoryInteractionController.java
+          git commit -m "Format physical inventory adapter"
+          git push origin HEAD:agent/physical-inventory-paper-adapter

@@ -1,0 +1,43 @@
+name: fix-physical-durable-test-assertions
+on:
+  push:
+    branches: [agent/physical-melee-weapon-bridge]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/physical-melee-weapon-bridge
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Fix assertions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('mmo-bootstrap/src/test/java/com/branz/mmorpg/bootstrap/CharacterSessionServiceIntegrationTest.java')
+          text = path.read_text()
+          old_staff = '''            assertEquals(\n                    ValueLocation.inventory("slot:0"), itemRecord(session, staffId).location());\n'''
+          new_staff = '''            assertEquals(\n                    0,\n                    session.snapshot().inventory().stream()\n                            .filter(value -> value.valueId().equals(staffId.value()))\n                            .findFirst()\n                            .orElseThrow()\n                            .slot());\n'''
+          old_crossbow = '''            assertEquals(\n                    ValueLocation.inventory("slot:0"), itemRecord(session, crossbowId).location());\n'''
+          new_crossbow = '''            assertEquals(\n                    0,\n                    session.snapshot().inventory().stream()\n                            .filter(value -> value.valueId().equals(crossbowId.value()))\n                            .findFirst()\n                            .orElseThrow()\n                            .slot());\n'''
+          if text.count(old_staff) != 1 or text.count(old_crossbow) != 1:
+              raise SystemExit('expected physical assertion blocks not found exactly once')
+          text = text.replace(old_staff, new_staff, 1).replace(old_crossbow, new_crossbow, 1)
+          path.write_text(text)
+          PY
+          ./gradlew :mmo-bootstrap:spotlessApply
+      - name: Remove temporary workflow and commit
+        run: |
+          rm .github/workflows/fix-physical-durable-test-assertions.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add mmo-bootstrap/src/test/java/com/branz/mmorpg/bootstrap/CharacterSessionServiceIntegrationTest.java .github/workflows/fix-physical-durable-test-assertions.yml
+          git commit -m "Assert physical durable fixtures by projected slot"
+          git push origin HEAD:agent/physical-melee-weapon-bridge

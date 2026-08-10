@@ -11,7 +11,8 @@ import java.util.Optional;
 final class ShieldCombatReadiness {
     static final String BROKEN = "Guard not ready: equipped shield is broken.";
     static final String INVALID = "Guard not ready: shield durability state is invalid.";
-    static final String INSTANCE_UNAVAILABLE = "Guard not ready: equipped shield instance is unavailable.";
+    static final String INSTANCE_UNAVAILABLE =
+            "Guard not ready: equipped shield instance is unavailable.";
 
     private ShieldCombatReadiness() {}
 

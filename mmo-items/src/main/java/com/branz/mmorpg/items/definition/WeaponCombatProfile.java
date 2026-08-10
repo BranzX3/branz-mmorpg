@@ -61,14 +61,7 @@ public record WeaponCombatProfile(
             double power,
             Optional<BowWeaponProfile> bowProfile,
             Optional<CrossbowWeaponProfile> crossbowProfile) {
-        this(
-                family,
-                power,
-                1,
-                bowProfile,
-                crossbowProfile,
-                OffhandPolicy.ANY,
-                Optional.empty());
+        this(family, power, 1, bowProfile, crossbowProfile, OffhandPolicy.ANY, Optional.empty());
     }
 
     public WeaponCombatProfile(String family, double power, Optional<BowWeaponProfile> bowProfile) {

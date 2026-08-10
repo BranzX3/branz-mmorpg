@@ -25,5 +25,6 @@ class PhysicalInventoryInteractionPolicyTest {
                 PhysicalInventoryInteractionPolicy.supportsStorageAction("HOTBAR_MOVE_AND_READD"));
         assertFalse(PhysicalInventoryInteractionPolicy.supportsStorageAction("DROP_ALL_SLOT"));
         assertFalse(PhysicalInventoryInteractionPolicy.supportsStorageAction("COLLECT_TO_CURSOR"));
+        assertFalse(PhysicalInventoryInteractionPolicy.supportsStorageAction("NOTHING"));
     }
 }

@@ -123,10 +123,7 @@ class WeaponDurabilityServiceIntegrationTest {
 
             assertEquals(
                     swordItemId,
-                    restored.snapshot()
-                            .equipment()
-                            .item(EquipmentSlot.MAIN_HAND)
-                            .orElseThrow());
+                    restored.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElseThrow());
             assertTrue(durability.authoritativeState(restored, swordItemId, SWORD_ID, 3).broken());
             sessions.close(restored);
         }

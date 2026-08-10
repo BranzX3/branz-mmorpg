@@ -74,7 +74,8 @@ final class PhysicalOffHandInteractionController implements Listener {
         }
         event.setCancelled(true);
 
-        String validationFailure = validatePhysicalState(player, active, selected, committedOffHandId);
+        String validationFailure =
+                validatePhysicalState(player, active, selected, committedOffHandId);
         if (validationFailure != null) {
             reconcile(player, validationFailure);
             return;
@@ -156,7 +157,8 @@ final class PhysicalOffHandInteractionController implements Listener {
                         .orElse(null);
         if (record == null
                 || record.ownerCharacterId().filter(session.characterId()::equals).isEmpty()
-                || !record.location().equals(ValueLocation.nativeEquipped(EquipmentSlot.OFF_HAND.name()))) {
+                || !record.location()
+                        .equals(ValueLocation.nativeEquipped(EquipmentSlot.OFF_HAND.name()))) {
             return "Committed OFF_HAND item does not match authoritative item truth.";
         }
         ItemDefinition definition = items.find(record.definitionId()).orElse(null);
@@ -166,7 +168,8 @@ final class PhysicalOffHandInteractionController implements Listener {
         if (!codec.hasProjectionMarker(actualOffHand)) {
             return "Physical off-hand projection is missing.";
         }
-        ObservedProjection observed = codec.decode(actualOffHand, OFF_HAND_LOGICAL_SLOT).orElse(null);
+        ObservedProjection observed =
+                codec.decode(actualOffHand, OFF_HAND_LOGICAL_SLOT).orElse(null);
         if (observed == null
                 || !observed.valueId().equals(record.itemId().value())
                 || !observed.definitionId().equals(record.definitionId())

@@ -59,7 +59,9 @@ final class PhysicalOffHandItemMoveService {
         if (selectedShieldItemId.isPresent()) {
             if (selected == null
                     || !selected.itemId().equals(selectedShieldItemId.orElseThrow())
-                    || selected.ownerCharacterId().filter(session.characterId()::equals).isEmpty()) {
+                    || selected.ownerCharacterId()
+                            .filter(session.characterId()::equals)
+                            .isEmpty()) {
                 return Result.failure(
                         CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
                         "Selected shield no longer matches authoritative hotbar truth.");
@@ -81,7 +83,9 @@ final class PhysicalOffHandItemMoveService {
                                 .orElse(null);
         if (offHandId != null
                 && (offHand == null
-                        || offHand.ownerCharacterId().filter(session.characterId()::equals).isEmpty()
+                        || offHand.ownerCharacterId()
+                                .filter(session.characterId()::equals)
+                                .isEmpty()
                         || !offHand.location().equals(offHandLocation))) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_STATE_INVALID,

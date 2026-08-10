@@ -50,6 +50,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
     private DatabaseRuntime databaseRuntime;
     private CharacterSessionController characterSessionController;
     private PhysicalInventoryInteractionController physicalInventoryInteractionController;
+    private PhysicalOffHandInteractionController physicalOffHandInteractionController;
     private CombatSessionController combatSessionController;
     private FlaskHotbarController flaskHotbarController;
     private ConsumableHotbarController consumableHotbarController;
@@ -193,6 +194,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
             physicalInventoryInteractionController.shutdown();
             physicalInventoryInteractionController = null;
         }
+        physicalOffHandInteractionController = null;
         if (characterSessionController != null) {
             characterSessionController.shutdown();
             characterSessionController = null;
@@ -565,6 +567,15 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         new PhysicalInventoryItemMoveService(
                                 databaseRuntime, characterSessionService),
                         snapshot.manifest().contentVersion());
+        physicalOffHandInteractionController =
+                new PhysicalOffHandInteractionController(
+                        this,
+                        characterSessionController,
+                        projectionCodec,
+                        activeItemEngine.get(),
+                        new PhysicalOffHandItemMoveService(
+                                databaseRuntime, characterSessionService),
+                        snapshot.manifest().contentVersion());
         int weaponDrawTicks = getConfig().getInt("combat.weapon-draw-ticks", 6);
         int weaponSheatheTicks = getConfig().getInt("combat.weapon-sheathe-ticks", 4);
         int engagementExitTicks = getConfig().getInt("combat.engagement-exit-ticks", 160);
@@ -841,6 +852,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(resourcePackGate, this);
         getServer().getPluginManager().registerEvents(characterSessionController, this);
         getServer().getPluginManager().registerEvents(physicalInventoryInteractionController, this);
+        getServer().getPluginManager().registerEvents(physicalOffHandInteractionController, this);
         getServer().getPluginManager().registerEvents(combatSessionController, this);
         getServer().getPluginManager().registerEvents(flaskHotbarController, this);
         getServer().getPluginManager().registerEvents(consumableHotbarController, this);

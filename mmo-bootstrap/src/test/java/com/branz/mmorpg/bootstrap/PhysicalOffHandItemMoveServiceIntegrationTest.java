@@ -50,10 +50,10 @@ class PhysicalOffHandItemMoveServiceIntegrationTest {
                                     equipOperation,
                                     CONTENT));
             assertEquals(
-                    firstId, equipped.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
+                    firstId,
+                    equipped.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
             assertEquals(
-                    ValueLocation.nativeEquipped("OFF_HAND"),
-                    item(equipped, firstId).location());
+                    ValueLocation.nativeEquipped("OFF_HAND"), item(equipped, firstId).location());
 
             LoadedCharacterSession replayed =
                     success(
@@ -64,7 +64,8 @@ class PhysicalOffHandItemMoveServiceIntegrationTest {
                                     equipOperation,
                                     CONTENT));
             assertEquals(
-                    firstId, replayed.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
+                    firstId,
+                    replayed.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
             assertEquals(item(equipped, firstId).version(), item(replayed, firstId).version());
 
             LoadedCharacterSession secondGranted =
@@ -79,18 +80,14 @@ class PhysicalOffHandItemMoveServiceIntegrationTest {
                                     UUID.randomUUID(),
                                     CONTENT));
             assertEquals(
-                    secondId, swapped.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
+                    secondId,
+                    swapped.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
             assertEquals(ValueLocation.inventory("slot:4"), item(swapped, firstId).location());
-            assertEquals(ValueLocation.nativeEquipped("OFF_HAND"), item(swapped, secondId).location());
+            assertEquals(
+                    ValueLocation.nativeEquipped("OFF_HAND"), item(swapped, secondId).location());
 
             LoadedCharacterSession unequipped =
-                    success(
-                            offHand.swap(
-                                    swapped,
-                                    3,
-                                    Optional.empty(),
-                                    UUID.randomUUID(),
-                                    CONTENT));
+                    success(offHand.swap(swapped, 3, Optional.empty(), UUID.randomUUID(), CONTENT));
             assertTrue(unequipped.snapshot().equipment().item(EquipmentSlot.OFF_HAND).isEmpty());
             assertEquals(ValueLocation.inventory("slot:3"), item(unequipped, secondId).location());
             sessions.close(unequipped);
@@ -140,16 +137,7 @@ class PhysicalOffHandItemMoveServiceIntegrationTest {
                 Optional.empty(),
                 Optional.of(
                         new ShieldProfile(
-                                new GuardCombatProfile(
-                                        145,
-                                        0.9,
-                                        4,
-                                        130,
-                                        24,
-                                        24,
-                                        10,
-                                        22,
-                                        50))));
+                                new GuardCombatProfile(145, 0.9, 4, 130, 24, 24, 10, 22, 50))));
     }
 
     private static com.branz.mmorpg.persistence.transaction.ItemLocationRecord itemAt(
@@ -186,8 +174,8 @@ class PhysicalOffHandItemMoveServiceIntegrationTest {
     private static LoadedCharacterSession success(
             Result<LoadedCharacterSession, CharacterSessionErrorCode> result) {
         if (result
-                instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
-                        failure) {
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
             throw new AssertionError(failure.error().code() + ": " + failure.detail());
         }
         return ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result).value();

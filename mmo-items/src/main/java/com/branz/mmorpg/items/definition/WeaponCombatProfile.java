@@ -6,6 +6,7 @@ import java.util.Optional;
 public record WeaponCombatProfile(
         String family,
         double power,
+        int durabilityCostPerSuccessfulAttack,
         Optional<BowWeaponProfile> bowProfile,
         Optional<CrossbowWeaponProfile> crossbowProfile,
         OffhandPolicy offhandPolicy,
@@ -21,6 +22,10 @@ public record WeaponCombatProfile(
         }
         if (!Double.isFinite(power) || power <= 0) {
             throw new IllegalArgumentException("weapon power must be positive");
+        }
+        if (durabilityCostPerSuccessfulAttack < 1) {
+            throw new IllegalArgumentException(
+                    "weapon durability cost per successful attack must be positive");
         }
         if (family.equals("BOW") != bowProfile.isPresent()) {
             throw new IllegalArgumentException("only BOW family requires bow profile");
@@ -45,8 +50,25 @@ public record WeaponCombatProfile(
             String family,
             double power,
             Optional<BowWeaponProfile> bowProfile,
+            Optional<CrossbowWeaponProfile> crossbowProfile,
+            OffhandPolicy offhandPolicy,
+            Optional<GuardCombatProfile> guardProfile) {
+        this(family, power, 1, bowProfile, crossbowProfile, offhandPolicy, guardProfile);
+    }
+
+    public WeaponCombatProfile(
+            String family,
+            double power,
+            Optional<BowWeaponProfile> bowProfile,
             Optional<CrossbowWeaponProfile> crossbowProfile) {
-        this(family, power, bowProfile, crossbowProfile, OffhandPolicy.ANY, Optional.empty());
+        this(
+                family,
+                power,
+                1,
+                bowProfile,
+                crossbowProfile,
+                OffhandPolicy.ANY,
+                Optional.empty());
     }
 
     public WeaponCombatProfile(String family, double power, Optional<BowWeaponProfile> bowProfile) {
@@ -57,6 +79,7 @@ public record WeaponCombatProfile(
         this(
                 family,
                 power,
+                1,
                 Optional.empty(),
                 Optional.empty(),
                 OffhandPolicy.ANY,

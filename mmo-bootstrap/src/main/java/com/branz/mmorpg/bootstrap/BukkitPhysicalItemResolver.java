@@ -9,7 +9,7 @@ import java.util.Objects;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-/** Resolves a selected Bukkit hotbar stack back to exact authoritative MMO item truth. */
+/** Resolves a Bukkit hotbar stack back to exact authoritative MMO item truth. */
 final class BukkitPhysicalItemResolver {
     private final BukkitItemProjectionCodec codec;
     private final ItemEngine items;
@@ -23,7 +23,13 @@ final class BukkitPhysicalItemResolver {
             Player player, LoadedCharacterSession session) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(session, "session");
-        int slot = player.getInventory().getHeldItemSlot();
+        return resolveSlot(player, session, player.getInventory().getHeldItemSlot());
+    }
+
+    Result<ResolvedPhysicalItem, PhysicalItemResolutionErrorCode> resolveSlot(
+            Player player, LoadedCharacterSession session, int slot) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(session, "session");
         if (slot < 0 || slot >= ChronicleService.HOTBAR_SLOT) {
             return Result.failure(
                     PhysicalItemResolutionErrorCode.PHYSICAL_ITEM_SLOT_NOT_GAMEPLAY,

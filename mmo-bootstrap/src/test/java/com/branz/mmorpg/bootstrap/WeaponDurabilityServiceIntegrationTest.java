@@ -9,8 +9,8 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
-import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
+import com.branz.mmorpg.persistence.transaction.ValueLocation;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
@@ -24,7 +24,7 @@ class WeaponDurabilityServiceIntegrationTest {
     private static final DefinitionId MOVE_ID = DefinitionId.of("move.test_sword.primary_1");
 
     @Test
-    void successfulAttackWearIsAtomicAndSurvivesReconnect(
+    void successfulPhysicalWeaponWearIsAtomicAndSurvivesReconnectAndRestart(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
         DatabaseSettings settings = settings(databaseDirectory);
         UUID playerId = UUID.randomUUID();
@@ -35,25 +35,19 @@ class WeaponDurabilityServiceIntegrationTest {
             WeaponDurabilityService durability = new WeaponDurabilityService(database, sessions);
             LoadedCharacterSession opened = success(sessions.open(playerId));
             LoadedCharacterSession granted =
-                    success(sessions.grantTestValue(opened, swordDefinition(), 0, CONTENT_VERSION));
+                    success(sessions.grantTestValue(opened, swordDefinition(), 3, CONTENT_VERSION));
             swordItemId =
                     granted.snapshot().itemRecords().stream()
                             .filter(record -> record.definitionId().equals(SWORD_ID))
                             .findFirst()
                             .orElseThrow()
                             .itemId();
-            EquipmentLoadout equippedLoadout =
-                    granted.snapshot()
-                            .equipment()
-                            .with(EquipmentSlot.MAIN_HAND, Optional.of(swordItemId));
-            LoadedCharacterSession equipped =
-                    success(sessions.commitEquipment(granted, equippedLoadout, CONTENT_VERSION));
 
             UUID firstOperation = UUID.randomUUID();
             LoadedCharacterSession first =
                     success(
                             durability.commitSuccessfulAttack(
-                                    equipped,
+                                    granted,
                                     swordItemId,
                                     SWORD_ID,
                                     3,
@@ -67,7 +61,7 @@ class WeaponDurabilityServiceIntegrationTest {
             LoadedCharacterSession replay =
                     success(
                             durability.commitSuccessfulAttack(
-                                    equipped,
+                                    granted,
                                     swordItemId,
                                     SWORD_ID,
                                     3,
@@ -101,6 +95,14 @@ class WeaponDurabilityServiceIntegrationTest {
                                     UUID.randomUUID(),
                                     CONTENT_VERSION));
             assertTrue(durability.authoritativeState(third, swordItemId, SWORD_ID, 3).broken());
+            assertTrue(third.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).isEmpty());
+            assertEquals(
+                    ValueLocation.inventory("slot:3"),
+                    third.snapshot().itemRecords().stream()
+                            .filter(record -> record.itemId().equals(swordItemId))
+                            .findFirst()
+                            .orElseThrow()
+                            .location());
 
             Result<LoadedCharacterSession, CharacterSessionErrorCode> exhausted =
                     durability.commitSuccessfulAttack(
@@ -121,9 +123,14 @@ class WeaponDurabilityServiceIntegrationTest {
             WeaponDurabilityService durability = new WeaponDurabilityService(restarted, sessions);
             LoadedCharacterSession restored = success(sessions.open(playerId));
 
+            assertTrue(restored.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).isEmpty());
             assertEquals(
-                    swordItemId,
-                    restored.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElseThrow());
+                    ValueLocation.inventory("slot:3"),
+                    restored.snapshot().itemRecords().stream()
+                            .filter(record -> record.itemId().equals(swordItemId))
+                            .findFirst()
+                            .orElseThrow()
+                            .location());
             assertTrue(durability.authoritativeState(restored, swordItemId, SWORD_ID, 3).broken());
             sessions.close(restored);
         }

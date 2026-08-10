@@ -403,11 +403,11 @@ final class CharacterSessionService {
         Objects.requireNonNull(boltDefinitionId, "boltDefinitionId");
         Objects.requireNonNull(operationId, "operationId");
         Objects.requireNonNull(contentVersion, "contentVersion");
-        ItemLocationRecord crossbow = equippedMainHand(session, crossbowItemId);
+        ItemLocationRecord crossbow = physicalInventoryItem(session, crossbowItemId);
         if (crossbow == null) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
-                    "Crossbow bolt binding requires the same authoritative main-hand item.");
+                    "Crossbow bolt binding requires the same authoritative physical inventory item.");
         }
         CrossbowPersistentState current;
         try {
@@ -535,11 +535,11 @@ final class CharacterSessionService {
         Objects.requireNonNull(spellId, "spellId");
         Objects.requireNonNull(operationId, "operationId");
         Objects.requireNonNull(contentVersion, "contentVersion");
-        ItemLocationRecord catalyst = equippedMainHand(session, catalystItemId);
+        ItemLocationRecord catalyst = physicalInventoryItem(session, catalystItemId);
         if (catalyst == null || !catalyst.definitionId().equals(expectedDefinitionId)) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
-                    "Spell commit requires the same authoritative main-hand catalyst.");
+                    "Spell commit requires the same authoritative physical inventory catalyst.");
         }
         String replacement;
         CatalystDurability next;
@@ -1502,11 +1502,11 @@ final class CharacterSessionService {
         Objects.requireNonNull(operationId, "operationId");
         Objects.requireNonNull(idempotencyPrefix, "idempotencyPrefix");
         Objects.requireNonNull(contentVersion, "contentVersion");
-        ItemLocationRecord crossbow = equippedMainHand(session, crossbowItemId);
+        ItemLocationRecord crossbow = physicalInventoryItem(session, crossbowItemId);
         if (crossbow == null) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
-                    "Crossbow checkpoint update requires the same authoritative main-hand item.");
+                    "Crossbow checkpoint update requires the same authoritative physical inventory item.");
         }
         String replacement;
         try {
@@ -1558,18 +1558,27 @@ final class CharacterSessionService {
         return reload(session);
     }
 
-    private static ItemLocationRecord equippedMainHand(
+    private static ItemLocationRecord physicalInventoryItem(
             LoadedCharacterSession session, ItemId expectedItemId) {
-        ItemId equipped = session.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElse(null);
         ItemLocationRecord item =
-                equipped == null
-                        ? null
-                        : findItem(session.snapshot().itemRecords(), equipped).orElse(null);
-        return item != null
-                        && item.itemId().equals(expectedItemId)
-                        && item.location().equals(ValueLocation.nativeEquipped("MAIN_HAND"))
-                ? item
-                : null;
+                session.snapshot().itemRecords().stream()
+                        .filter(record -> record.itemId().equals(expectedItemId))
+                        .findFirst()
+                        .orElse(null);
+        if (item == null
+                || item.ownerCharacterId().filter(session.characterId()::equals).isEmpty()
+                || item.location().type()
+                        != com.branz.mmorpg.persistence.transaction.ValueLocationType
+                                .CHARACTER_INVENTORY) {
+            return null;
+        }
+        int slot;
+        try {
+            slot = inventorySlot(item.location());
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+        return slot >= 0 && slot < 36 && slot != ChronicleService.HOTBAR_SLOT ? item : null;
     }
 
     private static Set<KnowledgeKey> learnedKnowledge(PersistentCharacterSnapshot snapshot) {

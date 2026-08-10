@@ -3580,16 +3580,8 @@ final class CombatSessionController implements Listener {
         if (slot == ChronicleService.HOTBAR_SLOT) {
             return new SelectedHotbarSlot(slot, SelectedSlotKind.CHRONICLE);
         }
-        boolean mainHandEquipped =
-                characters
-                        .active(player)
-                        .flatMap(
-                                session ->
-                                        session.snapshot()
-                                                .equipment()
-                                                .item(EquipmentSlot.MAIN_HAND))
-                        .isPresent();
-        return mainHandEquipped && slot == 0
+        ResolvedPhysicalItem selected = characters.physicalItemAt(player, slot).orElse(null);
+        return selected != null && selected.definition().weaponProfile().isPresent()
                 ? SelectedHotbarSlot.combatWeapon(slot)
                 : new SelectedHotbarSlot(slot, SelectedSlotKind.TOOL_OR_BLOCK);
     }
@@ -3601,6 +3593,12 @@ final class CombatSessionController implements Listener {
     }
 
     private Optional<ItemDefinition> equippedDefinition(Player player, EquipmentSlot slot) {
+        if (slot == EquipmentSlot.MAIN_HAND) {
+            return characters
+                    .selectedPhysicalItem(player)
+                    .map(ResolvedPhysicalItem::definition)
+                    .filter(definition -> definition.weaponProfile().isPresent());
+        }
         return characters
                 .active(player)
                 .flatMap(
@@ -3625,7 +3623,11 @@ final class CombatSessionController implements Listener {
     }
 
     private Optional<String> combatReadinessFailure(Player player) {
-        ItemDefinition main = equippedDefinition(player, EquipmentSlot.MAIN_HAND).orElse(null);
+        if (characters.valueMutationInFlight(player)) {
+            return Optional.of("Combat not ready: inventory state is changing.");
+        }
+        ResolvedPhysicalItem selected = characters.selectedPhysicalItem(player).orElse(null);
+        ItemDefinition main = selected == null ? null : selected.definition();
         if (main == null || main.weaponProfile().isEmpty()) {
             return Optional.empty();
         }
@@ -3647,7 +3649,7 @@ final class CombatSessionController implements Listener {
             return Optional.of("Combat not ready: character build is unavailable.");
         }
         Optional<String> durabilityFailure =
-                WeaponCombatReadiness.durabilityFailure(character, main);
+                WeaponCombatReadiness.durabilityFailure(main, selected.record().payloadJson());
         if (durabilityFailure.isPresent()) {
             return durabilityFailure;
         }

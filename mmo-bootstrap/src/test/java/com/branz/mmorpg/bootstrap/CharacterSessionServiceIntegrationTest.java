@@ -661,14 +661,13 @@ class CharacterSessionServiceIntegrationTest {
                                     .findFirst()
                                     .orElseThrow()
                                     .valueId());
-            session =
-                    success(
-                            service.commitEquipment(
-                                    session,
-                                    session.snapshot()
-                                            .equipment()
-                                            .with(EquipmentSlot.MAIN_HAND, Optional.of(staffId)),
-                                    "content.test.1"));
+            assertEquals(
+                    0,
+                    session.snapshot().inventory().stream()
+                            .filter(value -> value.valueId().equals(staffId.value()))
+                            .findFirst()
+                            .orElseThrow()
+                            .slot());
             LoadedCharacterSession beforeCommit = session;
             UUID operationId = UUID.randomUUID();
             LoadedCharacterSession committed =
@@ -787,14 +786,13 @@ class CharacterSessionServiceIntegrationTest {
                                     .findFirst()
                                     .orElseThrow()
                                     .valueId());
-            session =
-                    success(
-                            service.commitEquipment(
-                                    session,
-                                    session.snapshot()
-                                            .equipment()
-                                            .with(EquipmentSlot.MAIN_HAND, Optional.of(crossbowId)),
-                                    "content.test.1"));
+            assertEquals(
+                    0,
+                    session.snapshot().inventory().stream()
+                            .filter(value -> value.valueId().equals(crossbowId.value()))
+                            .findFirst()
+                            .orElseThrow()
+                            .slot());
             session = success(service.grantTestValue(session, boltQuiver, 1, "content.test.1"));
             quiverId =
                     new ItemId(

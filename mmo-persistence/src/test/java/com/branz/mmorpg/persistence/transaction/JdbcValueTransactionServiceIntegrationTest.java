@@ -792,9 +792,9 @@ class JdbcValueTransactionServiceIntegrationTest {
         ItemId crossbowId = new ItemId(UUID.randomUUID());
         ItemId quiverId = new ItemId(UUID.randomUUID());
         LotId boltLotId = new LotId(UUID.randomUUID());
-        ValueLocation mainHand = ValueLocation.nativeEquipped("MAIN_HAND");
+        ValueLocation physicalCrossbow = ValueLocation.inventory("slot:3");
         ValueLocation quiver = ValueLocation.quiver(quiverId);
-        grantItem(crossbowId, mainHand);
+        grantItem(crossbowId, physicalCrossbow);
         grantLot(boltLotId, quiver, 2);
 
         String placedPayload =
@@ -808,7 +808,7 @@ class JdbcValueTransactionServiceIntegrationTest {
                                 crossbowId,
                                 1,
                                 Optional.of(CHARACTER),
-                                mainHand,
+                                physicalCrossbow,
                                 "{}",
                                 placedPayload),
                         new LotQuantityConsumption(boltLotId, 1, Optional.of(CHARACTER), quiver, 1),
@@ -840,6 +840,7 @@ class JdbcValueTransactionServiceIntegrationTest {
         ItemLocationRecord crossbow = success(service.findItem(crossbowId)).orElseThrow();
         LotLocationRecord bolt = success(service.findLot(boltLotId)).orElseThrow();
         assertTrue(crossbow.payloadJson().contains("BOLT_PLACED"));
+        assertEquals(physicalCrossbow, crossbow.location());
         assertEquals(2, crossbow.version());
         assertEquals(1, bolt.quantity());
         assertEquals(2, bolt.version());

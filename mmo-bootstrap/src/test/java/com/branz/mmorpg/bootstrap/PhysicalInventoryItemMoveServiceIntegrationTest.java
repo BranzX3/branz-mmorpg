@@ -44,23 +44,17 @@ class PhysicalInventoryItemMoveServiceIntegrationTest {
             charmId = itemAt(withBoth, 5).itemId();
 
             LoadedCharacterSession moved =
-                    success(
-                            moves.moveUniqueItem(
-                                    withBoth, swordId, 12, 3, moveOperation, CONTENT));
+                    success(moves.moveUniqueItem(withBoth, swordId, 12, 3, moveOperation, CONTENT));
             assertEquals(swordId, itemAt(moved, 3).itemId());
             assertEquals(charmId, itemAt(moved, 5).itemId());
 
             LoadedCharacterSession replayed =
-                    success(
-                            moves.moveUniqueItem(
-                                    withBoth, swordId, 12, 3, moveOperation, CONTENT));
+                    success(moves.moveUniqueItem(withBoth, swordId, 12, 3, moveOperation, CONTENT));
             assertEquals(swordId, itemAt(replayed, 3).itemId());
             assertEquals(charmId, itemAt(replayed, 5).itemId());
 
             LoadedCharacterSession swapped =
-                    success(
-                            moves.moveUniqueItem(
-                                    replayed, swordId, 3, 5, swapOperation, CONTENT));
+                    success(moves.moveUniqueItem(replayed, swordId, 3, 5, swapOperation, CONTENT));
             assertEquals(swordId, itemAt(swapped, 5).itemId());
             assertEquals(charmId, itemAt(swapped, 3).itemId());
             sessions.close(swapped);
@@ -138,9 +132,11 @@ class PhysicalInventoryItemMoveServiceIntegrationTest {
         assertTrue(
                 result.isSuccess(),
                 () ->
-                        result instanceof
+                        result
+                                        instanceof
                                         Result.Failure<
-                                                LoadedCharacterSession, CharacterSessionErrorCode>
+                                                LoadedCharacterSession,
+                                                CharacterSessionErrorCode>
                                 failure
                                 ? failure.error().code() + ": " + failure.detail()
                                 : "");

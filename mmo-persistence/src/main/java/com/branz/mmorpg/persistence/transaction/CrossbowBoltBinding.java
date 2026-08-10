@@ -15,8 +15,7 @@ public record CrossbowBoltBinding(
         if (!crossbowUpdate
                         .expectedOwnerCharacterId()
                         .equals(boltConsumption.expectedOwnerCharacterId())
-                || crossbowUpdate.expectedLocation().type()
-                        != ValueLocationType.CHARACTER_INVENTORY
+                || crossbowUpdate.expectedLocation().type() != ValueLocationType.CHARACTER_INVENTORY
                 || boltConsumption.expectedLocation().type() != ValueLocationType.QUIVER
                 || boltConsumption.quantity() != 1) {
             throw new IllegalArgumentException(

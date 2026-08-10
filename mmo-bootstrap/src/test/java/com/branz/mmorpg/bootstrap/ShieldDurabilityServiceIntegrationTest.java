@@ -10,8 +10,8 @@ import com.branz.mmorpg.items.definition.GuardCombatProfile;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ShieldProfile;
-import com.branz.mmorpg.items.equipment.EquipmentLoadout;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
+import com.branz.mmorpg.persistence.transaction.ValueLocation;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
@@ -24,7 +24,7 @@ class ShieldDurabilityServiceIntegrationTest {
     private static final DefinitionId SHIELD_ID = DefinitionId.of("equipment.test_shield");
 
     @Test
-    void blockedImpactWearIsAtomicIdempotentAndSurvivesRestart(
+    void physicalOffhandBlockedImpactWearIsAtomicIdempotentAndSurvivesRestart(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
         DatabaseSettings settings = settings(databaseDirectory);
         UUID playerId = UUID.randomUUID();
@@ -32,24 +32,38 @@ class ShieldDurabilityServiceIntegrationTest {
 
         try (DatabaseRuntime database = DatabaseRuntime.start(settings)) {
             CharacterSessionService sessions = new CharacterSessionService(database);
+            PhysicalOffHandItemMoveService offHand =
+                    new PhysicalOffHandItemMoveService(database, sessions);
             ShieldDurabilityService durability = new ShieldDurabilityService(database, sessions);
             LoadedCharacterSession opened = success(sessions.open(playerId));
             LoadedCharacterSession granted =
                     success(
                             sessions.grantTestValue(
-                                    opened, shieldDefinition(), 0, CONTENT_VERSION));
+                                    opened, shieldDefinition(), 3, CONTENT_VERSION));
             shieldItemId =
                     granted.snapshot().itemRecords().stream()
                             .filter(record -> record.definitionId().equals(SHIELD_ID))
                             .findFirst()
                             .orElseThrow()
                             .itemId();
-            EquipmentLoadout equippedLoadout =
-                    granted.snapshot()
-                            .equipment()
-                            .with(EquipmentSlot.OFF_HAND, Optional.of(shieldItemId));
             LoadedCharacterSession equipped =
-                    success(sessions.commitEquipment(granted, equippedLoadout, CONTENT_VERSION));
+                    success(
+                            offHand.swap(
+                                    granted,
+                                    3,
+                                    Optional.of(shieldItemId),
+                                    UUID.randomUUID(),
+                                    CONTENT_VERSION));
+            assertEquals(
+                    shieldItemId,
+                    equipped.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
+            assertEquals(
+                    ValueLocation.nativeEquipped("OFF_HAND"),
+                    equipped.snapshot().itemRecords().stream()
+                            .filter(record -> record.itemId().equals(shieldItemId))
+                            .findFirst()
+                            .orElseThrow()
+                            .location());
 
             UUID firstImpact = UUID.randomUUID();
             LoadedCharacterSession first =
@@ -111,6 +125,13 @@ class ShieldDurabilityServiceIntegrationTest {
             assertEquals(
                     shieldItemId,
                     restored.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
+            assertEquals(
+                    ValueLocation.nativeEquipped("OFF_HAND"),
+                    restored.snapshot().itemRecords().stream()
+                            .filter(record -> record.itemId().equals(shieldItemId))
+                            .findFirst()
+                            .orElseThrow()
+                            .location());
             assertTrue(
                     durability.authoritativeState(restored, shieldItemId, SHIELD_ID, 3).broken());
             sessions.close(restored);

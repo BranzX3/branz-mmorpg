@@ -2,9 +2,7 @@ package com.branz.mmorpg.bootstrap;
 
 record WeaponDurability(int current, int maximum) {
     WeaponDurability {
-        if (maximum < 1 || current < 0 || current > maximum) {
-            throw new IllegalArgumentException("invalid weapon durability");
-        }
+        new ItemDurability(current, maximum);
     }
 
     boolean broken() {
@@ -12,9 +10,7 @@ record WeaponDurability(int current, int maximum) {
     }
 
     WeaponDurability spend(int amount) {
-        if (amount < 1 || amount > current) {
-            throw new IllegalArgumentException("weapon durability is insufficient");
-        }
-        return new WeaponDurability(current - amount, maximum);
+        ItemDurability next = new ItemDurability(current, maximum).spend(amount);
+        return new WeaponDurability(next.current(), next.maximum());
     }
 }

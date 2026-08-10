@@ -21,8 +21,7 @@ public record ProjectionMoveIntent(
         }
     }
 
-    public ProjectionMoveIntent(
-            UUID valueId, int sourceSlot, int destinationSlot, boolean swap) {
+    public ProjectionMoveIntent(UUID valueId, int sourceSlot, int destinationSlot, boolean swap) {
         this(valueId, ProjectionValueType.UNIQUE_ITEM, sourceSlot, destinationSlot, swap);
     }
 }

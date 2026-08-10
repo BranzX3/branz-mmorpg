@@ -72,13 +72,7 @@ class PhysicalInventoryLotMoveServiceIntegrationTest {
             LotId firstId = lotAt(second, ValueLocation.inventory("slot:12")).lotId();
 
             assertTrue(
-                    moves.moveFullLot(
-                                    second,
-                                    firstId,
-                                    12,
-                                    3,
-                                    UUID.randomUUID(),
-                                    CONTENT)
+                    moves.moveFullLot(second, firstId, 12, 3, UUID.randomUUID(), CONTENT)
                             instanceof Result.Failure<?, ?>);
             assertTrue(
                     moves.moveFullLot(
@@ -95,11 +89,7 @@ class PhysicalInventoryLotMoveServiceIntegrationTest {
 
     private static ItemDefinition lotDefinition() {
         return new ItemDefinition(
-                CONSUMABLE,
-                CONSUMABLE,
-                ItemClass.STACKABLE_LOT,
-                OptionalInt.empty(),
-                false);
+                CONSUMABLE, CONSUMABLE, ItemClass.STACKABLE_LOT, OptionalInt.empty(), false);
     }
 
     private static com.branz.mmorpg.persistence.transaction.LotLocationRecord lotAt(
@@ -136,8 +126,8 @@ class PhysicalInventoryLotMoveServiceIntegrationTest {
     private static LoadedCharacterSession success(
             Result<LoadedCharacterSession, CharacterSessionErrorCode> result) {
         if (result
-                instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
-                        failure) {
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
             throw new AssertionError(failure.error().code() + ": " + failure.detail());
         }
         return ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result).value();

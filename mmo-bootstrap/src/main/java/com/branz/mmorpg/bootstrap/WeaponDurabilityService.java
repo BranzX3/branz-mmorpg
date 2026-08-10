@@ -4,19 +4,20 @@ import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.identity.TransactionId;
 import com.branz.mmorpg.api.result.Result;
-import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.ItemPayloadUpdate;
 import com.branz.mmorpg.persistence.transaction.JdbcValueTransactionService;
 import com.branz.mmorpg.persistence.transaction.TransactionErrorCode;
 import com.branz.mmorpg.persistence.transaction.TransactionExecution;
 import com.branz.mmorpg.persistence.transaction.TransactionRequest;
-import com.branz.mmorpg.persistence.transaction.ValueLocation;
+import com.branz.mmorpg.persistence.transaction.ValueLocationType;
 import java.util.Objects;
 import java.util.UUID;
 
 /** Durable weapon-wear commit boundary for one successful non-PvP attack. */
 final class WeaponDurabilityService {
+    private static final int INVENTORY_SIZE = 36;
+
     private final DatabaseRuntime database;
     private final CharacterSessionService sessions;
 
@@ -46,21 +47,17 @@ final class WeaponDurabilityService {
                     "Weapon durability profile must be positive.");
         }
 
-        ItemId equipped = session.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElse(null);
         ItemLocationRecord weapon =
                 session.snapshot().itemRecords().stream()
                         .filter(record -> record.itemId().equals(weaponItemId))
                         .findFirst()
                         .orElse(null);
-        ValueLocation expectedLocation =
-                ValueLocation.nativeEquipped(EquipmentSlot.MAIN_HAND.name());
-        if (!weaponItemId.equals(equipped)
-                || weapon == null
+        if (weapon == null
                 || !weapon.definitionId().equals(expectedDefinitionId)
-                || !weapon.location().equals(expectedLocation)) {
+                || !isPhysicalInventoryItem(session, weapon)) {
             return Result.failure(
                     CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
-                    "Weapon wear requires the same authoritative equipped main-hand item.");
+                    "Weapon wear requires the same authoritative physical inventory item.");
         }
 
         WeaponDurability next;
@@ -126,5 +123,23 @@ final class WeaponDurabilityService {
                         .orElseThrow(
                                 () -> new IllegalArgumentException("weapon item is unavailable"));
         return WeaponPayloadCodec.decode(weapon.payloadJson(), baseMaximumDurability);
+    }
+
+    private static boolean isPhysicalInventoryItem(
+            LoadedCharacterSession session, ItemLocationRecord item) {
+        if (item.ownerCharacterId().filter(session.characterId()::equals).isEmpty()
+                || item.location().type() != ValueLocationType.CHARACTER_INVENTORY) {
+            return false;
+        }
+        String reference = item.location().reference().orElse("");
+        if (!reference.startsWith("slot:")) {
+            return false;
+        }
+        try {
+            int slot = Integer.parseInt(reference.substring("slot:".length()));
+            return slot >= 0 && slot < INVENTORY_SIZE && slot != ChronicleService.HOTBAR_SLOT;
+        } catch (NumberFormatException exception) {
+            return false;
+        }
     }
 }

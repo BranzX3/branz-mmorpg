@@ -23,42 +23,21 @@ jobs:
           from pathlib import Path
           path = Path('mmo-persistence/src/test/java/com/branz/mmorpg/persistence/transaction/JdbcValueTransactionServiceIntegrationTest.java')
           text = path.read_text()
-          old = '''        ValueLocation mainHand = ValueLocation.nativeEquipped("MAIN_HAND");
-        ValueLocation quiver = ValueLocation.quiver(quiverId);
-        grantItem(crossbowId, mainHand);
-        grantLot(boltLotId, quiver, 2);
-'''
-          new = '''        ValueLocation physicalCrossbow = ValueLocation.inventory("slot:3");
-        ValueLocation quiver = ValueLocation.quiver(quiverId);
-        grantItem(crossbowId, physicalCrossbow);
-        grantLot(boltLotId, quiver, 2);
-'''
+          old = "        ValueLocation mainHand = ValueLocation.nativeEquipped(\"MAIN_HAND\");\n        ValueLocation quiver = ValueLocation.quiver(quiverId);\n        grantItem(crossbowId, mainHand);\n        grantLot(boltLotId, quiver, 2);\n"
+          new = "        ValueLocation physicalCrossbow = ValueLocation.inventory(\"slot:3\");\n        ValueLocation quiver = ValueLocation.quiver(quiverId);\n        grantItem(crossbowId, physicalCrossbow);\n        grantLot(boltLotId, quiver, 2);\n"
           if text.count(old) != 1:
               raise SystemExit(f'crossbow fixture expected once, found {text.count(old)}')
           text = text.replace(old, new, 1)
           marker = 'void crossbowBoltBindingCommitsItemCheckpointAndQuiverConsumptionExactlyOnce()'
           before, after = text.split(marker, 1)
-          old_update = '''                                Optional.of(CHARACTER),
-                                mainHand,
-                                "{}",
-                                placedPayload),
-'''
-          new_update = '''                                Optional.of(CHARACTER),
-                                physicalCrossbow,
-                                "{}",
-                                placedPayload),
-'''
+          old_update = "                                Optional.of(CHARACTER),\n                                mainHand,\n                                \"{}\",\n                                placedPayload),\n"
+          new_update = "                                Optional.of(CHARACTER),\n                                physicalCrossbow,\n                                \"{}\",\n                                placedPayload),\n"
           if old_update not in after:
               raise SystemExit('crossbow payload update location block not found')
           after = after.replace(old_update, new_update, 1)
           text = before + marker + after
-          needle = '''        assertTrue(crossbow.payloadJson().contains("BOLT_PLACED"));
-        assertEquals(2, crossbow.version());
-'''
-          replacement = '''        assertTrue(crossbow.payloadJson().contains("BOLT_PLACED"));
-        assertEquals(physicalCrossbow, crossbow.location());
-        assertEquals(2, crossbow.version());
-'''
+          needle = "        assertTrue(crossbow.payloadJson().contains(\"BOLT_PLACED\"));\n        assertEquals(2, crossbow.version());\n"
+          replacement = "        assertTrue(crossbow.payloadJson().contains(\"BOLT_PLACED\"));\n        assertEquals(physicalCrossbow, crossbow.location());\n        assertEquals(2, crossbow.version());\n"
           if text.count(needle) != 1:
               raise SystemExit('crossbow result assertion block not found exactly once')
           path.write_text(text.replace(needle, replacement, 1))

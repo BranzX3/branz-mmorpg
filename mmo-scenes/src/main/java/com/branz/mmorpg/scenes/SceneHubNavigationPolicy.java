@@ -22,8 +22,7 @@ public final class SceneHubNavigationPolicy {
                     SceneMode.MAGIC_ATTUNEMENT,
                     SceneMode.CHARACTER_INFORMATION);
 
-    private static final Set<SceneMode> REST_CONTEXTUAL_MODES =
-            Set.of(SceneMode.FLASK_PREPARATION);
+    private static final Set<SceneMode> REST_CONTEXTUAL_MODES = Set.of(SceneMode.FLASK_PREPARATION);
 
     private static final Set<SceneMode> COMPATIBILITY_OVERLAY_MODES =
             Set.of(SceneMode.JOURNAL_PENDING_REWARDS, SceneMode.SETTINGS_HELP);

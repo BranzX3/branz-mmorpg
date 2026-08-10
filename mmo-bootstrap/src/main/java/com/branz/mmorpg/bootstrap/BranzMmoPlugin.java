@@ -534,10 +534,12 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 new BukkitItemProjectionCodec(this, ProjectionTokenSigner.random());
         testItemProjections = new TestItemProjectionService(projectionCodec);
         testItemProjectionController = new TestItemProjectionController(testItemProjections);
+        CharacterSessionService characterSessionService =
+                new CharacterSessionService(databaseRuntime, activeBuildEngine.get());
         characterSessionController =
                 new CharacterSessionController(
                         this,
-                        new CharacterSessionService(databaseRuntime, activeBuildEngine.get()),
+                        characterSessionService,
                         new BukkitInventoryProjectionService(projectionCodec),
                         activeItemEngine.get(),
                         databaseRuntime.settings());
@@ -700,6 +702,15 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         characterSessionController,
                         combatSessionController,
                         bossEncounterController);
+        WeaponDurabilityController weaponDurabilityController =
+                new WeaponDurabilityController(
+                        this,
+                        characterSessionController,
+                        activeItemEngine.get(),
+                        activeMoveEngine.get(),
+                        new WeaponDurabilityService(databaseRuntime, characterSessionService),
+                        pvpController,
+                        snapshot.manifest().contentVersion());
         ResourceNodeContentCompiler.compileFirst(snapshot)
                 .ifPresent(
                         compiledNode -> {
@@ -740,7 +751,11 @@ public final class BranzMmoPlugin extends JavaPlugin {
         combatSessionController.setDamageImmunityObserver(downedController::protectedFromDamage);
         combatSessionController.setHostileActionObserver(downedController::observeHostileAction);
         combatSessionController.setSuccessfulActionObserver(
-                liveTeachingSessionController::observeSuccessfulAction);
+                (actorId, actionId, moveId, currentTick) -> {
+                    liveTeachingSessionController.observeSuccessfulAction(
+                            actorId, actionId, moveId, currentTick);
+                    weaponDurabilityController.observe(actorId, actionId, moveId, currentTick);
+                });
         ChronicleController chronicleController =
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         characterSessionController.addReadyHandler(chronicleController::reconcile);

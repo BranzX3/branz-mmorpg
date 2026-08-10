@@ -19,8 +19,7 @@ class WeaponCombatReadinessTest {
 
     @Test
     void brokenWeaponFailsClosed() {
-        String payload =
-                WeaponPayloadCodec.encode("{}", new WeaponDurability(0, 3));
+        String payload = WeaponPayloadCodec.encode("{}", new WeaponDurability(0, 3));
 
         assertEquals(
                 Optional.of(WeaponCombatReadiness.BROKEN),

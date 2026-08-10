@@ -1,0 +1,41 @@
+name: bind-consumable-to-physical-lot-authority
+on:
+  push:
+    branches:
+      - agent/physical-lot-movement
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/physical-lot-movement
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Bind selected consumables to DB slot truth
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/ConsumableHotbarController.java')
+          text = path.read_text()
+          old = "    private SelectedConsumable decode(Player player, ItemStack item, int slot) {\n        ObservedProjection observed = projections.decode(item, slot).orElse(null);\n        if (observed != null && !observed.signatureValid()) {\n            UUID candidateValueId = observed.valueId();\n            int authoritativeSlot =\n                    characters\n                            .active(player)\n                            .flatMap(\n                                    session ->\n                                            session.snapshot().inventory().stream()\n                                                    .filter(\n                                                            expected ->\n                                                                    expected.valueId()\n                                                                            .equals(\n                                                                                    candidateValueId))\n                                                    .map(expected -> expected.slot())\n                                                    .findFirst())\n                            .orElse(-1);\n            if (authoritativeSlot >= 0) {\n                observed = projections.decode(item, authoritativeSlot).orElse(null);\n            }\n        }\n        if (observed == null\n                || !observed.signatureValid()\n                || observed.valueType() != ProjectionValueType.STACKABLE_LOT) {\n            return null;\n        }\n        ItemDefinition definition = items.find(observed.definitionId()).orElse(null);\n        ConsumableDefinitionProfile profile =\n                definition == null ? null : definition.consumableProfile().orElse(null);\n        if (profile == null) {\n            return null;\n        }\n        return new SelectedConsumable(\n                new LotId(observed.valueId()), observed.definitionId(), profile);\n    }\n"
+          new = "    private SelectedConsumable decode(Player player, ItemStack item, int slot) {\n        ObservedProjection observed = projections.decode(item, slot).orElse(null);\n        LoadedCharacterSession session = characters.active(player).orElse(null);\n        if (observed == null\n                || session == null\n                || observed.valueType() != ProjectionValueType.STACKABLE_LOT) {\n            return null;\n        }\n        Result<com.branz.mmorpg.persistence.transaction.LotLocationRecord, PhysicalLotResolutionErrorCode>\n                authoritative =\n                        PhysicalLotAuthority.resolve(\n                                session.characterId(), slot, observed, session.snapshot());\n        if (!(authoritative\n                instanceof\n                Result.Success<\n                        com.branz.mmorpg.persistence.transaction.LotLocationRecord,\n                        PhysicalLotResolutionErrorCode>\n                        success)) {\n            return null;\n        }\n        com.branz.mmorpg.persistence.transaction.LotLocationRecord lot = success.value();\n        ItemDefinition definition = items.find(lot.definitionId()).orElse(null);\n        ConsumableDefinitionProfile profile =\n                definition == null ? null : definition.consumableProfile().orElse(null);\n        if (profile == null) {\n            return null;\n        }\n        return new SelectedConsumable(lot.lotId(), lot.definitionId(), profile);\n    }\n"
+          if text.count(old) != 1:
+              raise SystemExit(f'decode block expected once, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          ./gradlew :mmo-bootstrap:spotlessApply
+      - name: Commit patch and remove workflow
+        shell: bash
+        run: |
+          rm .github/workflows/bind-consumable-to-physical-lot-authority.yml
+          git config user.name github-actions[bot]
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Validate selected consumables against physical lot truth'
+          git push origin HEAD:agent/physical-lot-movement

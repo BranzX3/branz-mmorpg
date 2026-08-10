@@ -8,6 +8,7 @@ import com.branz.mmorpg.items.definition.GuardCombatProfile;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ShieldProfile;
+import com.branz.mmorpg.items.definition.WeaponCombatProfile;
 import java.util.Optional;
 import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,21 @@ class ShieldCombatReadinessTest {
                 ShieldCombatReadiness.durabilityFailure(
                         shield(),
                         "{\"durability\":{\"currentDurability\":1,\"maximumDurability\":4}}"));
+    }
+
+    @Test
+    void nonShieldWeaponIsOutsideShieldGuardDurabilityGate() {
+        ItemDefinition weapon =
+                new ItemDefinition(
+                        DefinitionId.of("weapon.test_sword"),
+                        DefinitionId.of("asset.weapon.test_sword"),
+                        ItemClass.UNIQUE_DURABLE,
+                        OptionalInt.of(3),
+                        false,
+                        Optional.of(new WeaponCombatProfile("SWORD", 100)));
+        String broken = ItemDurabilityPayloadCodec.encode("{}", new ItemDurability(0, 3));
+
+        assertTrue(ShieldCombatReadiness.durabilityFailure(weapon, broken).isEmpty());
     }
 
     private static ItemDefinition shield() {

@@ -9,6 +9,7 @@ import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemClass;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.WeaponCombatProfile;
+import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.persistence.transaction.ValueLocation;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -94,6 +95,7 @@ class WeaponDurabilityServiceIntegrationTest {
                                     UUID.randomUUID(),
                                     CONTENT_VERSION));
             assertTrue(durability.authoritativeState(third, swordItemId, SWORD_ID, 3).broken());
+            assertTrue(third.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).isEmpty());
             assertEquals(
                     ValueLocation.inventory("slot:3"),
                     third.snapshot().itemRecords().stream()
@@ -121,6 +123,7 @@ class WeaponDurabilityServiceIntegrationTest {
             WeaponDurabilityService durability = new WeaponDurabilityService(restarted, sessions);
             LoadedCharacterSession restored = success(sessions.open(playerId));
 
+            assertTrue(restored.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).isEmpty());
             assertEquals(
                     ValueLocation.inventory("slot:3"),
                     restored.snapshot().itemRecords().stream()

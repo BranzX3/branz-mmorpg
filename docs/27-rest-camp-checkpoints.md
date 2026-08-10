@@ -4,6 +4,8 @@
 
 Rest Context is required for applying full build presets, changing Form, changing Attunement, reallocating Flask charges and preparing expedition supplies.
 
+Rest Context is a world/service interaction boundary. Chronicle may inspect or link to Rest-owned information, but opening Chronicle is not itself the Rest interaction that refills Flask or consumes expedition stock.
+
 ## Sanctuary / Inn
 
 Provides:
@@ -15,6 +17,8 @@ Provides:
 - basic repair and condition recovery;
 - rest-based status cleansing;
 - party regroup.
+
+The player initiates preparation from the Sanctuary/Inn world/service interaction. The server then opens the owned Rest preparation surface and commits durable state before presentation completion.
 
 ## Field Camp
 
@@ -63,9 +67,6 @@ Rest applies changes atomically after validating safety and owned resources. Int
 
 ### V1 local Flask Rest transaction
 
-The local Chronicle provides an Expedition Flask page only while the character is in
-`EXPLORATION` near sanctuary spawn. Allocation preview keeps all five slots assigned. Confirmation
-atomically consumes exact versioned Infusion Stock lots and replaces the versioned Flask document;
-stale stock or state rolls back the entire request. No-stock characters below two total charges may
-receive the server-validated Mercy minimum. A successful allocation/refill clears the previous boss
-checkpoint snapshot so it cannot restore an obsolete preparation. See ADR 0024.
+The local Sanctuary/Rest interaction exposes Expedition Flask preparation only while the character is in `EXPLORATION` and the Rest Context is valid. Allocation preview keeps all five slots assigned. Confirmation atomically consumes exact versioned Infusion Stock lots and replaces the versioned Flask document; stale stock or state rolls back the entire request. No-stock characters below two total charges may receive the server-validated Mercy minimum. A successful allocation/refill clears the previous boss checkpoint snapshot so it cannot restore an obsolete preparation. See ADR 0024 and ADR 0025.
+
+Chronicle may display the current Expedition Flask allocation/charges, but it is not the required primary workflow for refill/allocation.

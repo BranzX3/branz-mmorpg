@@ -39,8 +39,7 @@ final class ShieldCombatReadiness {
         return durabilityFailure(shieldDefinition, record.payloadJson());
     }
 
-    static Optional<String> durabilityFailure(
-            ItemDefinition shieldDefinition, String payloadJson) {
+    static Optional<String> durabilityFailure(ItemDefinition shieldDefinition, String payloadJson) {
         Objects.requireNonNull(shieldDefinition, "shieldDefinition");
         Objects.requireNonNull(payloadJson, "payloadJson");
         if (shieldDefinition.shieldProfile().isEmpty()) {

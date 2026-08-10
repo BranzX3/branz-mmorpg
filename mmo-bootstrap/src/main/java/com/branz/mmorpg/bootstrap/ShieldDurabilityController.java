@@ -89,10 +89,7 @@ final class ShieldDurabilityController implements ShieldBlockedImpactObserver {
             return null;
         }
         return new PendingWear(
-                impactId,
-                itemId,
-                definition.id(),
-                definition.baseMaxDurability().getAsInt());
+                impactId, itemId, definition.id(), definition.baseMaxDurability().getAsInt());
     }
 
     private void drain(Player player) {
@@ -147,7 +144,8 @@ final class ShieldDurabilityController implements ShieldBlockedImpactObserver {
                                                                 completeHead(playerId);
                                                                 Player current =
                                                                         plugin.getServer()
-                                                                                .getPlayer(playerId);
+                                                                                .getPlayer(
+                                                                                        playerId);
                                                                 if (current != null
                                                                         && current.isOnline()) {
                                                                     drain(current);

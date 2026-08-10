@@ -12,7 +12,14 @@ import java.util.Objects;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-/** HMAC signer for PDC projection references. The signing key never enters the ItemStack. */
+/**
+ * HMAC signer for PDC projection references. The signing key never enters the ItemStack.
+ *
+ * <p>Physical slot is deliberately not signed. A valid MMO item may move through the player's
+ * inventory while retaining the same signed identity. Placement remains authoritative server state
+ * and is validated/committed separately; duplicate or stale placement is never accepted merely
+ * because the item token itself is valid.
+ */
 public final class ProjectionTokenSigner {
     private static final int KEY_BYTES = 32;
     private static final String ALGORITHM = "HmacSHA256";
@@ -61,7 +68,6 @@ public final class ProjectionTokenSigner {
                 write(output, projection.valueId().toString());
                 write(output, projection.definitionId().value());
                 write(output, projection.valueType().name());
-                output.writeInt(projection.slot());
                 output.writeInt(projection.quantity());
                 output.writeLong(projection.authorityVersion());
                 output.writeLong(projection.displayRevision());

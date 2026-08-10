@@ -4,6 +4,8 @@ import com.branz.mmorpg.api.identity.DefinitionId;
 import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemDefinition;
+import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -12,7 +14,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
@@ -22,11 +23,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 final class ShieldDurabilityController implements BlockedImpactObserver {
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
-    private final ItemEngineLookup items;
+    private final ItemEngine items;
     private final ShieldDurabilityService durability;
     private final PvpCombatPolicy pvp;
     private final String contentVersion;
-    private final Consumer<Player> durabilityChanged;
     private final Map<UUID, ArrayDeque<PendingWear>> queuedByPlayer = new HashMap<>();
     private final Set<UUID> processingPlayers = new HashSet<>();
     private final Set<UUID> retryScheduled = new HashSet<>();
@@ -34,18 +34,16 @@ final class ShieldDurabilityController implements BlockedImpactObserver {
     ShieldDurabilityController(
             JavaPlugin plugin,
             CharacterSessionController characters,
-            ItemEngineLookup items,
+            ItemEngine items,
             ShieldDurabilityService durability,
             PvpCombatPolicy pvp,
-            String contentVersion,
-            Consumer<Player> durabilityChanged) {
+            String contentVersion) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.characters = Objects.requireNonNull(characters, "characters");
         this.items = Objects.requireNonNull(items, "items");
         this.durability = Objects.requireNonNull(durability, "durability");
         this.pvp = Objects.requireNonNull(pvp, "pvp");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
-        this.durabilityChanged = Objects.requireNonNull(durabilityChanged, "durabilityChanged");
     }
 
     @Override
@@ -69,9 +67,7 @@ final class ShieldDurabilityController implements BlockedImpactObserver {
         ItemId itemId =
                 session == null
                         ? null
-                        : session.snapshot().equipment().item(
-                                        com.branz.mmorpg.items.equipment.EquipmentSlot.OFF_HAND)
-                                .orElse(null);
+                        : session.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElse(null);
         if (session == null || itemId == null) {
             return null;
         }
@@ -157,9 +153,7 @@ final class ShieldDurabilityController implements BlockedImpactObserver {
             clearPlayer(playerId);
             return;
         }
-        if (result instanceof Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) {
-            durabilityChanged.accept(current);
-        } else if (result
+        if (result
                 instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
             current.sendActionBar(
                     Component.text(
@@ -222,9 +216,4 @@ final class ShieldDurabilityController implements BlockedImpactObserver {
             ItemId shieldItemId,
             DefinitionId shieldDefinitionId,
             int baseMaximumDurability) {}
-
-    @FunctionalInterface
-    interface ItemEngineLookup {
-        java.util.Optional<ItemDefinition> find(DefinitionId definitionId);
-    }
 }

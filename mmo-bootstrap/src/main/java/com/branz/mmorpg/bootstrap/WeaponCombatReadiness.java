@@ -23,8 +23,7 @@ final class WeaponCombatReadiness {
         if (weapon.baseMaxDurability().isEmpty()) {
             return Optional.empty();
         }
-        ItemId itemId =
-                character.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElse(null);
+        ItemId itemId = character.snapshot().equipment().item(EquipmentSlot.MAIN_HAND).orElse(null);
         ItemLocationRecord record =
                 itemId == null
                         ? null
@@ -46,8 +45,7 @@ final class WeaponCombatReadiness {
         }
         try {
             WeaponDurability durability =
-                    WeaponPayloadCodec.decode(
-                            payloadJson, weapon.baseMaxDurability().getAsInt());
+                    WeaponPayloadCodec.decode(payloadJson, weapon.baseMaxDurability().getAsInt());
             return durability.broken() ? Optional.of(BROKEN) : Optional.empty();
         } catch (IllegalArgumentException exception) {
             return Optional.of(INVALID);

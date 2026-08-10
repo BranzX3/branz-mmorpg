@@ -36,10 +36,23 @@ final class ShieldCombatReadiness {
         if (record == null || !record.definitionId().equals(shieldDefinition.id())) {
             return Optional.of(INSTANCE_UNAVAILABLE);
         }
+        return durabilityFailure(shieldDefinition, record.payloadJson());
+    }
+
+    static Optional<String> durabilityFailure(
+            ItemDefinition shieldDefinition, String payloadJson) {
+        Objects.requireNonNull(shieldDefinition, "shieldDefinition");
+        Objects.requireNonNull(payloadJson, "payloadJson");
+        if (shieldDefinition.shieldProfile().isEmpty()) {
+            return Optional.empty();
+        }
+        if (shieldDefinition.baseMaxDurability().isEmpty()) {
+            return Optional.of(INVALID);
+        }
         try {
             ItemDurability durability =
                     ItemDurabilityPayloadCodec.decode(
-                            record.payloadJson(), shieldDefinition.baseMaxDurability().getAsInt());
+                            payloadJson, shieldDefinition.baseMaxDurability().getAsInt());
             return durability.broken() ? Optional.of(BROKEN) : Optional.empty();
         } catch (IllegalArgumentException exception) {
             return Optional.of(INVALID);

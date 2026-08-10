@@ -25,14 +25,18 @@ public final class SceneProfiles {
                 SceneMode.CHARACTER_INFORMATION,
                 SceneModeProfile.readOnly(SceneMode.CHARACTER_INFORMATION));
 
-        // Existing local features are compatibility overlays, not mandatory Scene workflows.
+        // Rest workflows are contextual Chronicle entries, not primary root categories.
         modes.put(
                 SceneMode.FLASK_PREPARATION,
                 SceneModeProfile.immediate(SceneMode.FLASK_PREPARATION));
+
+        // Existing local features remain compatibility overlays, not mandatory V1 root entries.
         modes.put(
                 SceneMode.JOURNAL_PENDING_REWARDS,
                 SceneModeProfile.readOnly(SceneMode.JOURNAL_PENDING_REWARDS));
         modes.put(SceneMode.SETTINGS_HELP, SceneModeProfile.readOnly(SceneMode.SETTINGS_HELP));
+
+        SceneHubNavigationPolicy.requireLocalCharacterHubModes(modes.keySet());
         return new SceneProfile(
                 DefinitionId.of("scene.character.local_hub"),
                 SceneTopology.LOCAL_CHARACTER,

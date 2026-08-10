@@ -43,8 +43,7 @@ class WeaponDurabilityServiceIntegrationTest {
                             .orElseThrow()
                             .itemId();
             EquipmentLoadout equippedLoadout =
-                    granted
-                            .snapshot()
+                    granted.snapshot()
                             .equipment()
                             .with(EquipmentSlot.MAIN_HAND, Optional.of(swordItemId));
             LoadedCharacterSession equipped =
@@ -62,7 +61,8 @@ class WeaponDurabilityServiceIntegrationTest {
                                     MOVE_ID,
                                     firstOperation,
                                     CONTENT_VERSION));
-            assertEquals(2, durability.authoritativeState(first, swordItemId, SWORD_ID, 3).current());
+            assertEquals(
+                    2, durability.authoritativeState(first, swordItemId, SWORD_ID, 3).current());
 
             LoadedCharacterSession replay =
                     success(
@@ -123,8 +123,7 @@ class WeaponDurabilityServiceIntegrationTest {
 
             assertEquals(
                     swordItemId,
-                    restored
-                            .snapshot()
+                    restored.snapshot()
                             .equipment()
                             .item(EquipmentSlot.MAIN_HAND)
                             .orElseThrow());

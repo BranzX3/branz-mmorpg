@@ -139,8 +139,7 @@ final class ShieldDurabilityController implements BlockedImpactObserver {
                                                             result,
                                                             completed ->
                                                                     completeCommit(
-                                                                            playerId,
-                                                                            completed)));
+                                                                            playerId, completed)));
                         });
     }
 
@@ -154,7 +153,8 @@ final class ShieldDurabilityController implements BlockedImpactObserver {
             return;
         }
         if (result
-                instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
             current.sendActionBar(
                     Component.text(
                             "Shield durability commit failed: " + failure.error().code(),

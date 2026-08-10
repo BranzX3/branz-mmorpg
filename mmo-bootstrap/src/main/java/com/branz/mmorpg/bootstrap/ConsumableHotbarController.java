@@ -479,39 +479,34 @@ final class ConsumableHotbarController implements Listener {
 
     private SelectedConsumable decode(Player player, ItemStack item, int slot) {
         ObservedProjection observed = projections.decode(item, slot).orElse(null);
-        if (observed != null && !observed.signatureValid()) {
-            UUID candidateValueId = observed.valueId();
-            int authoritativeSlot =
-                    characters
-                            .active(player)
-                            .flatMap(
-                                    session ->
-                                            session.snapshot().inventory().stream()
-                                                    .filter(
-                                                            expected ->
-                                                                    expected.valueId()
-                                                                            .equals(
-                                                                                    candidateValueId))
-                                                    .map(expected -> expected.slot())
-                                                    .findFirst())
-                            .orElse(-1);
-            if (authoritativeSlot >= 0) {
-                observed = projections.decode(item, authoritativeSlot).orElse(null);
-            }
-        }
+        LoadedCharacterSession session = characters.active(player).orElse(null);
         if (observed == null
-                || !observed.signatureValid()
+                || session == null
                 || observed.valueType() != ProjectionValueType.STACKABLE_LOT) {
             return null;
         }
-        ItemDefinition definition = items.find(observed.definitionId()).orElse(null);
+        Result<
+                        com.branz.mmorpg.persistence.transaction.LotLocationRecord,
+                        PhysicalLotResolutionErrorCode>
+                authoritative =
+                        PhysicalLotAuthority.resolve(
+                                session.characterId(), slot, observed, session.snapshot());
+        if (!(authoritative
+                instanceof
+                Result.Success<
+                                com.branz.mmorpg.persistence.transaction.LotLocationRecord,
+                                PhysicalLotResolutionErrorCode>
+                        success)) {
+            return null;
+        }
+        com.branz.mmorpg.persistence.transaction.LotLocationRecord lot = success.value();
+        ItemDefinition definition = items.find(lot.definitionId()).orElse(null);
         ConsumableDefinitionProfile profile =
                 definition == null ? null : definition.consumableProfile().orElse(null);
         if (profile == null) {
             return null;
         }
-        return new SelectedConsumable(
-                new LotId(observed.valueId()), observed.definitionId(), profile);
+        return new SelectedConsumable(lot.lotId(), lot.definitionId(), profile);
     }
 
     private record SelectedConsumable(

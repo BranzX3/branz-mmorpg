@@ -36,7 +36,8 @@ class PhysicalLotAuthorityIntegrationTest {
             ObservedProjection exact = observed(expected, 3);
 
             Result<LotLocationRecord, PhysicalLotResolutionErrorCode> resolved =
-                    PhysicalLotAuthority.resolve(granted.characterId(), 3, exact, granted.snapshot());
+                    PhysicalLotAuthority.resolve(
+                            granted.characterId(), 3, exact, granted.snapshot());
 
             assertTrue(resolved instanceof Result.Success<?, ?>);
             LotLocationRecord record =
@@ -72,8 +73,7 @@ class PhysicalLotAuthorityIntegrationTest {
     }
 
     private static ItemDefinition lotDefinition() {
-        return new ItemDefinition(
-                LOT, LOT, ItemClass.STACKABLE_LOT, OptionalInt.empty(), false);
+        return new ItemDefinition(LOT, LOT, ItemClass.STACKABLE_LOT, OptionalInt.empty(), false);
     }
 
     private static DatabaseSettings settings(Path directory) {
@@ -94,8 +94,8 @@ class PhysicalLotAuthorityIntegrationTest {
     private static LoadedCharacterSession success(
             Result<LoadedCharacterSession, CharacterSessionErrorCode> result) {
         if (result
-                instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
-                        failure) {
+                instanceof
+                Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode> failure) {
             throw new AssertionError(failure.error().code() + ": " + failure.detail());
         }
         return ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) result).value();

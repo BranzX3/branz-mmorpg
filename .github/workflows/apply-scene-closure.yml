@@ -1,0 +1,28 @@
+name: apply-scene-closure
+
+on:
+  push:
+    branches:
+      - agent/local-character-scene-closure
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/local-character-scene-closure
+      - name: Apply Scene wiring
+        run: python .github/apply-scene-closure.py
+      - name: Commit Scene wiring
+        run: |
+          rm .github/apply-scene-closure.py
+          rm .github/workflows/apply-scene-closure.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Wire Scene admission and navigation policy"
+          git push origin HEAD:agent/local-character-scene-closure

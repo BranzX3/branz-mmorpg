@@ -3634,6 +3634,11 @@ final class CombatSessionController implements Listener {
         if (character == null) {
             return Optional.of("Combat not ready: character build is unavailable.");
         }
+        Optional<String> durabilityFailure =
+                WeaponCombatReadiness.durabilityFailure(character, main);
+        if (durabilityFailure.isPresent()) {
+            return durabilityFailure;
+        }
         Result<BuildResolution, BuildErrorCode> build =
                 builds.resolve(character.snapshot().build(), family, learnedKnowledge(character));
         return build instanceof Result.Failure<BuildResolution, BuildErrorCode> failure

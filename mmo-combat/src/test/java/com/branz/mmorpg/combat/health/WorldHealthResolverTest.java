@@ -22,6 +22,15 @@ class WorldHealthResolverTest {
     }
 
     @Test
+    void zeroDamagePreservesCurrentHealth() {
+        WorldHealthResolution result = resolver.damage(7.5, 10, 0);
+
+        assertEquals(7.5, result.current());
+        assertEquals(0, result.appliedAmount());
+        assertFalse(result.lethalNow());
+    }
+
+    @Test
     void lethalDamageClampsAtTheRemainingHealth() {
         WorldHealthResolution result = resolver.damage(4, 10, 1000);
 

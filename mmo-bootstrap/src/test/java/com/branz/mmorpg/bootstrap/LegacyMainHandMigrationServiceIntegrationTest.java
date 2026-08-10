@@ -42,15 +42,13 @@ class LegacyMainHandMigrationServiceIntegrationTest {
                     success(
                             sessions.commitEquipment(
                                     granted,
-                                    granted
-                                            .snapshot()
+                                    granted.snapshot()
                                             .equipment()
                                             .with(
                                                     EquipmentSlot.MAIN_HAND,
                                                     java.util.Optional.of(swordId)),
                                     CONTENT));
-            ItemLocationRecord legacy =
-                    itemAt(equipped, ValueLocation.nativeEquipped("MAIN_HAND"));
+            ItemLocationRecord legacy = itemAt(equipped, ValueLocation.nativeEquipped("MAIN_HAND"));
             payload = legacy.payloadJson();
 
             LoadedCharacterSession migrated = success(migration.migrate(equipped, CONTENT));
@@ -80,14 +78,16 @@ class LegacyMainHandMigrationServiceIntegrationTest {
             assertEquals(payload, physical.payloadJson());
 
             LoadedCharacterSession noOp = success(migration.migrate(restored, CONTENT));
-            assertEquals(physical.version(), itemAt(noOp, ValueLocation.inventory("slot:0")).version());
+            assertEquals(
+                    physical.version(), itemAt(noOp, ValueLocation.inventory("slot:0")).version());
             assertFalse(noOp.snapshot().inventory().isEmpty());
             sessions.close(noOp);
         }
     }
 
     private static ItemDefinition uniqueSword() {
-        return new ItemDefinition(SWORD, SWORD, ItemClass.UNIQUE_DURABLE, OptionalInt.of(100), false);
+        return new ItemDefinition(
+                SWORD, SWORD, ItemClass.UNIQUE_DURABLE, OptionalInt.of(100), false);
     }
 
     private static ItemLocationRecord itemAt(

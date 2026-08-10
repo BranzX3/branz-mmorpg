@@ -543,11 +543,18 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 new CharacterSessionService(databaseRuntime, activeBuildEngine.get());
         BukkitInventoryProjectionService inventoryProjectionService =
                 new BukkitInventoryProjectionService(projectionCodec);
+        BukkitPhysicalItemResolver physicalItemResolver =
+                new BukkitPhysicalItemResolver(projectionCodec, activeItemEngine.get());
+        LegacyMainHandMigrationService legacyMainHandMigration =
+                new LegacyMainHandMigrationService(databaseRuntime, characterSessionService);
         characterSessionController =
                 new CharacterSessionController(
                         this,
                         characterSessionService,
                         inventoryProjectionService,
+                        physicalItemResolver,
+                        legacyMainHandMigration,
+                        snapshot.manifest().contentVersion(),
                         activeItemEngine.get(),
                         databaseRuntime.settings());
         physicalInventoryInteractionController =

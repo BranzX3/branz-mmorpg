@@ -53,6 +53,9 @@ final class CharacterSessionController implements Listener {
     private final JavaPlugin plugin;
     private final CharacterSessionService sessions;
     private final BukkitInventoryProjectionService projections;
+    private final BukkitPhysicalItemResolver physicalItems;
+    private final LegacyMainHandMigrationService legacyMainHandMigration;
+    private final String contentVersion;
     private final ItemEngine itemEngine;
     private final long heartbeatTicks;
     private final Map<UUID, UUID> loadAttempts = new HashMap<>();
@@ -69,11 +72,18 @@ final class CharacterSessionController implements Listener {
             JavaPlugin plugin,
             CharacterSessionService sessions,
             BukkitInventoryProjectionService projections,
+            BukkitPhysicalItemResolver physicalItems,
+            LegacyMainHandMigrationService legacyMainHandMigration,
+            String contentVersion,
             ItemEngine itemEngine,
             DatabaseSettings databaseSettings) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.projections = Objects.requireNonNull(projections, "projections");
+        this.physicalItems = Objects.requireNonNull(physicalItems, "physicalItems");
+        this.legacyMainHandMigration =
+                Objects.requireNonNull(legacyMainHandMigration, "legacyMainHandMigration");
+        this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
         this.itemEngine = Objects.requireNonNull(itemEngine, "itemEngine");
         Objects.requireNonNull(databaseSettings, "databaseSettings");
         heartbeatTicks = Math.max(1L, databaseSettings.leaseHeartbeat().toMillis() / 50L);
@@ -119,6 +129,38 @@ final class CharacterSessionController implements Listener {
     Optional<LoadedCharacterSession> active(Player player) {
         return Optional.ofNullable(
                 active.get(Objects.requireNonNull(player, "player").getUniqueId()));
+    }
+
+    Optional<ResolvedPhysicalItem> selectedPhysicalItem(Player player) {
+        Objects.requireNonNull(player, "player");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            return Optional.empty();
+        }
+        Result<ResolvedPhysicalItem, PhysicalItemResolutionErrorCode> resolved =
+                physicalItems.resolveSelected(player, session);
+        return resolved
+                        instanceof
+                        Result.Success<ResolvedPhysicalItem, PhysicalItemResolutionErrorCode>
+                                success
+                ? Optional.of(success.value())
+                : Optional.empty();
+    }
+
+    Optional<ResolvedPhysicalItem> physicalItemAt(Player player, int slot) {
+        Objects.requireNonNull(player, "player");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        if (session == null || !ready(player)) {
+            return Optional.empty();
+        }
+        Result<ResolvedPhysicalItem, PhysicalItemResolutionErrorCode> resolved =
+                physicalItems.resolveSlot(player, session, slot);
+        return resolved
+                        instanceof
+                        Result.Success<ResolvedPhysicalItem, PhysicalItemResolutionErrorCode>
+                                success
+                ? Optional.of(success.value())
+                : Optional.empty();
     }
 
     Optional<LoadedCharacterSession> beginExternalValueMutation(Player player) {
@@ -1030,11 +1072,28 @@ final class CharacterSessionController implements Listener {
                         plugin,
                         () -> {
                             Result<LoadedCharacterSession, CharacterSessionErrorCode> loaded =
-                                    sessions.open(playerId);
+                                    openAndMigrate(playerId);
                             plugin.getServer()
                                     .getScheduler()
                                     .runTask(plugin, () -> completeLoad(playerId, attempt, loaded));
                         });
+    }
+
+    private Result<LoadedCharacterSession, CharacterSessionErrorCode> openAndMigrate(
+            UUID playerId) {
+        Result<LoadedCharacterSession, CharacterSessionErrorCode> opened = sessions.open(playerId);
+        if (opened instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>) {
+            return opened;
+        }
+        LoadedCharacterSession session =
+                ((Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>) opened)
+                        .value();
+        Result<LoadedCharacterSession, CharacterSessionErrorCode> migrated =
+                legacyMainHandMigration.migrate(session, contentVersion);
+        if (migrated instanceof Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>) {
+            sessions.close(session);
+        }
+        return migrated;
     }
 
     private void completeLoad(

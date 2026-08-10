@@ -45,12 +45,13 @@ final class BukkitPhysicalItemResolver {
                 PhysicalInventoryAuthority.resolveUniqueItem(
                         session.characterId(), slot, observed, session.snapshot());
         if (authoritative
-                instanceof Result.Failure<ItemLocationRecord, PhysicalItemResolutionErrorCode>
-                        failure) {
+                instanceof
+                Result.Failure<ItemLocationRecord, PhysicalItemResolutionErrorCode> failure) {
             return Result.failure(failure.error(), failure.detail());
         }
         ItemLocationRecord record =
-                ((Result.Success<ItemLocationRecord, PhysicalItemResolutionErrorCode>) authoritative)
+                ((Result.Success<ItemLocationRecord, PhysicalItemResolutionErrorCode>)
+                                authoritative)
                         .value();
         ItemDefinition definition = items.find(record.definitionId()).orElse(null);
         if (definition == null) {

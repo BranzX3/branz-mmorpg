@@ -18,6 +18,13 @@ class WeaponCombatReadinessTest {
     }
 
     @Test
+    void wornWeaponAboveZeroRemainsReady() {
+        String payload = WeaponPayloadCodec.encode("{}", new WeaponDurability(1, 3));
+
+        assertTrue(WeaponCombatReadiness.durabilityFailure(sword(3), payload).isEmpty());
+    }
+
+    @Test
     void brokenWeaponFailsClosed() {
         String payload = WeaponPayloadCodec.encode("{}", new WeaponDurability(0, 3));
 

@@ -7,12 +7,12 @@ import com.branz.mmorpg.items.definition.ItemEngine;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.projection.ObservedProjection;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
+import com.branz.mmorpg.persistence.transaction.ValueLocation;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -156,7 +156,7 @@ final class PhysicalOffHandInteractionController implements Listener {
                         .orElse(null);
         if (record == null
                 || record.ownerCharacterId().filter(session.characterId()::equals).isEmpty()
-                || !record.location().equals(ValueLocations.offHand())) {
+                || !record.location().equals(ValueLocation.nativeEquipped(EquipmentSlot.OFF_HAND.name()))) {
             return "Committed OFF_HAND item does not match authoritative item truth.";
         }
         ItemDefinition definition = items.find(record.definitionId()).orElse(null);
@@ -177,6 +177,39 @@ final class PhysicalOffHandInteractionController implements Listener {
         return null;
     }
 
+    private void finish(
+            Player player,
+            LoadedCharacterSession session,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> result,
+            String originalFailure) {
+        characters.completeExternalValueMutation(
+                session,
+                result,
+                completed -> {
+                    if (!player.isOnline()) {
+                        return;
+                    }
+                    if (completed
+                            instanceof
+                            Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
+                                    failure) {
+                        player.kick(
+                                Component.text(
+                                        "Off-hand authority could not be reloaded: "
+                                                + failure.detail()
+                                                + ". Reconnect after database recovery.",
+                                        NamedTextColor.RED));
+                        return;
+                    }
+                    if (originalFailure != null) {
+                        player.sendActionBar(
+                                Component.text(
+                                        "Off-hand swap rejected and reconciled: " + originalFailure,
+                                        NamedTextColor.RED));
+                    }
+                });
+    }
+
     private void reconcile(Player player, String detail) {
         LoadedCharacterSession session = characters.beginExternalValueMutation(player).orElse(null);
         if (session == null) {
@@ -191,14 +224,5 @@ final class PhysicalOffHandInteractionController implements Listener {
                         player.sendActionBar(Component.text(detail, NamedTextColor.RED));
                     }
                 });
-    }
-
-    private static final class ValueLocations {
-        private ValueLocations() {}
-
-        static com.branz.mmorpg.persistence.transaction.ValueLocation offHand() {
-            return com.branz.mmorpg.persistence.transaction.ValueLocation.nativeEquipped(
-                    EquipmentSlot.OFF_HAND.name());
-        }
     }
 }

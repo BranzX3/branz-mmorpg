@@ -51,7 +51,8 @@ final class ShieldDurabilityService {
                         .filter(record -> record.itemId().equals(shieldItemId))
                         .findFirst()
                         .orElse(null);
-        ValueLocation expectedLocation = ValueLocation.nativeEquipped(EquipmentSlot.OFF_HAND.name());
+        ValueLocation expectedLocation =
+                ValueLocation.nativeEquipped(EquipmentSlot.OFF_HAND.name());
         if (!shieldItemId.equals(equipped)
                 || shield == null
                 || !shield.definitionId().equals(expectedDefinitionId)
@@ -65,8 +66,7 @@ final class ShieldDurabilityService {
         String replacement;
         try {
             ItemDurability current =
-                    ItemDurabilityPayloadCodec.decode(
-                            shield.payloadJson(), baseMaximumDurability);
+                    ItemDurabilityPayloadCodec.decode(shield.payloadJson(), baseMaximumDurability);
             next = current.spend(DURABILITY_PER_BLOCKED_IMPACT);
             replacement = ItemDurabilityPayloadCodec.encode(shield.payloadJson(), next);
         } catch (IllegalArgumentException exception) {
@@ -120,7 +120,8 @@ final class ShieldDurabilityService {
                         .filter(record -> record.itemId().equals(shieldItemId))
                         .filter(record -> record.definitionId().equals(expectedDefinitionId))
                         .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("shield item is unavailable"));
+                        .orElseThrow(
+                                () -> new IllegalArgumentException("shield item is unavailable"));
         return ItemDurabilityPayloadCodec.decode(shield.payloadJson(), baseMaximumDurability);
     }
 }

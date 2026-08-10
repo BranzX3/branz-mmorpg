@@ -35,7 +35,9 @@ class ShieldDurabilityServiceIntegrationTest {
             ShieldDurabilityService durability = new ShieldDurabilityService(database, sessions);
             LoadedCharacterSession opened = success(sessions.open(playerId));
             LoadedCharacterSession granted =
-                    success(sessions.grantTestValue(opened, shieldDefinition(), 0, CONTENT_VERSION));
+                    success(
+                            sessions.grantTestValue(
+                                    opened, shieldDefinition(), 0, CONTENT_VERSION));
             shieldItemId =
                     granted.snapshot().itemRecords().stream()
                             .filter(record -> record.definitionId().equals(SHIELD_ID))
@@ -72,8 +74,7 @@ class ShieldDurabilityServiceIntegrationTest {
                                     firstImpact,
                                     CONTENT_VERSION));
             assertEquals(
-                    2,
-                    durability.authoritativeState(replay, shieldItemId, SHIELD_ID, 3).current());
+                    2, durability.authoritativeState(replay, shieldItemId, SHIELD_ID, 3).current());
 
             LoadedCharacterSession second =
                     success(
@@ -97,12 +98,7 @@ class ShieldDurabilityServiceIntegrationTest {
 
             Result<LoadedCharacterSession, CharacterSessionErrorCode> exhausted =
                     durability.commitBlockedImpact(
-                            third,
-                            shieldItemId,
-                            SHIELD_ID,
-                            3,
-                            UUID.randomUUID(),
-                            CONTENT_VERSION);
+                            third, shieldItemId, SHIELD_ID, 3, UUID.randomUUID(), CONTENT_VERSION);
             assertTrue(exhausted instanceof Result.Failure<?, ?>);
             sessions.close(third);
         }
@@ -115,7 +111,8 @@ class ShieldDurabilityServiceIntegrationTest {
             assertEquals(
                     shieldItemId,
                     restored.snapshot().equipment().item(EquipmentSlot.OFF_HAND).orElseThrow());
-            assertTrue(durability.authoritativeState(restored, shieldItemId, SHIELD_ID, 3).broken());
+            assertTrue(
+                    durability.authoritativeState(restored, shieldItemId, SHIELD_ID, 3).broken());
             sessions.close(restored);
         }
     }
@@ -133,8 +130,7 @@ class ShieldDurabilityServiceIntegrationTest {
                 Optional.empty(),
                 Optional.of(
                         new ShieldProfile(
-                                new GuardCombatProfile(
-                                        145, 0.9, 4, 130, 24, 24, 10, 22, 50))));
+                                new GuardCombatProfile(145, 0.9, 4, 130, 24, 24, 10, 22, 50))));
     }
 
     private static DatabaseSettings settings(Path databaseDirectory) {

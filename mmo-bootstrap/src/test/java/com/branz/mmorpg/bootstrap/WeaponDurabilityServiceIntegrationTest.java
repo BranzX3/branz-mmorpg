@@ -24,7 +24,7 @@ class WeaponDurabilityServiceIntegrationTest {
     private static final DefinitionId MOVE_ID = DefinitionId.of("move.test_sword.primary_1");
 
     @Test
-    void successfulPhysicalWeaponWearIsAtomicAndSurvivesReconnect(
+    void successfulPhysicalWeaponWearIsAtomicAndSurvivesReconnectAndRestart(
             @org.junit.jupiter.api.io.TempDir Path databaseDirectory) throws Exception {
         DatabaseSettings settings = settings(databaseDirectory);
         UUID playerId = UUID.randomUUID();

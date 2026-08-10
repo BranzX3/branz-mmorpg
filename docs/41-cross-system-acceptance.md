@@ -6,17 +6,26 @@ This matrix defines end-to-end scenarios that must pass before V1 release. Unit 
 
 - Login with valid pack acquires one lease and creates exactly one Chronicle in slot 9.
 - Attempts to move, swap-hand, drop, container-transfer or number-key-swap Chronicle are rejected without inventory desync.
-- Selecting a weapon draws it; selecting Chronicle sheaths it; right-click opens Scene only under allowed conditions.
-- Damage during Scene closes it, removes Preview Actor and preserves all unconfirmed equipment/cosmetic state.
+- Selecting a physical weapon from hotbar 1–8 draws it; selecting Chronicle sheaths it; right-click opens Scene only under allowed conditions.
+- Damage during Scene closes it, removes Preview Actor and preserves all unconfirmed virtual equipment/cosmetic/build state.
+- Chronicle can inspect selected weapon, native off-hand and armor, but ordinary weapon/shield/armor handling does not require Chronicle confirmation.
 
 ## Combat and inventory
 
+- A dev-granted Training Sword is an MMO-owned durable item immediately when granted; it does not become a different logical item after a Scene equip operation.
+- The same Training Sword UUID may be moved to any hotbar slot 1–8, selected, drawn and used without a persistent `MAIN_HAND` equip transaction.
+- Moving the selected sword between hotbar slots preserves UUID, durability, enhancement and other item payload state.
+- An MMO-owned Training Sword can damage and kill an ordinary vanilla cow through exactly one authoritative combat path; no training-only hidden 1000-HP runtime owns that cow.
+- Vanilla melee damage is suppressed only when the MMO runtime actually claims the attack; an unclaimed physical item interaction does not silently become a zero-damage swing.
 - Player opens normal inventory while ENGAGED; enemies continue and may damage the player.
 - Moving a potion into hotbar and closing inventory allows normal consumable timeline; no snapshot/loadout restriction exists.
-- The character-bound Flask representation cannot leave gameplay hotbar slots, spends its durable
-  selected charge at commit and never restores that charge after a post-commit interrupt.
+- Moving a valid shield to off-hand performs the authoritative native-equipment validation/commit and enables the compatible guard style; removing it physically disables that style after reconciliation.
+- Moving valid armor through native armor slots commits authoritative equipment without requiring Chronicle.
+- The character-bound Flask representation cannot leave gameplay hotbar slots, spends its durable selected charge at commit and never restores that charge after a post-commit interrupt.
+- Flask refill/allocation is initiated from valid Sanctuary/Camp/Checkpoint Rest interaction rather than requiring Chronicle as the primary preparation surface.
 - Weapon scroll spam cannot skip sheathe/draw or retain an illegal buffered attack.
 - Dodge, Perfect Guard, Parry and hard CC resolve in the documented priority under same-tick input tests.
+- Disconnect/reconnect and a full server/database restart reconstruct the same physical sword/shield/armor/consumable ownership without duplicate projections or ghost `MAIN_HAND` equipment.
 
 ## Boss retry
 

@@ -109,6 +109,18 @@ class InventoryProjectionMovePlannerTest {
     }
 
     @Test
+    void signedUnknownUuidCannotBecomeMoveIntent() {
+        ExpectedProjection sword = unique(SWORD, 12, 7);
+        ExpectedProjection foreign = unique(CHARM, 20, 4);
+
+        assertFailure(
+                List.of(sword),
+                List.of(observed(foreign, 3)),
+                Optional.empty(),
+                ProjectionMoveErrorCode.PROJECTION_MOVE_UNKNOWN);
+    }
+
+    @Test
     void duplicateUuidAcrossStorageAndCursorIsRejected() {
         ExpectedProjection sword = unique(SWORD, 12, 3);
 

@@ -711,6 +711,14 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         new WeaponDurabilityService(databaseRuntime, characterSessionService),
                         pvpController,
                         snapshot.manifest().contentVersion());
+        ShieldDurabilityController shieldDurabilityController =
+                new ShieldDurabilityController(
+                        this,
+                        characterSessionController,
+                        activeItemEngine.get(),
+                        new ShieldDurabilityService(databaseRuntime, characterSessionService),
+                        pvpController,
+                        snapshot.manifest().contentVersion());
         ResourceNodeContentCompiler.compileFirst(snapshot)
                 .ifPresent(
                         compiledNode -> {
@@ -750,6 +758,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 });
         combatSessionController.setDamageImmunityObserver(downedController::protectedFromDamage);
         combatSessionController.setHostileActionObserver(downedController::observeHostileAction);
+        combatSessionController.setShieldBlockedImpactObserver(shieldDurabilityController);
         combatSessionController.setSuccessfulActionObserver(
                 (actorId, actionId, moveId, currentTick) -> {
                     liveTeachingSessionController.observeSuccessfulAction(

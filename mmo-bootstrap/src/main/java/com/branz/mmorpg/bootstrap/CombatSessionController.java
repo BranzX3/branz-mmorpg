@@ -312,6 +312,8 @@ final class CombatSessionController implements Listener {
     private final Map<UUID, java.util.Set<UUID>> debugViewers = new HashMap<>();
     private SuccessfulCombatActionObserver successfulActionObserver =
             SuccessfulCombatActionObserver.NONE;
+    private ShieldBlockedImpactObserver shieldBlockedImpactObserver =
+            ShieldBlockedImpactObserver.NONE;
     private BiConsumer<Player, String> consumableInterruptObserver = (player, reason) -> {};
     private LethalDamageObserver lethalDamageObserver = LethalDamageObserver.NONE;
     private PvpCombatPolicy pvpCombatPolicy = PvpCombatPolicy.NONE;
@@ -580,6 +582,13 @@ final class CombatSessionController implements Listener {
             throw new IllegalStateException("successful combat action observer is already set");
         }
         successfulActionObserver = Objects.requireNonNull(observer, "observer");
+    }
+
+    void setShieldBlockedImpactObserver(ShieldBlockedImpactObserver observer) {
+        if (shieldBlockedImpactObserver != ShieldBlockedImpactObserver.NONE) {
+            throw new IllegalStateException("shield blocked-impact observer is already set");
+        }
+        shieldBlockedImpactObserver = Objects.requireNonNull(observer, "observer");
     }
 
     private MoveDefinition requirePrimaryMove(DefinitionId id, String family) {
@@ -1224,6 +1233,9 @@ final class CombatSessionController implements Listener {
                                         incomingGuardPressure));
         long currentTick = plugin.getServer().getCurrentTick();
         defenderSession.guard = resolved.guardRuntime();
+        if (ShieldImpactWearPolicy.consumesDurability(resolved.outcome())) {
+            shieldBlockedImpactObserver.observe(defender, UUID.randomUUID());
+        }
         if (resolved.staminaSpent() > 0) {
             defenderSession.resources =
                     defenderSession.resources.spendStamina(resolved.staminaSpent()).orElseThrow();
@@ -3045,7 +3057,7 @@ final class CombatSessionController implements Listener {
         if (available.isEmpty()) {
             player.sendActionBar(
                     Component.text(
-                            combatReadinessFailure(player)
+                            guardReadinessFailure(player)
                                     .orElse("This weapon has no defensive response."),
                             NamedTextColor.RED));
             return;
@@ -3646,8 +3658,36 @@ final class CombatSessionController implements Listener {
                 : Optional.empty();
     }
 
+    private Optional<String> guardReadinessFailure(Player player) {
+        Optional<String> combatFailure = combatReadinessFailure(player);
+        if (combatFailure.isPresent()) {
+            return combatFailure;
+        }
+        ItemDefinition main = equippedDefinition(player, EquipmentSlot.MAIN_HAND).orElse(null);
+        Optional<ItemDefinition> offHand = equippedDefinition(player, EquipmentSlot.OFF_HAND);
+        if (main == null) {
+            return Optional.empty();
+        }
+        Result<WeaponLoadoutResolution, WeaponLoadoutErrorCode> resolved =
+                WeaponLoadoutPolicy.resolve(main, offHand);
+        if (resolved
+                instanceof
+                Result.Failure<WeaponLoadoutResolution, WeaponLoadoutErrorCode> failure) {
+            return Optional.of("Guard not ready: " + failure.detail());
+        }
+        ItemDefinition shield =
+                offHand.filter(definition -> definition.shieldProfile().isPresent()).orElse(null);
+        if (shield == null) {
+            return Optional.empty();
+        }
+        LoadedCharacterSession character = characters.active(player).orElse(null);
+        return character == null
+                ? Optional.of("Guard not ready: character state is unavailable.")
+                : ShieldCombatReadiness.durabilityFailure(character, shield);
+    }
+
     private Optional<GuardEngine> guardEngineFor(Player player) {
-        if (combatReadinessFailure(player).isPresent()) {
+        if (guardReadinessFailure(player).isPresent()) {
             return Optional.empty();
         }
         ItemDefinition main = equippedDefinition(player, EquipmentSlot.MAIN_HAND).orElse(null);
@@ -4518,6 +4558,9 @@ final class CombatSessionController implements Listener {
                                         Math.max(1.0, incomingPostureDamage)
                                                 * profile.guardPressureMultiplier()));
         defenderSession.guard = resolved.guardRuntime();
+        if (ShieldImpactWearPolicy.consumesDurability(resolved.outcome())) {
+            shieldBlockedImpactObserver.observe(defender, UUID.randomUUID());
+        }
         if (resolved.staminaSpent() > 0) {
             defenderSession.resources =
                     defenderSession.resources.spendStamina(resolved.staminaSpent()).orElseThrow();

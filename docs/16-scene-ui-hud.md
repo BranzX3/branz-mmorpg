@@ -47,12 +47,13 @@ Pod for the normal Chronicle menu.
 The actor mirrors:
 
 - skin/profile,
-- gameplay equipment,
+- currently selected physical weapon and native armor/off-hand,
+- virtual equipment,
 - cosmetics and dye,
-- held weapon or selected pose,
+- selected pose,
 - scale/pose supported by provider.
 
-It has no collision, AI, hitbox, persistence or visibility to other players. Preview changes exist in `ScenePreviewState`; only Confirm invokes a transaction.
+Physical gameplay equipment is inspectable in Scene but remains owned by normal inventory/off-hand/armor interaction. Preview changes exist only for Scene-owned build/virtual/cosmetic state; only Confirm invokes the corresponding transaction.
 
 ## Scene close triggers
 
@@ -89,11 +90,26 @@ The following are not mandatory V1 Scene workflows:
 
 ### Character & Equipment
 
-- Equipment slots and comparison.
-- Armor load tier.
-- Durability and traits.
-- Visible attunement/load constraints.
-- Qualitative handling/conditioning feedback.
+This page is a character/build surface rather than the primary physical inventory equip screen.
+
+Read-only physical inspection:
+
+- currently selected weapon from hotbar 1–8;
+- physical off-hand and native armor;
+- armor load tier;
+- durability and traits;
+- qualitative handling/conditioning feedback.
+
+Editable Scene-owned state:
+
+- Necklace;
+- Ring I;
+- Ring II;
+- Talisman;
+- Quiver/build configuration where allowed;
+- other authored virtual equipment.
+
+Weapons, shields, native armor and normal consumables are moved/equipped through ordinary inventory interaction and are not selected from an equipment deck in Chronicle.
 
 ### Wardrobe & Dye
 
@@ -129,6 +145,10 @@ The following are not mandatory V1 Scene workflows:
 
 - Read-only character identity and combat/build summary.
 - It has no Preview/Confirm transaction.
+
+## Rest-owned preparation
+
+Flask refill/allocation is owned by the current Sanctuary/Inn/Field Camp/Checkpoint Rest interaction. Chronicle may display current Flask allocation and charges as character information, but V1 does not require Chronicle to be the primary refill/preparation surface.
 
 ## Inventory UI implementation
 

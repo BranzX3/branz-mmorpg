@@ -12,12 +12,17 @@ implementation is complete or ready for acceptance.
 
 ## Current single-feature delivery queue
 
-1. **Physical gameplay item authority refactor — `IN_PROGRESS`.** Replace the temporary
-   `MAIN_HAND`/Scene-deck interaction model with the authored physical model from ADR 0025: weapons
-   and consumables live in hotbar 1–8, selected hotbar weapon drives combat authority, shield/armor
-   use native physical slots, Chronicle owns build/virtual/cosmetic state, and production world mobs
-   never use training-only hidden health. Migrate legacy main-hand locations idempotently while
-   preserving item UUID/payload/durability and reconnect/restart truth.
+1. **Physical gameplay item authority refactor — `AUTOMATED_VERIFIED`; live client pass pending.**
+   The temporary `MAIN_HAND`/Scene-deck authority is removed for the currently authored gameplay
+   content: weapons and whole consumable lots use physical inventory/hotbar truth, the selected
+   signed hotbar weapon drives combat, authored shields use transactional native `OFF_HAND`,
+   Chronicle cannot mutate native weapon/shield/armor slots, legacy MAIN_HAND migrates before Player
+   Session readiness, and ordinary world mobs use canonical entity health. CI covers idempotent
+   move/swap/wear, reconnect/restart and selected-slot authority. Active content has no authored MMO
+   armor profile/item, so HEAD/CHEST/LEGS/FEET remain deliberately fail-closed rather than inferred
+   from Bukkit Material. The required real Paper client A–F pass is recorded in
+   `44-physical-gameplay-item-acceptance.md`; per `42-ai-coding-handoff.md`, feature 2 remains blocked
+   until that live pass succeeds.
 2. **Local Character Scene/build configuration — `NOT_STARTED` for renewed acceptance (blocked by
    feature 1).** Preserve the already-tested world-backed Scene lifecycle/recovery, but remove
    ordinary weapon/shield/native-armor/consumable equip from the Scene acceptance target. Re-verify

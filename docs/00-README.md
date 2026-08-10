@@ -87,6 +87,7 @@ Any change to persistent identity, input ownership, transaction semantics, state
 | `41-cross-system-acceptance.md` | End-to-end acceptance and crash-recovery matrix |
 | `42-ai-coding-handoff.md` | Coding-agent prompt/PR contracts and stop conditions |
 | `43-content-authoring-tools.md` | Content CLI, in-game labs, simulations, authoring UX and PR previews |
+| `44-physical-gameplay-item-acceptance.md` | Physical hotbar/offhand/consumable authority live acceptance and evidence gate |
 
 ## V1 content target
 

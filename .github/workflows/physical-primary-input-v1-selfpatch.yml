@@ -1,0 +1,114 @@
+name: physical-primary-input-v1-selfpatch
+
+on:
+  push:
+    branches:
+      - acceptance/physical-primary-input-v1
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Patch physical primary-input acceptance
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          controller = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/CombatSessionController.java')
+          text = controller.read_text(encoding='utf-8')
+          intent_old = '''        if (intent != SemanticInput.PRIMARY) {
+            return;
+        }
+        event.setCancelled(true);
+'''
+          intent_new = '''        if (intent != SemanticInput.PRIMARY) {
+            return;
+        }
+        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_PRIMARY_INTENT_SERVER player="
+                                    + event.getPlayer().getName());
+        }
+        event.setCancelled(true);
+'''
+          if text.count(intent_old) != 1:
+              raise SystemExit(f'primary intent anchor count={text.count(intent_old)}')
+          text = text.replace(intent_old, intent_new, 1)
+
+          route_old = '''        if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
+            handleRoute(event.getPlayer(), session, success.value());
+        }
+'''
+          route_new = '''        if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
+            if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+                plugin.getLogger()
+                        .info(
+                                "PHYSICAL_AUTHORITY_PRIMARY_ROUTED_SERVER player="
+                                        + event.getPlayer().getName());
+            }
+            handleRoute(event.getPlayer(), session, success.value());
+        }
+'''
+          if text.count(route_old) != 1:
+              raise SystemExit(f'primary route anchor count={text.count(route_old)}')
+          controller.write_text(text.replace(route_old, route_new, 1), encoding='utf-8')
+
+          client = Path('acceptance/physical-client-26.2/src/gametest/java/com/branz/mmorpg/acceptance/PhysicalAuthorityClientGameTest.java')
+          text = client.read_text(encoding='utf-8')
+          client_old = '''        System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
+        context.getInput().pressKey(options -> options.keyChat);
+'''
+          client_new = '''        System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
+        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
+        context.waitTicks(5);
+        context.getInput().pressKey(options -> options.keyChat);
+'''
+          if text.count(client_old) != 1:
+              raise SystemExit(f'client gameplay anchor count={text.count(client_old)}')
+          client.write_text(text.replace(client_old, client_new, 1), encoding='utf-8')
+
+          build = Path('mmo-bootstrap/build.gradle.kts')
+          text = build.read_text(encoding='utf-8')
+          build_old = '''    jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
+
+    val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
+'''
+          build_new = '''    jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
+
+    val physicalPrimaryInputAcceptance =
+        providers.gradleProperty("physicalPrimaryInputAcceptance").orNull == "true"
+    if (physicalPrimaryInputAcceptance) {
+        jvmArgs("-Dmmo.physical-primary-input-acceptance=true")
+    }
+
+    val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
+'''
+          if text.count(build_old) != 1:
+              raise SystemExit(f'runServer property anchor count={text.count(build_old)}')
+          build.write_text(text.replace(build_old, build_new, 1), encoding='utf-8')
+          PY
+      - name: Validate repository and client acceptance compile
+        shell: bash
+        run: |
+          ./gradlew clean build
+          (cd acceptance/physical-client-26.2 && ./gradlew --no-daemon --console=plain compileGameTestJava)
+      - name: Commit bounded patch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/CombatSessionController.java mmo-bootstrap/build.gradle.kts acceptance/physical-client-26.2/src/gametest/java/com/branz/mmorpg/acceptance/PhysicalAuthorityClientGameTest.java
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git commit -m 'acceptance: observe real client primary input boundary'
+          git push origin HEAD:${GITHUB_REF_NAME}

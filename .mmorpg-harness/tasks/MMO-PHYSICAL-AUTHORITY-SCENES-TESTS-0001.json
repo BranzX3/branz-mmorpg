@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-AUTHORITY-SCENES-TESTS-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-AUTHORITY-SCENES-TESTS-0001",
+  "base_commit": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "action_id": "MMO_GRADLE_TEST_SCENES_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-AUTHORITY-SCENES-TESTS-0001/**"
+  ]
+}

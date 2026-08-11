@@ -1127,18 +1127,56 @@ final class CombatSessionController implements Listener {
                 });
     }
 
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPhysicalPrimaryInteractObservation(PlayerInteractEvent event) {
+        if (!Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+            return;
+        }
+        if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND
+                || (event.getAction() != Action.LEFT_CLICK_AIR
+                        && event.getAction() != Action.LEFT_CLICK_BLOCK)) {
+            return;
+        }
+        plugin.getLogger()
+                .info(
+                        "PHYSICAL_AUTHORITY_PRIMARY_INTERACT_SERVER player="
+                                + event.getPlayer().getName()
+                                + " action="
+                                + event.getAction());
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onArmSwing(PlayerAnimationEvent event) {
         if (event.getAnimationType() != PlayerAnimationType.ARM_SWING) {
             return;
         }
+        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_ARM_SWING_SERVER player="
+                                    + event.getPlayer().getName());
+        }
         LiveSession session = sessions.get(event.getPlayer().getUniqueId());
         if (session == null || !characters.ready(event.getPlayer())) {
             return;
         }
+        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_PRIMARY_SESSION_READY_SERVER player="
+                                    + event.getPlayer().getName());
+        }
         MoveDefinition primary = primaryMove(event.getPlayer()).orElse(null);
         if (primary == null) {
             return;
+        }
+        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_PRIMARY_MOVE_RESOLVED_SERVER player="
+                                    + event.getPlayer().getName()
+                                    + " move="
+                                    + primary.id());
         }
         SemanticInput intent =
                 resolvedIntent(event.getPlayer(), session, ClientAction.ATTACK).orElse(null);

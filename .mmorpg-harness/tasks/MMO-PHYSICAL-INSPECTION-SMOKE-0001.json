@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-INSPECTION-SMOKE-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-INSPECTION-SMOKE-0001",
+  "base_commit": "c694973d557e2176f082d91b7c89b8d7423cf1a6",
+  "action_id": "MMO_BOOTSTRAP_SMOKE_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-INSPECTION-SMOKE-0001/**"
+  ]
+}

@@ -13,10 +13,16 @@ JSON or large raw server logs. Keep only the stable authority fields and minimum
 identify a failed or passed invariant.
 
 For the physical gameplay item authority pass, follow
-`../45-physical-gameplay-item-live-runbook.md` and the acceptance owner
-`../44-physical-gameplay-item-acceptance.md`. On the accepted runtime use `/mmo physical status` for
+`../45-physical-gameplay-item-live-runbook.md`, the acceptance owner
+`../44-physical-gameplay-item-acceptance.md`, and the mandatory environment gate
+`physical-gameplay-item-environment.md`. On the accepted runtime use `/mmo physical status` for
 item/lot authority evidence; section A additionally uses the old runtime's signed held-item
 projection evidence as described by the runbook.
+
+The physical A-F evidence record must also contain one environment fingerprint covering Paper build
+and commit identity, Java runtime/JAVA_HOME, client version and acceptance machine. The same
+fingerprint must remain valid for every A0/A1/server restart used by that pass. If it changes, discard
+the mixed evidence and restart A-F from A0.
 
 A feature status must not advance from `AUTOMATED_VERIFIED` to `LIVE_ACCEPTED` merely because an
 evidence file exists. The owning acceptance checklist must actually pass on a real local client.

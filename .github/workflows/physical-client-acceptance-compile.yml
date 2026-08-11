@@ -1,0 +1,27 @@
+name: physical-client-acceptance-compile
+
+on:
+  push:
+    branches:
+      - lead/physical-client-acceptance-harness-v1
+  pull_request:
+    paths:
+      - 'acceptance/physical-client-26.2/**'
+      - '.github/workflows/physical-client-acceptance-compile.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Compile client acceptance harness
+        shell: bash
+        working-directory: acceptance/physical-client-26.2
+        run: ./gradlew --no-daemon --console=plain build

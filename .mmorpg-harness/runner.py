@@ -391,7 +391,10 @@ def action_client_acceptance_compile(
 
 
 def action_client_acceptance_ingress(
-    repo: Path, result_dir: Path, manifest: dict[str, Any]
+    repo: Path,
+    result_dir: Path,
+    manifest: dict[str, Any],
+    require_primary_input: bool = False,
 ) -> tuple[int, str, str, dict[str, Any]]:
     import re
     import shutil
@@ -439,6 +442,8 @@ def action_client_acceptance_ingress(
         "--console=plain",
         ":mmo-bootstrap:runServer",
     ]
+    if require_primary_input:
+        server_argv.append("-PphysicalPrimaryInputAcceptance=true")
     client_argv = [
         str(client_wrapper),
         "--no-daemon",
@@ -585,6 +590,17 @@ def action_client_acceptance_ingress(
             "client_exit_zero": client_rc == 0,
             "server_exit_zero": server_rc == 0,
         }
+        if require_primary_input:
+            checks.update(
+                {
+                    "primary_mouse_sent_client": "PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT"
+                    in client_text,
+                    "primary_intent_server": "PHYSICAL_AUTHORITY_PRIMARY_INTENT_SERVER"
+                    in paper_text,
+                    "primary_routed_server": "PHYSICAL_AUTHORITY_PRIMARY_ROUTED_SERVER"
+                    in paper_text,
+                }
+            )
         passed = all(checks.values())
         return (
             0 if passed else 1,
@@ -594,7 +610,11 @@ def action_client_acceptance_ingress(
             "",
             {
                 "action_status": "PASS" if passed else "FAIL",
-                "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS",
+                "fixed_command_id": (
+                    "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT"
+                    if require_primary_input
+                    else "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS"
+                ),
                 "server_argv": server_argv,
                 "client_argv": client_argv,
                 "player_name": player_name,
@@ -613,6 +633,14 @@ def action_client_acceptance_ingress(
                 kill_tree(server)
         kill_tree(client)
         kill_tree(server)
+
+
+def action_client_acceptance_primary_input(
+    repo: Path, result_dir: Path, manifest: dict[str, Any]
+) -> tuple[int, str, str, dict[str, Any]]:
+    return action_client_acceptance_ingress(
+        repo, result_dir, manifest, require_primary_input=True
+    )
 
 
 ActionHandler = Callable[[Path, Path, dict[str, Any]], tuple[int, str, str, dict[str, Any]]]
@@ -713,6 +741,9 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     ),
     "MMO_CLIENT_ACCEPTANCE_INGRESS_V1": ActionSpec(
         action_client_acceptance_ingress, "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS"
+    ),
+    "MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1": ActionSpec(
+        action_client_acceptance_primary_input, "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT"
     ),
 }
 

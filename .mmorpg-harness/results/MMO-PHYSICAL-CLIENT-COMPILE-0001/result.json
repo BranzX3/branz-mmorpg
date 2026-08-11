@@ -1,0 +1,38 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_COMPILE_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_COMPILE",
+  "action_record": {
+    "action_status": "PASS",
+    "argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "build"
+    ],
+    "client_wrapper_properties_sha256": "bfacbb1c556cb1b3f213cfd01f20d54f4f6c2bff68c31ef6762f745a0ac9d757",
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 121.109,
+    "exit_code": 0,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_COMPILE",
+    "working_directory": "acceptance/physical-client-26.2"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CLIENT-COMPILE-0001/**"
+  ],
+  "base_commit_expected": "0797f8faca76972e78ccf789db67604d7a9f90ed",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "f1c9f03fd34eb7972db85929bc06cefa24ec0acc",
+  "duration_seconds": 121.391,
+  "ending_commit_before_result_commit": "0797f8faca76972e78ccf789db67604d7a9f90ed",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-11T12:11:17.884726+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-11T12:09:16.486968+00:00",
+  "starting_commit_actual": "0797f8faca76972e78ccf789db67604d7a9f90ed",
+  "task_branch": "harness-task/MMO-PHYSICAL-CLIENT-COMPILE-0001",
+  "task_id": "MMO-PHYSICAL-CLIENT-COMPILE-0001",
+  "task_manifest_sha256": "e403f017349a04a9d885477b3a56c5ed1bef64848a5d6962f19e805d4ff76ca9",
+  "unauthorized_writes": []
+}

@@ -64,6 +64,27 @@ def main() -> int:
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_HOTBAR_MOVES"
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1"].handler is R.action_client_acceptance_hotbar_moves
 
+    sequence_uuid = "11111111-1111-1111-1111-111111111111"
+    dynamic_snapshots = [
+        {"uuid": sequence_uuid, "slot": 0, "version": 4, "durability": 100, "max_durability": 100},
+        {"uuid": sequence_uuid, "slot": 7, "version": 5, "durability": 100, "max_durability": 100},
+        {"uuid": sequence_uuid, "slot": 7, "version": 5, "durability": 100, "max_durability": 100},
+        {"uuid": sequence_uuid, "slot": 6, "version": 6, "durability": 100, "max_durability": 100},
+        {"uuid": sequence_uuid, "slot": 6, "version": 6, "durability": 100, "max_durability": 100},
+    ]
+    dynamic_commits = [(sequence_uuid, 0, 7), (sequence_uuid, 7, 6)]
+    assert all(R.evaluate_hotbar_move_sequence(dynamic_snapshots, dynamic_commits).values())
+
+    bad_slots = [dict(row) for row in dynamic_snapshots]
+    bad_slots[3]["slot"] = 7
+    bad_slots[4]["slot"] = 7
+    assert not R.evaluate_hotbar_move_sequence(bad_slots, dynamic_commits)["hotbar_slot_sequence"]
+
+    bad_commit = [(sequence_uuid, 0, 7), (sequence_uuid, 7, 5)]
+    assert not R.evaluate_hotbar_move_sequence(dynamic_snapshots, bad_commit)[
+        "hotbar_server_commit_sequence"
+    ]
+
     bad = manifest(action="NOT_REAL")
     expect_code("ACTION_NOT_ALLOWLISTED", lambda: R.validate_manifest(bad))
 

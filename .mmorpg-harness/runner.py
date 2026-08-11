@@ -217,6 +217,27 @@ def expected_writes(task_id: str) -> tuple[str, ...]:
     return (f"{result_dir_rel(task_id)}/**",)
 
 
+def stage_evidence_files(repo: Path, result_dir: Path, allowed: tuple[str, ...] | list[str]) -> list[str]:
+    """Force-stage only evidence files under the allowlisted result directory.
+
+    Evidence intentionally includes stdout/stderr logs even when the implementation branch ignores
+    ``*.log``. The harness capability boundary, not repository ignore rules, owns result staging.
+    """
+    paths = [
+        path.relative_to(repo).as_posix()
+        for path in sorted(result_dir.rglob("*"))
+        if path.is_file()
+    ]
+    if not paths:
+        raise HarnessError("NO_EVIDENCE_CHANGES", result_dir.relative_to(repo).as_posix())
+    bad = [path for path in paths if not path_allowed(path, allowed)]
+    if bad:
+        raise HarnessError("UNAUTHORIZED_EVIDENCE_PATH", json.dumps(bad))
+    for path in paths:
+        git(repo, "add", "-f", "--", path)
+    return paths
+
+
 def validate_manifest(manifest: dict[str, Any]) -> tuple[str, str, str, str]:
     bad_command_keys = sorted(set(manifest) & COMMAND_LIKE_KEYS)
     if bad_command_keys:
@@ -423,7 +444,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     "MMO_BOOTSTRAP_SHADOWJAR_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:shadowJar",), 1200, "BOOTSTRAP_SHADOWJAR"), "BOOTSTRAP_SHADOWJAR"),
     "MMO_BOOTSTRAP_SMOKE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PsmokeTest=true"), 600, "BOOTSTRAP_SMOKE"), "BOOTSTRAP_SMOKE"),
     "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1": ActionSpec(action_bootstrap_combat_acceptance, "BOOTSTRAP_COMBAT_ACCEPTANCE"),
-    "MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PsmokeTest=true", "-PsmokeInvalidContent=true"), 600, "BOOTSTRAP_INVALID_CONTENT_SMOKE"), "BOOTSTRAP_INVALID_CONTENT_SMOKE"),
+    "MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PsmokeTest=true", "-PsmokeInvalidContent=true"), 600, "BOOTSTRAP_INVALID_CONTENT_SMOKE"),
     "MMO_CONTENT_VALIDATE_FIXTURE_V1": ActionSpec(action_content_validate_fixture, "CONTENT_VALIDATE_MILESTONE1"),
 }
 
@@ -563,16 +584,7 @@ def execute_task(repo: Path, manifest: dict[str, Any], manifest_sha: str, contro
     write_json(result_dir / "hashes.json", hashes)
     final = classify_worktree(repo)
 
-    stage: set[str] = set()
-    for entry in final["substantive"]:
-        if path_allowed(entry["path"], allowed):
-            stage.add(entry["path"])
-        if entry.get("source_path") and path_allowed(entry["source_path"], allowed):
-            stage.add(entry["source_path"])
-    if not stage:
-        raise HarnessError("NO_EVIDENCE_CHANGES", task_id)
-    for path in sorted(stage):
-        git(repo, "add", "-A", "--", path)
+    stage_evidence_files(repo, result_dir, allowed)
     staged = [p for p in git(repo, "diff", "--cached", "--name-only").stdout.splitlines() if p]
     bad = [p for p in staged if not path_allowed(p, allowed)]
     if bad:

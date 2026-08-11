@@ -67,6 +67,26 @@ final class PhysicalInventoryInteractionController implements Listener {
             return;
         }
         UUID playerId = player.getUniqueId();
+        if (Boolean.getBoolean("mmo.physical-hotbar-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_HOTBAR_CLICK_HANDLER_SERVER player="
+                                    + player.getName()
+                                    + " action="
+                                    + event.getAction()
+                                    + " click="
+                                    + event.getClick()
+                                    + " rawSlot="
+                                    + event.getRawSlot()
+                                    + " slot="
+                                    + event.getSlot()
+                                    + " cancelled="
+                                    + event.isCancelled()
+                                    + " currentProjection="
+                                    + hasProjection(event.getCurrentItem())
+                                    + " cursorProjection="
+                                    + hasProjection(player.getItemOnCursor()));
+        }
         PendingInteraction interaction = pending.get(playerId);
         boolean touchesMmo =
                 hasProjection(event.getCurrentItem()) || hasProjection(player.getItemOnCursor());
@@ -101,6 +121,36 @@ final class PhysicalInventoryInteractionController implements Listener {
             pending.put(playerId, interaction);
         }
         scheduleObservation(playerId);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void observeHotbarAcceptanceClick(InventoryClickEvent event) {
+        if (!Boolean.getBoolean("mmo.physical-hotbar-acceptance")
+                || !(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        plugin.getLogger()
+                .info(
+                        "PHYSICAL_AUTHORITY_HOTBAR_CLICK_MONITOR_SERVER player="
+                                + player.getName()
+                                + " action="
+                                + event.getAction()
+                                + " click="
+                                + event.getClick()
+                                + " rawSlot="
+                                + event.getRawSlot()
+                                + " slot="
+                                + event.getSlot()
+                                + " cancelled="
+                                + event.isCancelled()
+                                + " sameInventory="
+                                + (event.getClickedInventory() == player.getInventory())
+                                + " currentProjection="
+                                + hasProjection(event.getCurrentItem())
+                                + " eventCursorProjection="
+                                + hasProjection(event.getCursor())
+                                + " playerCursorProjection="
+                                + hasProjection(player.getItemOnCursor()));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -183,6 +233,16 @@ final class PhysicalInventoryInteractionController implements Listener {
                 ((Result.Success<PhysicalInventoryObservation, ProjectionMoveErrorCode>)
                                 observation)
                         .value();
+        if (Boolean.getBoolean("mmo.physical-hotbar-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_HOTBAR_OBSERVATION_SERVER player="
+                                    + player.getName()
+                                    + " storageCount="
+                                    + observed.storage().size()
+                                    + " cursorPresent="
+                                    + observed.cursor().isPresent());
+        }
         Result<ProjectionMovePlan, ProjectionMoveErrorCode> planned =
                 InventoryProjectionMovePlanner.plan(
                         interaction.session().snapshot().inventory(),
@@ -192,11 +252,39 @@ final class PhysicalInventoryInteractionController implements Listener {
                         ChronicleService.HOTBAR_SLOT);
         if (planned
                 instanceof Result.Failure<ProjectionMovePlan, ProjectionMoveErrorCode> failure) {
+            if (Boolean.getBoolean("mmo.physical-hotbar-acceptance")) {
+                plugin.getLogger()
+                        .severe(
+                                "PHYSICAL_AUTHORITY_HOTBAR_PLAN_FAILED_SERVER player="
+                                        + player.getName()
+                                        + " code="
+                                        + failure.error().code()
+                                        + " detail="
+                                        + failure.detail());
+            }
             abortInteraction(playerId, failure.error().code() + ": " + failure.detail());
             return;
         }
         ProjectionMovePlan plan =
                 ((Result.Success<ProjectionMovePlan, ProjectionMoveErrorCode>) planned).value();
+        if (Boolean.getBoolean("mmo.physical-hotbar-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_HOTBAR_PLAN_SERVER player="
+                                    + player.getName()
+                                    + " disposition="
+                                    + plan.disposition()
+                                    + " intent="
+                                    + plan.intent()
+                                            .map(
+                                                    intent ->
+                                                            intent.sourceSlot()
+                                                                    + "->"
+                                                                    + intent.destinationSlot()
+                                                                    + ":"
+                                                                    + intent.valueId())
+                                            .orElse("none"));
+        }
         if (plan.disposition() == ProjectionMoveDisposition.TRANSIENT_CURSOR) {
             return;
         }
@@ -240,6 +328,18 @@ final class PhysicalInventoryInteractionController implements Listener {
     private void commit(
             Player player, PendingInteraction interaction, ProjectionMoveIntent intent) {
         UUID playerId = player.getUniqueId();
+        if (Boolean.getBoolean("mmo.physical-hotbar-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_HOTBAR_COMMIT_BEGIN_SERVER player="
+                                    + player.getName()
+                                    + " source="
+                                    + intent.sourceSlot()
+                                    + " destination="
+                                    + intent.destinationSlot()
+                                    + " value="
+                                    + intent.valueId());
+        }
         if (!pending.replace(
                 playerId,
                 interaction,

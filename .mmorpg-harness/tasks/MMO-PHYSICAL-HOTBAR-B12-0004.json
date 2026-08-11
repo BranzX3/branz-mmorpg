@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-HOTBAR-B12-0004",
+  "task_branch": "harness-task/MMO-PHYSICAL-HOTBAR-B12-0004",
+  "base_commit": "b2cbe3ac491de9cdbc08929d1184430726e0b955",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-HOTBAR-B12-0004/**"
+  ]
+}

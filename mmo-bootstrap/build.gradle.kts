@@ -59,9 +59,26 @@ tasks.runServer {
                 rootProject.layout.projectDirectory.dir("example-content/milestone-1").asFile
         }
     jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
-    if (providers.gradleProperty("smokeTest").orNull == "true") {
+
+    val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
+    if (smokeTest) {
+        val smokeDatabaseDirectory =
+            layout.projectDirectory.dir("run/plugins/BranzMMO/smoke-embedded-postgres").asFile
+        val smokeFailureMarker =
+            layout.projectDirectory.file("run/plugins/BranzMMO/smoke-startup-failure.marker").asFile
+        doFirst {
+            project.delete(smokeDatabaseDirectory)
+            project.delete(smokeFailureMarker)
+        }
         jvmArgs(
             "-Dmmo.bootstrap.smoke-test=true",
         )
+        doLast {
+            if (smokeFailureMarker.isFile) {
+                throw GradleException(
+                    "Bootstrap smoke startup failed: ${smokeFailureMarker.readText().trim()}",
+                )
+            }
+        }
     }
 }

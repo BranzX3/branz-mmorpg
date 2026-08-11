@@ -1,0 +1,57 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT",
+  "action_record": {
+    "action_status": "FAIL",
+    "checks": {
+      "client_exit_zero": true,
+      "primary_intent_server": false,
+      "primary_mouse_sent_client": true,
+      "primary_projection_ready_client": true,
+      "primary_routed_server": false,
+      "primary_stage_persisted_server": true,
+      "primary_stage_projected_server": true,
+      "server_exit_zero": true,
+      "server_handshake_client": true,
+      "status_command_logged_server": true,
+      "status_command_sent_client": true
+    },
+    "client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalPrimaryInputAcceptance=true"
+    ],
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 91.062,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT",
+    "player_name": "Player0",
+    "server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalPrimaryInputAcceptance=true"
+    ]
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-PRIMARY-INPUT-0005/**"
+  ],
+  "base_commit_expected": "5584f9ba458d7327de9d359d9649bb48fd09a94d",
+  "blocker_code": "ACTION_FAILED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "695f8ac07e9320e5db35484bcd8ca228cabbfcf0",
+  "duration_seconds": 92.141,
+  "ending_commit_before_result_commit": "5584f9ba458d7327de9d359d9649bb48fd09a94d",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-11T17:29:25.216707+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-11T17:27:53.073983+00:00",
+  "starting_commit_actual": "5584f9ba458d7327de9d359d9649bb48fd09a94d",
+  "task_branch": "harness-task/MMO-PHYSICAL-PRIMARY-INPUT-0005",
+  "task_id": "MMO-PHYSICAL-PRIMARY-INPUT-0005",
+  "task_manifest_sha256": "8cba74b1d0457b082fbb9de6d8c1c27cd641c0b315b4fd424b57c16f6d834ee6",
+  "unauthorized_writes": []
+}

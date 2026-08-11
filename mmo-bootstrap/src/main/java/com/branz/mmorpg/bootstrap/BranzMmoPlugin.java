@@ -821,7 +821,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                         if (!acceptancePreparedPlayers.add(player.getUniqueId())) {
                             return;
                         }
-                        characterSessionController.grantTestValue(
+                        characterSessionController.grantAcceptanceValue(
                                 player,
                                 acceptanceWeapon,
                                 snapshot.manifest().contentVersion(),

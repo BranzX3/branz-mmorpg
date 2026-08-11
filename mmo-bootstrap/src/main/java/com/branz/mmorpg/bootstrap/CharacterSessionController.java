@@ -239,6 +239,53 @@ final class CharacterSessionController implements Listener {
                         });
     }
 
+    void grantAcceptanceValue(
+            Player player,
+            ItemDefinition definition,
+            String contentVersion,
+            Consumer<Result<LoadedCharacterSession, CharacterSessionErrorCode>> completion) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(definition, "definition");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        Objects.requireNonNull(completion, "completion");
+        LoadedCharacterSession session = active.get(player.getUniqueId());
+        int slot = firstFreeStorageSlot(player);
+        if (session == null || !ready(player)) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "Character session is not ready."));
+            return;
+        }
+        if (slot < 0) {
+            completion.accept(
+                    Result.failure(
+                            CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                            "No free inventory slot is available."));
+            return;
+        }
+        if (!valueMutationInFlight.add(player.getUniqueId())) {
+            completion.accept(valueMutationBusy());
+            return;
+        }
+        plugin.getServer()
+                .getScheduler()
+                .runTaskAsynchronously(
+                        plugin,
+                        () -> {
+                            Result<LoadedCharacterSession, CharacterSessionErrorCode> result =
+                                    sessions.grantAcceptanceValue(
+                                            session, definition, slot, contentVersion);
+                            plugin.getServer()
+                                    .getScheduler()
+                                    .runTask(
+                                            plugin,
+                                            () ->
+                                                    completeSnapshotMutation(
+                                                            session, result, completion));
+                        });
+    }
+
     void consumeAmmo(
             Player player,
             DefinitionId ammoDefinitionId,

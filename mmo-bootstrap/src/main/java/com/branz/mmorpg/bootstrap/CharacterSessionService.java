@@ -334,6 +334,49 @@ final class CharacterSessionService {
         return reload(session);
     }
 
+    Result<LoadedCharacterSession, CharacterSessionErrorCode> grantAcceptanceValue(
+            LoadedCharacterSession session,
+            ItemDefinition definition,
+            int inventorySlot,
+            String contentVersion) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(definition, "definition");
+        Objects.requireNonNull(contentVersion, "contentVersion");
+        if (definition.itemClass() != ItemClass.UNIQUE_DURABLE) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_STATE_INVALID,
+                    "Physical acceptance staging requires one unique durable item.");
+        }
+        UUID valueId = UUID.randomUUID();
+        String payload = "{\"displayRevision\":1}";
+        TransactionRequest request =
+                TransactionRequest.forCharacter(
+                        new TransactionId(UUID.randomUUID()),
+                        "acceptance-grant:" + valueId,
+                        session.characterId(),
+                        session.sessionId(),
+                        JdbcValueTransactionService.ITEM_GRANT,
+                        "{}",
+                        "{\"definitionId\":\"" + definition.id().value() + "\",\"quantity\":1}",
+                        contentVersion);
+        Result<TransactionExecution, TransactionErrorCode> granted =
+                database.values()
+                        .grantItem(
+                                request,
+                                new NewItemLocation(
+                                        new ItemId(valueId),
+                                        definition.id(),
+                                        java.util.Optional.of(session.characterId()),
+                                        ValueLocation.inventory("slot:" + inventorySlot),
+                                        payload));
+        if (granted instanceof Result.Failure<TransactionExecution, TransactionErrorCode> failure) {
+            return Result.failure(
+                    CharacterSessionErrorCode.CHARACTER_TRANSACTION_REJECTED,
+                    failure.error().code() + ": " + failure.detail());
+        }
+        return reload(session);
+    }
+
     Result<LoadedCharacterSession, CharacterSessionErrorCode> consumeAmmo(
             LoadedCharacterSession session,
             DefinitionId ammoDefinitionId,

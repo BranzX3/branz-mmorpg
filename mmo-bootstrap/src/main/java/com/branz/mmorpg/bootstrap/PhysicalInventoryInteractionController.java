@@ -296,6 +296,7 @@ final class PhysicalInventoryInteractionController implements Listener {
                                                     finishCommit(
                                                             playerId,
                                                             interaction,
+                                                            intent,
                                                             completed,
                                                             failureMessage));
                         });
@@ -304,6 +305,7 @@ final class PhysicalInventoryInteractionController implements Listener {
     private void finishCommit(
             UUID playerId,
             PendingInteraction interaction,
+            ProjectionMoveIntent intent,
             Result<LoadedCharacterSession, CharacterSessionErrorCode> result,
             String originalFailure) {
         pending.remove(playerId);
@@ -336,8 +338,66 @@ final class PhysicalInventoryInteractionController implements Listener {
                                         "Inventory move rejected and reconciled: "
                                                 + originalFailure,
                                         NamedTextColor.RED));
+                        return;
+                    }
+                    if (Boolean.getBoolean("mmo.physical-hotbar-acceptance")
+                            && completed
+                                    instanceof
+                                    Result.Success<
+                                                    LoadedCharacterSession,
+                                                    CharacterSessionErrorCode>
+                                            success) {
+                        recordHotbarAcceptanceMove(player, success.value(), intent);
                     }
                 });
+    }
+
+    private void recordHotbarAcceptanceMove(
+            Player player, LoadedCharacterSession completed, ProjectionMoveIntent intent) {
+        if (intent.valueType()
+                != com.branz.mmorpg.items.projection.ProjectionValueType.UNIQUE_ITEM) {
+            return;
+        }
+        String expectedReference = "slot:" + intent.destinationSlot();
+        boolean authoritative =
+                completed.snapshot().itemRecords().stream()
+                        .anyMatch(
+                                record ->
+                                        record.itemId().value().equals(intent.valueId())
+                                                && record.location().type()
+                                                        == com.branz.mmorpg.persistence.transaction
+                                                                .ValueLocationType
+                                                                .CHARACTER_INVENTORY
+                                                && record.location()
+                                                        .reference()
+                                                        .filter(expectedReference::equals)
+                                                        .isPresent());
+        if (!authoritative) {
+            plugin.getLogger()
+                    .severe(
+                            "PHYSICAL_AUTHORITY_HOTBAR_MOVE_VERIFY_FAILED_SERVER player="
+                                    + player.getName()
+                                    + " value="
+                                    + intent.valueId()
+                                    + " destination="
+                                    + intent.destinationSlot());
+            return;
+        }
+        plugin.getLogger()
+                .info(
+                        "PHYSICAL_AUTHORITY_HOTBAR_MOVE_COMMITTED_SERVER player="
+                                + player.getName()
+                                + " value="
+                                + intent.valueId()
+                                + " source="
+                                + intent.sourceSlot()
+                                + " destination="
+                                + intent.destinationSlot());
+        if (intent.sourceSlot() == 0 && intent.destinationSlot() == 1) {
+            player.setLevel(9);
+        } else if (intent.sourceSlot() == 1 && intent.destinationSlot() == 2) {
+            player.setLevel(10);
+        }
     }
 
     private void abortInteraction(UUID playerId, String detail) {

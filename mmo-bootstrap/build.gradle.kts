@@ -65,6 +65,11 @@ tasks.runServer {
     if (physicalPrimaryInputAcceptance) {
         jvmArgs("-Dmmo.physical-primary-input-acceptance=true")
     }
+    val physicalHotbarAcceptance =
+        providers.gradleProperty("physicalHotbarAcceptance").orNull == "true"
+    if (physicalHotbarAcceptance) {
+        jvmArgs("-Dmmo.physical-hotbar-acceptance=true")
+    }
 
     val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
     if (smokeTest) {

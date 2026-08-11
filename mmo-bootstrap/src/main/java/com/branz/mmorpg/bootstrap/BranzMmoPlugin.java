@@ -855,6 +855,7 @@ public final class BranzMmoPlugin extends JavaPlugin {
                                                                 + player.getName()
                                                                 + " definition="
                                                                 + acceptanceWeapon.id());
+                                        player.setLevel(8);
                                     }));
         }
         characterSessionController.addEquipmentMutationHandler(

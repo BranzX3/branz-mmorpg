@@ -1,0 +1,36 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_BOOTSTRAP_SMOKE_V1",
+  "action_identity": "BOOTSTRAP_SMOKE",
+  "action_record": {
+    "action_status": "PASS",
+    "argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PsmokeTest=true"
+    ],
+    "duration_seconds": 18.75,
+    "exit_code": 0,
+    "fixed_command_id": "BOOTSTRAP_SMOKE"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-AUTHORITY-BOOTSTRAP-SMOKE-0001/**"
+  ],
+  "base_commit_expected": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "696a4afb03e3382025645e08baa48a2f383a51f4",
+  "duration_seconds": 18.828,
+  "ending_commit_before_result_commit": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-11T07:30:55.297324+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-11T07:30:36.473598+00:00",
+  "starting_commit_actual": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "task_branch": "harness-task/MMO-PHYSICAL-AUTHORITY-BOOTSTRAP-SMOKE-0001",
+  "task_id": "MMO-PHYSICAL-AUTHORITY-BOOTSTRAP-SMOKE-0001",
+  "task_manifest_sha256": "23a6ee7162e620591841cc139c531b118153bc115f2d589658cca1e6055044d7",
+  "unauthorized_writes": []
+}

@@ -139,10 +139,54 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
             ClientGameTestContext context, int sourceSlot, int destinationSlot) {
         context.getInput().pressKey(options -> options.keyInventory);
         context.waitForScreen(InventoryScreen.class);
+
         setHotbarCursor(context, sourceSlot);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        context.waitFor(
+                client -> {
+                    if (!(client.gui.screen() instanceof InventoryScreen screen)
+                            || client.player == null) {
+                        return false;
+                    }
+                    Slot source =
+                            findHotbarSlot(screen, client.player.getInventory(), sourceSlot);
+                    return source.getItem().isEmpty() && !screen.getMenu().getCarried().isEmpty();
+                },
+                20 * 5);
+        System.out.println(
+                "PHYSICAL_AUTHORITY_HOTBAR_PICKUP_OBSERVED_CLIENT source=" + sourceSlot);
+
         setHotbarCursor(context, destinationSlot);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        context.waitFor(
+                client -> {
+                    if (!(client.gui.screen() instanceof InventoryScreen screen)
+                            || client.player == null) {
+                        return false;
+                    }
+                    Slot destination =
+                            findHotbarSlot(screen, client.player.getInventory(), destinationSlot);
+                    return !destination.getItem().isEmpty()
+                            && screen.getMenu().getCarried().isEmpty();
+                },
+                20 * 5);
+        System.out.println(
+                "PHYSICAL_AUTHORITY_HOTBAR_PLACE_OBSERVED_CLIENT destination="
+                        + destinationSlot);
+        context.waitTicks(2);
+    }
+
+    private static Slot findHotbarSlot(InventoryScreen screen, Object inventory, int hotbarSlot) {
+        return screen.getMenu().slots.stream()
+                .filter(
+                        candidate ->
+                                candidate.container == inventory
+                                        && candidate.getContainerSlot() == hotbarSlot)
+                .findFirst()
+                .orElseThrow(
+                        () ->
+                                new AssertionError(
+                                        "Hotbar slot not found in InventoryScreen: " + hotbarSlot));
     }
 
     private static void setHotbarCursor(ClientGameTestContext context, int hotbarSlot) {
@@ -155,20 +199,8 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                                         "InventoryScreen and player must be present for hotbar input");
                             }
                             Slot slot =
-                                    screen.getMenu().slots.stream()
-                                            .filter(
-                                                    candidate ->
-                                                            candidate.container
-                                                                            == client.player
-                                                                                    .getInventory()
-                                                                    && candidate.getContainerSlot()
-                                                                            == hotbarSlot)
-                                            .findFirst()
-                                            .orElseThrow(
-                                                    () ->
-                                                            new AssertionError(
-                                                                    "Hotbar slot not found in InventoryScreen: "
-                                                                            + hotbarSlot));
+                                    findHotbarSlot(
+                                            screen, client.player.getInventory(), hotbarSlot);
                             double guiWidth = client.getWindow().getGuiScaledWidth();
                             double guiHeight = client.getWindow().getGuiScaledHeight();
                             double screenWidth = client.getWindow().getScreenWidth();

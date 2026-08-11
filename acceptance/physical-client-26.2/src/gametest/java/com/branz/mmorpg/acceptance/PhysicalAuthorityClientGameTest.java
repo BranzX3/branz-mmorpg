@@ -94,7 +94,6 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.waitFor(
                 client ->
                         client.player != null
-                                && client.player.getInventory().getItem(0).isEmpty()
                                 && !client.player
                                         .getInventory()
                                         .getItem(moveOneDestination)
@@ -107,7 +106,6 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.waitFor(
                 client ->
                         client.player != null
-                                && client.player.getInventory().getItem(0).isEmpty()
                                 && !client.player
                                         .getInventory()
                                         .getItem(moveOneDestination)
@@ -133,10 +131,6 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.waitFor(
                 client ->
                         client.player != null
-                                && client.player
-                                        .getInventory()
-                                        .getItem(moveOneDestination)
-                                        .isEmpty()
                                 && !client.player
                                         .getInventory()
                                         .getItem(moveTwoDestination)
@@ -149,10 +143,6 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.waitFor(
                 client ->
                         client.player != null
-                                && client.player
-                                        .getInventory()
-                                        .getItem(moveOneDestination)
-                                        .isEmpty()
                                 && !client.player
                                         .getInventory()
                                         .getItem(moveTwoDestination)

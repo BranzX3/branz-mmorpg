@@ -135,8 +135,7 @@ Join the test character and wait for the session to become ready.
 The signed legacy projection is evidence of the exact authoritative value identity/version that the
 old runtime reconstructed from MAIN_HAND. The live pass does **not** expose or copy raw database
 payload JSON. Raw payload preservation remains an automated migration invariant; the client pass
-checks the same UUID, expected location/version transition and resolved durability before/after the
-upgrade.
+checks the same UUID, exact version transition and resolved durability before/after the upgrade.
 
 Do not delete or move `mmo-bootstrap/run` after this point.
 
@@ -159,9 +158,10 @@ Pass only when all are true:
   `CHARACTER_INVENTORY/slot:n` location, with `n` in 0-35 excluding Chronicle slot 8;
 - definition/content identity remain the expected Training Sword values;
 - resolved durability is still `120/120` for the fresh, unused migration sword;
-- version advanced only as required by the location transition relative to the captured legacy
-  authority version;
-- disconnect/reconnect keeps that exact UUID, committed inventory slot, version and durability;
+- target `ver` is **exactly** the captured legacy `projection_authority_version + 1`; the migration is
+  one authoritative item-location move and must not spend an additional version;
+- disconnect/reconnect keeps that exact UUID, committed inventory slot, post-migration version and
+  durability;
 - full server stop/restart and reconnect keeps that same authoritative state again;
 - the item is never forced back into player-facing hotbar slot 1 by migration or projection.
 

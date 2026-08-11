@@ -1,0 +1,450 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :mmo-api:compileJava UP-TO-DATE
+> Task :mmo-api:processResources NO-SOURCE
+> Task :mmo-api:classes UP-TO-DATE
+> Task :mmo-api:jar UP-TO-DATE
+> Task :mmo-content:compileJava UP-TO-DATE
+> Task :mmo-combat:compileJava UP-TO-DATE
+> Task :mmo-integrations:compileJava UP-TO-DATE
+> Task :mmo-items:compileJava UP-TO-DATE
+> Task :mmo-lifeskills:compileJava UP-TO-DATE
+> Task :mmo-magic:compileJava UP-TO-DATE
+> Task :mmo-progression:compileJava UP-TO-DATE
+> Task :mmo-persistence:compileJava UP-TO-DATE
+> Task :mmo-scenes:compileJava UP-TO-DATE
+> Task :mmo-social:compileJava UP-TO-DATE
+> Task :mmo-worldloop:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-mythicmobs:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-oraxen:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-packetevents:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-wallet:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-worldguard:compileJava UP-TO-DATE
+> Task :mmo-bootstrap:compileJava UP-TO-DATE
+> Task :mmo-bootstrap:processResources UP-TO-DATE
+> Task :mmo-bootstrap:classes UP-TO-DATE
+> Task :mmo-combat:processResources NO-SOURCE
+> Task :mmo-combat:classes UP-TO-DATE
+> Task :mmo-combat:jar UP-TO-DATE
+> Task :mmo-content:processResources NO-SOURCE
+> Task :mmo-content:classes UP-TO-DATE
+> Task :mmo-content:jar UP-TO-DATE
+> Task :mmo-integrations:processResources NO-SOURCE
+> Task :mmo-integrations:classes UP-TO-DATE
+> Task :mmo-integrations:jar UP-TO-DATE
+> Task :mmo-items:processResources NO-SOURCE
+> Task :mmo-items:classes UP-TO-DATE
+> Task :mmo-items:jar UP-TO-DATE
+> Task :mmo-lifeskills:processResources NO-SOURCE
+> Task :mmo-lifeskills:classes UP-TO-DATE
+> Task :mmo-lifeskills:jar UP-TO-DATE
+> Task :mmo-magic:processResources NO-SOURCE
+> Task :mmo-magic:classes UP-TO-DATE
+> Task :mmo-magic:jar UP-TO-DATE
+> Task :mmo-persistence:processResources UP-TO-DATE
+> Task :mmo-persistence:classes UP-TO-DATE
+> Task :mmo-persistence:jar UP-TO-DATE
+> Task :mmo-progression:processResources NO-SOURCE
+> Task :mmo-progression:classes UP-TO-DATE
+> Task :mmo-progression:jar UP-TO-DATE
+> Task :mmo-scenes:processResources NO-SOURCE
+> Task :mmo-scenes:classes UP-TO-DATE
+> Task :mmo-scenes:jar UP-TO-DATE
+> Task :mmo-social:processResources NO-SOURCE
+> Task :mmo-social:classes UP-TO-DATE
+> Task :mmo-social:jar UP-TO-DATE
+> Task :mmo-worldloop:processResources NO-SOURCE
+> Task :mmo-worldloop:classes UP-TO-DATE
+> Task :mmo-worldloop:jar UP-TO-DATE
+> Task :mmo-integrations:integration-mythicmobs:processResources NO-SOURCE
+> Task :mmo-integrations:integration-mythicmobs:classes UP-TO-DATE
+> Task :mmo-integrations:integration-mythicmobs:jar UP-TO-DATE
+> Task :mmo-integrations:integration-oraxen:processResources NO-SOURCE
+> Task :mmo-integrations:integration-oraxen:classes UP-TO-DATE
+> Task :mmo-integrations:integration-oraxen:jar UP-TO-DATE
+> Task :mmo-integrations:integration-packetevents:processResources NO-SOURCE
+> Task :mmo-integrations:integration-packetevents:classes UP-TO-DATE
+> Task :mmo-integrations:integration-packetevents:jar UP-TO-DATE
+> Task :mmo-integrations:integration-wallet:processResources NO-SOURCE
+> Task :mmo-integrations:integration-wallet:classes UP-TO-DATE
+> Task :mmo-integrations:integration-wallet:jar UP-TO-DATE
+> Task :mmo-integrations:integration-worldguard:processResources NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:classes UP-TO-DATE
+> Task :mmo-integrations:integration-worldguard:jar UP-TO-DATE
+> Task :mmo-bootstrap:shadowJar UP-TO-DATE
+
+> Task :mmo-bootstrap:runServer
+Located Paper 26.2 build 112 in local cache.
+Starting Paper...
+
+Downloading mojang_26.2.jar
+Applying patches
+Starting org.bukkit.craftbukkit.Main
+2026-08-11T13:36:30.025926200Z ServerMain WARN Advanced terminal features are not available in this environment
+[20:36:30 INFO]: [bootstrap] Running Java 25 (OpenJDK 64-Bit Server VM 25.0.3+9-LTS; Eclipse Adoptium Temurin-25.0.3+9) on Windows 11 10.0 (amd64)
+[20:36:30 INFO]: [bootstrap] Loading Paper 26.2-112-main@c9e894d (2026-08-11T05:18:39Z) for Minecraft 26.2
+[20:36:30 INFO]: [PluginInitializerManager] Initializing plugins...
+[20:36:30 INFO]: [PluginInitializerManager] Initialized 1 plugin
+[20:36:30 INFO]: [PluginInitializerManager] Bukkit plugins (1):
+ - BranzMMO (1.0.0-SNAPSHOT)
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/C:/Users/User/AppData/Local/BranzMMORPGHarness/repo/mmo-bootstrap/run/libraries/org/joml/joml/1.10.8/joml-1.10.8.jar)
+WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[20:36:33 INFO]: [ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry] Initialising converters for DataConverter...
+[20:36:34 INFO]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, profilesHost=https://api.mojang.com, name=PROD]
+[20:36:34 INFO]: [ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry] Finished initialising converters for DataConverter in 476.1ms
+[20:36:34 INFO]: Found new data pack paper, loading it automatically
+[20:36:35 INFO]: No existing world data, creating new world
+[20:36:35 INFO]: Loaded 1585 recipes
+[20:36:35 INFO]: Loaded 1688 advancements
+[20:36:35 INFO]: Starting minecraft server version 26.2
+[20:36:35 INFO]: Loading properties
+[20:36:35 INFO]: This server is running Paper version 26.2-112-main@c9e894d (2026-08-11T05:18:39Z) (Implementing API version 26.2.build.112-stable)
+[20:36:35 INFO]: [spark] This server bundles the spark profiler. For more information please visit https://docs.papermc.io/paper/profiling
+[20:36:35 INFO]: Using 4 threads for Netty based IO
+[20:36:35 INFO]: Server Ping Player Sample Count: 12
+[20:36:36 INFO]: [MoonriseCommon] Paper is using 3 worker threads, 1 I/O threads
+[20:36:36 INFO]: Default game type: SURVIVAL
+[20:36:36 INFO]: Generating keypair
+[20:36:36 INFO]: Starting Minecraft server on *:25565
+[20:36:36 INFO]: Paper: Using Java compression from Velocity.
+[20:36:36 INFO]: Paper: Using Java cipher from Velocity.
+[20:36:36 INFO]: [BranzMMO] Loading server plugin BranzMMO v1.0.0-SNAPSHOT
+[20:36:36 INFO]: [BranzMMO] Enabling BranzMMO v1.0.0-SNAPSHOT
+[20:36:36 INFO]: [BranzMMO] Loading and validating content snapshot from C:\Users\User\AppData\Local\BranzMMORPGHarness\repo\example-content\milestone-1
+[20:36:36 WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!
+[20:36:36 WARN]: The server will make no attempt to authenticate usernames. Beware.
+[20:36:36 WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.
+[20:36:36 WARN]: To change this, set "online-mode" to "true" in the server.properties file.
+[20:36:36 INFO]: Preparing level "world"
+[20:36:36 INFO]: Selecting spawn point for level 'minecraft:overworld'...
+[20:36:39 INFO]: Selecting spawn point for level 'minecraft:the_nether'...
+[20:36:39 INFO]: Selecting spawn point for level 'minecraft:the_end'...
+[20:36:39 INFO]: Loading 0 persistent chunks for level 'minecraft:overworld'...
+[20:36:39 INFO]: Preparing spawn area: 100%
+[20:36:39 INFO]: Prepared spawn area in 2981 ms
+[20:36:39 INFO]: Loading 0 persistent chunks for level 'minecraft:the_nether'...
+[20:36:39 INFO]: Preparing spawn area: 100%
+[20:36:39 INFO]: Prepared spawn area in 600 ms
+[20:36:39 INFO]: Loading 0 persistent chunks for level 'minecraft:the_end'...
+[20:36:39 INFO]: Preparing spawn area: 100%
+[20:36:39 INFO]: Prepared spawn area in 224 ms
+[20:36:39 INFO]: Done preparing level "world" (3.295s)
+[20:36:39 INFO]: [spark] Starting background profiler...
+[20:36:39 INFO]: [spark] The async-profiler engine is not supported for your os/arch (windows11/amd64), so the built-in Java engine will be used instead.
+[20:36:40 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:overworld
+[20:36:40 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:the_nether
+[20:36:40 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:the_end
+[20:36:40 INFO]: ThreadedAnvilChunkStorage (world): All chunks are saved
+[20:36:40 INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[20:36:40 INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[20:36:40 INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[20:36:40 INFO]: Running delayed init tasks
+[20:36:40 INFO]: Done (10.764s)! For help, type "help"
+[20:36:40 INFO]: *************************************************************************************
+[20:36:40 INFO]: This is the first time you're starting this server.
+[20:36:40 INFO]: It's recommended you read our 'Getting Started' documentation for guidance.
+[20:36:40 INFO]: View this and more helpful information here: https://docs.papermc.io/paper/next-steps
+[20:36:40 INFO]: *************************************************************************************
+[20:36:40 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Detected a Windows x86_64 system
+[20:36:40 INFO]: [io.zonky.test.db.postgres.embedded.DefaultPostgresBinaryResolver] Detected distribution: 'Unknown'
+[20:36:40 INFO]: [io.zonky.test.db.postgres.embedded.DefaultPostgresBinaryResolver] System specific postgres binaries found: 'postgres-windows-x86_64.txz'
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Postgres binaries at C:\Users\User\AppData\Local\Temp\embedded-pg\PG-3942d5a1dcdbfebc27772e9e670d5d85
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] The files belonging to this database system will be owned by user "User".
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] This user must also own the server process.
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] The database cluster will be initialized with locale "English_United States.874".
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] The default text search configuration will be set to "english".
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Data page checksums are disabled.
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] fixing permissions on existing directory C:/Users/User/AppData/Local/BranzMMORPGHarness/repo/mmo-bootstrap/run/plugins/BranzMMO/embedded-postgres ... ok
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] creating subdirectories ... ok
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] selecting dynamic shared memory implementation ... windows
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] selecting default max_connections ... 100
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] selecting default shared_buffers ... 128MB
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] selecting default time zone ... Asia/Bangkok
+[20:36:41 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] creating configuration files ... ok
+[20:36:42 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] running bootstrap script ... ok
+[20:36:45 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] performing post-bootstrap initialization ... ok
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] syncing data to disk ... ok
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Success. You can now start the database server using:
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres]     ^"C^:^\Users^\User^\AppData^\Local^\Temp^\embedded^-pg^\PG^-3942d5a1dcdbfebc27772e9e670d5d85^\bin^\pg^_ctl^" -D ^"C^:^\Users^\User^\AppData^\Local^\BranzMMORPGHarness^\repo^\mmo^-bootstrap^\run^\plugins^\BranzMMO^\embedded^-postgres^" -l logfile start
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 432513c9-7063-4bad-9fcd-bd2123810f79 initdb completed in 00:00:08.284
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 432513c9-7063-4bad-9fcd-bd2123810f79 postmaster started as Process[pid=22804, exitValue="not exited"] on port 59157.  Waiting up to PT10S for server startup to finish.
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] waiting for server to start....2026-08-11 20:36:49.503 +07 [14292] LOG:  starting PostgreSQL 14.22, compiled by Visual C++ build 1944, 64-bit
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 20:36:49.510 +07 [14292] LOG:  listening on IPv6 address "::1", port 59157
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 20:36:49.510 +07 [14292] LOG:  listening on IPv4 address "127.0.0.1", port 59157
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 20:36:49.558 +07 [10940] LOG:  database system was shut down at 2026-08-11 20:36:45 +07
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 20:36:49.643 +07 [14292] LOG:  database system is ready to accept connections
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres]  done
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] server started
+[20:36:49 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 432513c9-7063-4bad-9fcd-bd2123810f79 postmaster startup finished in 00:00:00.516
+[20:36:51 INFO]: [BranzMMO] Milestone 3 runtime ready; item definitions=20, move definitions=6, spell definitions=5, technique definitions=5, form definitions=4, ailment definitions=6, encounter reward definitions=1, Scene presentation=WORLD_BACKED
+[20:36:51 INFO]: [BranzMMO] Provider asset.oraxen=UNAVAILABLE [OPTIONAL]: plugin is not installed: Oraxen
+[20:36:51 INFO]: [BranzMMO] Provider mob.mythicmobs=UNAVAILABLE [OPTIONAL]: plugin is not installed: MythicMobs
+[20:36:51 INFO]: [BranzMMO] Provider packet.packetevents=UNAVAILABLE [OPTIONAL]: plugin is not installed: packetevents
+[20:36:51 INFO]: [BranzMMO] Provider region.worldguard=UNAVAILABLE [OPTIONAL]: plugin is not installed: WorldGuard
+[20:36:51 INFO]: [BranzMMO] Provider wallet.external=UNAVAILABLE [OPTIONAL]: plugin is not installed: Wallet
+[20:36:51 WARN]: [BranzMMO] asset.oraxen [OPTIONAL]: plugin is not installed: Oraxen
+[20:36:51 WARN]: [BranzMMO] mob.mythicmobs [OPTIONAL]: plugin is not installed: MythicMobs
+[20:36:51 WARN]: [BranzMMO] packet.packetevents [OPTIONAL]: plugin is not installed: packetevents
+[20:36:51 WARN]: [BranzMMO] region.worldguard [OPTIONAL]: plugin is not installed: WorldGuard
+[20:36:51 WARN]: [BranzMMO] wallet.external [OPTIONAL]: plugin is not installed: Wallet
+[20:36:51 INFO]: [BranzMMO] Branz MMO startup DEGRADED; content=v1.milestone-1.example.4, definitions=48
+[20:36:51 INFO]: [BranzMMO] PostgreSQL runtime ready; mode=EMBEDDED_LOCAL, server-instance=local-50db9389-3637-43f3-b72a-b653d0335519
+[20:36:51 INFO]: [BranzMMO] Recovered 0 boss encounter(s) from V0009.
+[20:36:51 INFO]: [BranzMMO] Death Pouch reconciliation is ready.
+[20:36:51 INFO]: [BranzMMO] Recovered 0 downed encounter(s) from V0010.
+[20:37:26 INFO]: UUID of player Player0 is 2654e3c3-150d-3857-a426-0b141796a4e0
+[20:37:32 INFO]: Player0 joined the game
+[20:37:32 INFO]: Player0[/127.0.0.1:59755] logged in with entity id 5 at ([minecraft:overworld]-89.5, 71.0, 150.5)
+[20:37:32 INFO]: Made Player0 a server operator
+[20:37:32 INFO]: Set 7 experience levels on Player0
+[20:37:34 INFO]: Player0 issued server command: /mmo physical status
+[20:37:35 INFO]: Stopping the server
+[20:37:35 INFO]: Stopping server
+[20:37:35 INFO]: [BranzMMO] Disabling BranzMMO v1.0.0-SNAPSHOT
+[20:37:35 ERROR]: [STDERR] [me.lucko.spark.paper.common.util.log.Logger$1] Uncaught exception thrown in thread spark-java-sampler-2-thread-5
+[20:37:35 WARN]: java.util.concurrent.CancellationException
+[20:37:35 WARN]: 	at java.base/java.util.concurrent.FutureTask.report(FutureTask.java:123)
+[20:37:35 WARN]: 	at java.base/java.util.concurrent.FutureTask.get(FutureTask.java:193)
+[20:37:35 WARN]: 	at me.lucko.spark.paper.common.util.SparkScheduledThreadPoolExecutor.afterExecute(SparkScheduledThreadPoolExecutor.java:48)
+[20:37:35 WARN]: 	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1091)
+[20:37:35 WARN]: 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+[20:37:35 WARN]: 	at java.base/java.lang.Thread.run(Thread.java:1474)
+[20:37:35 ERROR]: [ca.spottedleaf.moonrise.common.util.TickThread] Thread failed main thread check: Accessing poi chunk off-main, context=thread=Paper Common Worker #0, world=minecraft:overworld, chunk_pos=[-1, 11]
+java.lang.Throwable
+	at ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(TickThread.java:64) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.entity.ai.village.poi.PoiManager.getOrLoad(PoiManager.java:89) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.entity.ai.village.poi.PoiManager.exists(PoiManager.java:410) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.level.ServerLevel.lambda$updatePOIOnBlockStateChange$3(ServerLevel.java:2400) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.TickTask.run(TickTask.java:18) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.util.thread.BlockableEventLoop.doRunTask(BlockableEventLoop.java:207) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.util.thread.ReentrantBlockableEventLoop.doRunTask(ReentrantBlockableEventLoop.java:24) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.MinecraftServer.doRunTask(MinecraftServer.java:1534) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.MinecraftServer.doRunTask(MinecraftServer.java:192) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.util.thread.BlockableEventLoop.execute(BlockableEventLoop.java:150) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.level.ServerLevel.lambda$updatePOIOnBlockStateChange$2(ServerLevel.java:2398) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at java.base/java.util.Optional.ifPresent(Optional.java:178) ~[?:?]
+	at net.minecraft.server.level.ServerLevel.updatePOIOnBlockStateChange(ServerLevel.java:2398) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.level.WorldGenRegion.setBlock(WorldGenRegion.java:366) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.LevelWriter.setBlock(LevelWriter.java:13) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.TreeFeature.lambda$place$2(TreeFeature.java:151) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.treedecorators.TreeDecorator$Context.setBlock(TreeDecorator.java:60) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.treedecorators.BeehiveDecorator.place(BeehiveDecorator.java:56) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.TreeFeature.lambda$place$3(TreeFeature.java:157) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at java.base/java.lang.Iterable.forEach(Iterable.java:75) ~[?:?]
+	at net.minecraft.world.level.levelgen.feature.TreeFeature.place(TreeFeature.java:157) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.Feature.place(Feature.java:192) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.ConfiguredFeature.place(ConfiguredFeature.java:25) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.lambda$placeWithContext$1(PlacedFeature.java:55) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632) ~[?:?]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.placeWithContext(PlacedFeature.java:54) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.place(PlacedFeature.java:38) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.RandomSelectorFeature.place(RandomSelectorFeature.java:29) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.Feature.place(Feature.java:192) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.ConfiguredFeature.place(ConfiguredFeature.java:25) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.lambda$placeWithContext$1(PlacedFeature.java:55) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186) ~[?:?]
+	at java.base/java.util.stream.IntPipeline$1$1.accept(IntPipeline.java:180) ~[?:?]
+	at java.base/java.util.stream.Streams$RangeIntSpliterator.forEachRemaining(Streams.java:104) ~[?:?]
+	at java.base/java.util.Spliterator$OfInt.forEachRemaining(Spliterator.java:710) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632) ~[?:?]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.placeWithContext(PlacedFeature.java:54) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.placeWithBiomeCheck(PlacedFeature.java:42) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.ChunkGenerator.addVanillaDecorations(ChunkGenerator.java:426) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.ChunkGenerator.applyBiomeDecoration(ChunkGenerator.java:459) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.ChunkGenerator.applyBiomeDecoration(ChunkGenerator.java:452) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.status.ChunkStatusTasks.generateFeatures(ChunkStatusTasks.java:147) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.status.ChunkStep.apply(ChunkStep.java:65) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at ca.spottedleaf.moonrise.patches.chunk_system.scheduling.task.ChunkUpgradeGenericStatusTask.run(ChunkUpgradeGenericStatusTask.java:97) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at ca.spottedleaf.concurrentutil.executor.queue.AreaDependentQueue$QueuedTask.run(AreaDependentQueue.java:1154) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.thread.BalancedPrioritisedThreadPool$OrderedStreamGroup$Queue.lambda$createTask$0(BalancedPrioritisedThreadPool.java:467) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.queue.PrioritisedTaskQueue$PrioritisedQueuedTask.execute(PrioritisedTaskQueue.java:345) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.thread.BalancedPrioritisedThreadPool$OrderedStreamGroup.executeTask(BalancedPrioritisedThreadPool.java:344) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.thread.BalancedPrioritisedThreadPool$WorkerThread.pollTasks(BalancedPrioritisedThreadPool.java:630) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.QueueExecutorRunnable.mainLoop(QueueExecutorRunnable.java:50) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.QueueExecutorRunnable.doRun(QueueExecutorRunnable.java:115) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.QueueExecutorRunnable.run(QueueExecutorRunnable.java:42) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.util.LazyRunnable.run(LazyRunnable.java:25) ~[leafpile-1.0.0.jar:?]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[?:?]
+[20:37:35 ERROR]: Error executing task on Server
+java.lang.IllegalStateException: Thread failed main thread check: Accessing poi chunk off-main, context=thread=Paper Common Worker #0, world=minecraft:overworld, chunk_pos=[-1, 11]
+	at ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(TickThread.java:65) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.entity.ai.village.poi.PoiManager.getOrLoad(PoiManager.java:89) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.entity.ai.village.poi.PoiManager.exists(PoiManager.java:410) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.level.ServerLevel.lambda$updatePOIOnBlockStateChange$3(ServerLevel.java:2400) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.TickTask.run(TickTask.java:18) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.util.thread.BlockableEventLoop.doRunTask(BlockableEventLoop.java:207) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.util.thread.ReentrantBlockableEventLoop.doRunTask(ReentrantBlockableEventLoop.java:24) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.MinecraftServer.doRunTask(MinecraftServer.java:1534) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.MinecraftServer.doRunTask(MinecraftServer.java:192) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.util.thread.BlockableEventLoop.execute(BlockableEventLoop.java:150) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.level.ServerLevel.lambda$updatePOIOnBlockStateChange$2(ServerLevel.java:2398) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at java.base/java.util.Optional.ifPresent(Optional.java:178) ~[?:?]
+	at net.minecraft.server.level.ServerLevel.updatePOIOnBlockStateChange(ServerLevel.java:2398) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.server.level.WorldGenRegion.setBlock(WorldGenRegion.java:366) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.LevelWriter.setBlock(LevelWriter.java:13) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.TreeFeature.lambda$place$2(TreeFeature.java:151) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.treedecorators.TreeDecorator$Context.setBlock(TreeDecorator.java:60) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.treedecorators.BeehiveDecorator.place(BeehiveDecorator.java:56) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.TreeFeature.lambda$place$3(TreeFeature.java:157) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at java.base/java.lang.Iterable.forEach(Iterable.java:75) ~[?:?]
+	at net.minecraft.world.level.levelgen.feature.TreeFeature.place(TreeFeature.java:157) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.Feature.place(Feature.java:192) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.ConfiguredFeature.place(ConfiguredFeature.java:25) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.lambda$placeWithContext$1(PlacedFeature.java:55) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632) ~[?:?]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.placeWithContext(PlacedFeature.java:54) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.place(PlacedFeature.java:38) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.RandomSelectorFeature.place(RandomSelectorFeature.java:29) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.Feature.place(Feature.java:192) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.feature.ConfiguredFeature.place(ConfiguredFeature.java:25) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.lambda$placeWithContext$1(PlacedFeature.java:55) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$Head.forEach(ReferencePipeline.java:803) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:186) ~[?:?]
+	at java.base/java.util.stream.IntPipeline$1$1.accept(IntPipeline.java:180) ~[?:?]
+	at java.base/java.util.stream.Streams$RangeIntSpliterator.forEachRemaining(Streams.java:104) ~[?:?]
+	at java.base/java.util.Spliterator$OfInt.forEachRemaining(Spliterator.java:710) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline$7$1FlatMap.accept(ReferencePipeline.java:293) ~[?:?]
+	at java.base/java.util.stream.Streams$StreamBuilderImpl.forEachRemaining(Streams.java:411) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:570) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:560) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:153) ~[?:?]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:176) ~[?:?]
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:265) ~[?:?]
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:632) ~[?:?]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.placeWithContext(PlacedFeature.java:54) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.levelgen.placement.PlacedFeature.placeWithBiomeCheck(PlacedFeature.java:42) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.ChunkGenerator.addVanillaDecorations(ChunkGenerator.java:426) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.ChunkGenerator.applyBiomeDecoration(ChunkGenerator.java:459) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.ChunkGenerator.applyBiomeDecoration(ChunkGenerator.java:452) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.status.ChunkStatusTasks.generateFeatures(ChunkStatusTasks.java:147) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at net.minecraft.world.level.chunk.status.ChunkStep.apply(ChunkStep.java:65) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at ca.spottedleaf.moonrise.patches.chunk_system.scheduling.task.ChunkUpgradeGenericStatusTask.run(ChunkUpgradeGenericStatusTask.java:97) ~[paper-26.2.jar:26.2-112-c9e894d]
+	at ca.spottedleaf.concurrentutil.executor.queue.AreaDependentQueue$QueuedTask.run(AreaDependentQueue.java:1154) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.thread.BalancedPrioritisedThreadPool$OrderedStreamGroup$Queue.lambda$createTask$0(BalancedPrioritisedThreadPool.java:467) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.queue.PrioritisedTaskQueue$PrioritisedQueuedTask.execute(PrioritisedTaskQueue.java:345) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.thread.BalancedPrioritisedThreadPool$OrderedStreamGroup.executeTask(BalancedPrioritisedThreadPool.java:344) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.thread.BalancedPrioritisedThreadPool$WorkerThread.pollTasks(BalancedPrioritisedThreadPool.java:630) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.QueueExecutorRunnable.mainLoop(QueueExecutorRunnable.java:50) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.QueueExecutorRunnable.doRun(QueueExecutorRunnable.java:115) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.executor.QueueExecutorRunnable.run(QueueExecutorRunnable.java:42) ~[leafpile-1.0.0.jar:?]
+	at ca.spottedleaf.concurrentutil.util.LazyRunnable.run(LazyRunnable.java:25) ~[leafpile-1.0.0.jar:?]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[?:?]
+[20:37:35 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 20:37:35.863 +07 [14292] LOG:  received fast shutdown request
+[20:37:35 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 20:37:35.864 +07 [14292] LOG:  aborting any active transactions
+[20:37:35 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 20:37:35.895 +07 [14292] LOG:  background worker "logical replication launcher" (PID 8892) exited with exit code 1
+[20:37:35 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 20:37:35.951 +07 [12192] LOG:  shutting down
+[20:37:36 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 20:37:36.732 +07 [14292] LOG:  database system is shut down
+[20:37:36 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] waiting for server to shut down.... done
+[20:37:36 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] server stopped
+[20:37:36 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 432513c9-7063-4bad-9fcd-bd2123810f79 shut down postmaster in 00:00:01.211
+[20:37:36 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Did not clean up directory C:\Users\User\AppData\Local\BranzMMORPGHarness\repo\mmo-bootstrap\run\plugins\BranzMMO\embedded-postgres
+[20:37:36 INFO]: [BranzMMO] Branz MMO platform disabled cleanly.
+[20:37:36 INFO]: Saving players
+[20:37:36 INFO]: Player0 lost connection: Server closed
+[20:37:36 INFO]: Player0 left the game
+[20:37:36 INFO]: Saving worlds
+[20:37:36 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:overworld
+[20:37:37 INFO]: [ChunkHolderManager] Waiting 60s for chunk system to halt for world 'minecraft:overworld'
+[20:37:37 INFO]: [ChunkHolderManager] Halted chunk system for world 'minecraft:overworld'
+[20:37:37 INFO]: [ChunkHolderManager] Saving all chunkholders for world 'minecraft:overworld'
+[20:37:37 INFO]: [ChunkHolderManager] Saved 1193 block chunks, 49 entity chunks, 0 poi chunks in world 'minecraft:overworld' in 0.48s
+[20:37:37 INFO]: [ChunkHolderManager] Waiting 60s for chunk I/O to halt for world 'minecraft:overworld'
+[20:37:37 INFO]: [ChunkHolderManager] Halted I/O scheduler for world 'minecraft:overworld'
+[20:37:37 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:the_nether
+[20:37:37 INFO]: [ChunkHolderManager] Waiting 60s for chunk system to halt for world 'minecraft:the_nether'
+[20:37:37 INFO]: [ChunkHolderManager] Halted chunk system for world 'minecraft:the_nether'
+[20:37:37 INFO]: [ChunkHolderManager] Saving all chunkholders for world 'minecraft:the_nether'
+[20:37:37 INFO]: [ChunkHolderManager] Saved 0 block chunks, 0 entity chunks, 0 poi chunks in world 'minecraft:the_nether' in 0.00s
+[20:37:37 INFO]: [ChunkHolderManager] Waiting 60s for chunk I/O to halt for world 'minecraft:the_nether'
+[20:37:37 INFO]: [ChunkHolderManager] Halted I/O scheduler for world 'minecraft:the_nether'
+[20:37:37 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:the_end
+[20:37:37 INFO]: [ChunkHolderManager] Waiting 60s for chunk system to halt for world 'minecraft:the_end'
+[20:37:37 INFO]: [ChunkHolderManager] Halted chunk system for world 'minecraft:the_end'
+[20:37:37 INFO]: [ChunkHolderManager] Saving all chunkholders for world 'minecraft:the_end'
+[20:37:37 INFO]: [ChunkHolderManager] Saved 0 block chunks, 0 entity chunks, 0 poi chunks in world 'minecraft:the_end' in 0.00s
+[20:37:37 INFO]: [ChunkHolderManager] Waiting 60s for chunk I/O to halt for world 'minecraft:the_end'
+[20:37:37 INFO]: [ChunkHolderManager] Halted I/O scheduler for world 'minecraft:the_end'
+[20:37:37 INFO]: ThreadedAnvilChunkStorage (world): All chunks are saved
+[20:37:37 INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[20:37:37 INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[20:37:37 INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[20:37:37 INFO]: Waiting for all RegionFile I/O tasks to complete...
+[20:37:37 INFO]: All RegionFile I/O tasks to complete
+[20:37:37 INFO]: [MoonriseCommon] Awaiting termination of worker pool for up to 60s...
+[20:37:37 INFO]: [MoonriseCommon] Awaiting termination of I/O pool for up to 60s...
+
+BUILD SUCCESSFUL in 1m 30s
+39 actionable tasks: 1 executed, 38 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html

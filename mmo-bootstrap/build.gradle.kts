@@ -60,6 +60,12 @@ tasks.runServer {
         }
     jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
 
+    val physicalPrimaryInputAcceptance =
+        providers.gradleProperty("physicalPrimaryInputAcceptance").orNull == "true"
+    if (physicalPrimaryInputAcceptance) {
+        jvmArgs("-Dmmo.physical-primary-input-acceptance=true")
+    }
+
     val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
     if (smokeTest) {
         val smokeDatabaseDirectory =

@@ -1145,6 +1145,12 @@ final class CombatSessionController implements Listener {
         if (intent != SemanticInput.PRIMARY) {
             return;
         }
+        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_PRIMARY_INTENT_SERVER player="
+                                    + event.getPlayer().getName());
+        }
         event.setCancelled(true);
         Result<CombatInputRequest, InputRejectionCode> observed =
                 session.input.observe(
@@ -1163,6 +1169,12 @@ final class CombatSessionController implements Listener {
         Result<InputRouteOutcome, InputRejectionCode> routed =
                 session.input.routeFrame(List.of(request), context);
         if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
+            if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+                plugin.getLogger()
+                        .info(
+                                "PHYSICAL_AUTHORITY_PRIMARY_ROUTED_SERVER player="
+                                        + event.getPlayer().getName());
+            }
             handleRoute(event.getPlayer(), session, success.value());
         }
     }

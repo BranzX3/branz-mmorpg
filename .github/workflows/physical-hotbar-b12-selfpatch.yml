@@ -1,0 +1,269 @@
+name: physical-hotbar-b12-selfpatch
+
+on:
+  push:
+    branches:
+      - acceptance/physical-hotbar-b12
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Patch B1-B2 physical hotbar acceptance
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('mmo-bootstrap/build.gradle.kts')
+          text = path.read_text(encoding='utf-8')
+          old = '''    if (physicalPrimaryInputAcceptance) {
+        jvmArgs("-Dmmo.physical-primary-input-acceptance=true")
+    }
+
+    val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
+'''
+          new = '''    if (physicalPrimaryInputAcceptance) {
+        jvmArgs("-Dmmo.physical-primary-input-acceptance=true")
+    }
+    val physicalHotbarAcceptance =
+        providers.gradleProperty("physicalHotbarAcceptance").orNull == "true"
+    if (physicalHotbarAcceptance) {
+        jvmArgs("-Dmmo.physical-hotbar-acceptance=true")
+    }
+
+    val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'bootstrap gradle anchor count={text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          path = Path('acceptance/physical-client-26.2/build.gradle')
+          text = path.read_text(encoding='utf-8')
+          old = '''tasks.withType(JavaExec).configureEach {
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalPrimaryInputAcceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalPrimaryInput', 'true'
+    }
+}
+'''
+          new = '''tasks.withType(JavaExec).configureEach {
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalPrimaryInputAcceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalPrimaryInput', 'true'
+    }
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalHotbarAcceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalHotbar', 'true'
+    }
+}
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'client gradle anchor count={text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          path = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/BranzMmoPlugin.java')
+          text = path.read_text(encoding='utf-8')
+          old = '''        characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);
+        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+            var acceptanceWeapon =
+'''
+          new = '''        characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);
+        boolean physicalPrimaryInputAcceptance =
+                Boolean.getBoolean("mmo.physical-primary-input-acceptance");
+        boolean physicalHotbarAcceptance = Boolean.getBoolean("mmo.physical-hotbar-acceptance");
+        if (physicalPrimaryInputAcceptance || physicalHotbarAcceptance) {
+            java.util.Set<java.util.UUID> acceptancePreparedPlayers =
+                    java.util.HashSet.newHashSet(1);
+            var acceptanceWeapon =
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'staging start anchor count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '''            characterSessionController.addReadyHandler(
+                    player ->
+                            characterSessionController.grantTestValue(
+                                    player,
+                                    acceptanceWeapon,
+'''
+          new = '''            characterSessionController.addReadyHandler(
+                    player -> {
+                        if (!acceptancePreparedPlayers.add(player.getUniqueId())) {
+                            return;
+                        }
+                        characterSessionController.grantTestValue(
+                                    player,
+                                    acceptanceWeapon,
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'staging handler anchor count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '''                                        getLogger()
+                                                .info(
+                                                        "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PROJECTED_SERVER player="
+                                                                + player.getName()
+                                                                + " definition="
+                                                                + acceptanceWeapon.id());
+                                        player.setLevel(8);
+                                    }));
+        }
+'''
+          new = '''                                        getLogger()
+                                                .info(
+                                                        "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PROJECTED_SERVER player="
+                                                                + player.getName()
+                                                                + " definition="
+                                                                + acceptanceWeapon.id());
+                                        if (physicalHotbarAcceptance) {
+                                            getLogger()
+                                                    .info(
+                                                            "PHYSICAL_AUTHORITY_HOTBAR_STAGE_PROJECTED_SERVER player="
+                                                                    + player.getName()
+                                                                    + " definition="
+                                                                    + acceptanceWeapon.id());
+                                        }
+                                        player.setLevel(8);
+                                    });
+                    });
+        }
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'staging end anchor count={text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          path = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/PhysicalInventoryInteractionController.java')
+          text = path.read_text(encoding='utf-8')
+          old = '''                                                    finishCommit(
+                                                            playerId,
+                                                            interaction,
+                                                            completed,
+                                                            failureMessage));
+'''
+          new = '''                                                    finishCommit(
+                                                            playerId,
+                                                            interaction,
+                                                            intent,
+                                                            completed,
+                                                            failureMessage));
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'finish call anchor count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '''    private void finishCommit(
+            UUID playerId,
+            PendingInteraction interaction,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> result,
+            String originalFailure) {
+'''
+          new = '''    private void finishCommit(
+            UUID playerId,
+            PendingInteraction interaction,
+            ProjectionMoveIntent intent,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> result,
+            String originalFailure) {
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'finish signature anchor count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '''                    if (originalFailure != null) {
+                        player.sendActionBar(
+                                Component.text(
+                                        "Inventory move rejected and reconciled: "
+                                                + originalFailure,
+                                        NamedTextColor.RED));
+                    }
+                });
+    }
+'''
+          new = '''                    if (originalFailure != null) {
+                        player.sendActionBar(
+                                Component.text(
+                                        "Inventory move rejected and reconciled: "
+                                                + originalFailure,
+                                        NamedTextColor.RED));
+                        return;
+                    }
+                    if (Boolean.getBoolean("mmo.physical-hotbar-acceptance")
+                            && completed
+                                    instanceof Result.Success<
+                                            LoadedCharacterSession, CharacterSessionErrorCode>
+                                            success) {
+                        recordHotbarAcceptanceMove(player, success.value(), intent);
+                    }
+                });
+    }
+
+    private void recordHotbarAcceptanceMove(
+            Player player, LoadedCharacterSession completed, ProjectionMoveIntent intent) {
+        if (intent.valueType()
+                != com.branz.mmorpg.items.projection.ProjectionValueType.UNIQUE_ITEM) {
+            return;
+        }
+        String expectedReference = "slot:" + intent.destinationSlot();
+        boolean authoritative =
+                completed.snapshot().itemRecords().stream()
+                        .anyMatch(
+                                record ->
+                                        record.itemId().value().equals(intent.valueId())
+                                                && record.location().type()
+                                                        == com.branz.mmorpg.persistence.transaction.ValueLocationType.CHARACTER_INVENTORY
+                                                && record.location()
+                                                        .reference()
+                                                        .equals(expectedReference));
+        if (!authoritative) {
+            plugin.getLogger()
+                    .severe(
+                            "PHYSICAL_AUTHORITY_HOTBAR_MOVE_VERIFY_FAILED_SERVER player="
+                                    + player.getName()
+                                    + " value="
+                                    + intent.valueId()
+                                    + " destination="
+                                    + intent.destinationSlot());
+            return;
+        }
+        plugin.getLogger()
+                .info(
+                        "PHYSICAL_AUTHORITY_HOTBAR_MOVE_COMMITTED_SERVER player="
+                                + player.getName()
+                                + " value="
+                                + intent.valueId()
+                                + " source="
+                                + intent.sourceSlot()
+                                + " destination="
+                                + intent.destinationSlot());
+        if (intent.sourceSlot() == 0 && intent.destinationSlot() == 1) {
+            player.setLevel(9);
+        } else if (intent.sourceSlot() == 1 && intent.destinationSlot() == 2) {
+            player.setLevel(10);
+        }
+    }
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'finish callback anchor count={text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Apply formatting
+        shell: bash
+        run: ./gradlew spotlessApply
+      - name: Validate repository
+        shell: bash
+        run: ./gradlew clean build
+      - name: Commit bounded server patch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mmo-bootstrap/build.gradle.kts acceptance/physical-client-26.2/build.gradle mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/BranzMmoPlugin.java mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/PhysicalInventoryInteractionController.java
+          test "$(git diff --cached --name-only | wc -l)" -eq 4
+          git commit -m 'acceptance: stage physical hotbar cursor authority'
+          git push origin HEAD:${GITHUB_REF_NAME}

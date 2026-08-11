@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "branz-physical-authority-client-acceptance",
+  "version": "1.0.0",
+  "name": "Branz Physical Authority Client Acceptance",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "com.branz.mmorpg.acceptance.PhysicalAuthorityClientGameTest"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "26.2",
+    "fabric-api": "*"
+  }
+}

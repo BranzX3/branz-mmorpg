@@ -49,9 +49,18 @@ Initial allowlist:
 - `MMO_GRADLE_TEST_MARKET_V1`
 - `MMO_BOOTSTRAP_SHADOWJAR_V1`
 - `MMO_BOOTSTRAP_SMOKE_V1`
-- `MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1`
+- `MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1` — **deprecated; do not dispatch**. The current
+  implementation does not consume the `combatAcceptance` Gradle property, so this legacy action
+  starts an ordinary Paper server and eventually times out. Use `MMO_GRADLE_TEST_COMBAT_V1`
+  followed by `MMO_BOOTSTRAP_SMOKE_V1` for deterministic automated combat/bootstrap preflight.
+  A real combat acceptance remains a local Minecraft-client gate and must not be inferred from
+  either automated action.
 - `MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1`
 - `MMO_CONTENT_VALIDATE_FIXTURE_V1`
+
+The deprecated combat-acceptance action remains compiled only for protocol compatibility with
+historical task manifests. New tasks must not select it. Removing the compiled action is a separate
+runner cleanup and must pass the harness self-test before control-branch promotion.
 
 Adding a capability requires changing and reviewing runner code on the control branch first.
 
@@ -103,10 +112,13 @@ A task action failure is evidence and is committed/pushed as `execution_status=F
 
 The current implementation branch uses Gradle multi-project build `mmo-platform`, JDK 25, Paper 26.2, `mmo-bootstrap:runServer`, embedded PostgreSQL integration tests and fixed local smoke properties. Harness Gradle actions use the checked-in wrapper and an isolated `GRADLE_USER_HOME` under the MMORPG WorkerRoot.
 
-The smoke actions use only the repository-authored fixed properties:
+The supported deterministic smoke actions use only repository-authored fixed properties:
 
 - `:mmo-bootstrap:runServer -PsmokeTest=true`
-- `:mmo-bootstrap:runServer -PcombatAcceptance=true`
 - `:mmo-bootstrap:runServer -PsmokeTest=true -PsmokeInvalidContent=true`
 
-They never accept a remote content path or arbitrary Gradle arguments.
+The historical `-PcombatAcceptance=true` invocation is not a supported smoke path because the
+current `mmo-bootstrap` build does not map that property to a JVM acceptance mode or deterministic
+shutdown lifecycle.
+
+Smoke actions never accept a remote content path or arbitrary Gradle arguments.

@@ -25,27 +25,8 @@ jobs:
           from pathlib import Path
           path = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/CharacterSessionController.java')
           text = path.read_text(encoding='utf-8')
-          old = '''        Player player = plugin.getServer().getPlayer(playerId);
-        if (player != null && player.isOnline()) {
-            applyProjectionIfReady(player, false);
-            if (equipmentChanged && ready(player)) {
-                equipmentMutationHandlers.forEach(handler -> handler.accept(player));
-            }
-        }
-'''
-          new = '''        Player player = plugin.getServer().getPlayer(playerId);
-        if (player != null && player.isOnline()) {
-            boolean selectedHotbarAuthorityChanged =
-                    SelectedHotbarAuthorityIdentity.changed(
-                            current.snapshot().itemRecords(),
-                            updated.snapshot().itemRecords(),
-                            player.getInventory().getHeldItemSlot());
-            applyProjectionIfReady(player, false);
-            if ((equipmentChanged || selectedHotbarAuthorityChanged) && ready(player)) {
-                equipmentMutationHandlers.forEach(handler -> handler.accept(player));
-            }
-        }
-'''
+          old = "        Player player = plugin.getServer().getPlayer(playerId);\n        if (player != null && player.isOnline()) {\n            applyProjectionIfReady(player, false);\n            if (equipmentChanged && ready(player)) {\n                equipmentMutationHandlers.forEach(handler -> handler.accept(player));\n            }\n        }\n"
+          new = "        Player player = plugin.getServer().getPlayer(playerId);\n        if (player != null && player.isOnline()) {\n            boolean selectedHotbarAuthorityChanged =\n                    SelectedHotbarAuthorityIdentity.changed(\n                            current.snapshot().itemRecords(),\n                            updated.snapshot().itemRecords(),\n                            player.getInventory().getHeldItemSlot());\n            applyProjectionIfReady(player, false);\n            if ((equipmentChanged || selectedHotbarAuthorityChanged) && ready(player)) {\n                equipmentMutationHandlers.forEach(handler -> handler.accept(player));\n            }\n        }\n"
           if text.count(old) != 1:
               raise SystemExit(f'completeSnapshotMutation anchor count={text.count(old)}')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')

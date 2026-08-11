@@ -1,0 +1,36 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CONTENT_VALIDATE_FIXTURE_V1",
+  "action_identity": "CONTENT_VALIDATE_MILESTONE1",
+  "action_record": {
+    "action_status": "PASS",
+    "argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-content:run",
+      "--args=validate C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\example-content\\milestone-1"
+    ],
+    "duration_seconds": 6.765,
+    "exit_code": 0,
+    "fixed_command_id": "CONTENT_VALIDATE_MILESTONE1"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-AUTHORITY-CONTENT-VALIDATE-0001/**"
+  ],
+  "base_commit_expected": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "a41e0b77a5d713a9be95e0d254d544901e25fc59",
+  "duration_seconds": 6.828,
+  "ending_commit_before_result_commit": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-11T07:44:43.166632+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-11T07:44:36.334804+00:00",
+  "starting_commit_actual": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "task_branch": "harness-task/MMO-PHYSICAL-AUTHORITY-CONTENT-VALIDATE-0001",
+  "task_id": "MMO-PHYSICAL-AUTHORITY-CONTENT-VALIDATE-0001",
+  "task_manifest_sha256": "f338c62e6800e5fb752867e6dbf6b4a565dd6a83b0984b224b584bc850b3875c",
+  "unauthorized_writes": []
+}

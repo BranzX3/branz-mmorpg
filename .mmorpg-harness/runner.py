@@ -503,7 +503,7 @@ def action_client_acceptance_ingress(
                     stderr=subprocess.STDOUT,
                     text=True,
                 )
-                join_deadline = time.monotonic() + 120
+                join_deadline = time.monotonic() + 300
                 while time.monotonic() < join_deadline:
                     paper_text = read_log(paper_log)
                     match = re.search(

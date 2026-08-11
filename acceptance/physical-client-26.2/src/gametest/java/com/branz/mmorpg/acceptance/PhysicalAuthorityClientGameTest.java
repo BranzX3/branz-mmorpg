@@ -18,6 +18,8 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
     private static final int HOTBAR_MOVE_TWO_HANDSHAKE_LEVEL = 10;
     private static final int INVENTORY_IMAGE_WIDTH = 176;
     private static final int INVENTORY_IMAGE_HEIGHT = 166;
+    private static final int FIRST_GAMEPLAY_HOTBAR_SLOT = 0;
+    private static final int LAST_GAMEPLAY_HOTBAR_SLOT = 7;
     private static final double SLOT_HITBOX_SIZE = 16.0;
     private static final double SLOT_CENTER_OFFSET = SLOT_HITBOX_SIZE / 2.0;
 
@@ -79,8 +81,10 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         System.out.println("PHYSICAL_AUTHORITY_HOTBAR_PROJECTION_READY_CLIENT");
         sendStatus(context, "PHYSICAL_AUTHORITY_HOTBAR_STATUS_INITIAL_CLIENT");
 
-        moveHotbarItem(context, 0, 1);
-        System.out.println("PHYSICAL_AUTHORITY_HOTBAR_MOVE1_MOUSE_SENT_CLIENT");
+        int moveOneDestination = moveHotbarItem(context, 0);
+        System.out.println(
+                "PHYSICAL_AUTHORITY_HOTBAR_MOVE1_MOUSE_SENT_CLIENT source=0 destination="
+                        + moveOneDestination);
         context.waitFor(
                 client ->
                         client.player != null
@@ -91,7 +95,10 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                 client ->
                         client.player != null
                                 && client.player.getInventory().getItem(0).isEmpty()
-                                && !client.player.getInventory().getItem(1).isEmpty(),
+                                && !client.player
+                                        .getInventory()
+                                        .getItem(moveOneDestination)
+                                        .isEmpty(),
                 20 * 30);
         closeInventory(context);
         sendStatus(context, "PHYSICAL_AUTHORITY_HOTBAR_STATUS_AFTER_MOVE1_CLIENT");
@@ -101,13 +108,22 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                 client ->
                         client.player != null
                                 && client.player.getInventory().getItem(0).isEmpty()
-                                && !client.player.getInventory().getItem(1).isEmpty(),
+                                && !client.player
+                                        .getInventory()
+                                        .getItem(moveOneDestination)
+                                        .isEmpty(),
                 20 * 30);
-        System.out.println("PHYSICAL_AUTHORITY_HOTBAR_RECONNECT1_PROJECTED_CLIENT");
+        System.out.println(
+                "PHYSICAL_AUTHORITY_HOTBAR_RECONNECT1_PROJECTED_CLIENT slot="
+                        + moveOneDestination);
         sendStatus(context, "PHYSICAL_AUTHORITY_HOTBAR_STATUS_RECONNECT1_CLIENT");
 
-        moveHotbarItem(context, 1, 2);
-        System.out.println("PHYSICAL_AUTHORITY_HOTBAR_MOVE2_MOUSE_SENT_CLIENT");
+        int moveTwoDestination = moveHotbarItem(context, moveOneDestination);
+        System.out.println(
+                "PHYSICAL_AUTHORITY_HOTBAR_MOVE2_MOUSE_SENT_CLIENT source="
+                        + moveOneDestination
+                        + " destination="
+                        + moveTwoDestination);
         context.waitFor(
                 client ->
                         client.player != null
@@ -117,8 +133,14 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.waitFor(
                 client ->
                         client.player != null
-                                && client.player.getInventory().getItem(1).isEmpty()
-                                && !client.player.getInventory().getItem(2).isEmpty(),
+                                && client.player
+                                        .getInventory()
+                                        .getItem(moveOneDestination)
+                                        .isEmpty()
+                                && !client.player
+                                        .getInventory()
+                                        .getItem(moveTwoDestination)
+                                        .isEmpty(),
                 20 * 30);
         closeInventory(context);
         sendStatus(context, "PHYSICAL_AUTHORITY_HOTBAR_STATUS_AFTER_MOVE2_CLIENT");
@@ -127,18 +149,31 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.waitFor(
                 client ->
                         client.player != null
-                                && client.player.getInventory().getItem(1).isEmpty()
-                                && !client.player.getInventory().getItem(2).isEmpty(),
+                                && client.player
+                                        .getInventory()
+                                        .getItem(moveOneDestination)
+                                        .isEmpty()
+                                && !client.player
+                                        .getInventory()
+                                        .getItem(moveTwoDestination)
+                                        .isEmpty(),
                 20 * 30);
-        System.out.println("PHYSICAL_AUTHORITY_HOTBAR_RECONNECT2_PROJECTED_CLIENT");
+        System.out.println(
+                "PHYSICAL_AUTHORITY_HOTBAR_RECONNECT2_PROJECTED_CLIENT slot="
+                        + moveTwoDestination);
         sendStatus(context, "PHYSICAL_AUTHORITY_HOTBAR_STATUS_RECONNECT2_CLIENT");
         System.out.println("PHYSICAL_AUTHORITY_HOTBAR_SEQUENCE_COMPLETE_CLIENT");
     }
 
-    private static void moveHotbarItem(
-            ClientGameTestContext context, int sourceSlot, int destinationSlot) {
+    private static int moveHotbarItem(ClientGameTestContext context, int sourceSlot) {
         context.getInput().pressKey(options -> options.keyInventory);
         context.waitForScreen(InventoryScreen.class);
+        int destinationSlot = selectEmptyGameplayHotbarDestination(context, sourceSlot);
+        System.out.println(
+                "PHYSICAL_AUTHORITY_HOTBAR_DESTINATION_SELECTED_CLIENT source="
+                        + sourceSlot
+                        + " destination="
+                        + destinationSlot);
 
         setHotbarCursor(context, sourceSlot);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
@@ -174,6 +209,33 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                 "PHYSICAL_AUTHORITY_HOTBAR_PLACE_OBSERVED_CLIENT destination="
                         + destinationSlot);
         context.waitTicks(2);
+        return destinationSlot;
+    }
+
+    private static int selectEmptyGameplayHotbarDestination(
+            ClientGameTestContext context, int sourceSlot) {
+        return context.computeOnClient(
+                client -> {
+                    if (!(client.gui.screen() instanceof InventoryScreen screen)
+                            || client.player == null) {
+                        throw new AssertionError(
+                                "InventoryScreen and player must be present for destination selection");
+                    }
+                    for (int slot = LAST_GAMEPLAY_HOTBAR_SLOT;
+                            slot >= FIRST_GAMEPLAY_HOTBAR_SLOT;
+                            slot--) {
+                        if (slot == sourceSlot) {
+                            continue;
+                        }
+                        Slot candidate =
+                                findHotbarSlot(screen, client.player.getInventory(), slot);
+                        if (candidate.getItem().isEmpty()) {
+                            return slot;
+                        }
+                    }
+                    throw new AssertionError(
+                            "No empty gameplay hotbar destination is available for physical acceptance");
+                });
     }
 
     private static Slot findHotbarSlot(InventoryScreen screen, Object inventory, int hotbarSlot) {

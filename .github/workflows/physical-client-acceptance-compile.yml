@@ -10,7 +10,7 @@ on:
       - '.github/workflows/physical-client-acceptance-compile.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   compile:
@@ -32,20 +32,27 @@ jobs:
           gradle -p acceptance/physical-client-26.2 wrapper --gradle-version 9.5.0 --distribution-type bin
           checksum="$(curl -fsSL https://services.gradle.org/distributions/gradle-9.5.0-bin.zip.sha256 | tr -d '\r\n')"
           test "${#checksum}" -eq 64
-          printf '\ndistributionSha256Sum=%s\n' "$checksum" >> acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.properties
+          if ! grep -q '^distributionSha256Sum=' acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.properties; then
+            printf '\ndistributionSha256Sum=%s\n' "$checksum" >> acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.properties
+          fi
+          test "$(sed -n 's/^distributionSha256Sum=//p' acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.properties)" = "$checksum"
           chmod +x acceptance/physical-client-26.2/gradlew
       - name: Compile client acceptance harness through generated wrapper
         shell: bash
         working-directory: acceptance/physical-client-26.2
         run: ./gradlew --no-daemon --console=plain build
-      - name: Upload pinned wrapper
-        uses: actions/upload-artifact@v4
-        with:
-          name: physical-client-gradle-wrapper-9.5.0
-          path: |
-            acceptance/physical-client-26.2/gradlew
-            acceptance/physical-client-26.2/gradlew.bat
-            acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.jar
-            acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.properties
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit generated wrapper once
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          git add --chmod=+x acceptance/physical-client-26.2/gradlew
+          git add acceptance/physical-client-26.2/gradlew.bat
+          git add acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.jar
+          git add acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.properties
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test: check in pinned client Gradle wrapper'
+          git push origin HEAD:lead/physical-client-acceptance-harness-v1

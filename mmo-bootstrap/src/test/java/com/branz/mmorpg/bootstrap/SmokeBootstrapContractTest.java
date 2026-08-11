@@ -33,8 +33,7 @@ class SmokeBootstrapContractTest {
         try {
             Path configured = tempDir.resolve("embedded-postgres");
             assertEquals(
-                    tempDir
-                            .resolve(SmokeBootstrapContract.EMBEDDED_DATA_DIRECTORY_NAME)
+                    tempDir.resolve(SmokeBootstrapContract.EMBEDDED_DATA_DIRECTORY_NAME)
                             .toAbsolutePath()
                             .normalize(),
                     SmokeBootstrapContract.embeddedDataDirectory(tempDir, configured));
@@ -56,8 +55,7 @@ class SmokeBootstrapContractTest {
             Path marker = SmokeBootstrapContract.startupFailureMarker(embedded);
             assertTrue(Files.isRegularFile(marker));
             assertEquals(
-                    "IllegalStateException: migration rejected",
-                    Files.readString(marker).trim());
+                    "IllegalStateException: migration rejected", Files.readString(marker).trim());
             assertEquals(0, failure.getSuppressed().length);
         } finally {
             restore(previous);

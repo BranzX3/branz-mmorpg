@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_HOTBAR_MOVES",
+  "action_record": {
+    "harness_error": "CLIENT_ACCEPTANCE_CLIENT_EXITED"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-HOTBAR-B12-0004/**"
+  ],
+  "base_commit_expected": "b2cbe3ac491de9cdbc08929d1184430726e0b955",
+  "blocker_code": "CLIENT_ACCEPTANCE_CLIENT_EXITED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "f081f13bc25e463ff58a523dd152a2cb3b000ab2",
+  "duration_seconds": 233.906,
+  "ending_commit_before_result_commit": "b2cbe3ac491de9cdbc08929d1184430726e0b955",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-11T20:21:18.771676+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-11T20:17:24.870927+00:00",
+  "starting_commit_actual": "b2cbe3ac491de9cdbc08929d1184430726e0b955",
+  "task_branch": "harness-task/MMO-PHYSICAL-HOTBAR-B12-0004",
+  "task_id": "MMO-PHYSICAL-HOTBAR-B12-0004",
+  "task_manifest_sha256": "e50448197aa2598918c52acdb35eadd2edbb1cc9d2febc839fc209522fea17a3",
+  "unauthorized_writes": []
+}

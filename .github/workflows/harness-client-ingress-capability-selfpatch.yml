@@ -1,0 +1,80 @@
+name: harness-client-ingress-capability-selfpatch
+
+on:
+  push:
+    branches:
+      - harness-fix/physical-client-ingress-v1
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Patch reviewed real-client capability from exact anchors
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runner = Path('.mmorpg-harness/runner.py')
+          text = runner.read_text(encoding='utf-8')
+          action_anchor = '''\n\nActionHandler = Callable[[Path, Path, dict[str, Any]], tuple[int, str, str, dict[str, Any]]]\n'''
+          action_code = r'''\n\ndef action_client_acceptance_ingress(\n    repo: Path, result_dir: Path, manifest: dict[str, Any]\n) -> tuple[int, str, str, dict[str, Any]]:\n    import re\n    import shutil\n    import socket\n\n    client_dir = repo / "acceptance" / "physical-client-26.2"\n    client_wrapper = client_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")\n    root_wrapper = Path(gradle_wrapper(repo))\n    required = (\n        client_wrapper,\n        client_dir / "gradle" / "wrapper" / "gradle-wrapper.jar",\n        repo / "mmo-bootstrap" / "build.gradle.kts",\n    )\n    missing = [str(path.relative_to(repo)) for path in required if not path.is_file()]\n    if missing:\n        raise HarnessError("CLIENT_ACCEPTANCE_PROJECT_MISSING", json.dumps(missing))\n\n    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:\n        probe.settimeout(0.4)\n        if probe.connect_ex(("127.0.0.1", 25565)) == 0:\n            raise HarnessError("CLIENT_ACCEPTANCE_PORT_IN_USE", "127.0.0.1:25565")\n\n    server_run = repo / "mmo-bootstrap" / "run"\n    if server_run.exists():\n        shutil.rmtree(server_run)\n    server_run.mkdir(parents=True)\n    (server_run / "eula.txt").write_text("eula=true\\n", encoding="utf-8")\n    (server_run / "server.properties").write_text(\n        "online-mode=false\\n"\n        "server-port=25565\\n"\n        "spawn-protection=0\\n"\n        "max-players=1\\n"\n        "difficulty=normal\\n",\n        encoding="utf-8",\n    )\n\n    paper_log = result_dir / "paper.log"\n    client_log = result_dir / "client.log"\n    server_env = gradle_env(repo)\n    client_env = gradle_env(repo)\n    client_env["GRADLE_USER_HOME"] = str((repo.parent / "gradle-home-client").resolve())\n    server_argv = [str(root_wrapper), "--no-daemon", "--console=plain", ":mmo-bootstrap:runServer"]\n    client_argv = [str(client_wrapper), "--no-daemon", "--console=plain", "runClientGameTest"]\n\n    def read_log(path: Path) -> str:\n        try:\n            return path.read_text(encoding="utf-8", errors="replace")\n        except FileNotFoundError:\n            return ""\n\n    def kill_tree(process: subprocess.Popen[str] | None) -> None:\n        if process is None or process.poll() is not None:\n            return\n        if os.name == "nt":\n            subprocess.run(\n                ["taskkill", "/PID", str(process.pid), "/T", "/F"],\n                stdout=subprocess.DEVNULL,\n                stderr=subprocess.DEVNULL,\n                check=False,\n            )\n        else:\n            process.terminate()\n\n    server = None\n    client = None\n    started = time.monotonic()\n    player_name = None\n    try:\n        with paper_log.open("w", encoding="utf-8") as paper_out:\n            server = subprocess.Popen(\n                server_argv,\n                cwd=repo,\n                env=server_env,\n                stdin=subprocess.PIPE,\n                stdout=paper_out,\n                stderr=subprocess.STDOUT,\n                text=True,\n            )\n            deadline = time.monotonic() + 240\n            while time.monotonic() < deadline:\n                if "Done (" in read_log(paper_log):\n                    break\n                if server.poll() is not None:\n                    raise HarnessError("CLIENT_ACCEPTANCE_PAPER_EXITED", f"exit={server.returncode}")\n                time.sleep(1)\n            else:\n                raise HarnessError("CLIENT_ACCEPTANCE_PAPER_TIMEOUT", "Paper did not become ready")\n\n            with client_log.open("w", encoding="utf-8") as client_out:\n                client = subprocess.Popen(\n                    client_argv,\n                    cwd=client_dir,\n                    env=client_env,\n                    stdout=client_out,\n                    stderr=subprocess.STDOUT,\n                    text=True,\n                )\n                join_deadline = time.monotonic() + 120\n                while time.monotonic() < join_deadline:\n                    paper_text = read_log(paper_log)\n                    match = re.search(r"UUID of player ([A-Za-z0-9_]{1,16}) is", paper_text)\n                    if match is None:\n                        match = re.search(r"([A-Za-z0-9_]{1,16}) joined the game", paper_text)\n                    if match is not None:\n                        player_name = match.group(1)\n                        break\n                    if client.poll() is not None:\n                        raise HarnessError("CLIENT_ACCEPTANCE_CLIENT_EXITED", f"exit={client.returncode}")\n                    time.sleep(0.5)\n                if player_name is None:\n                    raise HarnessError("CLIENT_ACCEPTANCE_JOIN_TIMEOUT", "client did not join Paper")\n                if server.stdin is None:\n                    raise HarnessError("CLIENT_ACCEPTANCE_NO_CONSOLE", "Paper stdin unavailable")\n                server.stdin.write(f"op {player_name}\\n")\n                server.stdin.write(f"experience set {player_name} 7 levels\\n")\n                server.stdin.flush()\n\n                marker_deadline = time.monotonic() + 120\n                while time.monotonic() < marker_deadline:\n                    client_text = read_log(client_log)\n                    if "PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT" in client_text:\n                        break\n                    if client.poll() is not None:\n                        raise HarnessError("CLIENT_ACCEPTANCE_CLIENT_EXITED", f"exit={client.returncode}")\n                    time.sleep(0.5)\n                else:\n                    raise HarnessError("CLIENT_ACCEPTANCE_COMMAND_TIMEOUT", "client status marker missing")\n\n                receipt_deadline = time.monotonic() + 20\n                receipt = False\n                while time.monotonic() < receipt_deadline:\n                    paper_text = read_log(paper_log)\n                    if "/mmo physical status" in paper_text:\n                        receipt = True\n                        break\n                    time.sleep(0.5)\n                if not receipt:\n                    raise HarnessError("CLIENT_ACCEPTANCE_COMMAND_NOT_LOGGED", "Paper did not log status command")\n\n                server.stdin.write("stop\\n")\n                server.stdin.flush()\n                try:\n                    server_rc = server.wait(timeout=60)\n                except subprocess.TimeoutExpired:\n                    raise HarnessError("CLIENT_ACCEPTANCE_PAPER_STOP_TIMEOUT", "Paper did not stop")\n                try:\n                    client_rc = client.wait(timeout=60)\n                except subprocess.TimeoutExpired:\n                    raise HarnessError("CLIENT_ACCEPTANCE_CLIENT_STOP_TIMEOUT", "client did not finish after disconnect")\n\n        client_text = read_log(client_log)\n        paper_text = read_log(paper_log)\n        checks = {\n            "server_handshake_client": "PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT" in client_text,\n            "status_command_sent_client": "PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT" in client_text,\n            "status_command_logged_server": "/mmo physical status" in paper_text,\n            "client_exit_zero": client_rc == 0,\n            "server_exit_zero": server_rc == 0,\n        }\n        passed = all(checks.values())\n        return (\n            0 if passed else 1,\n            "PHYSICAL_CLIENT_INGRESS_PASS\\n" if passed else "PHYSICAL_CLIENT_INGRESS_FAIL\\n",\n            "",\n            {\n                "action_status": "PASS" if passed else "FAIL",\n                "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS",\n                "server_argv": server_argv,\n                "client_argv": client_argv,\n                "player_name": player_name,\n                "checks": checks,\n                "client_wrapper_sha256": sha256_file(client_wrapper),\n                "duration_seconds": round(time.monotonic() - started, 3),\n            },\n        )\n    finally:\n        if server is not None and server.poll() is None and server.stdin is not None:\n            try:\n                server.stdin.write("stop\\n")\n                server.stdin.flush()\n                server.wait(timeout=15)\n            except Exception:\n                kill_tree(server)\n        kill_tree(client)\n        kill_tree(server)\n\n\nActionHandler = Callable[[Path, Path, dict[str, Any]], tuple[int, str, str, dict[str, Any]]]\n'''
+          if text.count(action_anchor) != 1:
+              raise SystemExit('runner action anchor mismatch')
+          text = text.replace(action_anchor, action_code, 1)
+
+          spec_anchor = '''    "MMO_CLIENT_ACCEPTANCE_COMPILE_V1": ActionSpec(\n        action_client_acceptance_compile, "PHYSICAL_CLIENT_ACCEPTANCE_COMPILE"\n    ),\n}\n'''
+          spec_replacement = '''    "MMO_CLIENT_ACCEPTANCE_COMPILE_V1": ActionSpec(\n        action_client_acceptance_compile, "PHYSICAL_CLIENT_ACCEPTANCE_COMPILE"\n    ),\n    "MMO_CLIENT_ACCEPTANCE_INGRESS_V1": ActionSpec(\n        action_client_acceptance_ingress, "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS"\n    ),\n}\n'''
+          if text.count(spec_anchor) != 1:
+              raise SystemExit('runner spec anchor mismatch')
+          runner.write_text(text.replace(spec_anchor, spec_replacement, 1), encoding='utf-8')
+
+          selftest = Path('.mmorpg-harness/selftest.py')
+          tests = selftest.read_text(encoding='utf-8')
+          test_anchor = '''    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_COMPILE_V1"].handler is R.action_client_acceptance_compile\n\n'''
+          test_replacement = '''    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_COMPILE_V1"].handler is R.action_client_acceptance_compile\n    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_INGRESS_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS"\n    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_INGRESS_V1"].handler is R.action_client_acceptance_ingress\n\n'''
+          if tests.count(test_anchor) != 1:
+              raise SystemExit('selftest anchor mismatch')
+          selftest.write_text(tests.replace(test_anchor, test_replacement, 1), encoding='utf-8')
+
+          protocol = Path('.mmorpg-harness/PROTOCOL.md')
+          doc = protocol.read_text(encoding='utf-8')
+          allow_anchor = '''- `MMO_CLIENT_ACCEPTANCE_COMPILE_V1` — compile the checked-in standalone Minecraft 26.2 Fabric Client GameTest project using its own pinned Gradle wrapper. No remote argv or environment overrides are accepted.\n'''
+          allow_replacement = allow_anchor + '''- `MMO_CLIENT_ACCEPTANCE_INGRESS_V1` — launch a fresh offline local Paper 26.2 dev server and the checked-in Fabric Client GameTest with fixed commands; stage OP plus XP-level handshake through the Paper console, require the client to send `/mmo physical status` through real chat input, then stop both processes and retain Paper/client logs as evidence.\n'''
+          if doc.count(allow_anchor) != 1:
+              raise SystemExit('protocol allowlist anchor mismatch')
+          protocol.write_text(doc.replace(allow_anchor, allow_replacement, 1), encoding='utf-8')
+          PY
+      - name: Run harness self-test
+        shell: bash
+        run: python .mmorpg-harness/selftest.py
+      - name: Commit exact patched harness files through Git data API
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, json, os, pathlib, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']; parent = os.environ['GITHUB_SHA']; branch = os.environ['GITHUB_REF_NAME']; token = os.environ['GH_TOKEN']; api = 'https://api.github.com'
+          def request(method, path, body=None):
+              req = urllib.request.Request(api + path, data=None if body is None else json.dumps(body).encode(), method=method, headers={'Accept':'application/vnd.github+json','Authorization':f'Bearer {token}','X-GitHub-Api-Version':'2022-11-28','User-Agent':'branz-harness-ingress-selfpatch'})
+              with urllib.request.urlopen(req) as response: return json.load(response)
+          ref = request('GET', f'/repos/{repo}/git/ref/heads/{branch}')
+          if ref['object']['sha'] != parent: raise SystemExit('feature branch moved during harness patch')
+          commit = request('GET', f'/repos/{repo}/git/commits/{parent}')
+          entries = []
+          for path in ('.mmorpg-harness/runner.py','.mmorpg-harness/selftest.py','.mmorpg-harness/PROTOCOL.md'):
+              raw = pathlib.Path(path).read_bytes(); blob = request('POST', f'/repos/{repo}/git/blobs', {'content':base64.b64encode(raw).decode(),'encoding':'base64'})
+              entries.append({'path':path,'mode':'100644','type':'blob','sha':blob['sha']})
+          tree = request('POST', f'/repos/{repo}/git/trees', {'base_tree':commit['tree']['sha'],'tree':entries})
+          created = request('POST', f'/repos/{repo}/git/commits', {'message':'harness: add physical client ingress capability','tree':tree['sha'],'parents':[parent]})
+          request('PATCH', f'/repos/{repo}/git/refs/heads/{branch}', {'sha':created['sha'],'force':False})
+          print(f'HARNESS_PATCH_COMMIT={created["sha"]}')
+          PY

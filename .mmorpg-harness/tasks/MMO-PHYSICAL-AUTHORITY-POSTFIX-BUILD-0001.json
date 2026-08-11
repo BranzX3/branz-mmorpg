@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-AUTHORITY-POSTFIX-BUILD-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-AUTHORITY-POSTFIX-BUILD-0001",
+  "base_commit": "d01f50c36c343da188c7aa5d40a1907041009f20",
+  "action_id": "MMO_GRADLE_VERIFY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-AUTHORITY-POSTFIX-BUILD-0001/**"
+  ]
+}

@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
+import net.minecraft.world.inventory.Slot;
 import org.lwjgl.glfw.GLFW;
 
 public final class PhysicalAuthorityClientGameTest implements FabricClientGameTest {
@@ -17,9 +18,8 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
     private static final int HOTBAR_MOVE_TWO_HANDSHAKE_LEVEL = 10;
     private static final int INVENTORY_IMAGE_WIDTH = 176;
     private static final int INVENTORY_IMAGE_HEIGHT = 166;
-    private static final int HOTBAR_FIRST_SLOT_CENTER_X = 16;
-    private static final int HOTBAR_SLOT_STEP = 18;
-    private static final int HOTBAR_CENTER_Y = 150;
+    private static final double SLOT_HITBOX_SIZE = 16.0;
+    private static final double SLOT_CENTER_OFFSET = SLOT_HITBOX_SIZE / 2.0;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -146,22 +146,97 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
     }
 
     private static void setHotbarCursor(ClientGameTestContext context, int hotbarSlot) {
-        double[] position =
+        double[] target =
                 context.computeOnClient(
                         client -> {
+                            if (!(client.gui.screen() instanceof InventoryScreen screen)
+                                    || client.player == null) {
+                                throw new AssertionError(
+                                        "InventoryScreen and player must be present for hotbar input");
+                            }
+                            Slot slot =
+                                    screen.getMenu().slots.stream()
+                                            .filter(
+                                                    candidate ->
+                                                            candidate.container
+                                                                            == client.player
+                                                                                    .getInventory()
+                                                                    && candidate.getContainerSlot()
+                                                                            == hotbarSlot)
+                                            .findFirst()
+                                            .orElseThrow(
+                                                    () ->
+                                                            new AssertionError(
+                                                                    "Hotbar slot not found in InventoryScreen: "
+                                                                            + hotbarSlot));
                             double guiWidth = client.getWindow().getGuiScaledWidth();
                             double guiHeight = client.getWindow().getGuiScaledHeight();
+                            double screenWidth = client.getWindow().getScreenWidth();
+                            double screenHeight = client.getWindow().getScreenHeight();
                             double left = (guiWidth - INVENTORY_IMAGE_WIDTH) / 2.0;
                             double top = (guiHeight - INVENTORY_IMAGE_HEIGHT) / 2.0;
-                            double guiX = left + HOTBAR_FIRST_SLOT_CENTER_X + hotbarSlot * HOTBAR_SLOT_STEP;
-                            double guiY = top + HOTBAR_CENTER_Y;
-                            double rawX =
-                                    guiX * client.getWindow().getScreenWidth() / guiWidth;
-                            double rawY =
-                                    guiY * client.getWindow().getScreenHeight() / guiHeight;
-                            return new double[] {rawX, rawY};
+                            double guiX = left + slot.x + SLOT_CENTER_OFFSET;
+                            double guiY = top + slot.y + SLOT_CENTER_OFFSET;
+                            double rawX = guiX * screenWidth / guiWidth;
+                            double rawY = guiY * screenHeight / guiHeight;
+                            return new double[] {
+                                rawX,
+                                rawY,
+                                guiX,
+                                guiY,
+                                slot.x,
+                                slot.y,
+                                left,
+                                top,
+                                screenWidth,
+                                screenHeight,
+                                guiWidth,
+                                guiHeight
+                            };
                         });
-        context.getInput().setCursorPos(position[0], position[1]);
+        context.getInput().setCursorPos(target[0], target[1]);
+        double[] observed =
+                context.computeOnClient(
+                        client -> {
+                            double rawX = client.mouseHandler.xpos();
+                            double rawY = client.mouseHandler.ypos();
+                            double guiX =
+                                    rawX
+                                            * client.getWindow().getGuiScaledWidth()
+                                            / client.getWindow().getScreenWidth();
+                            double guiY =
+                                    rawY
+                                            * client.getWindow().getGuiScaledHeight()
+                                            / client.getWindow().getScreenHeight();
+                            return new double[] {rawX, rawY, guiX, guiY};
+                        });
+        double slotLeft = target[6] + target[4];
+        double slotTop = target[7] + target[5];
+        boolean overTarget =
+                observed[2] >= slotLeft
+                        && observed[2] < slotLeft + SLOT_HITBOX_SIZE
+                        && observed[3] >= slotTop
+                        && observed[3] < slotTop + SLOT_HITBOX_SIZE;
+        System.out.printf(
+                "PHYSICAL_AUTHORITY_HOTBAR_CURSOR_SLOT_CLIENT slot=%d raw=%.2f,%.2f gui=%.2f,%.2f target=%.2f,%.2f slotOrigin=%.2f,%.2f screen=%.0fx%.0f guiSize=%.0fx%.0f over=%s%n",
+                hotbarSlot,
+                observed[0],
+                observed[1],
+                observed[2],
+                observed[3],
+                target[2],
+                target[3],
+                slotLeft,
+                slotTop,
+                target[8],
+                target[9],
+                target[10],
+                target[11],
+                overTarget);
+        if (!overTarget) {
+            throw new AssertionError(
+                    "Physical cursor did not land inside InventoryScreen hotbar slot " + hotbarSlot);
+        }
     }
 
     private static void closeInventory(ClientGameTestContext context) {

@@ -1,0 +1,27 @@
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':mmo-bootstrap:spotlessJavaCheck'.
+> The following files had format violations:
+      src\main\java\com\branz\mmorpg\bootstrap\PhysicalOffHandInteractionController.java
+          @@ -95,9 +95,7 @@
+           ยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทNamedTextColor.AQUA));
+           ยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยท});
+           ยทยทยทยทยทยทยทยทsnapshot.lotRecords().stream()
+          -ยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยท.sorted(
+          -ยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทjava.util.Comparator.comparing(
+          -ยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทrecordยท->ยทrecord.lotId().value().toString()))
+          +ยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยท.sorted(java.util.Comparator.comparing(recordยท->ยทrecord.lotId().value().toString()))
+           ยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยท.forEach(
+           ยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทrecordยท->
+           ยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทยทplayer.sendMessage(
+  Run 'gradlew.bat spotlessApply' to fix all violations.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 31s

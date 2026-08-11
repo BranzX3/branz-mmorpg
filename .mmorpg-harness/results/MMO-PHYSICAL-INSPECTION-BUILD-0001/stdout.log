@@ -1,0 +1,132 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :clean
+> Task :mmo-api:clean
+> Task :mmo-bootstrap:clean
+> Task :mmo-character:clean
+> Task :mmo-combat:clean
+> Task :mmo-content:clean
+> Task :mmo-devtools:clean
+> Task :mmo-integrations:clean
+> Task :mmo-items:clean
+> Task :mmo-lifeskills:clean
+> Task :mmo-magic:clean
+> Task :mmo-market:clean
+> Task :mmo-persistence:clean
+> Task :mmo-progression:clean
+> Task :mmo-quests:clean
+> Task :mmo-scenes:clean
+> Task :mmo-social:clean
+> Task :mmo-worldloop:clean
+> Task :mmo-integrations:integration-mythicmobs:clean
+> Task :mmo-integrations:integration-oraxen:clean
+> Task :mmo-integrations:integration-packetevents:clean
+> Task :mmo-integrations:integration-wallet:clean
+> Task :mmo-integrations:integration-worldguard:clean
+> Task :assemble UP-TO-DATE
+> Task :check UP-TO-DATE
+> Task :build UP-TO-DATE
+> Task :mmo-api:compileJava
+> Task :mmo-api:processResources NO-SOURCE
+> Task :mmo-api:classes
+> Task :mmo-api:jar
+> Task :mmo-api:sourcesJar
+> Task :mmo-api:assemble
+> Task :mmo-api:compileTestJava
+> Task :mmo-api:processTestResources NO-SOURCE
+> Task :mmo-api:testClasses
+> Task :mmo-api:spotlessJava
+> Task :mmo-api:spotlessJavaCheck
+> Task :mmo-api:spotlessCheck
+> Task :mmo-api:test
+> Task :mmo-api:checkstyleTest
+> Task :mmo-api:checkstyleMain
+> Task :mmo-content:compileJava
+> Task :mmo-api:check
+> Task :mmo-api:build
+> Task :mmo-combat:compileJava
+> Task :mmo-integrations:compileJava
+> Task :mmo-items:compileJava
+> Task :mmo-lifeskills:compileJava
+> Task :mmo-magic:compileJava
+> Task :mmo-progression:compileJava
+> Task :mmo-persistence:compileJava
+> Task :mmo-scenes:compileJava
+> Task :mmo-social:compileJava
+> Task :mmo-worldloop:compileJava
+> Task :mmo-integrations:integration-mythicmobs:compileJava
+> Task :mmo-integrations:integration-oraxen:compileJava
+> Task :mmo-integrations:integration-packetevents:compileJava
+> Task :mmo-integrations:integration-wallet:compileJava
+> Task :mmo-integrations:integration-worldguard:compileJava
+> Task :mmo-bootstrap:compileJava
+> Task :mmo-bootstrap:processResources
+> Task :mmo-bootstrap:classes
+> Task :mmo-bootstrap:jar
+> Task :mmo-combat:processResources NO-SOURCE
+> Task :mmo-combat:classes
+> Task :mmo-combat:jar
+> Task :mmo-content:processResources NO-SOURCE
+> Task :mmo-content:classes
+> Task :mmo-content:jar
+> Task :mmo-integrations:processResources NO-SOURCE
+> Task :mmo-integrations:classes
+> Task :mmo-integrations:jar
+> Task :mmo-items:processResources NO-SOURCE
+> Task :mmo-items:classes
+> Task :mmo-items:jar
+> Task :mmo-lifeskills:processResources NO-SOURCE
+> Task :mmo-lifeskills:classes
+> Task :mmo-lifeskills:jar
+> Task :mmo-magic:processResources NO-SOURCE
+> Task :mmo-magic:classes
+> Task :mmo-magic:jar
+> Task :mmo-persistence:processResources
+> Task :mmo-persistence:classes
+> Task :mmo-persistence:jar
+> Task :mmo-progression:processResources NO-SOURCE
+> Task :mmo-progression:classes
+> Task :mmo-progression:jar
+> Task :mmo-scenes:processResources NO-SOURCE
+> Task :mmo-scenes:classes
+> Task :mmo-scenes:jar
+> Task :mmo-social:processResources NO-SOURCE
+> Task :mmo-social:classes
+> Task :mmo-social:jar
+> Task :mmo-worldloop:processResources NO-SOURCE
+> Task :mmo-worldloop:classes
+> Task :mmo-worldloop:jar
+> Task :mmo-integrations:integration-mythicmobs:processResources NO-SOURCE
+> Task :mmo-integrations:integration-mythicmobs:classes
+> Task :mmo-integrations:integration-mythicmobs:jar
+> Task :mmo-integrations:integration-oraxen:processResources NO-SOURCE
+> Task :mmo-integrations:integration-oraxen:classes
+> Task :mmo-integrations:integration-oraxen:jar
+> Task :mmo-integrations:integration-packetevents:processResources NO-SOURCE
+> Task :mmo-integrations:integration-packetevents:classes
+> Task :mmo-integrations:integration-packetevents:jar
+> Task :mmo-integrations:integration-wallet:processResources NO-SOURCE
+> Task :mmo-integrations:integration-wallet:classes
+> Task :mmo-integrations:integration-wallet:jar
+> Task :mmo-integrations:integration-worldguard:processResources NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:classes
+> Task :mmo-integrations:integration-worldguard:jar
+> Task :mmo-bootstrap:shadowJar
+> Task :mmo-bootstrap:sourcesJar
+> Task :mmo-bootstrap:assemble
+> Task :mmo-bootstrap:compileTestJava
+> Task :mmo-bootstrap:processTestResources NO-SOURCE
+> Task :mmo-bootstrap:testClasses
+> Task :mmo-bootstrap:checkstyleTest
+> Task :mmo-bootstrap:spotlessJava
+> Task :mmo-bootstrap:spotlessJavaCheck FAILED
+> Task :mmo-bootstrap:checkstyleMain
+
+[Incubating] Problems report is available at: file:///C:/Users/User/AppData/Local/BranzMMORPGHarness/repo/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+75 actionable tasks: 75 executed

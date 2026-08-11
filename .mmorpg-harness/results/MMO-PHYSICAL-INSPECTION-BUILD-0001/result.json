@@ -1,0 +1,36 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_GRADLE_VERIFY_V1",
+  "action_identity": "GRADLE_CLEAN_BUILD",
+  "action_record": {
+    "action_status": "FAIL",
+    "argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "clean",
+      "build"
+    ],
+    "duration_seconds": 32.11,
+    "exit_code": 1,
+    "fixed_command_id": "GRADLE_CLEAN_BUILD"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-INSPECTION-BUILD-0001/**"
+  ],
+  "base_commit_expected": "516f5dd635278415b969f96aa1e2c50968e31257",
+  "blocker_code": "ACTION_FAILED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "0619b4238a88a898ef57e1ce99b67d4e15850cf7",
+  "duration_seconds": 32.188,
+  "ending_commit_before_result_commit": "516f5dd635278415b969f96aa1e2c50968e31257",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-11T09:43:10.118918+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-11T09:42:37.931495+00:00",
+  "starting_commit_actual": "516f5dd635278415b969f96aa1e2c50968e31257",
+  "task_branch": "harness-task/MMO-PHYSICAL-INSPECTION-BUILD-0001",
+  "task_id": "MMO-PHYSICAL-INSPECTION-BUILD-0001",
+  "task_manifest_sha256": "556bb9dda5152de66e8c9d293666fb28b54960af091bc9d3523724de6099e784",
+  "unauthorized_writes": []
+}

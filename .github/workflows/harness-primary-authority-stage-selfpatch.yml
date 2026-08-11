@@ -1,0 +1,71 @@
+name: harness-primary-authority-stage-selfpatch
+
+on:
+  push:
+    branches:
+      - harness-fix/physical-primary-authority-stage-v1
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Tighten primary authority evidence
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runner = Path('.mmorpg-harness/runner.py')
+          text = runner.read_text(encoding='utf-8')
+          anchor = '    client_argv = [\n        str(client_wrapper),\n        "--no-daemon",\n        "--console=plain",\n        "runClientGameTest",\n    ]\n'
+          replacement = anchor + '    if require_primary_input:\n        client_argv.append("-PphysicalPrimaryInputAcceptance=true")\n'
+          if text.count(anchor) != 1:
+              raise SystemExit(f'client argv anchor count={text.count(anchor)}')
+          text = text.replace(anchor, replacement, 1)
+
+          anchor = '                    "primary_mouse_sent_client": "PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT"\n                    in client_text,\n'
+          lines = [
+              '                    "primary_stage_persisted_server": "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PERSISTED_SERVER"',
+              '                    in paper_text,',
+              '                    "primary_stage_projected_server": "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PROJECTED_SERVER"',
+              '                    in paper_text,',
+              '                    "primary_projection_ready_client": "PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT"',
+              '                    in client_text,',
+              '                    "primary_mouse_sent_client": "PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT"',
+              '                    in client_text,',
+          ]
+          replacement = '\n'.join(lines) + '\n'
+          if text.count(anchor) != 1:
+              raise SystemExit(f'primary checks anchor count={text.count(anchor)}')
+          runner.write_text(text.replace(anchor, replacement, 1), encoding='utf-8')
+
+          protocol = Path('.mmorpg-harness/PROTOCOL.md')
+          text = protocol.read_text(encoding='utf-8')
+          old = '- `MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1` — reuse the fixed real-client ingress path with `-PphysicalPrimaryInputAcceptance=true`; require a real client left-mouse press plus Paper evidence that the existing `PlayerAnimationEvent.ARM_SWING` path resolved to `SemanticInput.PRIMARY` and was accepted by `InputRouter.routeFrame`. This is an input-routing gate only, not full A–F physical item authority.\n'
+          new = '- `MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1` — reuse the fixed real-client ingress path with `-PphysicalPrimaryInputAcceptance=true` on both Paper and the checked-in client test; require TransactionService-backed training-blade persistence, authoritative selected-slot projection observed by both server and client, a real client left-mouse press, then Paper evidence that the existing `PlayerAnimationEvent.ARM_SWING` path resolved to `SemanticInput.PRIMARY` and was accepted by `InputRouter.routeFrame`. This remains a bounded primary-input authority gate, not full A–F acceptance.\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'protocol anchor count={text.count(old)}')
+          protocol.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Validate harness
+        shell: bash
+        run: |
+          python -m py_compile .mmorpg-harness/runner.py .mmorpg-harness/selftest.py
+          python .mmorpg-harness/selftest.py
+      - name: Commit bounded patch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .mmorpg-harness/runner.py .mmorpg-harness/PROTOCOL.md
+          test "$(git diff --cached --name-only | wc -l)" -eq 2
+          git commit -m 'harness: require authoritative primary staging evidence'
+          git push origin HEAD:${GITHUB_REF_NAME}

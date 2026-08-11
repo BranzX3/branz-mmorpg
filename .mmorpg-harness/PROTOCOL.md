@@ -58,6 +58,7 @@ Initial allowlist:
 - `MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1`
 - `MMO_CONTENT_VALIDATE_FIXTURE_V1`
 - `MMO_CLIENT_ACCEPTANCE_COMPILE_V1` — compile the checked-in standalone Minecraft 26.2 Fabric Client GameTest project using its own pinned Gradle wrapper. No remote argv or environment overrides are accepted.
+- `MMO_CLIENT_ACCEPTANCE_INGRESS_V1` — run a fresh offline local Paper 26.2 server and the checked-in Fabric Client GameTest with fixed commands; OP and XP-level 7 are console-only acceptance staging, `/mmo physical status` is typed through real client chat input, and Paper/client logs are retained as evidence.
 
 The deprecated combat-acceptance action remains compiled only for protocol compatibility with
 historical task manifests. New tasks must not select it. Removing the compiled action is a separate

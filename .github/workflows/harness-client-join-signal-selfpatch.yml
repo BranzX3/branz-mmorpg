@@ -24,22 +24,22 @@ jobs:
           from pathlib import Path
 
           runner = Path('.mmorpg-harness/runner.py')
-          text = runner.read_text(encoding='utf-8')
-          old = '''                    match = re.search(
-                        r"UUID of player ([A-Za-z0-9_]{1,16}) is", paper_text
-                    )
-                    if match is None:
-                        match = re.search(
-                            r"([A-Za-z0-9_]{1,16}) joined the game", paper_text
-                        )
-'''
-          new = '''                    match = re.search(
-                        r"([A-Za-z0-9_]{1,16}) joined the game", paper_text
-                    )
-'''
-          if text.count(old) != 1:
-              raise SystemExit(f'join signal anchor count={text.count(old)}')
-          runner.write_text(text.replace(old, new, 1), encoding='utf-8')
+          lines = runner.read_text(encoding='utf-8').splitlines(keepends=True)
+          uuid_hits = [i for i, line in enumerate(lines) if 'UUID of player' in line]
+          joined_hits = [i for i, line in enumerate(lines) if 'joined the game' in line]
+          if len(uuid_hits) != 1 or len(joined_hits) != 1:
+              raise SystemExit(f'join signal anchors uuid={uuid_hits} joined={joined_hits}')
+          start = uuid_hits[0] - 1
+          end = joined_hits[0] + 2
+          if start < 0 or end > len(lines):
+              raise SystemExit('join signal block bounds invalid')
+          replacement = [
+              '                    match = re.search(\n',
+              '                        r"([A-Za-z0-9_]{1,16}) joined the game", paper_text\n',
+              '                    )\n',
+          ]
+          lines[start:end] = replacement
+          runner.write_text(''.join(lines), encoding='utf-8')
           PY
       - name: Validate harness
         shell: bash

@@ -24,6 +24,8 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                 20 * 30);
         System.out.println("PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT");
 
+        context.waitFor(client -> client.gui.screen() == null, 20 * 30);
+        System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
         context.getInput().pressKey(options -> options.keyChat);
         context.waitFor(client -> client.gui.screen() instanceof ChatScreen, 20 * 5);
         context.getInput().typeChars("/mmo physical status");

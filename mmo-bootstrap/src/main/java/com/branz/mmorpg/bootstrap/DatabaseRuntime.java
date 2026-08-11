@@ -120,6 +120,8 @@ final class DatabaseRuntime implements AutoCloseable {
             migrateIfEnabled(settings, dataSource);
             return new DatabaseRuntime(settings, embedded, pool, dataSource);
         } catch (IOException | RuntimeException exception) {
+            SmokeBootstrapContract.recordStartupFailure(
+                    settings.embeddedDataDirectory(), exception);
             closeQuietly(pool);
             closeQuietly(embedded);
             throw exception;

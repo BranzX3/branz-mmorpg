@@ -1,4 +1,4 @@
-name: physical-primary-authority-stage-selfpatch
+name: physical-primary-authority-stage-diagnostic
 
 on:
   push:
@@ -9,157 +9,26 @@ permissions:
   contents: write
 
 jobs:
-  patch:
+  diagnose-client:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Patch authoritative primary staging
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          plugin = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/BranzMmoPlugin.java')
-          text = plugin.read_text(encoding='utf-8')
-          anchor = '        characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);\n'
-          lines = [
-              '        characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);',
-              '        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {',
-              '            var acceptanceWeapon =',
-              '                    activeItemEngine',
-              '                            .get()',
-              '                            .find(',
-              '                                    com.branz.mmorpg.api.identity.DefinitionId.of(',
-              '                                            "weapon.training_blade"))',
-              '                            .orElseThrow();',
-              '            characterSessionController.addReadyHandler(',
-              '                    player ->',
-              '                            characterSessionController.grantTestValue(',
-              '                                    player,',
-              '                                    acceptanceWeapon,',
-              '                                    snapshot.manifest().contentVersion(),',
-              '                                    result -> {',
-              '                                        if (!(result instanceof Result.Success<?, ?>)) {',
-              '                                            getLogger()',
-              '                                                    .severe(',
-              '                                                            "PHYSICAL_AUTHORITY_PRIMARY_STAGE_FAILED_SERVER player="',
-              '                                                                    + player.getName());',
-              '                                            return;',
-              '                                        }',
-              '                                        getLogger()',
-              '                                                .info(',
-              '                                                        "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PERSISTED_SERVER player="',
-              '                                                                + player.getName()',
-              '                                                                + " definition="',
-              '                                                                + acceptanceWeapon.id());',
-              '                                        boolean projected =',
-              '                                                characterSessionController',
-              '                                                        .selectedPhysicalItem(player)',
-              '                                                        .filter(',
-              '                                                                selected ->',
-              '                                                                        selected.definition()',
-              '                                                                                .id()',
-              '                                                                                .equals(',
-              '                                                                                        acceptanceWeapon',
-              '                                                                                                .id()))',
-              '                                                        .isPresent();',
-              '                                        if (!projected) {',
-              '                                            getLogger()',
-              '                                                    .severe(',
-              '                                                            "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PROJECTION_FAILED_SERVER player="',
-              '                                                                    + player.getName());',
-              '                                            return;',
-              '                                        }',
-              '                                        getLogger()',
-              '                                                .info(',
-              '                                                        "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PROJECTED_SERVER player="',
-              '                                                                + player.getName()',
-              '                                                                + " definition="',
-              '                                                                + acceptanceWeapon.id());',
-              '                                    }));',
-              '        }',
-          ]
-          if text.count(anchor) != 1:
-              raise SystemExit(f'plugin ready-handler anchor count={text.count(anchor)}')
-          plugin.write_text(text.replace(anchor, '\n'.join(lines) + '\n', 1), encoding='utf-8')
-
-          client = Path('acceptance/physical-client-26.2/src/gametest/java/com/branz/mmorpg/acceptance/PhysicalAuthorityClientGameTest.java')
-          text = client.read_text(encoding='utf-8')
-          address = '        String address = System.getProperty("branz.acceptance.server", "localhost:25565");\n'
-          property_lines = [
-              '        String address = System.getProperty("branz.acceptance.server", "localhost:25565");',
-              '        boolean primaryInputAcceptance =',
-              '                Boolean.getBoolean("branz.acceptance.physicalPrimaryInput");',
-          ]
-          if text.count(address) != 1:
-              raise SystemExit(f'client property anchor count={text.count(address)}')
-          text = text.replace(address, '\n'.join(property_lines) + '\n', 1)
-          old_lines = [
-              '        System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");',
-              '        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);',
-              '        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");',
-              '        context.waitTicks(5);',
-              '        context.getInput().pressKey(options -> options.keyChat);',
-          ]
-          new_lines = [
-              '        System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");',
-              '        if (primaryInputAcceptance) {',
-              '            context.waitFor(',
-              '                    client ->',
-              '                            client.player != null && !client.player.getMainHandItem().isEmpty(),',
-              '                    20 * 30);',
-              '            System.out.println("PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT");',
-              '            context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);',
-              '            System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");',
-              '            context.waitTicks(5);',
-              '        }',
-              '        context.getInput().pressKey(options -> options.keyChat);',
-          ]
-          old = '\n'.join(old_lines) + '\n'
-          if text.count(old) != 1:
-              raise SystemExit(f'client LMB anchor count={text.count(old)}')
-          client.write_text(text.replace(old, '\n'.join(new_lines) + '\n', 1), encoding='utf-8')
-
-          build = Path('acceptance/physical-client-26.2/build.gradle')
-          text = build.read_text(encoding='utf-8')
-          build_lines = [
-              '',
-              'tasks.withType(JavaExec).configureEach {',
-              "    if (name == 'runClientGameTest' && providers.gradleProperty('physicalPrimaryInputAcceptance').orNull == 'true') {",
-              "        systemProperty 'branz.acceptance.physicalPrimaryInput', 'true'",
-              '    }',
-              '}',
-          ]
-          if 'branz.acceptance.physicalPrimaryInput' in text:
-              raise SystemExit('client acceptance property already present')
-          build.write_text(text.rstrip() + '\n'.join(build_lines) + '\n', encoding='utf-8')
-          PY
-      - name: Commit bounded source patch
-        shell: bash
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/BranzMmoPlugin.java acceptance/physical-client-26.2/src/gametest/java/com/branz/mmorpg/acceptance/PhysicalAuthorityClientGameTest.java acceptance/physical-client-26.2/build.gradle
-          test "$(git diff --cached --name-only | wc -l)" -eq 3
-          git commit -m 'acceptance: stage authoritative primary weapon before LMB'
-          git push origin HEAD:${GITHUB_REF_NAME}
-      - name: Validate client compile
+      - name: Capture client compile
         id: client_compile
         continue-on-error: true
         shell: bash
         working-directory: acceptance/physical-client-26.2
         run: |
           set -o pipefail
-          ./gradlew --no-daemon --console=plain compileGameTestJava 2>&1 | tee ../../.primary-client-compile.log
-      - name: Persist client compile diagnostic
+          ./gradlew --no-daemon --console=plain compileGameTestJava 2>&1 | tee ../../client-compile-diagnostic.txt
+      - name: Persist diagnostic
         if: steps.client_compile.outcome == 'failure'
         shell: bash
         run: |
-          git add .primary-client-compile.log
-          git commit -m 'debug: capture primary client compile failure'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f client-compile-diagnostic.txt
+          git commit -m 'debug: capture primary client compile output'
           git push origin HEAD:${GITHUB_REF_NAME}
           exit 1

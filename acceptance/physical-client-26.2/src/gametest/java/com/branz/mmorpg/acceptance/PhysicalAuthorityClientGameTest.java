@@ -15,6 +15,8 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
     @Override
     public void runTest(ClientGameTestContext context) {
         String address = System.getProperty("branz.acceptance.server", "localhost:25565");
+        boolean primaryInputAcceptance =
+                Boolean.getBoolean("branz.acceptance.physicalPrimaryInput");
         connect(context, address);
         context.waitFor(client -> client.level != null && client.player != null, 20 * 30);
         context.waitFor(
@@ -26,9 +28,16 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
 
         context.waitFor(client -> client.gui.screen() == null, 20 * 30);
         System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
-        context.waitTicks(5);
+        if (primaryInputAcceptance) {
+            context.waitFor(
+                    client ->
+                            client.player != null && !client.player.getMainHandItem().isEmpty(),
+                    20 * 30);
+            System.out.println("PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT");
+            context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+            System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
+            context.waitTicks(5);
+        }
         context.getInput().pressKey(options -> options.keyChat);
         context.waitFor(client -> client.gui.screen() instanceof ChatScreen, 20 * 5);
         context.getInput().typeChars("/mmo physical status");

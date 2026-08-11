@@ -353,6 +353,43 @@ def gradle_wrapper(repo: Path) -> str:
     return str(p)
 
 
+def action_client_acceptance_compile(
+    repo: Path, result_dir: Path, manifest: dict[str, Any]
+) -> tuple[int, str, str, dict[str, Any]]:
+    client_dir = repo / "acceptance" / "physical-client-26.2"
+    wrapper = client_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")
+    required = (
+        client_dir / "settings.gradle",
+        client_dir / "build.gradle",
+        client_dir / "gradle.properties",
+        client_dir / "gradle" / "wrapper" / "gradle-wrapper.properties",
+        client_dir / "gradle" / "wrapper" / "gradle-wrapper.jar",
+        wrapper,
+    )
+    missing = [str(path.relative_to(repo)) for path in required if not path.is_file()]
+    if missing:
+        raise HarnessError("CLIENT_ACCEPTANCE_PROJECT_MISSING", json.dumps(missing))
+
+    env = gradle_env(repo)
+    env["GRADLE_USER_HOME"] = str((repo.parent / "gradle-home-client").resolve())
+    argv = [str(wrapper), "--no-daemon", "--console=plain", "build"]
+    started = time.monotonic()
+    cp = run_action(argv, cwd=client_dir, timeout=1800, env=env)
+    elapsed = round(time.monotonic() - started, 3)
+    return cp.returncode, cp.stdout, cp.stderr, {
+        "action_status": "PASS" if cp.returncode == 0 else "FAIL",
+        "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_COMPILE",
+        "argv": argv,
+        "working_directory": client_dir.relative_to(repo).as_posix(),
+        "client_wrapper_sha256": sha256_file(wrapper),
+        "client_wrapper_properties_sha256": sha256_file(
+            client_dir / "gradle" / "wrapper" / "gradle-wrapper.properties"
+        ),
+        "exit_code": cp.returncode,
+        "duration_seconds": elapsed,
+    }
+
+
 ActionHandler = Callable[[Path, Path, dict[str, Any]], tuple[int, str, str, dict[str, Any]]]
 
 
@@ -446,6 +483,9 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1": ActionSpec(action_bootstrap_combat_acceptance, "BOOTSTRAP_COMBAT_ACCEPTANCE"),
     "MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1": ActionSpec(make_gradle_action((":mmo-bootstrap:runServer", "-PsmokeTest=true", "-PsmokeInvalidContent=true"), 600, "BOOTSTRAP_INVALID_CONTENT_SMOKE"), "BOOTSTRAP_INVALID_CONTENT_SMOKE"),
     "MMO_CONTENT_VALIDATE_FIXTURE_V1": ActionSpec(action_content_validate_fixture, "CONTENT_VALIDATE_MILESTONE1"),
+    "MMO_CLIENT_ACCEPTANCE_COMPILE_V1": ActionSpec(
+        action_client_acceptance_compile, "PHYSICAL_CLIENT_ACCEPTANCE_COMPILE"
+    ),
 }
 
 

@@ -55,6 +55,8 @@ def main() -> int:
     assert R.ACTION_SPECS["MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1"].identity == "BOOTSTRAP_COMBAT_ACCEPTANCE"
     assert R.ACTION_SPECS["MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1"].handler is R.action_bootstrap_combat_acceptance
     assert R.ACTION_SPECS["MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1"].identity == "BOOTSTRAP_INVALID_CONTENT_SMOKE"
+    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_COMPILE_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_COMPILE"
+    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_COMPILE_V1"].handler is R.action_client_acceptance_compile
 
     bad = manifest(action="NOT_REAL")
     expect_code("ACTION_NOT_ALLOWLISTED", lambda: R.validate_manifest(bad))

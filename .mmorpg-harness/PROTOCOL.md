@@ -57,6 +57,7 @@ Initial allowlist:
   either automated action.
 - `MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1`
 - `MMO_CONTENT_VALIDATE_FIXTURE_V1`
+- `MMO_CLIENT_ACCEPTANCE_COMPILE_V1` — compile the checked-in standalone Minecraft 26.2 Fabric Client GameTest project using its own pinned Gradle wrapper. No remote argv or environment overrides are accepted.
 
 The deprecated combat-acceptance action remains compiled only for protocol compatibility with
 historical task manifests. New tasks must not select it. Removing the compiled action is a separate
@@ -122,3 +123,5 @@ current `mmo-bootstrap` build does not map that property to a JVM acceptance mod
 shutdown lifecycle.
 
 Smoke actions never accept a remote content path or arbitrary Gradle arguments.
+
+The client acceptance compile action is isolated from the production multi-project wrapper. It executes only `acceptance/physical-client-26.2/gradlew[.bat] --no-daemon --console=plain build` from that fixed directory and records the nested wrapper hashes in action metadata.

@@ -23,6 +23,25 @@ The automated implementation is present on `newmmo` through the following bounde
 The corresponding full-repository `./gradlew clean build` gates passed in CI runs #650, #664, #673,
 #694 and #697.
 
+Acceptance support was then hardened without changing gameplay authority semantics:
+
+- PR #29 — bootstrap smoke uses an isolated disposable embedded PostgreSQL directory and fails when
+  database startup/migration fails instead of treating a clean Paper shutdown as sufficient.
+- PR #30 — LOCAL/INTEGRATION dev acceptance can run `/mmo physical status` to read stable
+  item/lot UUID, authoritative location, version, resolved durability/quantity, last transaction and
+  content version from the active Player Session. Inspection refuses while a durable value mutation
+  is in flight and does not expose raw payload JSON.
+
+The runtime revision pinned for the next complete live pass is:
+
+```text
+0851f599caf8565d78338a53c9917f9c982d6f4a
+```
+
+A documentation-only evidence commit after this revision does not invalidate the runtime revision.
+Any later runtime source, migration, configuration-default or active-content change does invalidate
+it and requires the complete A-F pass to run on the new revision.
+
 This status is **not** `LIVE_ACCEPTED` or `COMPLETE`. A real local Paper client pass is still
 required by `42-ai-coding-handoff.md`.
 
@@ -64,54 +83,81 @@ this same transaction/reconnect acceptance discipline.
 Use a LOCAL or INTEGRATION server with the normal dev-value preparation path. Dev commands may grant
 values but must not substitute for the physical player actions below.
 
+For every target-runtime section, capture `/mmo physical status` immediately before and after each
+relevant value-changing action, then again after the required reconnect/restart. If inspection says
+that an authoritative value transaction is still in progress, wait for commit and retry; a stale
+pre-commit snapshot is not acceptance evidence.
+
 ### A. Legacy main-hand migration
 
-1. Start from a character containing one pre-refactor `NATIVE_EQUIPPED/MAIN_HAND` weapon.
-2. Join normally and wait for `MMO character ready`.
-3. Verify no persistent MAIN_HAND remains and the same weapon UUID appears in one free physical
-   inventory slot.
-4. Verify payload/durability is unchanged except for the expected location/version transition.
-5. Disconnect/reconnect, then restart the server and reconnect again. The UUID and physical inventory
-   location must remain canonical; the weapon must never be forced back to hotbar slot 1.
+1. Seed the character on the exact pre-PR #21 runtime
+   `8c5a04271f9385730aff0b3332608812a216dc95` with one fresh, unused Training Sword committed to
+   `NATIVE_EQUIPPED/MAIN_HAND` through the old supported Chronicle transaction.
+2. Reconnect on that legacy runtime so its MAIN_HAND row is reconstructed as the signed physical
+   held item. Run `/paper dumpitem` while holding it and record the complete BranzMMO projection
+   `value_id`, `definition_id`, `authority_version` and `content_version`. The eight-character
+   Chronicle label is supporting evidence only, not the authoritative UUID.
+3. Stop Paper normally, preserve the same normal embedded PostgreSQL run directory, switch to the
+   accepted runtime revision and join the same character.
+4. Run `/mmo physical status`. Verify no persistent MAIN_HAND remains and the exact full UUID from
+   the legacy signed projection appears exactly once in a free `CHARACTER_INVENTORY/slot:n`.
+5. The live check must show resolved durability `120/120` for the fresh unused Training Sword and
+   target `ver` must equal the captured legacy `authority_version + 1` exactly. The migration is one
+   authoritative item-location move; an additional version spend is a failure. Raw database payload
+   JSON is intentionally not exposed by the live inspector; raw payload preservation remains an
+   automated migration invariant.
+6. Disconnect/reconnect, then restart the server and reconnect again. The same UUID, physical
+   inventory location, post-migration version and durability must remain canonical; the weapon must
+   never be forced back to player-facing hotbar slot 1.
+7. On an isolated/disposable acceptance database, also prove the full-inventory migration
+   precondition fails closed without deleting, duplicating or inventing a destination for the item.
 
 ### B. Physical weapon hotbar
 
 1. Move one MMO-owned Training Sword from inventory into each of at least two different hotbar slots
    within 1–8 using normal cursor pickup/place.
-2. Reconnect after each final placement. The same UUID must remain in the committed slot.
-3. Select the sword and draw/use its real combat input. A miss must not spend durability.
+2. After each committed move, capture `/mmo physical status`; reconnect after each final placement
+   and require the same UUID/location/version to reconstruct.
+3. Select the sword and draw/use its real combat input. A miss must not spend durability; inspector
+   output before/after the MISS must show no wear transition.
 4. Hit an eligible target. Exactly one wear commit must occur for the action UUID even when one move
-   can resolve multiple targets.
+   can resolve multiple targets; inspector output must show the corresponding version/durability
+   transition.
 5. Wear the weapon to zero. Further combat moves must be rejected as broken without deleting or
    auto-unequipping the item.
 6. Attempt to place an MMO value into Chronicle slot 9. The move must be rejected/reconciled and
-   Chronicle must remain present.
+   Chronicle must remain present without any ownership/location loss.
+7. Restart and verify the exact broken sword UUID, final physical slot, version and durability again.
 
 ### C. Whole physical consumable lot
 
-1. Grant one authored consumable lot with quantity greater than one in normal inventory.
-2. Move the **whole stack** into a free hotbar slot 1–8, reconnect and verify the same lot UUID,
-   quantity and slot.
+1. Grant one authored consumable lot with quantity greater than one in normal inventory and capture
+   its initial `/mmo physical status` line.
+2. Move the **whole stack** into a free hotbar slot 1–8, inspect after commit, reconnect and verify
+   the same lot UUID, quantity, version and slot.
 3. Right-click the selected authoritative stack and allow the use to reach commit. The lot/effect
-   transaction must occur exactly once.
+   transaction must occur exactly once; inspector output must show the one authoritative decrement.
 4. Attempt half-stack pickup, split, merge and lot-to-lot swap. These operations must be rejected and
-   canonical DB quantity/location must be reprojected without duplication or loss.
-5. Move the whole remaining stack to another free slot and restart the server. The final slot must
-   survive.
+   canonical DB quantity/location must be reprojected without duplication or loss. Inspect after the
+   rejection classes rather than trusting only the visible stack.
+5. Move the whole remaining stack to another free slot and restart the server. The final UUID,
+   quantity, version and slot must survive.
 
 ### D. Physical shield OFF_HAND
 
 1. Put the authored Training Shield in a hotbar slot 1–8, select it and press F.
 2. The exact shield UUID must leave character inventory and become `NATIVE_EQUIPPED/OFF_HAND` before
-   its physical offhand projection is authoritative.
+   its physical offhand projection is authoritative; verify the committed state with `/mmo physical
+   status`.
 3. Select an empty hotbar slot and press F to unequip; repeat with two different shields to exercise
-   atomic shield-to-shield swap.
+   atomic shield-to-shield swap. Inspection must always show one exact UUID in OFF_HAND and the other
+   in inventory, never duplicate or missing.
 4. Equip the Training Shield again, block a real eligible impact and verify exactly one durability
-   spend for that impact UUID.
+   spend for that impact UUID/version transition.
 5. Wear the shield to zero. Guard must become invalid while the shield remains owned and repairable.
 6. With a Staff selected, press F and verify Staff spell cycling still owns the input; the Staff must
-   not enter OFF_HAND.
-7. Restart with a shield equipped and verify exact OFF_HAND UUID/durability reconstruction.
+   not enter OFF_HAND and its authoritative location must remain unchanged.
+7. Restart with a shield equipped and verify exact OFF_HAND UUID/version/durability reconstruction.
 
 ### E. Ordinary world-mob health
 
@@ -122,27 +168,37 @@ values but must not substitute for the physical player actions below.
 4. Repeat with projectile or Staff spell damage when practical.
 5. Separately verify an explicitly tagged training dummy still uses its intended training-health
    runtime.
+6. When a durable item participates in the check, compare `/mmo physical status` before/after so an
+   unrelated durability or ownership change cannot hide inside the world-health acceptance result.
 
 ### F. Chronicle/native-slot boundary
 
-1. Open Chronicle through slot 9.
+1. Capture `/mmo physical status` before opening Chronicle through slot 9.
 2. Verify physical weapon/shield/native armor slots cannot be committed from Chronicle.
 3. Verify existing virtual/build/cosmetic changes still use their normal Chronicle transaction path.
-4. Close/reopen/reconnect and confirm physical inventory/OFF_HAND truth is unchanged by Chronicle
-   inspection.
+4. Close/reopen Chronicle and compare inspector output. Inspection alone must not change physical
+   inventory/OFF_HAND UUID/location/version.
+5. Disconnect/reconnect and compare again; the same physical authority state must reconstruct.
 
 ## Pass/fail evidence
 
 Record, for each section A–F:
 
 - player UUID/character ID;
-- content version and server commit;
+- content version and accepted runtime revision;
 - item/lot UUIDs involved;
 - pre/post authoritative locations and versions;
+- pre/post resolved durability or quantity where applicable;
+- `/mmo physical status` output before/after/reconnect/restart on the accepted runtime;
+- for A only, the legacy held-item `/paper dumpitem` projection UUID/version evidence;
 - reconnect/restart result;
 - visible rejection/recovery message for negative cases;
 - terminal log excerpt only when it helps identify the exact failed invariant.
 
+Screenshots and Bukkit inventory appearance are supporting evidence only. Do not expose raw payload
+JSON just to strengthen an acceptance record; the stable authority fields above plus the automated
+persistence/migration tests own that decision.
+
 If any section fails, return this feature to `IN_PROGRESS`, fix the underlying authority boundary and
-rerun the complete A–F pass. Only after the real client pass may the roadmap advance this feature to
+rerun the complete A-F pass. Only after the real client pass may the roadmap advance this feature to
 `LIVE_ACCEPTED`/`COMPLETE` and unblock renewed Chronicle acceptance.

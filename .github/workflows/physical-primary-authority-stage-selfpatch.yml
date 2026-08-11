@@ -1,4 +1,4 @@
-name: physical-primary-authority-stage-diagnostic
+name: physical-primary-authority-stage-validation
 
 on:
   push:
@@ -6,29 +6,19 @@ on:
       - acceptance/physical-primary-authority-stage-v1
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  diagnose-client:
+  validate-client:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Capture client compile
-        id: client_compile
-        continue-on-error: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Validate client acceptance harness
         shell: bash
         working-directory: acceptance/physical-client-26.2
-        run: |
-          set -o pipefail
-          ./gradlew --no-daemon --console=plain compileGameTestJava 2>&1 | tee ../../client-compile-diagnostic.txt
-      - name: Persist diagnostic
-        if: steps.client_compile.outcome == 'failure'
-        shell: bash
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -f client-compile-diagnostic.txt
-          git commit -m 'debug: capture primary client compile output'
-          git push origin HEAD:${GITHUB_REF_NAME}
-          exit 1
+        run: ./gradlew --no-daemon --console=plain build

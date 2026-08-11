@@ -68,6 +68,13 @@ final class PhysicalOffHandInteractionController implements Listener {
                     Component.text("Character session is not ready.", NamedTextColor.RED));
             return;
         }
+        if (characters.valueMutationInFlight(player)) {
+            player.sendMessage(
+                    Component.text(
+                            "Authoritative value transaction is still in progress; retry after commit.",
+                            NamedTextColor.YELLOW));
+            return;
+        }
         PersistentCharacterSnapshot snapshot = active.snapshot();
         player.sendMessage(
                 Component.text(

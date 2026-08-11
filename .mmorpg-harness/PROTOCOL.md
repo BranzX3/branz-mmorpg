@@ -59,7 +59,7 @@ Initial allowlist:
 - `MMO_CONTENT_VALIDATE_FIXTURE_V1`
 - `MMO_CLIENT_ACCEPTANCE_COMPILE_V1` — compile the checked-in standalone Minecraft 26.2 Fabric Client GameTest project using its own pinned Gradle wrapper. No remote argv or environment overrides are accepted.
 - `MMO_CLIENT_ACCEPTANCE_INGRESS_V1` — run a fresh offline local Paper 26.2 server and the checked-in Fabric Client GameTest with fixed commands; OP and XP-level 7 are console-only acceptance staging, `/mmo physical status` is typed through real client chat input, and Paper/client logs are retained as evidence.
-- `MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1` — reuse the fixed real-client ingress path with `-PphysicalPrimaryInputAcceptance=true`; require a real client left-mouse press plus Paper evidence that the existing `PlayerAnimationEvent.ARM_SWING` path resolved to `SemanticInput.PRIMARY` and was accepted by `InputRouter.routeFrame`. This is an input-routing gate only, not full A–F physical item authority.
+- `MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1` — reuse the fixed real-client ingress path with `-PphysicalPrimaryInputAcceptance=true` on both Paper and the checked-in client test; require TransactionService-backed training-blade persistence, authoritative selected-slot projection observed by both server and client, a real client left-mouse press, then Paper evidence that the existing `PlayerAnimationEvent.ARM_SWING` path resolved to `SemanticInput.PRIMARY` and was accepted by `InputRouter.routeFrame`. This remains a bounded primary-input authority gate, not full A–F acceptance.
 
 The deprecated combat-acceptance action remains compiled only for protocol compatibility with
 historical task manifests. New tasks must not select it. Removing the compiled action is a separate

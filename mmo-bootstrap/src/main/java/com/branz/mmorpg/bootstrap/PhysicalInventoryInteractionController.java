@@ -37,6 +37,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 final class PhysicalInventoryInteractionController implements Listener {
     private static final int STORAGE_SIZE = 36;
     private static final int CURSOR_OBSERVATION_SLOT = 1000;
+    private static final int FIRST_GAMEPLAY_HOTBAR_SLOT = 0;
+    private static final int LAST_GAMEPLAY_HOTBAR_SLOT = 7;
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
@@ -45,6 +47,7 @@ final class PhysicalInventoryInteractionController implements Listener {
     private final PhysicalInventoryLotMoveService lotMoves;
     private final String contentVersion;
     private final Map<UUID, PendingInteraction> pending = new HashMap<>();
+    private final Map<UUID, HotbarAcceptanceProgress> hotbarAcceptanceProgress = new HashMap<>();
 
     PhysicalInventoryInteractionController(
             JavaPlugin plugin,
@@ -493,11 +496,59 @@ final class PhysicalInventoryInteractionController implements Listener {
                                 + intent.sourceSlot()
                                 + " destination="
                                 + intent.destinationSlot());
-        if (intent.sourceSlot() == 0 && intent.destinationSlot() == 1) {
-            player.setLevel(9);
-        } else if (intent.sourceSlot() == 1 && intent.destinationSlot() == 2) {
-            player.setLevel(10);
+        if (!gameplayHotbarSlot(intent.sourceSlot())
+                || !gameplayHotbarSlot(intent.destinationSlot())
+                || intent.sourceSlot() == intent.destinationSlot()) {
+            plugin.getLogger()
+                    .severe(
+                            "PHYSICAL_AUTHORITY_HOTBAR_SEQUENCE_INVALID_SERVER player="
+                                    + player.getName()
+                                    + " value="
+                                    + intent.valueId()
+                                    + " source="
+                                    + intent.sourceSlot()
+                                    + " destination="
+                                    + intent.destinationSlot());
+            return;
         }
+        UUID playerId = player.getUniqueId();
+        HotbarAcceptanceProgress progress = hotbarAcceptanceProgress.get(playerId);
+        if (progress == null) {
+            if (intent.sourceSlot() != FIRST_GAMEPLAY_HOTBAR_SLOT) {
+                plugin.getLogger()
+                        .severe(
+                                "PHYSICAL_AUTHORITY_HOTBAR_SEQUENCE_INVALID_SERVER player="
+                                        + player.getName()
+                                        + " expectedSource="
+                                        + FIRST_GAMEPLAY_HOTBAR_SLOT
+                                        + " actualSource="
+                                        + intent.sourceSlot());
+                return;
+            }
+            hotbarAcceptanceProgress.put(
+                    playerId,
+                    new HotbarAcceptanceProgress(intent.valueId(), intent.destinationSlot()));
+            player.setLevel(9);
+            return;
+        }
+        if (!progress.valueId().equals(intent.valueId())
+                || intent.sourceSlot() != progress.currentSlot()) {
+            plugin.getLogger()
+                    .severe(
+                            "PHYSICAL_AUTHORITY_HOTBAR_SEQUENCE_INVALID_SERVER player="
+                                    + player.getName()
+                                    + " expectedValue="
+                                    + progress.valueId()
+                                    + " actualValue="
+                                    + intent.valueId()
+                                    + " expectedSource="
+                                    + progress.currentSlot()
+                                    + " actualSource="
+                                    + intent.sourceSlot());
+            return;
+        }
+        hotbarAcceptanceProgress.remove(playerId);
+        player.setLevel(10);
     }
 
     private void abortInteraction(UUID playerId, String detail) {
@@ -531,6 +582,10 @@ final class PhysicalInventoryInteractionController implements Listener {
         return PhysicalInventoryInteractionPolicy.supportsStorageAction(event.getAction().name());
     }
 
+    private static boolean gameplayHotbarSlot(int slot) {
+        return slot >= FIRST_GAMEPLAY_HOTBAR_SLOT && slot <= LAST_GAMEPLAY_HOTBAR_SLOT;
+    }
+
     private boolean hasProjection(ItemStack stack) {
         return codec.hasProjectionMarker(stack);
     }
@@ -545,6 +600,12 @@ final class PhysicalInventoryInteractionController implements Listener {
         INTERACTING,
         COMMITTING,
         ABORTING
+    }
+
+    private record HotbarAcceptanceProgress(UUID valueId, int currentSlot) {
+        private HotbarAcceptanceProgress {
+            Objects.requireNonNull(valueId, "valueId");
+        }
     }
 
     private record PendingInteraction(

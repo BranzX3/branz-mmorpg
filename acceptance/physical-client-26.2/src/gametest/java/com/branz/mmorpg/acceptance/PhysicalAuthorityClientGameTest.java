@@ -11,6 +11,7 @@ import org.lwjgl.glfw.GLFW;
 
 public final class PhysicalAuthorityClientGameTest implements FabricClientGameTest {
     private static final int SERVER_HANDSHAKE_LEVEL = 7;
+    private static final int PRIMARY_STAGE_HANDSHAKE_LEVEL = 8;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -29,6 +30,12 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.waitFor(client -> client.gui.screen() == null, 20 * 30);
         System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
         if (primaryInputAcceptance) {
+            context.waitFor(
+                    client ->
+                            client.player != null
+                                    && client.player.experienceLevel
+                                            == PRIMARY_STAGE_HANDSHAKE_LEVEL,
+                    20 * 30);
             context.waitFor(
                     client ->
                             client.player != null && !client.player.getMainHandItem().isEmpty(),

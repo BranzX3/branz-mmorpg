@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -53,6 +54,7 @@ def main() -> int:
     assert "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1" in R.ACTION_SPECS
     assert R.ACTION_SPECS["MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1"].identity == "BOOTSTRAP_COMBAT_ACCEPTANCE"
     assert R.ACTION_SPECS["MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1"].handler is R.action_bootstrap_combat_acceptance
+    assert R.ACTION_SPECS["MMO_BOOTSTRAP_INVALID_CONTENT_SMOKE_V1"].identity == "BOOTSTRAP_INVALID_CONTENT_SMOKE"
 
     bad = manifest(action="NOT_REAL")
     expect_code("ACTION_NOT_ALLOWLISTED", lambda: R.validate_manifest(bad))
@@ -82,6 +84,35 @@ def main() -> int:
         p = Path(td) / "x.json"
         R.write_json(p, {"b": 2, "a": 1})
         assert json.loads(p.read_text(encoding="utf-8")) == {"a": 1, "b": 2}
+
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        subprocess.run(
+            ["git", "init", "--quiet"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        (repo / ".gitignore").write_text("*.log\n", encoding="utf-8")
+        result_dir = repo / ".mmorpg-harness" / "results" / "MMO-TEST-0001"
+        result_dir.mkdir(parents=True)
+        (result_dir / "stdout.log").write_text("partial stdout\n", encoding="utf-8")
+        (result_dir / "stderr.log").write_text("partial stderr\n", encoding="utf-8")
+        R.write_json(result_dir / "result.json", {"execution_status": "FAIL"})
+        staged = R.stage_evidence_files(repo, result_dir, R.expected_writes("MMO-TEST-0001"))
+        assert ".mmorpg-harness/results/MMO-TEST-0001/stdout.log" in staged
+        assert ".mmorpg-harness/results/MMO-TEST-0001/stderr.log" in staged
+        cached = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.splitlines()
+        assert ".mmorpg-harness/results/MMO-TEST-0001/stdout.log" in cached
+        assert ".mmorpg-harness/results/MMO-TEST-0001/stderr.log" in cached
+        assert all(path.startswith(".mmorpg-harness/results/MMO-TEST-0001/") for path in cached)
 
     print("MMORPG_HARNESS_SELFTEST_PASS")
     return 0

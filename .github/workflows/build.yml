@@ -17,5 +17,14 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: gradle
+      - name: Harness self-test
+        shell: bash
+        run: |
+          if [[ -f .mmorpg-harness/selftest.py ]]; then
+            python .mmorpg-harness/selftest.py
+          fi
       - name: Verify
-        run: ./gradlew clean build
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew clean build

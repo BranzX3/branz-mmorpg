@@ -6,7 +6,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Repository-owned isolation and failure-evidence contract for deterministic bootstrap smoke runs. */
+/**
+ * Repository-owned isolation and failure-evidence contract for deterministic bootstrap smoke runs.
+ */
 final class SmokeBootstrapContract {
     static final String ENABLED_PROPERTY = "mmo.bootstrap.smoke-test";
     static final String EMBEDDED_DATA_DIRECTORY_NAME = "smoke-embedded-postgres";
@@ -45,7 +47,8 @@ final class SmokeBootstrapContract {
             return;
         }
         Path marker = startupFailureMarker(embeddedDataDirectory);
-        String detail = failure.getClass().getSimpleName() + ": " + String.valueOf(failure.getMessage());
+        String detail =
+                failure.getClass().getSimpleName() + ": " + String.valueOf(failure.getMessage());
         try {
             Files.createDirectories(marker.getParent());
             Files.writeString(marker, detail + System.lineSeparator(), StandardCharsets.UTF_8);

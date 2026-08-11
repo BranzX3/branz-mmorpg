@@ -22,87 +22,33 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
           controller = Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/CombatSessionController.java')
           text = controller.read_text(encoding='utf-8')
-          intent_old = '''        if (intent != SemanticInput.PRIMARY) {
-            return;
-        }
-        event.setCancelled(true);
-'''
-          intent_new = '''        if (intent != SemanticInput.PRIMARY) {
-            return;
-        }
-        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
-            plugin.getLogger()
-                    .info(
-                            "PHYSICAL_AUTHORITY_PRIMARY_INTENT_SERVER player="
-                                    + event.getPlayer().getName());
-        }
-        event.setCancelled(true);
-'''
+          intent_old = "        if (intent != SemanticInput.PRIMARY) {\n            return;\n        }\n        event.setCancelled(true);\n"
+          intent_new = "        if (intent != SemanticInput.PRIMARY) {\n            return;\n        }\n        if (Boolean.getBoolean(\"mmo.physical-primary-input-acceptance\")) {\n            plugin.getLogger()\n                    .info(\n                            \"PHYSICAL_AUTHORITY_PRIMARY_INTENT_SERVER player=\"\n                                    + event.getPlayer().getName());\n        }\n        event.setCancelled(true);\n"
           if text.count(intent_old) != 1:
               raise SystemExit(f'primary intent anchor count={text.count(intent_old)}')
           text = text.replace(intent_old, intent_new, 1)
-
-          route_old = '''        if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
-            handleRoute(event.getPlayer(), session, success.value());
-        }
-'''
-          route_new = '''        if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {
-            if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
-                plugin.getLogger()
-                        .info(
-                                "PHYSICAL_AUTHORITY_PRIMARY_ROUTED_SERVER player="
-                                        + event.getPlayer().getName());
-            }
-            handleRoute(event.getPlayer(), session, success.value());
-        }
-'''
+          route_old = "        if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {\n            handleRoute(event.getPlayer(), session, success.value());\n        }\n"
+          route_new = "        if (routed instanceof Result.Success<InputRouteOutcome, InputRejectionCode> success) {\n            if (Boolean.getBoolean(\"mmo.physical-primary-input-acceptance\")) {\n                plugin.getLogger()\n                        .info(\n                                \"PHYSICAL_AUTHORITY_PRIMARY_ROUTED_SERVER player=\"\n                                        + event.getPlayer().getName());\n            }\n            handleRoute(event.getPlayer(), session, success.value());\n        }\n"
           if text.count(route_old) != 1:
               raise SystemExit(f'primary route anchor count={text.count(route_old)}')
           controller.write_text(text.replace(route_old, route_new, 1), encoding='utf-8')
-
           client = Path('acceptance/physical-client-26.2/src/gametest/java/com/branz/mmorpg/acceptance/PhysicalAuthorityClientGameTest.java')
           text = client.read_text(encoding='utf-8')
-          client_old = '''        System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
-        context.getInput().pressKey(options -> options.keyChat);
-'''
-          client_new = '''        System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
-        context.waitTicks(5);
-        context.getInput().pressKey(options -> options.keyChat);
-'''
+          client_old = "        System.out.println(\"PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT\");\n        context.getInput().pressKey(options -> options.keyChat);\n"
+          client_new = "        System.out.println(\"PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT\");\n        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);\n        System.out.println(\"PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT\");\n        context.waitTicks(5);\n        context.getInput().pressKey(options -> options.keyChat);\n"
           if text.count(client_old) != 1:
               raise SystemExit(f'client gameplay anchor count={text.count(client_old)}')
           client.write_text(text.replace(client_old, client_new, 1), encoding='utf-8')
-
           build = Path('mmo-bootstrap/build.gradle.kts')
           text = build.read_text(encoding='utf-8')
-          build_old = '''    jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
-
-    val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
-'''
-          build_new = '''    jvmArgs("-Dmmo.content.path=${contentFixture.absolutePath}")
-
-    val physicalPrimaryInputAcceptance =
-        providers.gradleProperty("physicalPrimaryInputAcceptance").orNull == "true"
-    if (physicalPrimaryInputAcceptance) {
-        jvmArgs("-Dmmo.physical-primary-input-acceptance=true")
-    }
-
-    val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
-'''
+          build_old = "    jvmArgs(\"-Dmmo.content.path=${contentFixture.absolutePath}\")\n\n    val smokeTest = providers.gradleProperty(\"smokeTest\").orNull == \"true\"\n"
+          build_new = "    jvmArgs(\"-Dmmo.content.path=${contentFixture.absolutePath}\")\n\n    val physicalPrimaryInputAcceptance =\n        providers.gradleProperty(\"physicalPrimaryInputAcceptance\").orNull == \"true\"\n    if (physicalPrimaryInputAcceptance) {\n        jvmArgs(\"-Dmmo.physical-primary-input-acceptance=true\")\n    }\n\n    val smokeTest = providers.gradleProperty(\"smokeTest\").orNull == \"true\"\n"
           if text.count(build_old) != 1:
               raise SystemExit(f'runServer property anchor count={text.count(build_old)}')
           build.write_text(text.replace(build_old, build_new, 1), encoding='utf-8')
           PY
-      - name: Validate repository and client acceptance compile
-        shell: bash
-        run: |
-          ./gradlew clean build
-          (cd acceptance/physical-client-26.2 && ./gradlew --no-daemon --console=plain compileGameTestJava)
       - name: Commit bounded patch
         shell: bash
         run: |

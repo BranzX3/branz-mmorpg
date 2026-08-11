@@ -1,0 +1,227 @@
+def action_client_acceptance_ingress(
+    repo: Path, result_dir: Path, manifest: dict[str, Any]
+) -> tuple[int, str, str, dict[str, Any]]:
+    import re
+    import shutil
+    import socket
+
+    client_dir = repo / "acceptance" / "physical-client-26.2"
+    client_wrapper = client_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")
+    root_wrapper = Path(gradle_wrapper(repo))
+    required = (
+        client_wrapper,
+        client_dir / "gradle" / "wrapper" / "gradle-wrapper.jar",
+        repo / "mmo-bootstrap" / "build.gradle.kts",
+    )
+    missing = [str(path.relative_to(repo)) for path in required if not path.is_file()]
+    if missing:
+        raise HarnessError("CLIENT_ACCEPTANCE_PROJECT_MISSING", json.dumps(missing))
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.4)
+        if probe.connect_ex(("127.0.0.1", 25565)) == 0:
+            raise HarnessError("CLIENT_ACCEPTANCE_PORT_IN_USE", "127.0.0.1:25565")
+
+    server_run = repo / "mmo-bootstrap" / "run"
+    if server_run.exists():
+        shutil.rmtree(server_run)
+    server_run.mkdir(parents=True)
+    (server_run / "eula.txt").write_text("eula=true\n", encoding="utf-8")
+    (server_run / "server.properties").write_text(
+        "online-mode=false\n"
+        "server-port=25565\n"
+        "spawn-protection=0\n"
+        "max-players=1\n"
+        "difficulty=normal\n",
+        encoding="utf-8",
+    )
+
+    paper_log = result_dir / "paper.log"
+    client_log = result_dir / "client.log"
+    server_env = gradle_env(repo)
+    client_env = gradle_env(repo)
+    client_env["GRADLE_USER_HOME"] = str((repo.parent / "gradle-home-client").resolve())
+    server_argv = [
+        str(root_wrapper),
+        "--no-daemon",
+        "--console=plain",
+        ":mmo-bootstrap:runServer",
+    ]
+    client_argv = [
+        str(client_wrapper),
+        "--no-daemon",
+        "--console=plain",
+        "runClientGameTest",
+    ]
+
+    def read_log(path: Path) -> str:
+        try:
+            return path.read_text(encoding="utf-8", errors="replace")
+        except FileNotFoundError:
+            return ""
+
+    def kill_tree(process: subprocess.Popen[str] | None) -> None:
+        if process is None or process.poll() is not None:
+            return
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        else:
+            process.terminate()
+
+    server = None
+    client = None
+    started = time.monotonic()
+    player_name = None
+    try:
+        with paper_log.open("w", encoding="utf-8") as paper_out:
+            server = subprocess.Popen(
+                server_argv,
+                cwd=repo,
+                env=server_env,
+                stdin=subprocess.PIPE,
+                stdout=paper_out,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            deadline = time.monotonic() + 240
+            while time.monotonic() < deadline:
+                if "Done (" in read_log(paper_log):
+                    break
+                if server.poll() is not None:
+                    raise HarnessError(
+                        "CLIENT_ACCEPTANCE_PAPER_EXITED", f"exit={server.returncode}"
+                    )
+                time.sleep(1)
+            else:
+                raise HarnessError(
+                    "CLIENT_ACCEPTANCE_PAPER_TIMEOUT", "Paper did not become ready"
+                )
+
+            with client_log.open("w", encoding="utf-8") as client_out:
+                client = subprocess.Popen(
+                    client_argv,
+                    cwd=client_dir,
+                    env=client_env,
+                    stdout=client_out,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+                join_deadline = time.monotonic() + 120
+                while time.monotonic() < join_deadline:
+                    paper_text = read_log(paper_log)
+                    match = re.search(
+                        r"UUID of player ([A-Za-z0-9_]{1,16}) is", paper_text
+                    )
+                    if match is None:
+                        match = re.search(
+                            r"([A-Za-z0-9_]{1,16}) joined the game", paper_text
+                        )
+                    if match is not None:
+                        player_name = match.group(1)
+                        break
+                    if client.poll() is not None:
+                        raise HarnessError(
+                            "CLIENT_ACCEPTANCE_CLIENT_EXITED", f"exit={client.returncode}"
+                        )
+                    time.sleep(0.5)
+                if player_name is None:
+                    raise HarnessError(
+                        "CLIENT_ACCEPTANCE_JOIN_TIMEOUT", "client did not join Paper"
+                    )
+                if server.stdin is None:
+                    raise HarnessError(
+                        "CLIENT_ACCEPTANCE_NO_CONSOLE", "Paper stdin unavailable"
+                    )
+                server.stdin.write(f"op {player_name}\n")
+                server.stdin.write(f"experience set {player_name} 7 levels\n")
+                server.stdin.flush()
+
+                marker_deadline = time.monotonic() + 120
+                while time.monotonic() < marker_deadline:
+                    client_text = read_log(client_log)
+                    if "PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT" in client_text:
+                        break
+                    if client.poll() is not None:
+                        raise HarnessError(
+                            "CLIENT_ACCEPTANCE_CLIENT_EXITED", f"exit={client.returncode}"
+                        )
+                    time.sleep(0.5)
+                else:
+                    raise HarnessError(
+                        "CLIENT_ACCEPTANCE_COMMAND_TIMEOUT", "client status marker missing"
+                    )
+
+                receipt_deadline = time.monotonic() + 20
+                receipt = False
+                while time.monotonic() < receipt_deadline:
+                    paper_text = read_log(paper_log)
+                    if "/mmo physical status" in paper_text:
+                        receipt = True
+                        break
+                    time.sleep(0.5)
+                if not receipt:
+                    raise HarnessError(
+                        "CLIENT_ACCEPTANCE_COMMAND_NOT_LOGGED",
+                        "Paper did not log status command",
+                    )
+
+                server.stdin.write("stop\n")
+                server.stdin.flush()
+                try:
+                    server_rc = server.wait(timeout=60)
+                except subprocess.TimeoutExpired:
+                    raise HarnessError(
+                        "CLIENT_ACCEPTANCE_PAPER_STOP_TIMEOUT", "Paper did not stop"
+                    )
+                try:
+                    client_rc = client.wait(timeout=60)
+                except subprocess.TimeoutExpired:
+                    raise HarnessError(
+                        "CLIENT_ACCEPTANCE_CLIENT_STOP_TIMEOUT",
+                        "client did not finish after disconnect",
+                    )
+
+        client_text = read_log(client_log)
+        paper_text = read_log(paper_log)
+        checks = {
+            "server_handshake_client": "PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT"
+            in client_text,
+            "status_command_sent_client": "PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT"
+            in client_text,
+            "status_command_logged_server": "/mmo physical status" in paper_text,
+            "client_exit_zero": client_rc == 0,
+            "server_exit_zero": server_rc == 0,
+        }
+        passed = all(checks.values())
+        return (
+            0 if passed else 1,
+            "PHYSICAL_CLIENT_INGRESS_PASS\n"
+            if passed
+            else "PHYSICAL_CLIENT_INGRESS_FAIL\n",
+            "",
+            {
+                "action_status": "PASS" if passed else "FAIL",
+                "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS",
+                "server_argv": server_argv,
+                "client_argv": client_argv,
+                "player_name": player_name,
+                "checks": checks,
+                "client_wrapper_sha256": sha256_file(client_wrapper),
+                "duration_seconds": round(time.monotonic() - started, 3),
+            },
+        )
+    finally:
+        if server is not None and server.poll() is None and server.stdin is not None:
+            try:
+                server.stdin.write("stop\n")
+                server.stdin.flush()
+                server.wait(timeout=15)
+            except Exception:
+                kill_tree(server)
+        kill_tree(client)
+        kill_tree(server)

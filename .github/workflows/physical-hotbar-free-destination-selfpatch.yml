@@ -1,0 +1,38 @@
+name: physical-hotbar-free-destination-selfpatch
+
+on:
+  push:
+    branches:
+      - fix/physical-hotbar-free-destination
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Apply free-destination acceptance patch
+        run: python .mmorpg-harness/tmp_hotbar_free_destination_patch.py
+      - name: Format and validate repository
+        run: |
+          ./gradlew --no-daemon --console=plain spotlessApply clean build
+      - name: Validate standalone physical client
+        working-directory: acceptance/physical-client-26.2
+        run: ./gradlew --no-daemon --console=plain build
+      - name: Commit bounded acceptance fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/PhysicalInventoryInteractionController.java
+          git add acceptance/physical-client-26.2/src/gametest/java/com/branz/mmorpg/acceptance/PhysicalAuthorityClientGameTest.java
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: select free physical hotbar destinations"
+          git push origin HEAD:fix/physical-hotbar-free-destination

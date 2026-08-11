@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-CLIENT-COMPILE-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-CLIENT-COMPILE-0001",
+  "base_commit": "0797f8faca76972e78ccf789db67604d7a9f90ed",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_COMPILE_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CLIENT-COMPILE-0001/**"
+  ]
+}

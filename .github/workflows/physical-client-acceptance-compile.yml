@@ -21,8 +21,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+      - name: Setup isolated Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.5.0'
+          cache-provider: basic
       - name: Compile client acceptance harness
         shell: bash
-        run: |
-          chmod +x gradlew
-          ./gradlew -p acceptance/physical-client-26.2 --no-daemon --console=plain build
+        run: gradle -p acceptance/physical-client-26.2 --no-daemon --console=plain build

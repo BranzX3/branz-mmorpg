@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT",
+  "action_record": {
+    "harness_error": "CLIENT_ACCEPTANCE_CLIENT_EXITED"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-PRIMARY-INPUT-0004/**"
+  ],
+  "base_commit_expected": "5584f9ba458d7327de9d359d9649bb48fd09a94d",
+  "blocker_code": "CLIENT_ACCEPTANCE_CLIENT_EXITED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "0043e9a49398ca355ae8f489a0908dd71d5ad03a",
+  "duration_seconds": 309.734,
+  "ending_commit_before_result_commit": "5584f9ba458d7327de9d359d9649bb48fd09a94d",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-11T17:22:10.982342+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-11T17:17:01.259060+00:00",
+  "starting_commit_actual": "5584f9ba458d7327de9d359d9649bb48fd09a94d",
+  "task_branch": "harness-task/MMO-PHYSICAL-PRIMARY-INPUT-0004",
+  "task_id": "MMO-PHYSICAL-PRIMARY-INPUT-0004",
+  "task_manifest_sha256": "65bbab68e58d65a5a531756f117ac8881321a497e36d7400377e944d84085ac9",
+  "unauthorized_writes": []
+}

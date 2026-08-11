@@ -10,6 +10,22 @@ Do not replace `Accepted runtime revision` with the later documentation/evidence
 runtime source, migrations, configuration defaults or active content change, create a new evidence
 record for the new runtime revision and rerun A-F.
 
+## Environment fingerprint
+
+Follow `physical-gameplay-item-environment.md` before A0.
+
+- Paper startup identity: `<Minecraft version + Paper build + Paper commit>`
+- Java runtime identity: `<java -version vendor/version/build>`
+- effective `JAVA_HOME`: `<path or stable machine-local identifier>`
+- Minecraft client version: `<version>`
+- acceptance machine/OS: `<stable identity>`
+- same fingerprint verified at A1 boot: `<PASS|FAIL>`
+- same fingerprint verified at every required restart: `<PASS|FAIL + notes>`
+
+If this fingerprint changes anywhere in the pass, this evidence record is invalid. Do not combine
+results from different Paper builds, Java runtimes, client versions or acceptance machines; restart
+A-F from A0.
+
 ## A. Legacy MAIN_HAND migration
 
 - legacy seed revision: `8c5a04271f9385730aff0b3332608812a216dc95`
@@ -89,6 +105,7 @@ record for the new runtime revision and rerun A-F.
 ## Final gate
 
 All A-F verdicts: `<PASS|FAIL>`  
+Environment fingerprint stayed consistent: `<PASS|FAIL>`  
 Known blocker: `<none|description>`  
 Feature status decision: `<remain AUTOMATED_VERIFIED | LIVE_ACCEPTED>`
 

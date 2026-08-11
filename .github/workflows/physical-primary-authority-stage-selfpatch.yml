@@ -140,11 +140,13 @@ jobs:
               raise SystemExit('client acceptance property already present')
           build.write_text(text.rstrip() + '\n'.join(build_lines) + '\n', encoding='utf-8')
           PY
-      - name: Validate repository and client compile
+      - name: Validate repository
         shell: bash
-        run: |
-          ./gradlew clean build
-          (cd acceptance/physical-client-26.2 && ./gradlew --no-daemon --console=plain compileGameTestJava)
+        run: ./gradlew clean build
+      - name: Validate client compile
+        shell: bash
+        working-directory: acceptance/physical-client-26.2
+        run: ./gradlew --no-daemon --console=plain compileGameTestJava
       - name: Commit bounded patch
         shell: bash
         run: |

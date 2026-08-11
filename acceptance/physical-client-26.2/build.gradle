@@ -25,3 +25,8 @@ java {
     sourceCompatibility = JavaVersion.VERSION_25
     targetCompatibility = JavaVersion.VERSION_25
 }
+tasks.withType(JavaExec).configureEach {
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalPrimaryInputAcceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalPrimaryInput', 'true'
+    }
+}

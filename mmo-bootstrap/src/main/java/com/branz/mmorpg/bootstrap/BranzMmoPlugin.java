@@ -803,6 +803,60 @@ public final class BranzMmoPlugin extends JavaPlugin {
                 new ChronicleController(this, chronicle, characterSessionController::ready);
         characterSessionController.addReadyHandler(chronicleController::reconcile);
         characterSessionController.addReadyHandler(combatSessionController::onCharacterReady);
+        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+            var acceptanceWeapon =
+                    activeItemEngine
+                            .get()
+                            .find(
+                                    com.branz.mmorpg.api.identity.DefinitionId.of(
+                                            "weapon.training_blade"))
+                            .orElseThrow();
+            characterSessionController.addReadyHandler(
+                    player ->
+                            characterSessionController.grantTestValue(
+                                    player,
+                                    acceptanceWeapon,
+                                    snapshot.manifest().contentVersion(),
+                                    result -> {
+                                        if (!(result instanceof Result.Success<?, ?>)) {
+                                            getLogger()
+                                                    .severe(
+                                                            "PHYSICAL_AUTHORITY_PRIMARY_STAGE_FAILED_SERVER player="
+                                                                    + player.getName());
+                                            return;
+                                        }
+                                        getLogger()
+                                                .info(
+                                                        "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PERSISTED_SERVER player="
+                                                                + player.getName()
+                                                                + " definition="
+                                                                + acceptanceWeapon.id());
+                                        boolean projected =
+                                                characterSessionController
+                                                        .selectedPhysicalItem(player)
+                                                        .filter(
+                                                                selected ->
+                                                                        selected.definition()
+                                                                                .id()
+                                                                                .equals(
+                                                                                        acceptanceWeapon
+                                                                                                .id()))
+                                                        .isPresent();
+                                        if (!projected) {
+                                            getLogger()
+                                                    .severe(
+                                                            "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PROJECTION_FAILED_SERVER player="
+                                                                    + player.getName());
+                                            return;
+                                        }
+                                        getLogger()
+                                                .info(
+                                                        "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PROJECTED_SERVER player="
+                                                                + player.getName()
+                                                                + " definition="
+                                                                + acceptanceWeapon.id());
+                                    }));
+        }
         characterSessionController.addEquipmentMutationHandler(
                 combatSessionController::onEquipmentChanged);
         characterSessionController.addReadyHandler(flaskHotbarController::onCharacterReady);

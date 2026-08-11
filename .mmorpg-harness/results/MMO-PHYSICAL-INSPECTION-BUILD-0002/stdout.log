@@ -1,0 +1,417 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :clean
+> Task :mmo-api:clean
+> Task :mmo-bootstrap:clean
+> Task :mmo-character:clean
+> Task :mmo-combat:clean
+> Task :mmo-content:clean
+> Task :mmo-devtools:clean
+> Task :mmo-integrations:clean
+> Task :mmo-items:clean
+> Task :mmo-lifeskills:clean
+> Task :mmo-magic:clean
+> Task :mmo-market:clean
+> Task :mmo-persistence:clean
+> Task :mmo-progression:clean
+> Task :mmo-quests:clean
+> Task :mmo-scenes:clean
+> Task :mmo-social:clean
+> Task :mmo-worldloop:clean
+> Task :mmo-integrations:integration-mythicmobs:clean
+> Task :mmo-integrations:integration-oraxen:clean
+> Task :mmo-integrations:integration-packetevents:clean
+> Task :mmo-integrations:integration-wallet:clean
+> Task :mmo-integrations:integration-worldguard:clean
+> Task :assemble UP-TO-DATE
+> Task :check UP-TO-DATE
+> Task :build UP-TO-DATE
+> Task :mmo-api:compileJava
+> Task :mmo-api:processResources NO-SOURCE
+> Task :mmo-api:classes
+> Task :mmo-api:jar
+> Task :mmo-api:sourcesJar
+> Task :mmo-api:assemble
+> Task :mmo-api:compileTestJava
+> Task :mmo-api:processTestResources NO-SOURCE
+> Task :mmo-api:testClasses
+> Task :mmo-api:spotlessJava
+> Task :mmo-api:spotlessJavaCheck
+> Task :mmo-api:spotlessCheck
+> Task :mmo-api:test
+> Task :mmo-api:checkstyleTest
+> Task :mmo-api:checkstyleMain
+> Task :mmo-content:compileJava
+> Task :mmo-api:check
+> Task :mmo-api:build
+> Task :mmo-combat:compileJava
+> Task :mmo-integrations:compileJava
+> Task :mmo-items:compileJava
+> Task :mmo-lifeskills:compileJava
+> Task :mmo-magic:compileJava
+> Task :mmo-progression:compileJava
+> Task :mmo-persistence:compileJava
+> Task :mmo-scenes:compileJava
+> Task :mmo-social:compileJava
+> Task :mmo-worldloop:compileJava
+> Task :mmo-integrations:integration-mythicmobs:compileJava
+> Task :mmo-integrations:integration-oraxen:compileJava
+> Task :mmo-integrations:integration-packetevents:compileJava
+> Task :mmo-integrations:integration-wallet:compileJava
+> Task :mmo-integrations:integration-worldguard:compileJava
+> Task :mmo-bootstrap:compileJava
+> Task :mmo-bootstrap:processResources
+> Task :mmo-bootstrap:classes
+> Task :mmo-bootstrap:jar
+> Task :mmo-combat:processResources NO-SOURCE
+> Task :mmo-combat:classes
+> Task :mmo-combat:jar
+> Task :mmo-content:processResources NO-SOURCE
+> Task :mmo-content:classes
+> Task :mmo-content:jar
+> Task :mmo-integrations:processResources NO-SOURCE
+> Task :mmo-integrations:classes
+> Task :mmo-integrations:jar
+> Task :mmo-items:processResources NO-SOURCE
+> Task :mmo-items:classes
+> Task :mmo-items:jar
+> Task :mmo-lifeskills:processResources NO-SOURCE
+> Task :mmo-lifeskills:classes
+> Task :mmo-lifeskills:jar
+> Task :mmo-magic:processResources NO-SOURCE
+> Task :mmo-magic:classes
+> Task :mmo-magic:jar
+> Task :mmo-persistence:processResources
+> Task :mmo-persistence:classes
+> Task :mmo-persistence:jar
+> Task :mmo-progression:processResources NO-SOURCE
+> Task :mmo-progression:classes
+> Task :mmo-progression:jar
+> Task :mmo-scenes:processResources NO-SOURCE
+> Task :mmo-scenes:classes
+> Task :mmo-scenes:jar
+> Task :mmo-social:processResources NO-SOURCE
+> Task :mmo-social:classes
+> Task :mmo-social:jar
+> Task :mmo-worldloop:processResources NO-SOURCE
+> Task :mmo-worldloop:classes
+> Task :mmo-worldloop:jar
+> Task :mmo-integrations:integration-mythicmobs:processResources NO-SOURCE
+> Task :mmo-integrations:integration-mythicmobs:classes
+> Task :mmo-integrations:integration-mythicmobs:jar
+> Task :mmo-integrations:integration-oraxen:processResources NO-SOURCE
+> Task :mmo-integrations:integration-oraxen:classes
+> Task :mmo-integrations:integration-oraxen:jar
+> Task :mmo-integrations:integration-packetevents:processResources NO-SOURCE
+> Task :mmo-integrations:integration-packetevents:classes
+> Task :mmo-integrations:integration-packetevents:jar
+> Task :mmo-integrations:integration-wallet:processResources NO-SOURCE
+> Task :mmo-integrations:integration-wallet:classes
+> Task :mmo-integrations:integration-wallet:jar
+> Task :mmo-integrations:integration-worldguard:processResources NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:classes
+> Task :mmo-integrations:integration-worldguard:jar
+> Task :mmo-bootstrap:shadowJar
+> Task :mmo-bootstrap:sourcesJar
+> Task :mmo-bootstrap:assemble
+> Task :mmo-bootstrap:compileTestJava
+> Task :mmo-bootstrap:processTestResources NO-SOURCE
+> Task :mmo-bootstrap:testClasses
+> Task :mmo-bootstrap:checkstyleTest
+> Task :mmo-bootstrap:spotlessJava
+> Task :mmo-bootstrap:spotlessJavaCheck
+> Task :mmo-bootstrap:spotlessCheck
+> Task :mmo-bootstrap:checkstyleMain
+> Task :mmo-bootstrap:test
+> Task :mmo-bootstrap:check
+> Task :mmo-bootstrap:build
+> Task :mmo-character:compileJava NO-SOURCE
+> Task :mmo-character:processResources NO-SOURCE
+> Task :mmo-character:classes UP-TO-DATE
+> Task :mmo-character:jar
+> Task :mmo-character:sourcesJar
+> Task :mmo-character:assemble
+> Task :mmo-character:checkstyleMain NO-SOURCE
+> Task :mmo-character:compileTestJava NO-SOURCE
+> Task :mmo-character:processTestResources NO-SOURCE
+> Task :mmo-character:testClasses UP-TO-DATE
+> Task :mmo-character:checkstyleTest NO-SOURCE
+> Task :mmo-character:spotlessJava
+> Task :mmo-character:spotlessJavaCheck
+> Task :mmo-character:spotlessCheck
+> Task :mmo-character:test NO-SOURCE
+> Task :mmo-character:check
+> Task :mmo-character:build
+> Task :mmo-combat:sourcesJar
+> Task :mmo-combat:assemble
+> Task :mmo-combat:compileTestJava
+> Task :mmo-combat:processTestResources NO-SOURCE
+> Task :mmo-combat:testClasses
+> Task :mmo-combat:checkstyleTest
+> Task :mmo-combat:checkstyleMain
+> Task :mmo-combat:spotlessJava
+> Task :mmo-combat:spotlessJavaCheck
+> Task :mmo-combat:spotlessCheck
+> Task :mmo-combat:test
+> Task :mmo-combat:check
+> Task :mmo-combat:build
+> Task :mmo-content:startScripts
+> Task :mmo-content:distTar
+> Task :mmo-content:distZip
+> Task :mmo-content:sourcesJar
+> Task :mmo-content:assemble
+> Task :mmo-content:compileTestJava
+> Task :mmo-content:processTestResources
+> Task :mmo-content:testClasses
+> Task :mmo-content:spotlessJava
+> Task :mmo-content:spotlessJavaCheck
+> Task :mmo-content:spotlessCheck
+> Task :mmo-content:test
+> Task :mmo-devtools:compileJava NO-SOURCE
+> Task :mmo-devtools:processResources NO-SOURCE
+> Task :mmo-devtools:classes UP-TO-DATE
+> Task :mmo-devtools:jar
+> Task :mmo-devtools:sourcesJar
+> Task :mmo-devtools:assemble
+> Task :mmo-devtools:checkstyleMain NO-SOURCE
+> Task :mmo-devtools:compileTestJava NO-SOURCE
+> Task :mmo-devtools:processTestResources NO-SOURCE
+> Task :mmo-devtools:testClasses UP-TO-DATE
+> Task :mmo-devtools:checkstyleTest NO-SOURCE
+> Task :mmo-devtools:spotlessJava
+> Task :mmo-devtools:spotlessJavaCheck
+> Task :mmo-devtools:spotlessCheck
+> Task :mmo-devtools:test NO-SOURCE
+> Task :mmo-devtools:check
+> Task :mmo-devtools:build
+> Task :mmo-integrations:sourcesJar
+> Task :mmo-integrations:assemble
+> Task :mmo-integrations:compileTestJava
+> Task :mmo-integrations:processTestResources NO-SOURCE
+> Task :mmo-integrations:testClasses
+> Task :mmo-integrations:spotlessJava
+> Task :mmo-integrations:spotlessJavaCheck
+> Task :mmo-integrations:spotlessCheck
+> Task :mmo-content:checkstyleTest
+> Task :mmo-content:checkstyleMain
+> Task :mmo-integrations:test
+> Task :mmo-content:check
+> Task :mmo-content:build
+> Task :mmo-items:sourcesJar
+> Task :mmo-items:assemble
+> Task :mmo-items:compileTestJava
+> Task :mmo-items:processTestResources NO-SOURCE
+> Task :mmo-items:testClasses
+> Task :mmo-items:checkstyleTest
+> Task :mmo-items:checkstyleMain
+> Task :mmo-items:spotlessJava
+> Task :mmo-items:spotlessJavaCheck
+> Task :mmo-items:spotlessCheck
+> Task :mmo-integrations:checkstyleTest
+> Task :mmo-integrations:checkstyleMain
+> Task :mmo-items:test
+> Task :mmo-integrations:check
+> Task :mmo-integrations:build
+> Task :mmo-items:check
+> Task :mmo-items:build
+> Task :mmo-lifeskills:sourcesJar
+> Task :mmo-lifeskills:assemble
+> Task :mmo-lifeskills:compileTestJava
+> Task :mmo-lifeskills:processTestResources NO-SOURCE
+> Task :mmo-lifeskills:testClasses
+> Task :mmo-lifeskills:checkstyleMain
+> Task :mmo-lifeskills:checkstyleTest
+> Task :mmo-lifeskills:spotlessJava
+> Task :mmo-lifeskills:spotlessJavaCheck
+> Task :mmo-lifeskills:spotlessCheck
+> Task :mmo-lifeskills:test
+> Task :mmo-lifeskills:check
+> Task :mmo-lifeskills:build
+> Task :mmo-magic:sourcesJar
+> Task :mmo-magic:assemble
+> Task :mmo-magic:compileTestJava
+> Task :mmo-magic:processTestResources NO-SOURCE
+> Task :mmo-magic:testClasses
+> Task :mmo-magic:checkstyleMain
+> Task :mmo-magic:spotlessJava
+> Task :mmo-magic:spotlessJavaCheck
+> Task :mmo-magic:spotlessCheck
+> Task :mmo-magic:checkstyleTest
+> Task :mmo-magic:test
+> Task :mmo-magic:check
+> Task :mmo-magic:build
+> Task :mmo-market:compileJava NO-SOURCE
+> Task :mmo-market:processResources NO-SOURCE
+> Task :mmo-market:classes UP-TO-DATE
+> Task :mmo-market:jar
+> Task :mmo-market:sourcesJar
+> Task :mmo-market:assemble
+> Task :mmo-market:checkstyleMain NO-SOURCE
+> Task :mmo-market:compileTestJava NO-SOURCE
+> Task :mmo-market:processTestResources NO-SOURCE
+> Task :mmo-market:testClasses UP-TO-DATE
+> Task :mmo-market:checkstyleTest NO-SOURCE
+> Task :mmo-market:spotlessJava
+> Task :mmo-market:spotlessJavaCheck
+> Task :mmo-market:spotlessCheck
+> Task :mmo-market:test NO-SOURCE
+> Task :mmo-market:check
+> Task :mmo-market:build
+> Task :mmo-persistence:sourcesJar
+> Task :mmo-persistence:assemble
+> Task :mmo-persistence:compileTestJava
+> Task :mmo-persistence:processTestResources NO-SOURCE
+> Task :mmo-persistence:testClasses
+> Task :mmo-persistence:checkstyleTest
+> Task :mmo-persistence:checkstyleMain
+> Task :mmo-persistence:spotlessJava
+> Task :mmo-persistence:spotlessJavaCheck
+> Task :mmo-persistence:spotlessCheck
+> Task :mmo-persistence:test
+> Task :mmo-persistence:check
+> Task :mmo-persistence:build
+> Task :mmo-progression:sourcesJar
+> Task :mmo-progression:assemble
+> Task :mmo-progression:compileTestJava
+> Task :mmo-progression:processTestResources NO-SOURCE
+> Task :mmo-progression:testClasses
+> Task :mmo-progression:checkstyleTest
+> Task :mmo-progression:checkstyleMain
+> Task :mmo-progression:spotlessJava
+> Task :mmo-progression:spotlessJavaCheck
+> Task :mmo-progression:spotlessCheck
+> Task :mmo-progression:test
+> Task :mmo-progression:check
+> Task :mmo-progression:build
+> Task :mmo-quests:compileJava NO-SOURCE
+> Task :mmo-quests:processResources NO-SOURCE
+> Task :mmo-quests:classes UP-TO-DATE
+> Task :mmo-quests:jar
+> Task :mmo-quests:sourcesJar
+> Task :mmo-quests:assemble
+> Task :mmo-quests:checkstyleMain NO-SOURCE
+> Task :mmo-quests:compileTestJava NO-SOURCE
+> Task :mmo-quests:processTestResources NO-SOURCE
+> Task :mmo-quests:testClasses UP-TO-DATE
+> Task :mmo-quests:checkstyleTest NO-SOURCE
+> Task :mmo-quests:spotlessJava
+> Task :mmo-quests:spotlessJavaCheck
+> Task :mmo-quests:spotlessCheck
+> Task :mmo-quests:test NO-SOURCE
+> Task :mmo-quests:check
+> Task :mmo-quests:build
+> Task :mmo-scenes:sourcesJar
+> Task :mmo-scenes:assemble
+> Task :mmo-scenes:compileTestJava
+> Task :mmo-scenes:processTestResources NO-SOURCE
+> Task :mmo-scenes:testClasses
+> Task :mmo-scenes:checkstyleMain
+> Task :mmo-scenes:checkstyleTest
+> Task :mmo-scenes:spotlessJava
+> Task :mmo-scenes:spotlessJavaCheck
+> Task :mmo-scenes:spotlessCheck
+> Task :mmo-scenes:test
+> Task :mmo-scenes:check
+> Task :mmo-scenes:build
+> Task :mmo-social:sourcesJar
+> Task :mmo-social:assemble
+> Task :mmo-social:compileTestJava
+> Task :mmo-social:processTestResources NO-SOURCE
+> Task :mmo-social:testClasses
+> Task :mmo-social:checkstyleTest
+> Task :mmo-social:spotlessJava
+> Task :mmo-social:spotlessJavaCheck
+> Task :mmo-social:spotlessCheck
+> Task :mmo-social:checkstyleMain
+> Task :mmo-social:test
+> Task :mmo-social:check
+> Task :mmo-social:build
+> Task :mmo-worldloop:sourcesJar
+> Task :mmo-worldloop:assemble
+> Task :mmo-worldloop:compileTestJava
+> Task :mmo-worldloop:processTestResources NO-SOURCE
+> Task :mmo-worldloop:testClasses
+> Task :mmo-worldloop:checkstyleMain
+> Task :mmo-worldloop:checkstyleTest
+> Task :mmo-worldloop:spotlessJava
+> Task :mmo-worldloop:spotlessJavaCheck
+> Task :mmo-worldloop:spotlessCheck
+> Task :mmo-worldloop:test
+> Task :mmo-worldloop:check
+> Task :mmo-worldloop:build
+> Task :mmo-integrations:integration-mythicmobs:sourcesJar
+> Task :mmo-integrations:integration-mythicmobs:assemble
+> Task :mmo-integrations:integration-mythicmobs:compileTestJava NO-SOURCE
+> Task :mmo-integrations:integration-mythicmobs:processTestResources NO-SOURCE
+> Task :mmo-integrations:integration-mythicmobs:testClasses UP-TO-DATE
+> Task :mmo-integrations:integration-mythicmobs:checkstyleTest NO-SOURCE
+> Task :mmo-integrations:integration-mythicmobs:spotlessJava
+> Task :mmo-integrations:integration-mythicmobs:spotlessJavaCheck
+> Task :mmo-integrations:integration-mythicmobs:spotlessCheck
+> Task :mmo-integrations:integration-mythicmobs:test NO-SOURCE
+> Task :mmo-integrations:integration-oraxen:sourcesJar
+> Task :mmo-integrations:integration-oraxen:assemble
+> Task :mmo-integrations:integration-oraxen:compileTestJava NO-SOURCE
+> Task :mmo-integrations:integration-oraxen:processTestResources NO-SOURCE
+> Task :mmo-integrations:integration-oraxen:testClasses UP-TO-DATE
+> Task :mmo-integrations:integration-oraxen:checkstyleTest NO-SOURCE
+> Task :mmo-integrations:integration-oraxen:spotlessJava
+> Task :mmo-integrations:integration-oraxen:spotlessJavaCheck
+> Task :mmo-integrations:integration-oraxen:spotlessCheck
+> Task :mmo-integrations:integration-mythicmobs:checkstyleMain
+> Task :mmo-integrations:integration-oraxen:test NO-SOURCE
+> Task :mmo-integrations:integration-mythicmobs:check
+> Task :mmo-integrations:integration-mythicmobs:build
+> Task :mmo-integrations:integration-packetevents:sourcesJar
+> Task :mmo-integrations:integration-packetevents:assemble
+> Task :mmo-integrations:integration-oraxen:checkstyleMain
+> Task :mmo-integrations:integration-oraxen:check
+> Task :mmo-integrations:integration-oraxen:build
+> Task :mmo-integrations:integration-packetevents:compileTestJava NO-SOURCE
+> Task :mmo-integrations:integration-packetevents:processTestResources NO-SOURCE
+> Task :mmo-integrations:integration-packetevents:testClasses UP-TO-DATE
+> Task :mmo-integrations:integration-packetevents:checkstyleTest NO-SOURCE
+> Task :mmo-integrations:integration-packetevents:spotlessJava
+> Task :mmo-integrations:integration-packetevents:spotlessJavaCheck
+> Task :mmo-integrations:integration-packetevents:spotlessCheck
+> Task :mmo-integrations:integration-packetevents:test NO-SOURCE
+> Task :mmo-integrations:integration-wallet:sourcesJar
+> Task :mmo-integrations:integration-wallet:assemble
+> Task :mmo-integrations:integration-packetevents:checkstyleMain
+> Task :mmo-integrations:integration-packetevents:check
+> Task :mmo-integrations:integration-packetevents:build
+> Task :mmo-integrations:integration-wallet:compileTestJava NO-SOURCE
+> Task :mmo-integrations:integration-wallet:processTestResources NO-SOURCE
+> Task :mmo-integrations:integration-wallet:testClasses UP-TO-DATE
+> Task :mmo-integrations:integration-wallet:checkstyleTest NO-SOURCE
+> Task :mmo-integrations:integration-wallet:spotlessJava
+> Task :mmo-integrations:integration-wallet:spotlessJavaCheck
+> Task :mmo-integrations:integration-wallet:spotlessCheck
+> Task :mmo-integrations:integration-wallet:test NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:sourcesJar
+> Task :mmo-integrations:integration-worldguard:assemble
+> Task :mmo-integrations:integration-wallet:checkstyleMain
+> Task :mmo-integrations:integration-wallet:check
+> Task :mmo-integrations:integration-wallet:build
+> Task :mmo-integrations:integration-worldguard:compileTestJava NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:processTestResources NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:testClasses UP-TO-DATE
+> Task :mmo-integrations:integration-worldguard:checkstyleTest NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:spotlessJava
+> Task :mmo-integrations:integration-worldguard:spotlessJavaCheck
+> Task :mmo-integrations:integration-worldguard:spotlessCheck
+> Task :mmo-integrations:integration-worldguard:test NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:checkstyleMain
+> Task :mmo-integrations:integration-worldguard:check
+> Task :mmo-integrations:integration-worldguard:build
+
+[Incubating] Problems report is available at: file:///C:/Users/User/AppData/Local/BranzMMORPGHarness/repo/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 7m 16s
+193 actionable tasks: 193 executed

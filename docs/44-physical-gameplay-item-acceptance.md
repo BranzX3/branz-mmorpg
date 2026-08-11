@@ -101,12 +101,14 @@ pre-commit snapshot is not acceptance evidence.
    accepted runtime revision and join the same character.
 4. Run `/mmo physical status`. Verify no persistent MAIN_HAND remains and the exact full UUID from
    the legacy signed projection appears exactly once in a free `CHARACTER_INVENTORY/slot:n`.
-5. The live check must show the expected version transition and resolved durability `120/120` for the
-   fresh unused Training Sword. Raw database payload JSON is intentionally not exposed by the live
-   inspector; raw payload preservation remains an automated migration invariant.
+5. The live check must show resolved durability `120/120` for the fresh unused Training Sword and
+   target `ver` must equal the captured legacy `authority_version + 1` exactly. The migration is one
+   authoritative item-location move; an additional version spend is a failure. Raw database payload
+   JSON is intentionally not exposed by the live inspector; raw payload preservation remains an
+   automated migration invariant.
 6. Disconnect/reconnect, then restart the server and reconnect again. The same UUID, physical
-   inventory location, version and durability must remain canonical; the weapon must never be forced
-   back to player-facing hotbar slot 1.
+   inventory location, post-migration version and durability must remain canonical; the weapon must
+   never be forced back to player-facing hotbar slot 1.
 7. On an isolated/disposable acceptance database, also prove the full-inventory migration
    precondition fails closed without deleting, duplicating or inventing a destination for the item.
 

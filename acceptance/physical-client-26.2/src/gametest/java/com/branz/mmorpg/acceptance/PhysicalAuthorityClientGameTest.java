@@ -10,12 +10,19 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import org.lwjgl.glfw.GLFW;
 
 public final class PhysicalAuthorityClientGameTest implements FabricClientGameTest {
+    private static final int SERVER_HANDSHAKE_LEVEL = 7;
+
     @Override
     public void runTest(ClientGameTestContext context) {
         String address = System.getProperty("branz.acceptance.server", "localhost:25565");
         connect(context, address);
         context.waitFor(client -> client.level != null && client.player != null, 20 * 30);
-        context.waitTicks(20);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player.experienceLevel == SERVER_HANDSHAKE_LEVEL,
+                20 * 30);
+        System.out.println("PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT");
 
         context.getInput().pressKey(options -> options.keyChat);
         context.waitFor(client -> client.gui.screen() instanceof ChatScreen, 20 * 5);
@@ -23,6 +30,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
         context.waitFor(client -> client.gui.screen() == null, 20 * 5);
         System.out.println("PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
+        context.waitTicks(20);
 
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);
         context.setScreen(TitleScreen::new);

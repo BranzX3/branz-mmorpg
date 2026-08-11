@@ -41,18 +41,83 @@ jobs:
         shell: bash
         working-directory: acceptance/physical-client-26.2
         run: ./gradlew --no-daemon --console=plain build
-      - name: Commit generated wrapper once
+      - name: Commit generated wrapper once through Git data API
         if: github.event_name == 'push'
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git add --chmod=+x acceptance/physical-client-26.2/gradlew
-          git add acceptance/physical-client-26.2/gradlew.bat
-          git add acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.jar
-          git add acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.properties
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'test: check in pinned client Gradle wrapper'
-          git push origin HEAD:lead/physical-client-acceptance-harness-v1
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import pathlib
+          import urllib.request
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          parent = os.environ['GITHUB_SHA']
+          branch = os.environ['GITHUB_REF_NAME']
+          token = os.environ['GH_TOKEN']
+          api = 'https://api.github.com'
+
+          def request(method, path, body=None):
+              data = None if body is None else json.dumps(body).encode('utf-8')
+              req = urllib.request.Request(
+                  api + path,
+                  data=data,
+                  method=method,
+                  headers={
+                      'Accept': 'application/vnd.github+json',
+                      'Authorization': f'Bearer {token}',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                      'User-Agent': 'branz-physical-client-wrapper-commit',
+                  },
+              )
+              with urllib.request.urlopen(req) as response:
+                  return json.load(response)
+
+          ref = request('GET', f'/repos/{repo}/git/ref/heads/{branch}')
+          if ref['object']['sha'] != parent:
+              raise SystemExit(
+                  f'branch moved during wrapper generation: expected {parent}, got {ref["object"]["sha"]}'
+              )
+
+          commit = request('GET', f'/repos/{repo}/git/commits/{parent}')
+          base_tree = commit['tree']['sha']
+          entries = []
+          files = [
+              ('acceptance/physical-client-26.2/gradlew', '100755'),
+              ('acceptance/physical-client-26.2/gradlew.bat', '100644'),
+              ('acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.jar', '100644'),
+              ('acceptance/physical-client-26.2/gradle/wrapper/gradle-wrapper.properties', '100644'),
+          ]
+          for path, mode in files:
+              raw = pathlib.Path(path).read_bytes()
+              blob = request(
+                  'POST',
+                  f'/repos/{repo}/git/blobs',
+                  {'content': base64.b64encode(raw).decode('ascii'), 'encoding': 'base64'},
+              )
+              entries.append({'path': path, 'mode': mode, 'type': 'blob', 'sha': blob['sha']})
+
+          tree = request(
+              'POST',
+              f'/repos/{repo}/git/trees',
+              {'base_tree': base_tree, 'tree': entries},
+          )
+          created = request(
+              'POST',
+              f'/repos/{repo}/git/commits',
+              {
+                  'message': 'test: check in pinned client Gradle wrapper',
+                  'tree': tree['sha'],
+                  'parents': [parent],
+              },
+          )
+          request(
+              'PATCH',
+              f'/repos/{repo}/git/refs/heads/{branch}',
+              {'sha': created['sha'], 'force': False},
+          )
+          print(f'WRAPPER_COMMIT={created["sha"]}')
+          PY

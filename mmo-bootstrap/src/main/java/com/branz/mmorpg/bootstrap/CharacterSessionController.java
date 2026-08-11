@@ -1245,8 +1245,13 @@ final class CharacterSessionController implements Listener {
         projected.remove(playerId);
         Player player = plugin.getServer().getPlayer(playerId);
         if (player != null && player.isOnline()) {
+            boolean selectedHotbarAuthorityChanged =
+                    SelectedHotbarAuthorityIdentity.changed(
+                            current.snapshot().itemRecords(),
+                            updated.snapshot().itemRecords(),
+                            player.getInventory().getHeldItemSlot());
             applyProjectionIfReady(player, false);
-            if (equipmentChanged && ready(player)) {
+            if ((equipmentChanged || selectedHotbarAuthorityChanged) && ready(player)) {
                 equipmentMutationHandlers.forEach(handler -> handler.accept(player));
             }
         }

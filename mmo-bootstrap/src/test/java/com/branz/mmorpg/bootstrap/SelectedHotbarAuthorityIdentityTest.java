@@ -35,9 +35,7 @@ class SelectedHotbarAuthorityIdentityTest {
         ItemLocationRecord before = item(itemId, BLADE, 0, 1, "{\"durability\":100}");
         ItemLocationRecord after = item(itemId, BLADE, 0, 2, "{\"durability\":99}");
 
-        assertFalse(
-                SelectedHotbarAuthorityIdentity.changed(
-                        List.of(before), List.of(after), 0));
+        assertFalse(SelectedHotbarAuthorityIdentity.changed(List.of(before), List.of(after), 0));
     }
 
     @Test
@@ -57,29 +55,19 @@ class SelectedHotbarAuthorityIdentityTest {
         ItemLocationRecord before = item(itemId, BLADE, 0, 1, "{}");
         ItemLocationRecord after = item(itemId, BLADE, 1, 2, "{}");
 
-        assertTrue(
-                SelectedHotbarAuthorityIdentity.changed(
-                        List.of(before), List.of(after), 0));
+        assertTrue(SelectedHotbarAuthorityIdentity.changed(List.of(before), List.of(after), 0));
     }
 
     @Test
     void replacingSelectedItemRequiresCombatRefresh() {
-        ItemLocationRecord before =
-                item(new ItemId(UUID.randomUUID()), BLADE, 0, 1, "{}");
-        ItemLocationRecord after =
-                item(new ItemId(UUID.randomUUID()), OTHER, 0, 1, "{}");
+        ItemLocationRecord before = item(new ItemId(UUID.randomUUID()), BLADE, 0, 1, "{}");
+        ItemLocationRecord after = item(new ItemId(UUID.randomUUID()), OTHER, 0, 1, "{}");
 
-        assertTrue(
-                SelectedHotbarAuthorityIdentity.changed(
-                        List.of(before), List.of(after), 0));
+        assertTrue(SelectedHotbarAuthorityIdentity.changed(List.of(before), List.of(after), 0));
     }
 
     private static ItemLocationRecord item(
-            ItemId itemId,
-            DefinitionId definitionId,
-            int slot,
-            long version,
-            String payloadJson) {
+            ItemId itemId, DefinitionId definitionId, int slot, long version, String payloadJson) {
         return new ItemLocationRecord(
                 itemId,
                 definitionId,

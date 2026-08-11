@@ -20,6 +20,10 @@ jobs:
           java-version: '25'
       - name: Apply B1-B2 patch
         run: python .mmorpg-harness/tmp_hotbar_b12_patch.py
+      - name: Correct authoritative location verification
+        shell: bash
+        run: |
+          python -c "from pathlib import Path; p=Path('mmo-bootstrap/src/main/java/com/branz/mmorpg/bootstrap/PhysicalInventoryInteractionController.java'); t=p.read_text(encoding='utf-8'); old='record.location()\\n                                                        .reference()\\n                                                        .equals(expectedReference)'; new='record.location()\\n                                                        .reference()\\n                                                        .filter(expectedReference::equals)\\n                                                        .isPresent()'; assert t.count(old)==1, t.count(old); p.write_text(t.replace(old,new,1),encoding='utf-8')"
       - name: Apply formatting
         run: ./gradlew spotlessApply
       - name: Validate repository

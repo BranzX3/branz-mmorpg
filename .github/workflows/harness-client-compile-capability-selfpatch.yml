@@ -63,9 +63,20 @@ jobs:
       - name: Verify patch scope
         shell: bash
         run: |
-          changed="$(git diff --name-only | sort)"
-          expected="$(printf '%s\n' .mmorpg-harness/PROTOCOL.md .mmorpg-harness/runner.py .mmorpg-harness/selftest.py | sort)"
-          test "$changed" = "$expected"
+          python - <<'PY'
+          import subprocess
+          expected = {
+              '.mmorpg-harness/PROTOCOL.md',
+              '.mmorpg-harness/runner.py',
+              '.mmorpg-harness/selftest.py',
+          }
+          changed = set(
+              subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
+          )
+          print('PATCHED_PATHS=' + ','.join(sorted(changed)))
+          if changed != expected:
+              raise SystemExit(f'patch scope mismatch: expected={sorted(expected)} actual={sorted(changed)}')
+          PY
       - name: Commit patched harness through Git data API
         shell: bash
         env:

@@ -95,9 +95,7 @@ final class PhysicalOffHandInteractionController implements Listener {
                                             NamedTextColor.AQUA));
                         });
         snapshot.lotRecords().stream()
-                .sorted(
-                        java.util.Comparator.comparing(
-                                record -> record.lotId().value().toString()))
+                .sorted(java.util.Comparator.comparing(record -> record.lotId().value().toString()))
                 .forEach(
                         record ->
                                 player.sendMessage(

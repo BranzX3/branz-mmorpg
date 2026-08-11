@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-INSPECTION-POSTMERGE-BUILD-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-INSPECTION-POSTMERGE-BUILD-0001",
+  "base_commit": "0851f599caf8565d78338a53c9917f9c982d6f4a",
+  "action_id": "MMO_GRADLE_VERIFY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-INSPECTION-POSTMERGE-BUILD-0001/**"
+  ]
+}

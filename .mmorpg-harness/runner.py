@@ -507,12 +507,8 @@ def action_client_acceptance_ingress(
                 while time.monotonic() < join_deadline:
                     paper_text = read_log(paper_log)
                     match = re.search(
-                        r"UUID of player ([A-Za-z0-9_]{1,16}) is", paper_text
+                        r"([A-Za-z0-9_]{1,16}) joined the game", paper_text
                     )
-                    if match is None:
-                        match = re.search(
-                            r"([A-Za-z0-9_]{1,16}) joined the game", paper_text
-                        )
                     if match is not None:
                         player_name = match.group(1)
                         break

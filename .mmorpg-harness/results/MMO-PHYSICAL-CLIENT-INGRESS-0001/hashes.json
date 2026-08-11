@@ -1,0 +1,9 @@
+{
+  ".mmorpg-harness/results/MMO-PHYSICAL-CLIENT-INGRESS-0001/client.log": "568988b170c94d8d6b9564bebffd5720636b47ae0f8c6f517e39ecd1cefd6e28",
+  ".mmorpg-harness/results/MMO-PHYSICAL-CLIENT-INGRESS-0001/dirty_manifest.json": "7e53471096ecd7a31cca69924e39e5758b769be871f085d4bd6c3421bfe67f05",
+  ".mmorpg-harness/results/MMO-PHYSICAL-CLIENT-INGRESS-0001/environment.json": "9ee8af26d24fa96a1c5ae13b70dd2235a4d55157e3c86a72aa256186ecb6a6fe",
+  ".mmorpg-harness/results/MMO-PHYSICAL-CLIENT-INGRESS-0001/paper.log": "4b8dbec11196fe8cbeeec44d5198eb300bde5312cfa21b11e5a8e5db81e14c3a",
+  ".mmorpg-harness/results/MMO-PHYSICAL-CLIENT-INGRESS-0001/result.json": "3b72a3ff018e47d65d63707ebb5d6e7e3466c7efde96bdc44aecd88a00937651",
+  ".mmorpg-harness/results/MMO-PHYSICAL-CLIENT-INGRESS-0001/stderr.log": "52e5128033c9183dedd69ed5da35d25d10499e2bff120b1982a67fa50e9808bd",
+  ".mmorpg-harness/results/MMO-PHYSICAL-CLIENT-INGRESS-0001/stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

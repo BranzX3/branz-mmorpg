@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-INSPECTION-BUILD-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-INSPECTION-BUILD-0001",
+  "base_commit": "516f5dd635278415b969f96aa1e2c50968e31257",
+  "action_id": "MMO_GRADLE_VERIFY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-INSPECTION-BUILD-0001/**"
+  ]
+}

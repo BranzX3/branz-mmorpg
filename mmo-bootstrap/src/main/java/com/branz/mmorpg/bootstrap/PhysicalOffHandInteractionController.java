@@ -17,6 +17,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -45,6 +46,73 @@ final class PhysicalOffHandInteractionController implements Listener {
         this.items = Objects.requireNonNull(items, "items");
         this.moves = Objects.requireNonNull(moves, "moves");
         this.contentVersion = Objects.requireNonNull(contentVersion, "contentVersion");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPhysicalStatus(PlayerCommandPreprocessEvent event) {
+        if (!event.getMessage().trim().equalsIgnoreCase("/mmo physical status")) {
+            return;
+        }
+        event.setCancelled(true);
+        Player player = event.getPlayer();
+        if (!devToolsAllowed(player)) {
+            player.sendMessage(
+                    Component.text(
+                            "Physical authority inspection is disabled for this environment/account.",
+                            NamedTextColor.RED));
+            return;
+        }
+        LoadedCharacterSession active = characters.active(player).orElse(null);
+        if (active == null || !characters.ready(player)) {
+            player.sendMessage(
+                    Component.text("Character session is not ready.", NamedTextColor.RED));
+            return;
+        }
+        if (characters.valueMutationInFlight(player)) {
+            player.sendMessage(
+                    Component.text(
+                            "Authoritative value transaction is still in progress; retry after commit.",
+                            NamedTextColor.YELLOW));
+            return;
+        }
+        PersistentCharacterSnapshot snapshot = active.snapshot();
+        player.sendMessage(
+                Component.text(
+                        "Physical Authority: character="
+                                + active.characterId().value()
+                                + " | items="
+                                + snapshot.itemRecords().size()
+                                + " | lots="
+                                + snapshot.lotRecords().size(),
+                        NamedTextColor.GOLD));
+        snapshot.itemRecords().stream()
+                .sorted(
+                        java.util.Comparator.comparing(
+                                record -> record.itemId().value().toString()))
+                .forEach(
+                        record -> {
+                            java.util.OptionalInt baseMaximumDurability =
+                                    items.find(record.definitionId())
+                                            .map(ItemDefinition::baseMaxDurability)
+                                            .orElse(java.util.OptionalInt.empty());
+                            player.sendMessage(
+                                    Component.text(
+                                            PhysicalAuthorityInspectionFormatter.item(
+                                                    record, baseMaximumDurability),
+                                            NamedTextColor.AQUA));
+                        });
+        snapshot.lotRecords().stream()
+                .sorted(java.util.Comparator.comparing(record -> record.lotId().value().toString()))
+                .forEach(
+                        record ->
+                                player.sendMessage(
+                                        Component.text(
+                                                PhysicalAuthorityInspectionFormatter.lot(record),
+                                                NamedTextColor.LIGHT_PURPLE)));
+        if (snapshot.itemRecords().isEmpty() && snapshot.lotRecords().isEmpty()) {
+            player.sendMessage(
+                    Component.text("No persisted item or lot records.", NamedTextColor.GRAY));
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -227,5 +295,21 @@ final class PhysicalOffHandInteractionController implements Listener {
                         player.sendActionBar(Component.text(detail, NamedTextColor.RED));
                     }
                 });
+    }
+
+    private boolean devToolsAllowed(Player player) {
+        String environment =
+                plugin.getConfig()
+                        .getString("environment", "LOCAL")
+                        .trim()
+                        .toUpperCase(java.util.Locale.ROOT);
+        boolean environmentAllowed =
+                environment.equals("LOCAL")
+                        || environment.equals("CONTENT_DEV")
+                        || environment.equals("INTEGRATION")
+                        || environment.equals("STAGING");
+        return environmentAllowed
+                && plugin.getConfig().getBoolean("dev-tools.enabled", false)
+                && player.hasPermission("branzmmo.dev");
     }
 }

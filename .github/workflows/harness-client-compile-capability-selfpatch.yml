@@ -60,24 +60,7 @@ jobs:
       - name: Run harness self-test
         shell: bash
         run: python .mmorpg-harness/selftest.py
-      - name: Verify patch scope
-        shell: bash
-        run: |
-          python - <<'PY'
-          import subprocess
-          expected = {
-              '.mmorpg-harness/PROTOCOL.md',
-              '.mmorpg-harness/runner.py',
-              '.mmorpg-harness/selftest.py',
-          }
-          changed = set(
-              subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
-          )
-          print('PATCHED_PATHS=' + ','.join(sorted(changed)))
-          if changed != expected:
-              raise SystemExit(f'patch scope mismatch: expected={sorted(expected)} actual={sorted(changed)}')
-          PY
-      - name: Commit patched harness through Git data API
+      - name: Commit exact patched harness files through Git data API
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

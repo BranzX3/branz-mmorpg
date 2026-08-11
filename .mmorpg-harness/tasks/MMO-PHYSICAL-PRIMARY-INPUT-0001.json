@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-PRIMARY-INPUT-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-PRIMARY-INPUT-0001",
+  "base_commit": "1500c4c00c59e82b236bfa8d664bc4ed405343a4",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-PRIMARY-INPUT-0001/**"
+  ]
+}

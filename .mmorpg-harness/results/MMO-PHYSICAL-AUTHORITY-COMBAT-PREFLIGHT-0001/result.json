@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_BOOTSTRAP_COMBAT_ACCEPTANCE_V1",
+  "action_identity": "BOOTSTRAP_COMBAT_ACCEPTANCE",
+  "action_record": {
+    "harness_error": "ACTION_TIMEOUT"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-AUTHORITY-COMBAT-PREFLIGHT-0001/**"
+  ],
+  "base_commit_expected": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "blocker_code": "ACTION_TIMEOUT",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "03c3133357c03830e453657f004c9606492f5bbc",
+  "duration_seconds": 600.265,
+  "ending_commit_before_result_commit": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-11T06:39:34.141566+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-11T06:29:33.886120+00:00",
+  "starting_commit_actual": "037897c39f45ddbb5b7da2a49f7ef6d1f69cfcdd",
+  "task_branch": "harness-task/MMO-PHYSICAL-AUTHORITY-COMBAT-PREFLIGHT-0001",
+  "task_id": "MMO-PHYSICAL-AUTHORITY-COMBAT-PREFLIGHT-0001",
+  "task_manifest_sha256": "d082ce4cc8eb8100dff4c7e7817dc550491f3e207964f59f8a753fc70737dc54",
+  "unauthorized_writes": []
+}

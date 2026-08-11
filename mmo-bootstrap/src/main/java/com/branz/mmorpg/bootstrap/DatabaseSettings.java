@@ -64,15 +64,22 @@ record DatabaseSettings(
                         config.getString("database.mode", "EMBEDDED_LOCAL")
                                 .trim()
                                 .toUpperCase(Locale.ROOT));
-        return new DatabaseSettings(
-                mode,
-                environment,
+        Path configuredEmbeddedDataDirectory =
                 pluginDataDirectory
                         .resolve(
                                 config.getString(
                                         "database.embedded-data-directory", "embedded-postgres"))
                         .toAbsolutePath()
-                        .normalize(),
+                        .normalize();
+        Path embeddedDataDirectory =
+                mode == DatabaseMode.EMBEDDED_LOCAL
+                        ? SmokeBootstrapContract.embeddedDataDirectory(
+                                pluginDataDirectory, configuredEmbeddedDataDirectory)
+                        : configuredEmbeddedDataDirectory;
+        return new DatabaseSettings(
+                mode,
+                environment,
+                embeddedDataDirectory,
                 config.getString("database.jdbc-url", "").trim(),
                 config.getString("database.username", "").trim(),
                 config.getString("database.password", ""),

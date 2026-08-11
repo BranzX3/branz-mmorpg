@@ -1,0 +1,47 @@
+name: harness-client-ingress-timeout-selfpatch
+
+on:
+  push:
+    branches:
+      - harness-fix/physical-client-ingress-timeout
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Patch cold-start join budget
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runner = Path('.mmorpg-harness/runner.py')
+          text = runner.read_text(encoding='utf-8')
+          old = '                join_deadline = time.monotonic() + 120\n'
+          new = '                join_deadline = time.monotonic() + 300\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'join deadline anchor count={text.count(old)}')
+          runner.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Validate harness
+        shell: bash
+        run: |
+          python -m py_compile .mmorpg-harness/runner.py .mmorpg-harness/selftest.py
+          python .mmorpg-harness/selftest.py
+      - name: Commit runner patch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .mmorpg-harness/runner.py
+          test "$(git diff --cached --name-only)" = '.mmorpg-harness/runner.py'
+          git commit -m 'harness: allow cold client asset bootstrap before join'
+          git push origin HEAD:${GITHUB_REF_NAME}

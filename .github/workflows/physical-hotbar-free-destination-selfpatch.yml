@@ -20,7 +20,7 @@ jobs:
           distribution: temurin
           java-version: '25'
       - name: Apply free-destination acceptance patch
-        run: python .mmorpg-harness/tmp_hotbar_free_destination_patch.py
+        run: python .mmorpg-harness/tmp_hotbar_free_destination_patch_v2.py
       - name: Format and validate repository
         run: |
           ./gradlew --no-daemon --console=plain spotlessApply clean build

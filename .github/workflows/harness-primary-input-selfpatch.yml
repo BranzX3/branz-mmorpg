@@ -1,0 +1,94 @@
+name: harness-primary-input-selfpatch
+
+on:
+  push:
+    branches:
+      - harness-feature/physical-primary-input-v1
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Patch primary-input capability
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runner = Path('.mmorpg-harness/runner.py')
+          text = runner.read_text(encoding='utf-8')
+
+          old = 'def action_client_acceptance_ingress(\n    repo: Path, result_dir: Path, manifest: dict[str, Any]\n) -> tuple[int, str, str, dict[str, Any]]:\n'
+          new = 'def action_client_acceptance_ingress(\n    repo: Path,\n    result_dir: Path,\n    manifest: dict[str, Any],\n    require_primary_input: bool = False,\n) -> tuple[int, str, str, dict[str, Any]]:\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'signature anchor count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '    client_argv = [\n        str(client_wrapper),\n        "--no-daemon",\n        "--console=plain",\n        "runClientGameTest",\n    ]\n'
+          new = '    if require_primary_input:\n        server_argv.append("-PphysicalPrimaryInputAcceptance=true")\n    client_argv = [\n        str(client_wrapper),\n        "--no-daemon",\n        "--console=plain",\n        "runClientGameTest",\n    ]\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'argv anchor count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '        passed = all(checks.values())\n        return (\n'
+          new = '        if require_primary_input:\n            checks.update(\n                {\n                    "primary_mouse_sent_client": "PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT"\n                    in client_text,\n                    "primary_intent_server": "PHYSICAL_AUTHORITY_PRIMARY_INTENT_SERVER"\n                    in paper_text,\n                    "primary_routed_server": "PHYSICAL_AUTHORITY_PRIMARY_ROUTED_SERVER"\n                    in paper_text,\n                }\n            )\n        passed = all(checks.values())\n        return (\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'checks anchor count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '                "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS",\n'
+          new = '                "fixed_command_id": (\n                    "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT"\n                    if require_primary_input\n                    else "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS"\n                ),\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'identity anchor count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '\n\nActionHandler = Callable[[Path, Path, dict[str, Any]], tuple[int, str, str, dict[str, Any]]]\n'
+          new = '\n\ndef action_client_acceptance_primary_input(\n    repo: Path, result_dir: Path, manifest: dict[str, Any]\n) -> tuple[int, str, str, dict[str, Any]]:\n    return action_client_acceptance_ingress(\n        repo, result_dir, manifest, require_primary_input=True\n    )\n\n\nActionHandler = Callable[[Path, Path, dict[str, Any]], tuple[int, str, str, dict[str, Any]]]\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'wrapper anchor count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '    "MMO_CLIENT_ACCEPTANCE_INGRESS_V1": ActionSpec(\n        action_client_acceptance_ingress, "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS"\n    ),\n'
+          new = old + '    "MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1": ActionSpec(\n        action_client_acceptance_primary_input, "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT"\n    ),\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'action spec anchor count={text.count(old)}')
+          runner.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          protocol = Path('.mmorpg-harness/PROTOCOL.md')
+          text = protocol.read_text(encoding='utf-8')
+          old = '- `MMO_CLIENT_ACCEPTANCE_INGRESS_V1` — run a fresh offline local Paper 26.2 server and the checked-in Fabric Client GameTest with fixed commands; OP and XP-level 7 are console-only acceptance staging, `/mmo physical status` is typed through real client chat input, and Paper/client logs are retained as evidence.\n'
+          new = old + '- `MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1` — reuse the fixed real-client ingress path with `-PphysicalPrimaryInputAcceptance=true`; require a real client left-mouse press plus Paper evidence that the existing `PlayerAnimationEvent.ARM_SWING` path resolved to `SemanticInput.PRIMARY` and was accepted by `InputRouter.routeFrame`. This is an input-routing gate only, not full A–F physical item authority.\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'protocol anchor count={text.count(old)}')
+          protocol.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          selftest = Path('.mmorpg-harness/selftest.py')
+          text = selftest.read_text(encoding='utf-8')
+          old = '    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_INGRESS_V1"].handler is R.action_client_acceptance_ingress\n'
+          new = old + '    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT"\n    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1"].handler is R.action_client_acceptance_primary_input\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'selftest anchor count={text.count(old)}')
+          selftest.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Validate harness
+        shell: bash
+        run: |
+          python -m py_compile .mmorpg-harness/runner.py .mmorpg-harness/selftest.py
+          python .mmorpg-harness/selftest.py
+      - name: Commit bounded capability
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .mmorpg-harness/runner.py .mmorpg-harness/PROTOCOL.md .mmorpg-harness/selftest.py
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git commit -m 'harness: add physical primary-input acceptance capability'
+          git push origin HEAD:${GITHUB_REF_NAME}

@@ -1,0 +1,209 @@
+Downloading https://services.gradle.org/distributions/gradle-9.1.0-bin.zip
+............10%.............20%.............30%.............40%.............50%............60%.............70%.............80%.............90%.............100%
+
+Welcome to Gradle 9.1.0!
+
+Here are the highlights of this release:
+ - Full Java 25 support
+ - Native task graph visualization
+ - Enhanced console output
+
+For more details see https://docs.gradle.org/9.1.0/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :clean UP-TO-DATE
+> Task :mmo-api:clean
+> Task :mmo-bootstrap:clean
+> Task :mmo-character:clean
+> Task :mmo-combat:clean
+> Task :mmo-content:clean
+> Task :mmo-devtools:clean
+> Task :mmo-integrations:clean
+> Task :mmo-items:clean
+> Task :mmo-lifeskills:clean
+> Task :mmo-magic:clean
+> Task :mmo-market:clean
+> Task :mmo-persistence:clean
+> Task :mmo-progression:clean
+> Task :mmo-quests:clean
+> Task :mmo-scenes:clean
+> Task :mmo-social:clean
+> Task :mmo-worldloop:clean
+> Task :mmo-integrations:integration-mythicmobs:clean
+> Task :mmo-integrations:integration-oraxen:clean
+> Task :mmo-integrations:integration-packetevents:clean
+> Task :mmo-integrations:integration-wallet:clean
+> Task :mmo-integrations:integration-worldguard:clean
+> Task :assemble UP-TO-DATE
+> Task :check UP-TO-DATE
+> Task :build UP-TO-DATE
+> Task :mmo-api:compileJava
+> Task :mmo-api:processResources NO-SOURCE
+> Task :mmo-api:classes
+> Task :mmo-api:jar
+> Task :mmo-api:sourcesJar
+> Task :mmo-api:assemble
+> Task :mmo-api:compileTestJava
+> Task :mmo-api:processTestResources NO-SOURCE
+> Task :mmo-api:testClasses
+> Task :mmo-api:spotlessJava
+> Task :mmo-api:spotlessJavaCheck
+> Task :mmo-api:spotlessCheck
+> Task :mmo-api:checkstyleMain
+> Task :mmo-api:test
+> Task :mmo-api:checkstyleTest
+> Task :mmo-content:compileJava
+> Task :mmo-api:check
+> Task :mmo-api:build
+> Task :mmo-combat:compileJava
+> Task :mmo-integrations:compileJava
+> Task :mmo-items:compileJava
+> Task :mmo-lifeskills:compileJava
+> Task :mmo-magic:compileJava
+> Task :mmo-progression:compileJava
+> Task :mmo-persistence:compileJava
+> Task :mmo-scenes:compileJava
+> Task :mmo-social:compileJava
+> Task :mmo-worldloop:compileJava
+> Task :mmo-integrations:integration-mythicmobs:compileJava
+> Task :mmo-integrations:integration-oraxen:compileJava
+> Task :mmo-integrations:integration-packetevents:compileJava
+> Task :mmo-integrations:integration-wallet:compileJava
+> Task :mmo-integrations:integration-worldguard:compileJava
+> Task :mmo-bootstrap:compileJava
+> Task :mmo-bootstrap:processResources
+> Task :mmo-bootstrap:classes
+> Task :mmo-bootstrap:jar
+> Task :mmo-combat:processResources NO-SOURCE
+> Task :mmo-combat:classes
+> Task :mmo-combat:jar
+> Task :mmo-content:processResources NO-SOURCE
+> Task :mmo-content:classes
+> Task :mmo-content:jar
+> Task :mmo-integrations:processResources NO-SOURCE
+> Task :mmo-integrations:classes
+> Task :mmo-integrations:jar
+> Task :mmo-items:processResources NO-SOURCE
+> Task :mmo-items:classes
+> Task :mmo-items:jar
+> Task :mmo-lifeskills:processResources NO-SOURCE
+> Task :mmo-lifeskills:classes
+> Task :mmo-lifeskills:jar
+> Task :mmo-magic:processResources NO-SOURCE
+> Task :mmo-magic:classes
+> Task :mmo-magic:jar
+> Task :mmo-persistence:processResources
+> Task :mmo-persistence:classes
+> Task :mmo-persistence:jar
+> Task :mmo-progression:processResources NO-SOURCE
+> Task :mmo-progression:classes
+> Task :mmo-progression:jar
+> Task :mmo-scenes:processResources NO-SOURCE
+> Task :mmo-scenes:classes
+> Task :mmo-scenes:jar
+> Task :mmo-social:processResources NO-SOURCE
+> Task :mmo-social:classes
+> Task :mmo-social:jar
+> Task :mmo-worldloop:processResources NO-SOURCE
+> Task :mmo-worldloop:classes
+> Task :mmo-worldloop:jar
+> Task :mmo-integrations:integration-mythicmobs:processResources NO-SOURCE
+> Task :mmo-integrations:integration-mythicmobs:classes
+> Task :mmo-integrations:integration-mythicmobs:jar
+> Task :mmo-integrations:integration-oraxen:processResources NO-SOURCE
+> Task :mmo-integrations:integration-oraxen:classes
+> Task :mmo-integrations:integration-oraxen:jar
+> Task :mmo-integrations:integration-packetevents:processResources NO-SOURCE
+> Task :mmo-integrations:integration-packetevents:classes
+> Task :mmo-integrations:integration-packetevents:jar
+> Task :mmo-integrations:integration-wallet:processResources NO-SOURCE
+> Task :mmo-integrations:integration-wallet:classes
+> Task :mmo-integrations:integration-wallet:jar
+> Task :mmo-integrations:integration-worldguard:processResources NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:classes
+> Task :mmo-integrations:integration-worldguard:jar
+> Task :mmo-bootstrap:sourcesJar
+> Task :mmo-bootstrap:shadowJar
+> Task :mmo-bootstrap:assemble
+> Task :mmo-bootstrap:compileTestJava
+> Task :mmo-bootstrap:processTestResources NO-SOURCE
+> Task :mmo-bootstrap:testClasses
+> Task :mmo-bootstrap:checkstyleTest
+> Task :mmo-bootstrap:spotlessJava
+> Task :mmo-bootstrap:spotlessJavaCheck FAILED
+> Task :mmo-bootstrap:checkstyleMain
+
+[Incubating] Problems report is available at: file:///home/runner/work/branz-mmorpg/branz-mmorpg/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':mmo-bootstrap:spotlessJavaCheck'.
+> The following files had format violations:
+      src/main/java/com/branz/mmorpg/bootstrap/SelectedHotbarAuthorityIdentity.java
+          @@ -8,7 +8,9 @@
+           import·java.util.Objects;
+           import·java.util.Optional;
+           
+          -/**·Stable·authoritative·identity·of·the·unique·MMO·item·occupying·the·currently·held·gameplay·slot.·*/
+          +/**
+          +·*·Stable·authoritative·identity·of·the·unique·MMO·item·occupying·the·currently·held·gameplay·slot.
+          +·*/
+           record·SelectedHotbarAuthorityIdentity(ItemId·itemId,·DefinitionId·definitionId)·{
+           ····SelectedHotbarAuthorityIdentity·{
+           ········Objects.requireNonNull(itemId,·"itemId");
+          @@ -23,10 +25,7 @@
+           ········}
+           ········String·slotReference·=·"slot:"·+·heldSlot;
+           ········return·records.stream()
+          -················.filter(
+          -························record·->
+          -································record.location().type()
+          -········································==·ValueLocationType.CHARACTER_INVENTORY)
+          +················.filter(record·->·record.location().type()·==·ValueLocationType.CHARACTER_INVENTORY)
+           ················.filter(
+           ························record·->
+           ································record.location()
+          @@ -41,9 +40,7 @@
+           ····}
+           
+           ····static·boolean·changed(
+          -············List<ItemLocationRecord>·before,
+          -············List<ItemLocationRecord>·after,
+          -············int·heldSlot)·{
+          +············List<ItemLocationRecord>·before,·List<ItemLocationRecord>·after,·int·heldSlot)·{
+           ········return·!resolve(before,·heldSlot).equals(resolve(after,·heldSlot));
+           ····}
+           }
+      src/test/java/com/branz/mmorpg/bootstrap/SelectedHotbarAuthorityIdentityTest.java
+          @@ -35,9 +35,7 @@
+           ········ItemLocationRecord·before·=·item(itemId,·BLADE,·0,·1,·"{\"durability\":100}");
+           ········ItemLocationRecord·after·=·item(itemId,·BLADE,·0,·2,·"{\"durability\":99}");
+           
+          -········assertFalse(
+          -················SelectedHotbarAuthorityIdentity.changed(
+          -························List.of(before),·List.of(after),·0));
+          +········assertFalse(SelectedHotbarAuthorityIdentity.changed(List.of(before),·List.of(after),·0));
+           ····}
+           
+           ····@Test
+          @@ -57,29 +55,19 @@
+           ········ItemLocationRecord·before·=·item(itemId,·BLADE,·0,·1,·"{}");
+           ········ItemLocationRecord·after·=·item(itemId,·BLADE,·1,·2,·"{}");
+      ... (32 more lines that didn't fit)
+  Run './gradlew spotlessApply' to fix all violations.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1m 31s
+75 actionable tasks: 74 executed, 1 up-to-date

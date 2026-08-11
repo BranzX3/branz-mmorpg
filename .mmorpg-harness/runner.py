@@ -450,6 +450,8 @@ def action_client_acceptance_ingress(
         "--console=plain",
         "runClientGameTest",
     ]
+    if require_primary_input:
+        client_argv.append("-PphysicalPrimaryInputAcceptance=true")
 
     def read_log(path: Path) -> str:
         try:
@@ -593,6 +595,12 @@ def action_client_acceptance_ingress(
         if require_primary_input:
             checks.update(
                 {
+                    "primary_stage_persisted_server": "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PERSISTED_SERVER"
+                    in paper_text,
+                    "primary_stage_projected_server": "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PROJECTED_SERVER"
+                    in paper_text,
+                    "primary_projection_ready_client": "PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT"
+                    in client_text,
                     "primary_mouse_sent_client": "PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT"
                     in client_text,
                     "primary_intent_server": "PHYSICAL_AUTHORITY_PRIMARY_INTENT_SERVER"

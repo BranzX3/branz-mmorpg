@@ -390,6 +390,59 @@ def action_client_acceptance_compile(
     }
 
 
+def evaluate_hotbar_move_sequence(
+    snapshots: list[dict[str, Any]],
+    commits: list[tuple[str, int, int]],
+) -> dict[str, bool]:
+    snapshots_exact = len(snapshots) == 5
+    same_uuid = snapshots_exact and len({row["uuid"] for row in snapshots}) == 1
+    slots = [row["slot"] for row in snapshots]
+    gameplay_chain = (
+        snapshots_exact
+        and slots[0] == 0
+        and 0 <= slots[1] <= 7
+        and slots[1] != slots[0]
+        and slots[2] == slots[1]
+        and 0 <= slots[3] <= 7
+        and slots[3] != slots[1]
+        and slots[4] == slots[3]
+    )
+    versions = [row["version"] for row in snapshots]
+    versions_exact = (
+        snapshots_exact
+        and versions[1] == versions[0] + 1
+        and versions[2] == versions[1]
+        and versions[3] == versions[0] + 2
+        and versions[4] == versions[3]
+    )
+    durability_exact = (
+        snapshots_exact
+        and len(
+            {
+                (row["durability"], row["max_durability"])
+                for row in snapshots
+            }
+        )
+        == 1
+    )
+    commit_sequence = (
+        gameplay_chain
+        and same_uuid
+        and len(commits) == 2
+        and commits[0][1:] == (slots[0], slots[1])
+        and commits[1][1:] == (slots[1], slots[3])
+        and all(row[0] == snapshots[0]["uuid"] for row in commits)
+    )
+    return {
+        "hotbar_snapshot_count": snapshots_exact,
+        "hotbar_same_uuid": same_uuid,
+        "hotbar_slot_sequence": gameplay_chain,
+        "hotbar_version_sequence": versions_exact,
+        "hotbar_durability_stable": durability_exact,
+        "hotbar_server_commit_sequence": commit_sequence,
+    }
+
+
 def action_client_acceptance_ingress(
     repo: Path,
     result_dir: Path,
@@ -634,27 +687,6 @@ def action_client_acceptance_ingress(
                         "max_durability": int(match.group(5)),
                     }
                 )
-            expected_slots = [0, 1, 1, 2, 2]
-            snapshots_exact = len(hotbar_snapshots) == 5
-            same_uuid = snapshots_exact and len({row["uuid"] for row in hotbar_snapshots}) == 1
-            versions = [row["version"] for row in hotbar_snapshots]
-            versions_exact = (
-                snapshots_exact
-                and versions[1] == versions[0] + 1
-                and versions[2] == versions[1]
-                and versions[3] == versions[0] + 2
-                and versions[4] == versions[3]
-            )
-            durability_exact = (
-                snapshots_exact
-                and len(
-                    {
-                        (row["durability"], row["max_durability"])
-                        for row in hotbar_snapshots
-                    }
-                )
-                == 1
-            )
             commit_pattern = re.compile(
                 r"PHYSICAL_AUTHORITY_HOTBAR_MOVE_COMMITTED_SERVER .*?value=([0-9a-fA-F-]{36}) "
                 r"source=(\d+) destination=(\d+)"
@@ -663,12 +695,7 @@ def action_client_acceptance_ingress(
                 (match.group(1).lower(), int(match.group(2)), int(match.group(3)))
                 for match in commit_pattern.finditer(paper_text)
             ]
-            commit_sequence = (
-                len(commits) == 2
-                and [(row[1], row[2]) for row in commits] == [(0, 1), (1, 2)]
-                and same_uuid
-                and all(row[0] == hotbar_snapshots[0]["uuid"] for row in commits)
-            )
+            hotbar_sequence_checks = evaluate_hotbar_move_sequence(hotbar_snapshots, commits)
             checks.update(
                 {
                     "hotbar_stage_projected_server": "PHYSICAL_AUTHORITY_HOTBAR_STAGE_PROJECTED_SERVER"
@@ -684,13 +711,7 @@ def action_client_acceptance_ingress(
                     "hotbar_sequence_complete_client": "PHYSICAL_AUTHORITY_HOTBAR_SEQUENCE_COMPLETE_CLIENT"
                     in client_text,
                     "hotbar_status_command_count_server": paper_text.count("/mmo physical status") == 5,
-                    "hotbar_snapshot_count": snapshots_exact,
-                    "hotbar_same_uuid": same_uuid,
-                    "hotbar_slot_sequence": snapshots_exact
-                    and [row["slot"] for row in hotbar_snapshots] == expected_slots,
-                    "hotbar_version_sequence": versions_exact,
-                    "hotbar_durability_stable": durability_exact,
-                    "hotbar_server_commit_sequence": commit_sequence,
+                    **hotbar_sequence_checks,
                 }
             )
         passed = all(checks.values())

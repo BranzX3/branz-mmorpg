@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-SMOKE-DB-GATE-VERIFY-0002",
+  "task_branch": "harness-task/MMO-SMOKE-DB-GATE-VERIFY-0002",
+  "base_commit": "257f0f4972c82347ecd8129fbe99e502d79c2bc6",
+  "action_id": "MMO_BOOTSTRAP_SMOKE_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-SMOKE-DB-GATE-VERIFY-0002/**"
+  ]
+}

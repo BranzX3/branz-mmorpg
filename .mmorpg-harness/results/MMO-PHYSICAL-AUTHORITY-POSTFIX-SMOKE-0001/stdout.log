@@ -1,0 +1,238 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :mmo-api:compileJava UP-TO-DATE
+> Task :mmo-api:processResources NO-SOURCE
+> Task :mmo-api:classes UP-TO-DATE
+> Task :mmo-api:jar UP-TO-DATE
+> Task :mmo-content:compileJava UP-TO-DATE
+> Task :mmo-combat:compileJava UP-TO-DATE
+> Task :mmo-integrations:compileJava UP-TO-DATE
+> Task :mmo-items:compileJava UP-TO-DATE
+> Task :mmo-lifeskills:compileJava UP-TO-DATE
+> Task :mmo-magic:compileJava UP-TO-DATE
+> Task :mmo-progression:compileJava UP-TO-DATE
+> Task :mmo-persistence:compileJava UP-TO-DATE
+> Task :mmo-scenes:compileJava UP-TO-DATE
+> Task :mmo-social:compileJava UP-TO-DATE
+> Task :mmo-worldloop:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-mythicmobs:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-oraxen:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-packetevents:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-wallet:compileJava UP-TO-DATE
+> Task :mmo-integrations:integration-worldguard:compileJava UP-TO-DATE
+> Task :mmo-bootstrap:compileJava UP-TO-DATE
+> Task :mmo-bootstrap:processResources UP-TO-DATE
+> Task :mmo-bootstrap:classes UP-TO-DATE
+> Task :mmo-combat:processResources NO-SOURCE
+> Task :mmo-combat:classes UP-TO-DATE
+> Task :mmo-combat:jar UP-TO-DATE
+> Task :mmo-content:processResources NO-SOURCE
+> Task :mmo-content:classes UP-TO-DATE
+> Task :mmo-content:jar UP-TO-DATE
+> Task :mmo-integrations:processResources NO-SOURCE
+> Task :mmo-integrations:classes UP-TO-DATE
+> Task :mmo-integrations:jar UP-TO-DATE
+> Task :mmo-items:processResources NO-SOURCE
+> Task :mmo-items:classes UP-TO-DATE
+> Task :mmo-items:jar UP-TO-DATE
+> Task :mmo-lifeskills:processResources NO-SOURCE
+> Task :mmo-lifeskills:classes UP-TO-DATE
+> Task :mmo-lifeskills:jar UP-TO-DATE
+> Task :mmo-magic:processResources NO-SOURCE
+> Task :mmo-magic:classes UP-TO-DATE
+> Task :mmo-magic:jar UP-TO-DATE
+> Task :mmo-persistence:processResources UP-TO-DATE
+> Task :mmo-persistence:classes UP-TO-DATE
+> Task :mmo-persistence:jar UP-TO-DATE
+> Task :mmo-progression:processResources NO-SOURCE
+> Task :mmo-progression:classes UP-TO-DATE
+> Task :mmo-progression:jar UP-TO-DATE
+> Task :mmo-scenes:processResources NO-SOURCE
+> Task :mmo-scenes:classes UP-TO-DATE
+> Task :mmo-scenes:jar UP-TO-DATE
+> Task :mmo-social:processResources NO-SOURCE
+> Task :mmo-social:classes UP-TO-DATE
+> Task :mmo-social:jar UP-TO-DATE
+> Task :mmo-worldloop:processResources NO-SOURCE
+> Task :mmo-worldloop:classes UP-TO-DATE
+> Task :mmo-worldloop:jar UP-TO-DATE
+> Task :mmo-integrations:integration-mythicmobs:processResources NO-SOURCE
+> Task :mmo-integrations:integration-mythicmobs:classes UP-TO-DATE
+> Task :mmo-integrations:integration-mythicmobs:jar UP-TO-DATE
+> Task :mmo-integrations:integration-oraxen:processResources NO-SOURCE
+> Task :mmo-integrations:integration-oraxen:classes UP-TO-DATE
+> Task :mmo-integrations:integration-oraxen:jar UP-TO-DATE
+> Task :mmo-integrations:integration-packetevents:processResources NO-SOURCE
+> Task :mmo-integrations:integration-packetevents:classes UP-TO-DATE
+> Task :mmo-integrations:integration-packetevents:jar UP-TO-DATE
+> Task :mmo-integrations:integration-wallet:processResources NO-SOURCE
+> Task :mmo-integrations:integration-wallet:classes UP-TO-DATE
+> Task :mmo-integrations:integration-wallet:jar UP-TO-DATE
+> Task :mmo-integrations:integration-worldguard:processResources NO-SOURCE
+> Task :mmo-integrations:integration-worldguard:classes UP-TO-DATE
+> Task :mmo-integrations:integration-worldguard:jar UP-TO-DATE
+> Task :mmo-bootstrap:shadowJar UP-TO-DATE
+
+> Task :mmo-bootstrap:runServer
+Fetching latest Paper build for version 26.2...
+Latest build for 26.2 is 112.
+Located Paper 26.2 build 112 in local cache.
+Starting Paper...
+
+Starting org.bukkit.craftbukkit.Main
+[16:25:07 INFO]: [bootstrap] Running Java 25 (OpenJDK 64-Bit Server VM 25.0.3+9-LTS; Eclipse Adoptium Temurin-25.0.3+9) on Windows 11 10.0 (amd64)
+[16:25:07 INFO]: [bootstrap] Loading Paper 26.2-112-main@c9e894d (2026-08-11T05:18:39Z) for Minecraft 26.2
+[16:25:07 INFO]: [PluginInitializerManager] Initializing plugins...
+[16:25:07 INFO]: [PluginInitializerManager] Initialized 1 plugin
+[16:25:07 INFO]: [PluginInitializerManager] Bukkit plugins (1):
+ - BranzMMO (1.0.0-SNAPSHOT)
+[16:25:10 INFO]: [ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry] Initialising converters for DataConverter...
+[16:25:10 INFO]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, profilesHost=https://api.mojang.com, name=PROD]
+[16:25:11 INFO]: [ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry] Finished initialising converters for DataConverter in 456.4ms
+[16:25:12 INFO]: Loaded 1585 recipes
+[16:25:12 INFO]: Loaded 1688 advancements
+[16:25:12 INFO]: Starting minecraft server version 26.2
+[16:25:12 INFO]: Loading properties
+[16:25:12 INFO]: This server is running Paper version 26.2-112-main@c9e894d (2026-08-11T05:18:39Z) (Implementing API version 26.2.build.112-stable)
+[16:25:12 INFO]: [spark] This server bundles the spark profiler. For more information please visit https://docs.papermc.io/paper/profiling
+[16:25:12 INFO]: Server Ping Player Sample Count: 12
+[16:25:12 INFO]: Using 4 threads for Netty based IO
+[16:25:12 INFO]: [MoonriseCommon] Paper is using 3 worker threads, 1 I/O threads
+[16:25:13 INFO]: Default game type: SURVIVAL
+[16:25:13 INFO]: Generating keypair
+[16:25:13 INFO]: Starting Minecraft server on *:25565
+[16:25:13 INFO]: Paper: Using Java compression from Velocity.
+[16:25:13 INFO]: Paper: Using Java cipher from Velocity.
+[16:25:13 INFO]: [BranzMMO] Loading server plugin BranzMMO v1.0.0-SNAPSHOT
+[16:25:13 INFO]: [BranzMMO] Enabling BranzMMO v1.0.0-SNAPSHOT
+[16:25:13 INFO]: [BranzMMO] Loading and validating content snapshot from C:\Users\User\AppData\Local\BranzMMORPGHarness\repo\example-content\milestone-1
+[16:25:13 INFO]: Preparing level "world"
+[16:25:13 INFO]: Loading 0 persistent chunks for level 'minecraft:overworld'...
+[16:25:13 INFO]: Preparing spawn area: 100%
+[16:25:13 INFO]: Prepared spawn area in 9 ms
+[16:25:13 INFO]: Loading 0 persistent chunks for level 'minecraft:the_nether'...
+[16:25:13 INFO]: Preparing spawn area: 100%
+[16:25:13 INFO]: Prepared spawn area in 13 ms
+[16:25:13 INFO]: Loading 0 persistent chunks for level 'minecraft:the_end'...
+[16:25:13 INFO]: Preparing spawn area: 100%
+[16:25:13 INFO]: Prepared spawn area in 15 ms
+[16:25:13 INFO]: Done preparing level "world" (0.400s)
+[16:25:13 INFO]: [spark] Starting background profiler...
+[16:25:13 INFO]: [spark] The async-profiler engine is not supported for your os/arch (windows11/amd64), so the built-in Java engine will be used instead.
+[16:25:13 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:overworld
+[16:25:13 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:the_nether
+[16:25:13 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:the_end
+[16:25:13 INFO]: ThreadedAnvilChunkStorage (world): All chunks are saved
+[16:25:13 INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[16:25:13 INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[16:25:13 INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[16:25:13 INFO]: Running delayed init tasks
+[16:25:13 INFO]: Done (7.470s)! For help, type "help"
+[16:25:13 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Detected a Windows x86_64 system
+[16:25:13 INFO]: [io.zonky.test.db.postgres.embedded.DefaultPostgresBinaryResolver] Detected distribution: 'Unknown'
+[16:25:13 INFO]: [io.zonky.test.db.postgres.embedded.DefaultPostgresBinaryResolver] System specific postgres binaries found: 'postgres-windows-x86_64.txz'
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Postgres binaries at C:\Users\User\AppData\Local\Temp\embedded-pg\PG-3942d5a1dcdbfebc27772e9e670d5d85
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] The files belonging to this database system will be owned by user "User".
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] This user must also own the server process.
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] The database cluster will be initialized with locale "English_United States.874".
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] The default text search configuration will be set to "english".
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Data page checksums are disabled.
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] fixing permissions on existing directory C:/Users/User/AppData/Local/BranzMMORPGHarness/repo/mmo-bootstrap/run/plugins/BranzMMO/smoke-embedded-postgres ... ok
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] creating subdirectories ... ok
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] selecting dynamic shared memory implementation ... windows
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] selecting default max_connections ... 100
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] selecting default shared_buffers ... 128MB
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] selecting default time zone ... Asia/Bangkok
+[16:25:14 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] creating configuration files ... ok
+[16:25:15 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] running bootstrap script ... ok
+[16:25:17 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] performing post-bootstrap initialization ... ok
+[16:25:19 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] syncing data to disk ... ok
+[16:25:19 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[16:25:19 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Success. You can now start the database server using:
+[16:25:19 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[16:25:19 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres]     ^"C^:^\Users^\User^\AppData^\Local^\Temp^\embedded^-pg^\PG^-3942d5a1dcdbfebc27772e9e670d5d85^\bin^\pg^_ctl^" -D ^"C^:^\Users^\User^\AppData^\Local^\BranzMMORPGHarness^\repo^\mmo^-bootstrap^\run^\plugins^\BranzMMO^\smoke^-embedded^-postgres^" -l logfile start
+[16:25:19 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 
+[16:25:19 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 7193cdf7-148d-44ef-9746-3e9ba09a90ee initdb completed in 00:00:05.637
+[16:25:20 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 7193cdf7-148d-44ef-9746-3e9ba09a90ee postmaster started as Process[pid=13392, exitValue="not exited"] on port 55051.  Waiting up to PT10S for server startup to finish.
+[16:25:20 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] waiting for server to start....2026-08-11 16:25:20.120 +07 [2676] LOG:  starting PostgreSQL 14.22, compiled by Visual C++ build 1944, 64-bit
+[16:25:20 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 16:25:20.124 +07 [2676] LOG:  listening on IPv6 address "::1", port 55051
+[16:25:20 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 16:25:20.124 +07 [2676] LOG:  listening on IPv4 address "127.0.0.1", port 55051
+[16:25:20 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 16:25:20.155 +07 [10652] LOG:  database system was shut down at 2026-08-11 16:25:17 +07
+[16:25:20 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 16:25:20.192 +07 [2676] LOG:  database system is ready to accept connections
+[16:25:20 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres]  done
+[16:25:20 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] server started
+[16:25:20 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 7193cdf7-148d-44ef-9746-3e9ba09a90ee postmaster startup finished in 00:00:00.447
+[16:25:21 INFO]: [BranzMMO] Milestone 3 runtime ready; item definitions=20, move definitions=6, spell definitions=5, technique definitions=5, form definitions=4, ailment definitions=6, encounter reward definitions=1, Scene presentation=WORLD_BACKED
+[16:25:21 INFO]: [BranzMMO] Provider asset.oraxen=UNAVAILABLE [OPTIONAL]: plugin is not installed: Oraxen
+[16:25:21 INFO]: [BranzMMO] Provider mob.mythicmobs=UNAVAILABLE [OPTIONAL]: plugin is not installed: MythicMobs
+[16:25:21 INFO]: [BranzMMO] Provider packet.packetevents=UNAVAILABLE [OPTIONAL]: plugin is not installed: packetevents
+[16:25:21 INFO]: [BranzMMO] Provider region.worldguard=UNAVAILABLE [OPTIONAL]: plugin is not installed: WorldGuard
+[16:25:21 INFO]: [BranzMMO] Provider wallet.external=UNAVAILABLE [OPTIONAL]: plugin is not installed: Wallet
+[16:25:21 WARN]: [BranzMMO] asset.oraxen [OPTIONAL]: plugin is not installed: Oraxen
+[16:25:21 WARN]: [BranzMMO] mob.mythicmobs [OPTIONAL]: plugin is not installed: MythicMobs
+[16:25:21 WARN]: [BranzMMO] packet.packetevents [OPTIONAL]: plugin is not installed: packetevents
+[16:25:21 WARN]: [BranzMMO] region.worldguard [OPTIONAL]: plugin is not installed: WorldGuard
+[16:25:21 WARN]: [BranzMMO] wallet.external [OPTIONAL]: plugin is not installed: Wallet
+[16:25:21 INFO]: [BranzMMO] Branz MMO startup DEGRADED; content=v1.milestone-1.example.4, definitions=48
+[16:25:21 INFO]: [BranzMMO] PostgreSQL runtime ready; mode=EMBEDDED_LOCAL, server-instance=local-2ea1263e-a4f3-4965-84c7-eecfdec1f500
+[16:25:21 INFO]: [BranzMMO] Bootstrap smoke test completed; scheduling a clean shutdown.
+[16:25:21 INFO]: [BranzMMO] Recovered 0 boss encounter(s) from V0009.
+[16:25:21 INFO]: [BranzMMO] Death Pouch reconciliation is ready.
+[16:25:21 INFO]: [BranzMMO] Recovered 0 downed encounter(s) from V0010.
+[16:25:22 INFO]: Stopping server
+[16:25:22 INFO]: [BranzMMO] Disabling BranzMMO v1.0.0-SNAPSHOT
+[16:25:22 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 16:25:22.214 +07 [2676] LOG:  received fast shutdown request
+[16:25:22 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 16:25:22.214 +07 [2676] LOG:  aborting any active transactions
+[16:25:22 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 16:25:22.219 +07 [2676] LOG:  background worker "logical replication launcher" (PID 23220) exited with exit code 1
+[16:25:22 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 16:25:22.219 +07 [17144] LOG:  shutting down
+[16:25:22 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 2026-08-11 16:25:22.349 +07 [2676] LOG:  database system is shut down
+[16:25:22 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] waiting for server to shut down.... done
+[16:25:22 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] server stopped
+[16:25:22 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] 7193cdf7-148d-44ef-9746-3e9ba09a90ee shut down postmaster in 00:00:00.253
+[16:25:22 INFO]: [io.zonky.test.db.postgres.embedded.EmbeddedPostgres] Did not clean up directory C:\Users\User\AppData\Local\BranzMMORPGHarness\repo\mmo-bootstrap\run\plugins\BranzMMO\smoke-embedded-postgres
+[16:25:22 INFO]: [BranzMMO] Branz MMO platform disabled cleanly.
+[16:25:22 INFO]: Saving players
+[16:25:22 INFO]: Saving worlds
+[16:25:22 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:overworld
+[16:25:22 INFO]: [ChunkHolderManager] Waiting 60s for chunk system to halt for world 'minecraft:overworld'
+[16:25:22 INFO]: [ChunkHolderManager] Halted chunk system for world 'minecraft:overworld'
+[16:25:22 INFO]: [ChunkHolderManager] Saving all chunkholders for world 'minecraft:overworld'
+[16:25:22 INFO]: [ChunkHolderManager] Saved 0 block chunks, 0 entity chunks, 0 poi chunks in world 'minecraft:overworld' in 0.00s
+[16:25:22 INFO]: [ChunkHolderManager] Waiting 60s for chunk I/O to halt for world 'minecraft:overworld'
+[16:25:22 INFO]: [ChunkHolderManager] Halted I/O scheduler for world 'minecraft:overworld'
+[16:25:22 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:the_nether
+[16:25:22 INFO]: [ChunkHolderManager] Waiting 60s for chunk system to halt for world 'minecraft:the_nether'
+[16:25:22 INFO]: [ChunkHolderManager] Halted chunk system for world 'minecraft:the_nether'
+[16:25:22 INFO]: [ChunkHolderManager] Saving all chunkholders for world 'minecraft:the_nether'
+[16:25:22 INFO]: [ChunkHolderManager] Saved 0 block chunks, 0 entity chunks, 0 poi chunks in world 'minecraft:the_nether' in 0.00s
+[16:25:22 INFO]: [ChunkHolderManager] Waiting 60s for chunk I/O to halt for world 'minecraft:the_nether'
+[16:25:22 INFO]: [ChunkHolderManager] Halted I/O scheduler for world 'minecraft:the_nether'
+[16:25:22 INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:the_end
+[16:25:22 INFO]: [ChunkHolderManager] Waiting 60s for chunk system to halt for world 'minecraft:the_end'
+[16:25:22 INFO]: [ChunkHolderManager] Halted chunk system for world 'minecraft:the_end'
+[16:25:22 INFO]: [ChunkHolderManager] Saving all chunkholders for world 'minecraft:the_end'
+[16:25:22 INFO]: [ChunkHolderManager] Saved 0 block chunks, 0 entity chunks, 0 poi chunks in world 'minecraft:the_end' in 0.00s
+[16:25:22 INFO]: [ChunkHolderManager] Waiting 60s for chunk I/O to halt for world 'minecraft:the_end'
+[16:25:22 INFO]: [ChunkHolderManager] Halted I/O scheduler for world 'minecraft:the_end'
+[16:25:22 INFO]: ThreadedAnvilChunkStorage (world): All chunks are saved
+[16:25:22 INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[16:25:22 INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[16:25:22 INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[16:25:22 INFO]: Waiting for all RegionFile I/O tasks to complete...
+[16:25:22 INFO]: All RegionFile I/O tasks to complete
+[16:25:22 INFO]: [MoonriseCommon] Awaiting termination of worker pool for up to 60s...
+[16:25:22 INFO]: [MoonriseCommon] Awaiting termination of I/O pool for up to 60s...
+
+[Incubating] Problems report is available at: file:///C:/Users/User/AppData/Local/BranzMMORPGHarness/repo/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 28s
+39 actionable tasks: 1 executed, 38 up-to-date

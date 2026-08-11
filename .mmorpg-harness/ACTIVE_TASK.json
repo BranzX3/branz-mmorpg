@@ -1,4 +1,5 @@
 {
   "protocol_version": 1,
-  "state": "IDLE"
+  "state": "ACTIVE",
+  "task_path": ".mmorpg-harness/tasks/MMO-PHYSICAL-PRIMARY-INPUT-0004.json"
 }

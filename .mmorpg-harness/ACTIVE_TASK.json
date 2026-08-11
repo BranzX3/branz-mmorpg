@@ -1,5 +1,4 @@
 {
   "protocol_version": 1,
-  "state": "ACTIVE",
-  "task_path": ".mmorpg-harness/tasks/MMO-PHYSICAL-CLIENT-INGRESS-0003.json"
+  "state": "IDLE"
 }

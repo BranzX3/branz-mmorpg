@@ -83,6 +83,12 @@ this same transaction/reconnect acceptance discipline.
 Use a LOCAL or INTEGRATION server with the normal dev-value preparation path. Dev commands may grant
 values but must not substitute for the physical player actions below.
 
+Before A0, complete the mandatory environment fingerprint in
+`acceptance/physical-gameplay-item-environment.md`. The same Paper build/commit identity, Java
+runtime/JAVA_HOME, Minecraft client version and acceptance machine must remain unchanged through A0,
+A1 and every reconnect/restart used by B-F. If the fingerprint changes, do not combine the evidence;
+restart the complete A-F pass from A0.
+
 For every target-runtime section, capture `/mmo physical status` immediately before and after each
 relevant value-changing action, then again after the required reconnect/restart. If inspection says
 that an authoritative value transaction is still in progress, wait for commit and retry; a stale
@@ -186,6 +192,7 @@ Record, for each section A–F:
 
 - player UUID/character ID;
 - content version and accepted runtime revision;
+- the environment fingerprint required by `acceptance/physical-gameplay-item-environment.md`;
 - item/lot UUIDs involved;
 - pre/post authoritative locations and versions;
 - pre/post resolved durability or quantity where applicable;

@@ -20,6 +20,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 /** Bridges committed successful combat actions to authoritative physical-weapon durability wear. */
 final class WeaponDurabilityController implements SuccessfulCombatActionObserver {
+    private static final DefinitionId TRAINING_BLADE = DefinitionId.of("weapon.training_blade");
+
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
     private final MoveEngine moves;
@@ -74,6 +76,15 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
                                     + " move="
                                     + moveId);
         }
+        if (Boolean.getBoolean("mmo.physical-broken-acceptance")
+                && pending.weaponDefinitionId().equals(TRAINING_BLADE)) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_BROKEN_ACCELERATED_WEAR_SERVER action="
+                                    + actionId
+                                    + " cost="
+                                    + pending.durabilityCost());
+        }
         queuedByPlayer
                 .computeIfAbsent(player.getUniqueId(), ignored -> new ArrayDeque<>())
                 .addLast(pending);
@@ -93,13 +104,19 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
                 || !weapon.family().equals(move.family())) {
             return null;
         }
+        int baseMaximumDurability = definition.baseMaxDurability().getAsInt();
+        int durabilityCost = weapon.durabilityCostPerSuccessfulAttack();
+        if (Boolean.getBoolean("mmo.physical-broken-acceptance")
+                && definition.id().equals(TRAINING_BLADE)) {
+            durabilityCost = baseMaximumDurability;
+        }
         return new PendingWear(
                 actionId,
                 moveId,
                 selected.record().itemId(),
                 definition.id(),
-                definition.baseMaxDurability().getAsInt(),
-                weapon.durabilityCostPerSuccessfulAttack());
+                baseMaximumDurability,
+                durabilityCost);
     }
 
     private void drain(Player player) {

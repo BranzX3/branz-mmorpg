@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-WEAPON-B4-HIT-0002",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B4-HIT-0002",
+  "base_commit": "38c97bf02135b7396eeb0bfb41bd4a87e92f3ba5",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_HIT_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B4-HIT-0002/**"
+  ]
+}

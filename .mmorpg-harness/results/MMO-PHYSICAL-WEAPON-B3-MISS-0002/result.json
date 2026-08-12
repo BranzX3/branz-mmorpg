@@ -1,0 +1,58 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT",
+  "action_record": {
+    "action_status": "PASS",
+    "checks": {
+      "client_exit_zero": true,
+      "primary_intent_server": true,
+      "primary_mouse_sent_client": true,
+      "primary_projection_ready_client": true,
+      "primary_routed_server": true,
+      "primary_stage_persisted_server": true,
+      "primary_stage_projected_server": true,
+      "server_exit_zero": true,
+      "server_handshake_client": true,
+      "status_command_logged_server": true,
+      "status_command_sent_client": true
+    },
+    "client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalPrimaryInputAcceptance=true"
+    ],
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 110.515,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT",
+    "hotbar_snapshots": [],
+    "player_name": "Player0",
+    "server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalPrimaryInputAcceptance=true"
+    ]
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B3-MISS-0002/**"
+  ],
+  "base_commit_expected": "ed911ec3546c3badcc174060c89119677ea18968",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "e584bac0ba809b1371fa49d501de46ed855d0108",
+  "duration_seconds": 112.187,
+  "ending_commit_before_result_commit": "ed911ec3546c3badcc174060c89119677ea18968",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-12T18:27:35.017494+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-12T18:25:42.833078+00:00",
+  "starting_commit_actual": "ed911ec3546c3badcc174060c89119677ea18968",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B3-MISS-0002",
+  "task_id": "MMO-PHYSICAL-WEAPON-B3-MISS-0002",
+  "task_manifest_sha256": "8776f2897daefb68c4bb07e36d3fdd07b88a7288910c03818561cb43166ffd20",
+  "unauthorized_writes": []
+}

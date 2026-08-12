@@ -74,6 +74,7 @@ final class PhysicalBrokenWeaponClientGameTest {
                     "B5 requires a fresh 100/100 Training Blade before accelerated wear: " + before);
         }
 
+        int firstBrokenStateMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
         System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
         System.out.println("PHYSICAL_AUTHORITY_PRIMARY_BROKEN_FIRST_MOUSE_SENT_CLIENT");
@@ -97,10 +98,9 @@ final class PhysicalBrokenWeaponClientGameTest {
         }
         System.out.println("PHYSICAL_AUTHORITY_PRIMARY_BROKEN_ZERO_CLIENT");
 
-        int firstRetryMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
         System.out.println("PHYSICAL_AUTHORITY_PRIMARY_BROKEN_RETRY_MOUSE_SENT_CLIENT");
-        context.waitFor(client -> brokenMessageSince(firstRetryMessage), 20 * 5);
+        context.waitFor(client -> brokenMessageSince(firstBrokenStateMessage), 20 * 5);
         System.out.println("PHYSICAL_AUTHORITY_PRIMARY_BROKEN_REJECTION_MESSAGE_CLIENT");
         context.waitTicks(40);
 

@@ -2,9 +2,48 @@
 """Stable harness wrapper: byte-preserved core plus reviewed capability extensions."""
 from __future__ import annotations
 
-import runner_b5 as _runner_b5
-import runner_core as _runner_core
+import subprocess as _bootstrap_subprocess
+import sys as _bootstrap_sys
+import types as _bootstrap_types
+from pathlib import Path as _BootstrapPath
 
+_CONTROL_BRANCH = "HARNESS_MMORPG_CONTROL"
+
+
+def _worker_repo() -> _BootstrapPath:
+    cwd = _BootstrapPath.cwd().resolve()
+    for candidate in (cwd, cwd.parent / "repo"):
+        if (candidate / ".git").exists():
+            return candidate
+    raise RuntimeError("MMORPG harness worker repository is unavailable to runner wrapper")
+
+
+def _load_control_module(name: str, relative_path: str):
+    repo = _worker_repo()
+    ref = f"origin/{_CONTROL_BRANCH}:{relative_path}"
+    loaded = _bootstrap_subprocess.run(
+        ["git", "-C", str(repo), "show", ref],
+        text=True,
+        encoding="utf-8",
+        errors="strict",
+        stdout=_bootstrap_subprocess.PIPE,
+        stderr=_bootstrap_subprocess.PIPE,
+        check=False,
+    )
+    if loaded.returncode != 0:
+        raise RuntimeError(
+            f"Could not load reviewed harness module {relative_path} from {_CONTROL_BRANCH}: "
+            + loaded.stderr.strip()
+        )
+    module = _bootstrap_types.ModuleType(name)
+    module.__file__ = str(repo / relative_path)
+    _bootstrap_sys.modules[name] = module
+    exec(compile(loaded.stdout, module.__file__, "exec"), module.__dict__)
+    return module
+
+
+_runner_core = _load_control_module("runner_core", ".mmorpg-harness/runner_core.py")
+_runner_b5 = _load_control_module("runner_b5", ".mmorpg-harness/runner_b5.py")
 _runner_b5.install(_runner_core)
 
 for _name in dir(_runner_core):

@@ -51,16 +51,6 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
         Objects.requireNonNull(actorId, "actorId");
         Objects.requireNonNull(actionId, "actionId");
         Objects.requireNonNull(moveId, "moveId");
-        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
-            plugin.getLogger()
-                    .info(
-                            "PHYSICAL_AUTHORITY_WEAPON_SUCCESS_OBSERVED_SERVER actor="
-                                    + actorId
-                                    + " action="
-                                    + actionId
-                                    + " move="
-                                    + moveId);
-        }
         Player player = plugin.getServer().getPlayer(actorId.value());
         if (player == null || !player.isOnline() || suppressesDurability(player)) {
             return;
@@ -73,6 +63,16 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
                 queuedActionIds.computeIfAbsent(player.getUniqueId(), ignored -> new HashSet<>());
         if (!actionIds.add(actionId)) {
             return;
+        }
+        if (Boolean.getBoolean("mmo.physical-primary-input-acceptance")) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_WEAPON_SUCCESS_OBSERVED_SERVER actor="
+                                    + actorId
+                                    + " action="
+                                    + actionId
+                                    + " move="
+                                    + moveId);
         }
         queuedByPlayer
                 .computeIfAbsent(player.getUniqueId(), ignored -> new ArrayDeque<>())

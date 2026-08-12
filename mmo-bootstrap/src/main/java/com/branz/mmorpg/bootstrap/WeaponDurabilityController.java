@@ -15,12 +15,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /** Bridges committed successful combat actions to authoritative physical-weapon durability wear. */
 final class WeaponDurabilityController implements SuccessfulCombatActionObserver {
     private static final DefinitionId TRAINING_BLADE = DefinitionId.of("weapon.training_blade");
+    private static final String BROKEN_COMBAT_MESSAGE =
+            "Combat not ready: equipped weapon is broken.";
 
     private final JavaPlugin plugin;
     private final CharacterSessionController characters;
@@ -177,12 +181,40 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
                                                                                         playerId);
                                                                 if (current != null
                                                                         && current.isOnline()) {
+                                                                    notifyIfBroken(
+                                                                            current,
+                                                                            pending,
+                                                                            completed);
                                                                     drain(current);
                                                                 } else {
                                                                     clearPlayer(playerId);
                                                                 }
                                                             }));
                         });
+    }
+
+    private void notifyIfBroken(
+            Player player,
+            PendingWear pending,
+            Result<LoadedCharacterSession, CharacterSessionErrorCode> completed) {
+        if (!(completed instanceof Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>
+                success)) {
+            return;
+        }
+        WeaponDurability state;
+        try {
+            state =
+                    durability.authoritativeState(
+                            success.value(),
+                            pending.weaponItemId(),
+                            pending.weaponDefinitionId(),
+                            pending.baseMaximumDurability());
+        } catch (IllegalArgumentException exception) {
+            return;
+        }
+        if (state.current() == 0) {
+            player.sendActionBar(Component.text(BROKEN_COMBAT_MESSAGE, NamedTextColor.RED));
+        }
     }
 
     private boolean suppressesDurability(Player player) {

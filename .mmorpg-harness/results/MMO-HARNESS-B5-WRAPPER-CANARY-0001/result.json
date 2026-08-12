@@ -1,0 +1,29 @@
+{
+  "action_exit_code": 0,
+  "action_id": "HARNESS_CANARY_V1",
+  "action_identity": "HARNESS_CANARY_V1",
+  "action_record": {
+    "head": "02c00dae85cf92c357ade9a4a0207e5fb5bfa9b9",
+    "missing": [],
+    "mmo_platform_detected": true,
+    "status": "PASS"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-HARNESS-B5-WRAPPER-CANARY-0001/**"
+  ],
+  "base_commit_expected": "02c00dae85cf92c357ade9a4a0207e5fb5bfa9b9",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "9d521e59a0d0e5b7ab732c902a4fd227f1a5e3aa",
+  "duration_seconds": 0.094,
+  "ending_commit_before_result_commit": "02c00dae85cf92c357ade9a4a0207e5fb5bfa9b9",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-12T21:30:15.618003+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-12T21:30:15.521070+00:00",
+  "starting_commit_actual": "02c00dae85cf92c357ade9a4a0207e5fb5bfa9b9",
+  "task_branch": "harness-task/MMO-HARNESS-B5-WRAPPER-CANARY-0001",
+  "task_id": "MMO-HARNESS-B5-WRAPPER-CANARY-0001",
+  "task_manifest_sha256": "72bc1c5111bf760e7868450ae3f799564b0d138205f3b7c00ebe3ab916de16d6",
+  "unauthorized_writes": []
+}

@@ -55,11 +55,16 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                                 client.player != null && !client.player.getMainHandItem().isEmpty(),
                         20 * 30);
                 System.out.println("PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT");
+                sendStatus(context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_BEFORE_CLIENT");
                 context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
                 System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
-                context.waitTicks(5);
+                context.waitTicks(60);
+                System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MISS_SETTLED_CLIENT");
+                sendStatus(context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_AFTER_CLIENT");
+                System.out.println("PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
+            } else {
+                sendStatus(context, "PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
             }
-            sendStatus(context, "PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
         }
 
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);

@@ -78,6 +78,8 @@ def install(core: Any) -> None:
             core.evaluate_primary_hit_log_checks = original_evaluator
             core.subprocess.Popen = original_popen
 
+    core.evaluate_broken_log_checks = evaluate_broken_log_checks
+    core.action_client_acceptance_primary_broken = action_client_acceptance_primary_broken
     core.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_PRIMARY_BROKEN_V1"] = core.ActionSpec(
         action_client_acceptance_primary_broken,
         "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_BROKEN",

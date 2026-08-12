@@ -17,7 +17,7 @@ import org.lwjgl.glfw.GLFW;
 /** Section B5: drive one real weapon to zero, then prove the next real PRIMARY is rejected. */
 final class PhysicalBrokenWeaponClientGameTest {
     private static final int SERVER_HANDSHAKE_LEVEL = 7;
-    private static final int BROKEN_TARGET_READY_LEVEL = 12;
+    private static final int BROKEN_TARGET_READY_LEVEL = 11;
     private static final int TRAINING_BLADE_MAXIMUM = 100;
     private static final float HIT_AIM_MAX_ABS_PITCH = 5.0F;
     private static final String BROKEN_MESSAGE = "Combat not ready: equipped weapon is broken.";
@@ -66,6 +66,7 @@ final class PhysicalBrokenWeaponClientGameTest {
         }
 
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
         System.out.println("PHYSICAL_AUTHORITY_PRIMARY_BROKEN_FIRST_MOUSE_SENT_CLIENT");
         context.waitTicks(80);
         String zeroLine =
@@ -90,9 +91,7 @@ final class PhysicalBrokenWeaponClientGameTest {
         int firstRetryMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
         System.out.println("PHYSICAL_AUTHORITY_PRIMARY_BROKEN_RETRY_MOUSE_SENT_CLIENT");
-        context.waitFor(
-                client -> brokenMessageSince(firstRetryMessage),
-                20 * 5);
+        context.waitFor(client -> brokenMessageSince(firstRetryMessage), 20 * 5);
         System.out.println("PHYSICAL_AUTHORITY_PRIMARY_BROKEN_REJECTION_MESSAGE_CLIENT");
         context.waitTicks(40);
 

@@ -1,0 +1,101 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_HOTBAR_MOVES",
+  "action_record": {
+    "action_status": "PASS",
+    "checks": {
+      "client_exit_zero": true,
+      "hotbar_durability_stable": true,
+      "hotbar_move1_mouse_client": true,
+      "hotbar_move2_mouse_client": true,
+      "hotbar_reconnect1_projected_client": true,
+      "hotbar_reconnect2_projected_client": true,
+      "hotbar_same_uuid": true,
+      "hotbar_sequence_complete_client": true,
+      "hotbar_server_commit_sequence": true,
+      "hotbar_slot_sequence": true,
+      "hotbar_snapshot_count": true,
+      "hotbar_stage_projected_server": true,
+      "hotbar_status_command_count_server": true,
+      "hotbar_version_sequence": true,
+      "server_exit_zero": true,
+      "server_handshake_client": true,
+      "status_command_logged_server": true,
+      "status_command_sent_client": true
+    },
+    "client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalHotbarAcceptance=true"
+    ],
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 92.828,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_HOTBAR_MOVES",
+    "hotbar_snapshots": [
+      {
+        "durability": 100,
+        "max_durability": 100,
+        "slot": 0,
+        "uuid": "2458a263-48cf-40d4-b19a-fdb6abec9332",
+        "version": 1
+      },
+      {
+        "durability": 100,
+        "max_durability": 100,
+        "slot": 7,
+        "uuid": "2458a263-48cf-40d4-b19a-fdb6abec9332",
+        "version": 2
+      },
+      {
+        "durability": 100,
+        "max_durability": 100,
+        "slot": 7,
+        "uuid": "2458a263-48cf-40d4-b19a-fdb6abec9332",
+        "version": 2
+      },
+      {
+        "durability": 100,
+        "max_durability": 100,
+        "slot": 6,
+        "uuid": "2458a263-48cf-40d4-b19a-fdb6abec9332",
+        "version": 3
+      },
+      {
+        "durability": 100,
+        "max_durability": 100,
+        "slot": 6,
+        "uuid": "2458a263-48cf-40d4-b19a-fdb6abec9332",
+        "version": 3
+      }
+    ],
+    "player_name": "Player0",
+    "server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalHotbarAcceptance=true"
+    ]
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-HOTBAR-B12-0007/**"
+  ],
+  "base_commit_expected": "8e0226bd696562df335c22b57f7711432ebbf230",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "21c5f027f1f33cab1730d9a4db52ad8777d7cd74",
+  "duration_seconds": 93.922,
+  "ending_commit_before_result_commit": "8e0226bd696562df335c22b57f7711432ebbf230",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-12T17:53:44.983145+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-12T17:52:11.064012+00:00",
+  "starting_commit_actual": "8e0226bd696562df335c22b57f7711432ebbf230",
+  "task_branch": "harness-task/MMO-PHYSICAL-HOTBAR-B12-0007",
+  "task_id": "MMO-PHYSICAL-HOTBAR-B12-0007",
+  "task_manifest_sha256": "89db3d5228e42ff98179179cb59d9c5b58eff6780591d77356b08e745cb78827",
+  "unauthorized_writes": []
+}

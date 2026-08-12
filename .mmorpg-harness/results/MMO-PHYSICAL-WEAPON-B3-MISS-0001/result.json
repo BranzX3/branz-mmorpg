@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT",
+  "action_record": {
+    "harness_error": "CLIENT_ACCEPTANCE_CLIENT_EXITED"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B3-MISS-0001/**"
+  ],
+  "base_commit_expected": "30a88b1fa25798ad5c7c34cda7363109e9a9048b",
+  "blocker_code": "CLIENT_ACCEPTANCE_CLIENT_EXITED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "4d475c2f667738e6034b6922a043c04dc019ce45",
+  "duration_seconds": 70.156,
+  "ending_commit_before_result_commit": "30a88b1fa25798ad5c7c34cda7363109e9a9048b",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-12T18:19:06.386043+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-12T18:17:56.232912+00:00",
+  "starting_commit_actual": "30a88b1fa25798ad5c7c34cda7363109e9a9048b",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B3-MISS-0001",
+  "task_id": "MMO-PHYSICAL-WEAPON-B3-MISS-0001",
+  "task_manifest_sha256": "7097564aee48e9b59bb4a3c68244b3b71ed42adfca7aa6d8bbe59c6bb35ab452",
+  "unauthorized_writes": []
+}

@@ -3,6 +3,8 @@ package com.branz.mmorpg.acceptance;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
@@ -20,6 +22,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
     private static final int PRIMARY_STAGE_HANDSHAKE_LEVEL = 8;
     private static final int HOTBAR_MOVE_ONE_HANDSHAKE_LEVEL = 9;
     private static final int HOTBAR_MOVE_TWO_HANDSHAKE_LEVEL = 10;
+    private static final int PRIMARY_HIT_TARGETS_READY_LEVEL = 11;
     private static final int INVENTORY_IMAGE_WIDTH = 176;
     private static final int INVENTORY_IMAGE_HEIGHT = 166;
     private static final int FIRST_GAMEPLAY_HOTBAR_SLOT = 0;
@@ -27,6 +30,10 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
     private static final double SLOT_HITBOX_SIZE = 16.0;
     private static final double SLOT_CENTER_OFFSET = SLOT_HITBOX_SIZE / 2.0;
     private static final float MISS_AIM_MAX_PITCH = -85.0F;
+    private static final float HIT_AIM_MAX_ABS_PITCH = 5.0F;
+    private static final Pattern TRAINING_BLADE_STATUS =
+            Pattern.compile(
+                    "^ITEM uuid=([0-9a-fA-F-]{36}) def=weapon\\.training_blade loc=([^ ]+) ver=(\\d+) durability=(\\d+)/(\\d+) tx=([0-9a-fA-F-]{36}) content=(\\S+)$");
     private static final List<String> RECEIVED_GAME_MESSAGES = new CopyOnWriteArrayList<>();
     private static final AtomicBoolean GAME_MESSAGE_LISTENER_REGISTERED = new AtomicBoolean();
 
@@ -37,6 +44,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         String address = System.getProperty("branz.acceptance.server", "localhost:25565");
         boolean primaryInputAcceptance =
                 Boolean.getBoolean("branz.acceptance.physicalPrimaryInput");
+        boolean primaryHitAcceptance = Boolean.getBoolean("branz.acceptance.physicalPrimaryHit");
         boolean hotbarAcceptance = Boolean.getBoolean("branz.acceptance.physicalHotbar");
         connect(context, address);
         context.waitFor(client -> client.level != null && client.player != null, 20 * 30);
@@ -51,47 +59,108 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
         if (hotbarAcceptance) {
             runHotbarAcceptance(context, address);
-        } else {
-            if (primaryInputAcceptance) {
-                context.waitFor(
-                        client ->
-                                client.player != null
-                                        && client.player.experienceLevel
-                                                == PRIMARY_STAGE_HANDSHAKE_LEVEL,
-                        20 * 30);
-                context.waitFor(
-                        client ->
-                                client.player != null && !client.player.getMainHandItem().isEmpty(),
-                        20 * 30);
-                System.out.println("PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT");
-                String before =
-                        sendStatusAndCaptureTrainingBlade(
-                                context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_BEFORE_CLIENT");
-                aimSkyForMiss(context);
-                context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-                System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
-                context.waitTicks(60);
-                System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MISS_SETTLED_CLIENT");
-                String after =
-                        sendStatusAndCaptureTrainingBlade(
-                                context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_AFTER_CLIENT");
-                if (!before.equals(after)) {
-                    throw new AssertionError(
-                            "Authoritative Training Blade changed across deterministic miss: before="
-                                    + before
-                                    + " after="
-                                    + after);
-                }
-                System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MISS_AUTHORITY_STABLE_CLIENT");
-                System.out.println("PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
+        } else if (primaryInputAcceptance) {
+            context.waitFor(
+                    client ->
+                            client.player != null
+                                    && client.player.experienceLevel
+                                            == PRIMARY_STAGE_HANDSHAKE_LEVEL,
+                    20 * 30);
+            context.waitFor(
+                    client -> client.player != null && !client.player.getMainHandItem().isEmpty(),
+                    20 * 30);
+            System.out.println("PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT");
+            if (primaryHitAcceptance) {
+                runPrimaryHitAcceptance(context);
             } else {
-                sendStatus(context, "PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
+                runPrimaryMissAcceptance(context);
             }
+        } else {
+            sendStatus(context, "PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
         }
 
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);
         context.setScreen(TitleScreen::new);
         context.waitForScreen(TitleScreen.class);
+    }
+
+    private static void runPrimaryMissAcceptance(ClientGameTestContext context) {
+        String before =
+                sendStatusAndCaptureTrainingBlade(
+                        context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_BEFORE_CLIENT");
+        aimSkyForMiss(context);
+        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
+        context.waitTicks(60);
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MISS_SETTLED_CLIENT");
+        String after =
+                sendStatusAndCaptureTrainingBlade(
+                        context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_AFTER_CLIENT");
+        if (!before.equals(after)) {
+            throw new AssertionError(
+                    "Authoritative Training Blade changed across deterministic miss: before="
+                            + before
+                            + " after="
+                            + after);
+        }
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MISS_AUTHORITY_STABLE_CLIENT");
+        System.out.println("PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
+    }
+
+    private static void runPrimaryHitAcceptance(ClientGameTestContext context) {
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player.experienceLevel == PRIMARY_HIT_TARGETS_READY_LEVEL,
+                20 * 30);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && Math.abs(client.player.getXRot()) <= HIT_AIM_MAX_ABS_PITCH,
+                20 * 5);
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_HIT_TARGETS_READY_CLIENT");
+        ItemAuthority before =
+                parseTrainingBladeStatus(
+                        sendStatusAndCaptureTrainingBlade(
+                                context, "PHYSICAL_AUTHORITY_PRIMARY_HIT_STATUS_BEFORE_CLIENT"));
+        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
+        context.waitTicks(80);
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_HIT_SETTLED_CLIENT");
+        ItemAuthority after =
+                parseTrainingBladeStatus(
+                        sendStatusAndCaptureTrainingBlade(
+                                context, "PHYSICAL_AUTHORITY_PRIMARY_HIT_STATUS_AFTER_CLIENT"));
+        if (!before.uuid().equals(after.uuid())
+                || !before.location().equals(after.location())
+                || !before.contentVersion().equals(after.contentVersion())
+                || before.maximumDurability() != after.maximumDurability()
+                || after.version() != before.version() + 1
+                || after.currentDurability() != before.currentDurability() - 1
+                || before.transactionId().equals(after.transactionId())) {
+            throw new AssertionError(
+                    "Authoritative Training Blade did not wear exactly once after successful hit: before="
+                            + before
+                            + " after="
+                            + after);
+        }
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_HIT_AUTHORITY_WORN_ONCE_CLIENT");
+        System.out.println("PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
+    }
+
+    private static ItemAuthority parseTrainingBladeStatus(String status) {
+        Matcher match = TRAINING_BLADE_STATUS.matcher(status);
+        if (!match.matches()) {
+            throw new AssertionError("Unexpected Training Blade authority status: " + status);
+        }
+        return new ItemAuthority(
+                match.group(1).toLowerCase(),
+                match.group(2),
+                Integer.parseInt(match.group(3)),
+                Integer.parseInt(match.group(4)),
+                Integer.parseInt(match.group(5)),
+                match.group(6).toLowerCase(),
+                match.group(7));
     }
 
     private static void registerGameMessageCapture() {
@@ -110,9 +179,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.getInput().typeChars("/mmo physical status");
         context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
         context.waitFor(client -> client.gui.screen() == null, 20 * 5);
-        context.waitFor(
-                client -> trainingBladeStatusSince(firstNewMessage) != null,
-                20 * 5);
+        context.waitFor(client -> trainingBladeStatusSince(firstNewMessage) != null, 20 * 5);
         String status = trainingBladeStatusSince(firstNewMessage);
         if (status == null) {
             throw new AssertionError("Training Blade authority status disappeared after capture wait");
@@ -261,8 +328,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                             || client.player == null) {
                         return false;
                     }
-                    Slot source =
-                            findHotbarSlot(screen, client.player.getInventory(), sourceSlot);
+                    Slot source = findHotbarSlot(screen, client.player.getInventory(), sourceSlot);
                     return source.getItem().isEmpty() && !screen.getMenu().getCarried().isEmpty();
                 },
                 20 * 5);
@@ -305,8 +371,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                         if (slot == sourceSlot) {
                             continue;
                         }
-                        Slot candidate =
-                                findHotbarSlot(screen, client.player.getInventory(), slot);
+                        Slot candidate = findHotbarSlot(screen, client.player.getInventory(), slot);
                         if (candidate.getItem().isEmpty()) {
                             return slot;
                         }
@@ -338,9 +403,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                                 throw new AssertionError(
                                         "InventoryScreen and player must be present for hotbar input");
                             }
-                            Slot slot =
-                                    findHotbarSlot(
-                                            screen, client.player.getInventory(), hotbarSlot);
+                            Slot slot = findHotbarSlot(screen, client.player.getInventory(), hotbarSlot);
                             double guiWidth = client.getWindow().getGuiScaledWidth();
                             double guiHeight = client.getWindow().getGuiScaledHeight();
                             double screenWidth = client.getWindow().getScreenWidth();
@@ -453,4 +516,13 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                             null);
                 });
     }
+
+    private record ItemAuthority(
+            String uuid,
+            String location,
+            int version,
+            int currentDurability,
+            int maximumDurability,
+            String transactionId,
+            String contentVersion) {}
 }

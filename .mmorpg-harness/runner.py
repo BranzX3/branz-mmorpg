@@ -443,11 +443,27 @@ def evaluate_hotbar_move_sequence(
     }
 
 
+def evaluate_primary_hit_log_checks(client_text: str, paper_text: str) -> dict[str, bool]:
+    return {
+        "primary_hit_targets_ready_client": "PHYSICAL_AUTHORITY_PRIMARY_HIT_TARGETS_READY_CLIENT" in client_text,
+        "primary_hit_status_before_client": "PHYSICAL_AUTHORITY_PRIMARY_HIT_STATUS_BEFORE_CLIENT" in client_text,
+        "primary_hit_settled_client": "PHYSICAL_AUTHORITY_PRIMARY_HIT_SETTLED_CLIENT" in client_text,
+        "primary_hit_status_after_client": "PHYSICAL_AUTHORITY_PRIMARY_HIT_STATUS_AFTER_CLIENT" in client_text,
+        "primary_hit_authority_worn_once_client": "PHYSICAL_AUTHORITY_PRIMARY_HIT_AUTHORITY_WORN_ONCE_CLIENT" in client_text,
+        "primary_hit_target_a_staged_server": "PHYSICAL_AUTHORITY_B4_TARGET_A_STAGED_SERVER" in paper_text,
+        "primary_hit_target_b_staged_server": "PHYSICAL_AUTHORITY_B4_TARGET_B_STAGED_SERVER" in paper_text,
+        "primary_hit_target_a_changed_server": "PHYSICAL_AUTHORITY_B4_TARGET_A_CHANGED_SERVER" in paper_text,
+        "primary_hit_target_b_changed_server": "PHYSICAL_AUTHORITY_B4_TARGET_B_CHANGED_SERVER" in paper_text,
+        "primary_hit_success_observer_once_server": paper_text.count("PHYSICAL_AUTHORITY_WEAPON_SUCCESS_OBSERVED_SERVER") == 1,
+    }
+
+
 def action_client_acceptance_ingress(
     repo: Path,
     result_dir: Path,
     manifest: dict[str, Any],
     require_primary_input: bool = False,
+    require_primary_hit: bool = False,
     require_hotbar_moves: bool = False,
 ) -> tuple[int, str, str, dict[str, Any]]:
     import re
@@ -508,6 +524,8 @@ def action_client_acceptance_ingress(
     ]
     if require_primary_input:
         client_argv.append("-PphysicalPrimaryInputAcceptance=true")
+    if require_primary_hit:
+        client_argv.append("-PphysicalPrimaryHitAcceptance=true")
     if require_hotbar_moves:
         client_argv.append("-PphysicalHotbarAcceptance=true")
 
@@ -594,6 +612,57 @@ def action_client_acceptance_ingress(
                 server.stdin.write(f"experience set {player_name} 7 levels\n")
                 server.stdin.flush()
 
+                if require_primary_hit:
+                    stage_deadline = time.monotonic() + 30
+                    while time.monotonic() < stage_deadline:
+                        if "PHYSICAL_AUTHORITY_PRIMARY_STAGE_PROJECTED_SERVER" in read_log(paper_log):
+                            break
+                        if client.poll() is not None:
+                            raise HarnessError(
+                                "CLIENT_ACCEPTANCE_CLIENT_EXITED", f"exit={client.returncode}"
+                            )
+                        time.sleep(0.25)
+                    else:
+                        raise HarnessError(
+                            "CLIENT_ACCEPTANCE_PRIMARY_STAGE_TIMEOUT",
+                            "authoritative primary stage projection marker missing",
+                        )
+                    server.stdin.write(
+                        f"execute as {player_name} at @s run tp @s ~ ~ ~ 0 0\n"
+                    )
+                    server.stdin.write(
+                        f'execute as {player_name} at @s run summon minecraft:iron_golem ^-0.45 ^ ^2 '
+                        '{NoAI:1b,NoGravity:1b,Silent:1b,PersistenceRequired:1b,Tags:["branz_b4_target_a"]}\n'
+                    )
+                    server.stdin.write(
+                        f'execute as {player_name} at @s run summon minecraft:iron_golem ^0.45 ^ ^2 '
+                        '{NoAI:1b,NoGravity:1b,Silent:1b,PersistenceRequired:1b,Tags:["branz_b4_target_b"]}\n'
+                    )
+                    server.stdin.write(
+                        'execute if entity @e[tag=branz_b4_target_a,limit=1] run say '
+                        'PHYSICAL_AUTHORITY_B4_TARGET_A_STAGED_SERVER\n'
+                    )
+                    server.stdin.write(
+                        'execute if entity @e[tag=branz_b4_target_b,limit=1] run say '
+                        'PHYSICAL_AUTHORITY_B4_TARGET_B_STAGED_SERVER\n'
+                    )
+                    server.stdin.write(f"experience set {player_name} 11 levels\n")
+                    server.stdin.flush()
+                    targets_deadline = time.monotonic() + 10
+                    while time.monotonic() < targets_deadline:
+                        staged_text = read_log(paper_log)
+                        if (
+                            "PHYSICAL_AUTHORITY_B4_TARGET_A_STAGED_SERVER" in staged_text
+                            and "PHYSICAL_AUTHORITY_B4_TARGET_B_STAGED_SERVER" in staged_text
+                        ):
+                            break
+                        time.sleep(0.25)
+                    else:
+                        raise HarnessError(
+                            "CLIENT_ACCEPTANCE_PRIMARY_TARGET_STAGE_TIMEOUT",
+                            "B4 target staging markers missing",
+                        )
+
                 completion_marker = (
                     "PHYSICAL_AUTHORITY_HOTBAR_SEQUENCE_COMPLETE_CLIENT"
                     if require_hotbar_moves
@@ -627,6 +696,31 @@ def action_client_acceptance_ingress(
                         "CLIENT_ACCEPTANCE_COMMAND_NOT_LOGGED",
                         "Paper did not log status command",
                     )
+
+                if require_primary_hit:
+                    server.stdin.write(
+                        'execute unless entity @e[tag=branz_b4_target_a,limit=1,nbt={Health:100.0f}] run say '
+                        'PHYSICAL_AUTHORITY_B4_TARGET_A_CHANGED_SERVER\n'
+                    )
+                    server.stdin.write(
+                        'execute unless entity @e[tag=branz_b4_target_b,limit=1,nbt={Health:100.0f}] run say '
+                        'PHYSICAL_AUTHORITY_B4_TARGET_B_CHANGED_SERVER\n'
+                    )
+                    server.stdin.flush()
+                    changed_deadline = time.monotonic() + 10
+                    while time.monotonic() < changed_deadline:
+                        changed_text = read_log(paper_log)
+                        if (
+                            "PHYSICAL_AUTHORITY_B4_TARGET_A_CHANGED_SERVER" in changed_text
+                            and "PHYSICAL_AUTHORITY_B4_TARGET_B_CHANGED_SERVER" in changed_text
+                        ):
+                            break
+                        time.sleep(0.25)
+                    else:
+                        raise HarnessError(
+                            "CLIENT_ACCEPTANCE_PRIMARY_TARGET_HIT_TIMEOUT",
+                            "both B4 targets did not show canonical health change",
+                        )
 
                 server.stdin.write("stop\n")
                 server.stdin.flush()
@@ -671,6 +765,8 @@ def action_client_acceptance_ingress(
                     in paper_text,
                 }
             )
+        if require_primary_hit:
+            checks.update(evaluate_primary_hit_log_checks(client_text, paper_text))
         hotbar_snapshots: list[dict[str, Any]] = []
         if require_hotbar_moves:
             item_pattern = re.compile(
@@ -727,9 +823,13 @@ def action_client_acceptance_ingress(
                     "PHYSICAL_CLIENT_ACCEPTANCE_HOTBAR_MOVES"
                     if require_hotbar_moves
                     else (
-                        "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT"
-                        if require_primary_input
-                        else "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS"
+                        "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_HIT"
+                        if require_primary_hit
+                        else (
+                            "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT"
+                            if require_primary_input
+                            else "PHYSICAL_CLIENT_ACCEPTANCE_INGRESS"
+                        )
                     )
                 ),
                 "server_argv": server_argv,
@@ -758,6 +858,18 @@ def action_client_acceptance_primary_input(
 ) -> tuple[int, str, str, dict[str, Any]]:
     return action_client_acceptance_ingress(
         repo, result_dir, manifest, require_primary_input=True
+    )
+
+
+def action_client_acceptance_primary_hit(
+    repo: Path, result_dir: Path, manifest: dict[str, Any]
+) -> tuple[int, str, str, dict[str, Any]]:
+    return action_client_acceptance_ingress(
+        repo,
+        result_dir,
+        manifest,
+        require_primary_input=True,
+        require_primary_hit=True,
     )
 
 
@@ -870,6 +982,9 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     ),
     "MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1": ActionSpec(
         action_client_acceptance_primary_input, "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT"
+    ),
+    "MMO_CLIENT_ACCEPTANCE_PRIMARY_HIT_V1": ActionSpec(
+        action_client_acceptance_primary_hit, "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_HIT"
     ),
     "MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1": ActionSpec(
         action_client_acceptance_hotbar_moves, "PHYSICAL_CLIENT_ACCEPTANCE_HOTBAR_MOVES"

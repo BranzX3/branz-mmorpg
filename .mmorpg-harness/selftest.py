@@ -61,6 +61,30 @@ def main() -> int:
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_INGRESS_V1"].handler is R.action_client_acceptance_ingress
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_INPUT"
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1"].handler is R.action_client_acceptance_primary_input
+    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_PRIMARY_HIT_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_HIT"
+    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_PRIMARY_HIT_V1"].handler is R.action_client_acceptance_primary_hit
+    hit_client = "\n".join([
+        "PHYSICAL_AUTHORITY_PRIMARY_HIT_TARGETS_READY_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_HIT_STATUS_BEFORE_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_HIT_SETTLED_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_HIT_STATUS_AFTER_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_HIT_AUTHORITY_WORN_ONCE_CLIENT",
+    ])
+    hit_paper = "\n".join([
+        "PHYSICAL_AUTHORITY_B4_TARGET_A_STAGED_SERVER",
+        "PHYSICAL_AUTHORITY_B4_TARGET_B_STAGED_SERVER",
+        "PHYSICAL_AUTHORITY_B4_TARGET_A_CHANGED_SERVER",
+        "PHYSICAL_AUTHORITY_B4_TARGET_B_CHANGED_SERVER",
+        "PHYSICAL_AUTHORITY_WEAPON_SUCCESS_OBSERVED_SERVER actor=x action=a move=m",
+    ])
+    assert all(R.evaluate_primary_hit_log_checks(hit_client, hit_paper).values())
+    duplicate_success = hit_paper + "\nPHYSICAL_AUTHORITY_WEAPON_SUCCESS_OBSERVED_SERVER actor=x action=a move=m"
+    assert not R.evaluate_primary_hit_log_checks(hit_client, duplicate_success)[
+        "primary_hit_success_observer_once_server"
+    ]
+    assert not R.evaluate_primary_hit_log_checks(hit_client, hit_paper.replace(
+        "PHYSICAL_AUTHORITY_B4_TARGET_B_CHANGED_SERVER", ""
+    ))["primary_hit_target_b_changed_server"]
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_HOTBAR_MOVES"
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1"].handler is R.action_client_acceptance_hotbar_moves
 

@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-WEAPON-B5-BROKEN-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B5-BROKEN-0001",
+  "base_commit": "02c00dae85cf92c357ade9a4a0207e5fb5bfa9b9",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_BROKEN_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B5-BROKEN-0001/**"
+  ]
+}

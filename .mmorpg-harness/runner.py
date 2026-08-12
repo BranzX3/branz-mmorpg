@@ -627,7 +627,9 @@ def action_client_acceptance_ingress(
                             "CLIENT_ACCEPTANCE_PRIMARY_STAGE_TIMEOUT",
                             "authoritative primary stage projection marker missing",
                         )
-                    server.stdin.write(f"tp {player_name} ~ ~ ~ 0 0\n")
+                    server.stdin.write(
+                        f"execute as {player_name} at @s run tp @s ~ ~ ~ 0 0\n"
+                    )
                     server.stdin.write(
                         f'execute as {player_name} at @s run summon minecraft:iron_golem ^-0.45 ^ ^2 '
                         '{NoAI:1b,NoGravity:1b,Silent:1b,PersistenceRequired:1b,Tags:["branz_b4_target_a"]}\n'

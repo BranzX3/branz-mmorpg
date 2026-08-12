@@ -35,6 +35,9 @@ tasks.withType(JavaExec).configureEach {
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalPrimaryBrokenAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalPrimaryBroken', 'true'
     }
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalChronicleSlotAcceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalChronicleSlot', 'true'
+    }
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalHotbarAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalHotbar', 'true'
     }

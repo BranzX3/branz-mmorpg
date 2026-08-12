@@ -133,7 +133,14 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
     }
 
     private static void aimSkyForMiss(ClientGameTestContext context) {
-        context.getInput().moveCursor(0.0, -10000.0);
+        context.runOnClient(
+                client -> {
+                    if (client.player == null) {
+                        throw new AssertionError("Player disappeared while staging miss aim");
+                    }
+                    client.player.setXRot(-90.0F);
+                });
+        context.waitTicks(2);
         context.waitFor(
                 client -> client.player != null && client.player.getXRot() <= MISS_AIM_MAX_PITCH,
                 20 * 5);
@@ -141,7 +148,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                 context.computeOnClient(
                         client -> {
                             if (client.player == null) {
-                                throw new AssertionError("Player disappeared while staging miss aim");
+                                throw new AssertionError("Player disappeared while verifying miss aim");
                             }
                             return client.player.getXRot();
                         });

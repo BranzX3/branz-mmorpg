@@ -6,7 +6,7 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
-      "com.branz.mmorpg.acceptance.PhysicalAuthorityClientGameTest"
+      "com.branz.mmorpg.acceptance.PhysicalAuthorityClientGameTestDispatcher"
     ]
   },
   "depends": {

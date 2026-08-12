@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stable harness wrapper: byte-preserved core plus reviewed capability extensions."""
+"""Stable harness wrapper for the reviewed core and B5 extension."""
 from __future__ import annotations
 
 import subprocess as _bootstrap_subprocess
@@ -15,7 +15,7 @@ def _worker_repo() -> _BootstrapPath:
     for candidate in (cwd, cwd.parent / "repo"):
         if (candidate / ".git").exists():
             return candidate
-    raise RuntimeError("MMORPG harness worker repository is unavailable to runner wrapper")
+    raise RuntimeError("MMORPG harness worker repository is unavailable")
 
 
 def _load_control_module(name: str, relative_path: str):
@@ -31,10 +31,7 @@ def _load_control_module(name: str, relative_path: str):
         check=False,
     )
     if loaded.returncode != 0:
-        raise RuntimeError(
-            f"Could not load reviewed harness module {relative_path} from {_CONTROL_BRANCH}: "
-            + loaded.stderr.strip()
-        )
+        raise RuntimeError(f"Could not load reviewed harness module {relative_path}: {loaded.stderr.strip()}")
     module = _bootstrap_types.ModuleType(name)
     module.__file__ = str(repo / relative_path)
     _bootstrap_sys.modules[name] = module
@@ -43,6 +40,7 @@ def _load_control_module(name: str, relative_path: str):
 
 
 _runner_core = _load_control_module("runner_core", ".mmorpg-harness/runner_core.py")
+_runner_core.__file__ = __file__
 _runner_b5 = _load_control_module("runner_b5", ".mmorpg-harness/runner_b5.py")
 _runner_b5.install(_runner_core)
 

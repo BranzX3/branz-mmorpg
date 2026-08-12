@@ -213,7 +213,9 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
             return;
         }
         if (state.current() == 0) {
-            player.sendActionBar(Component.text(BROKEN_COMBAT_MESSAGE, NamedTextColor.RED));
+            Component message = Component.text(BROKEN_COMBAT_MESSAGE, NamedTextColor.RED);
+            player.sendActionBar(message);
+            player.sendMessage(message);
         }
     }
 

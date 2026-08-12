@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_BROKEN_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_BROKEN",
+  "action_record": {
+    "harness_error": "CLIENT_ACCEPTANCE_CLIENT_EXITED"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B5-BROKEN-0002/**"
+  ],
+  "base_commit_expected": "a53aff2778ac119099a5985c681aa2b74ccdd953",
+  "blocker_code": "CLIENT_ACCEPTANCE_CLIENT_EXITED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "b79958ea11a71b74af9e3fabbf82eac63dd34aa9",
+  "duration_seconds": 70.203,
+  "ending_commit_before_result_commit": "a53aff2778ac119099a5985c681aa2b74ccdd953",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-12T21:49:25.802190+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-12T21:48:15.598733+00:00",
+  "starting_commit_actual": "a53aff2778ac119099a5985c681aa2b74ccdd953",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B5-BROKEN-0002",
+  "task_id": "MMO-PHYSICAL-WEAPON-B5-BROKEN-0002",
+  "task_manifest_sha256": "6d0bf7b41212ea2745c1920700c9b53b87d2a08e92501bdccbfee5bac80596fa",
+  "unauthorized_writes": []
+}

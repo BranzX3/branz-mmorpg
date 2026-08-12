@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-WEAPON-B3-MISS-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B3-MISS-0001",
+  "base_commit": "30a88b1fa25798ad5c7c34cda7363109e9a9048b",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_INPUT_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B3-MISS-0001/**"
+  ]
+}

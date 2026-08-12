@@ -85,6 +85,40 @@ def main() -> int:
     assert not R.evaluate_primary_hit_log_checks(hit_client, hit_paper.replace(
         "PHYSICAL_AUTHORITY_B4_TARGET_B_CHANGED_SERVER", ""
     ))["primary_hit_target_b_changed_server"]
+
+    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_PRIMARY_BROKEN_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_BROKEN"
+    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_PRIMARY_BROKEN_V1"].handler is R.action_client_acceptance_primary_broken
+    broken_client = "\n".join([
+        "PHYSICAL_AUTHORITY_PRIMARY_BROKEN_TARGET_READY_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_BROKEN_STATUS_BEFORE_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_BROKEN_FIRST_MOUSE_SENT_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_BROKEN_ZERO_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_BROKEN_RETRY_MOUSE_SENT_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_BROKEN_REJECTION_MESSAGE_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_BROKEN_STATUS_AFTER_REJECT_CLIENT",
+        "PHYSICAL_AUTHORITY_PRIMARY_BROKEN_REJECTED_STABLE_CLIENT",
+    ])
+    broken_paper = "\n".join([
+        "PHYSICAL_AUTHORITY_B4_TARGET_A_STAGED_SERVER",
+        "PHYSICAL_AUTHORITY_B4_TARGET_B_STAGED_SERVER",
+        "PHYSICAL_AUTHORITY_B4_TARGET_A_CHANGED_SERVER",
+        "PHYSICAL_AUTHORITY_B4_TARGET_B_CHANGED_SERVER",
+        "PHYSICAL_AUTHORITY_ARM_SWING_SERVER player=Player0",
+        "PHYSICAL_AUTHORITY_PRIMARY_ROUTED_SERVER player=Player0",
+        "PHYSICAL_AUTHORITY_WEAPON_SUCCESS_OBSERVED_SERVER actor=x action=a move=m",
+        "PHYSICAL_AUTHORITY_BROKEN_ACCELERATED_WEAR_SERVER action=a cost=100",
+        "PHYSICAL_AUTHORITY_ARM_SWING_SERVER player=Player0",
+    ])
+    assert all(R.evaluate_broken_log_checks(broken_client, broken_paper).values())
+    duplicate_route = broken_paper + "\nPHYSICAL_AUTHORITY_PRIMARY_ROUTED_SERVER player=Player0"
+    assert not R.evaluate_broken_log_checks(broken_client, duplicate_route)[
+        "primary_broken_routed_once_server"
+    ]
+    assert not R.evaluate_broken_log_checks(
+        broken_client.replace("PHYSICAL_AUTHORITY_PRIMARY_BROKEN_REJECTION_MESSAGE_CLIENT", ""),
+        broken_paper,
+    )["primary_broken_rejection_message_client"]
+
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_HOTBAR_MOVES"
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1"].handler is R.action_client_acceptance_hotbar_moves
 

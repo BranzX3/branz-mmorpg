@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-HARNESS-B5-WRAPPER-CANARY-0001",
+  "task_branch": "harness-task/MMO-HARNESS-B5-WRAPPER-CANARY-0001",
+  "base_commit": "02c00dae85cf92c357ade9a4a0207e5fb5bfa9b9",
+  "action_id": "HARNESS_CANARY_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-HARNESS-B5-WRAPPER-CANARY-0001/**"
+  ]
+}

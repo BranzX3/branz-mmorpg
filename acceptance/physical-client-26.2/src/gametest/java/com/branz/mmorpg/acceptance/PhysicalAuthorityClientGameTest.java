@@ -1,7 +1,11 @@
 package com.branz.mmorpg.acceptance;
 
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -23,9 +27,13 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
     private static final double SLOT_HITBOX_SIZE = 16.0;
     private static final double SLOT_CENTER_OFFSET = SLOT_HITBOX_SIZE / 2.0;
     private static final float MISS_AIM_MAX_PITCH = -85.0F;
+    private static final List<String> RECEIVED_GAME_MESSAGES = new CopyOnWriteArrayList<>();
+    private static final AtomicBoolean GAME_MESSAGE_LISTENER_REGISTERED = new AtomicBoolean();
 
     @Override
     public void runTest(ClientGameTestContext context) {
+        registerGameMessageCapture();
+        RECEIVED_GAME_MESSAGES.clear();
         String address = System.getProperty("branz.acceptance.server", "localhost:25565");
         boolean primaryInputAcceptance =
                 Boolean.getBoolean("branz.acceptance.physicalPrimaryInput");
@@ -56,13 +64,25 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                                 client.player != null && !client.player.getMainHandItem().isEmpty(),
                         20 * 30);
                 System.out.println("PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT");
-                sendStatus(context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_BEFORE_CLIENT");
+                String before =
+                        sendStatusAndCaptureTrainingBlade(
+                                context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_BEFORE_CLIENT");
                 aimSkyForMiss(context);
                 context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
                 System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
                 context.waitTicks(60);
                 System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MISS_SETTLED_CLIENT");
-                sendStatus(context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_AFTER_CLIENT");
+                String after =
+                        sendStatusAndCaptureTrainingBlade(
+                                context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_AFTER_CLIENT");
+                if (!before.equals(after)) {
+                    throw new AssertionError(
+                            "Authoritative Training Blade changed across deterministic miss: before="
+                                    + before
+                                    + " after="
+                                    + after);
+                }
+                System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MISS_AUTHORITY_STABLE_CLIENT");
                 System.out.println("PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
             } else {
                 sendStatus(context, "PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
@@ -72,6 +92,44 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);
         context.setScreen(TitleScreen::new);
         context.waitForScreen(TitleScreen.class);
+    }
+
+    private static void registerGameMessageCapture() {
+        if (!GAME_MESSAGE_LISTENER_REGISTERED.compareAndSet(false, true)) {
+            return;
+        }
+        ClientReceiveMessageEvents.GAME.register(
+                (message, overlay) -> RECEIVED_GAME_MESSAGES.add(message.getString()));
+    }
+
+    private static String sendStatusAndCaptureTrainingBlade(
+            ClientGameTestContext context, String marker) {
+        int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
+        context.getInput().pressKey(options -> options.keyChat);
+        context.waitFor(client -> client.gui.screen() instanceof ChatScreen, 20 * 5);
+        context.getInput().typeChars("/mmo physical status");
+        context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
+        context.waitFor(client -> client.gui.screen() == null, 20 * 5);
+        context.waitFor(
+                client -> trainingBladeStatusSince(firstNewMessage) != null,
+                20 * 5);
+        String status = trainingBladeStatusSince(firstNewMessage);
+        if (status == null) {
+            throw new AssertionError("Training Blade authority status disappeared after capture wait");
+        }
+        System.out.println(marker);
+        return status;
+    }
+
+    private static String trainingBladeStatusSince(int firstMessage) {
+        for (int index = RECEIVED_GAME_MESSAGES.size() - 1; index >= firstMessage; index--) {
+            String message = RECEIVED_GAME_MESSAGES.get(index);
+            if (message.startsWith("ITEM uuid=")
+                    && message.contains(" def=weapon.training_blade ")) {
+                return message;
+            }
+        }
+        return null;
     }
 
     private static void aimSkyForMiss(ClientGameTestContext context) {

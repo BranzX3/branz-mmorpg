@@ -17,6 +17,7 @@ import org.lwjgl.glfw.GLFW;
 /** Section B5: drive one real weapon to zero, then prove the next real PRIMARY is rejected. */
 final class PhysicalBrokenWeaponClientGameTest {
     private static final int SERVER_HANDSHAKE_LEVEL = 7;
+    private static final int PRIMARY_STAGE_HANDSHAKE_LEVEL = 8;
     private static final int BROKEN_TARGET_READY_LEVEL = 11;
     private static final int TRAINING_BLADE_MAXIMUM = 100;
     private static final float HIT_AIM_MAX_ABS_PITCH = 5.0F;
@@ -41,6 +42,14 @@ final class PhysicalBrokenWeaponClientGameTest {
         System.out.println("PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT");
         context.waitFor(client -> client.gui.screen() == null, 20 * 30);
         System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
+
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player.experienceLevel == PRIMARY_STAGE_HANDSHAKE_LEVEL
+                                && !client.player.getMainHandItem().isEmpty(),
+                20 * 30);
+        System.out.println("PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT");
 
         context.waitFor(
                 client ->

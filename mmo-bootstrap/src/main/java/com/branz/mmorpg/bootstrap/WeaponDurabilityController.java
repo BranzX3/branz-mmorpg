@@ -182,7 +182,8 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
                                                                 if (current != null
                                                                         && current.isOnline()) {
                                                                     notifyIfBroken(
-                                                                            current, pending, completed);
+                                                                            current, pending,
+                                                                            completed);
                                                                     drain(current);
                                                                 } else {
                                                                     clearPlayer(playerId);

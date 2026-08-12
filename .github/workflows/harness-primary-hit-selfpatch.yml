@@ -4,13 +4,15 @@ on:
   push:
     branches:
       - harness-feature/physical-primary-hit-v1
+    paths:
+      - '.github/workflows/harness-primary-hit-selfpatch.yml'
+      - '.mmorpg-harness/patch_primary_hit_v1.py'
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.event.head_commit.message == 'Harness self-patch: activate physical primary hit v1'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

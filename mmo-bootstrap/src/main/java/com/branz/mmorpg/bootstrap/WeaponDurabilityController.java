@@ -182,9 +182,7 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
                                                                 if (current != null
                                                                         && current.isOnline()) {
                                                                     notifyIfBroken(
-                                                                            current,
-                                                                            pending,
-                                                                            completed);
+                                                                            current, pending, completed);
                                                                     drain(current);
                                                                 } else {
                                                                     clearPlayer(playerId);
@@ -197,8 +195,9 @@ final class WeaponDurabilityController implements SuccessfulCombatActionObserver
             Player player,
             PendingWear pending,
             Result<LoadedCharacterSession, CharacterSessionErrorCode> completed) {
-        if (!(completed instanceof Result.Success<LoadedCharacterSession, CharacterSessionErrorCode>
-                success)) {
+        if (!(completed
+                instanceof
+                Result.Success<LoadedCharacterSession, CharacterSessionErrorCode> success)) {
             return;
         }
         WeaponDurability state;

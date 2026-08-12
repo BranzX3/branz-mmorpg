@@ -65,6 +65,11 @@ tasks.runServer {
     if (physicalPrimaryInputAcceptance) {
         jvmArgs("-Dmmo.physical-primary-input-acceptance=true")
     }
+    val physicalPrimaryBrokenAcceptance =
+        providers.gradleProperty("physicalPrimaryBrokenAcceptance").orNull == "true"
+    if (physicalPrimaryBrokenAcceptance) {
+        jvmArgs("-Dmmo.physical-broken-acceptance=true")
+    }
     val physicalHotbarAcceptance =
         providers.gradleProperty("physicalHotbarAcceptance").orNull == "true"
     if (physicalHotbarAcceptance) {

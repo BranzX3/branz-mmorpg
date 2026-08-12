@@ -22,6 +22,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
     private static final int LAST_GAMEPLAY_HOTBAR_SLOT = 7;
     private static final double SLOT_HITBOX_SIZE = 16.0;
     private static final double SLOT_CENTER_OFFSET = SLOT_HITBOX_SIZE / 2.0;
+    private static final float MISS_AIM_MAX_PITCH = -85.0F;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -56,6 +57,7 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
                         20 * 30);
                 System.out.println("PHYSICAL_AUTHORITY_PRIMARY_PROJECTION_READY_CLIENT");
                 sendStatus(context, "PHYSICAL_AUTHORITY_PRIMARY_MISS_STATUS_BEFORE_CLIENT");
+                aimSkyForMiss(context);
                 context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
                 System.out.println("PHYSICAL_AUTHORITY_PRIMARY_MOUSE_SENT_CLIENT");
                 context.waitTicks(60);
@@ -70,6 +72,22 @@ public final class PhysicalAuthorityClientGameTest implements FabricClientGameTe
         context.waitFor(client -> client.level == null && client.player == null, 20 * 30);
         context.setScreen(TitleScreen::new);
         context.waitForScreen(TitleScreen.class);
+    }
+
+    private static void aimSkyForMiss(ClientGameTestContext context) {
+        context.getInput().moveCursor(0.0, -10000.0);
+        context.waitFor(
+                client -> client.player != null && client.player.getXRot() <= MISS_AIM_MAX_PITCH,
+                20 * 5);
+        float pitch =
+                context.computeOnClient(
+                        client -> {
+                            if (client.player == null) {
+                                throw new AssertionError("Player disappeared while staging miss aim");
+                            }
+                            return client.player.getXRot();
+                        });
+        System.out.printf("PHYSICAL_AUTHORITY_PRIMARY_MISS_AIM_SKY_CLIENT pitch=%.2f%n", pitch);
     }
 
     private static void runHotbarAcceptance(ClientGameTestContext context, String address) {

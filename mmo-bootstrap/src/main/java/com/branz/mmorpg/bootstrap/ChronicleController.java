@@ -60,6 +60,12 @@ final class ChronicleController implements Listener {
                 || chronicle.isChronicle(event.getCurrentItem())
                 || chronicle.isChronicle(event.getCursor())) {
             event.setCancelled(true);
+            Component message =
+                    Component.text(
+                            "This MMO inventory action is not available in the physical-item slice yet.",
+                            NamedTextColor.RED);
+            player.sendActionBar(message);
+            player.sendMessage(message);
             scheduleReconcile(player);
         }
     }

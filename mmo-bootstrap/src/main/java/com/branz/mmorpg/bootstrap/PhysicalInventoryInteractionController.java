@@ -102,10 +102,12 @@ final class PhysicalInventoryInteractionController implements Listener {
         }
         if (!supported(event, player)) {
             event.setCancelled(true);
-            player.sendActionBar(
+            Component message =
                     Component.text(
                             "This MMO inventory action is not available in the physical-item slice yet.",
-                            NamedTextColor.RED));
+                            NamedTextColor.RED);
+            player.sendActionBar(message);
+            player.sendMessage(message);
             return;
         }
         if (interaction == null) {

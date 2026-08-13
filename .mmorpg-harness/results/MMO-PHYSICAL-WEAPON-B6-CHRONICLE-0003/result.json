@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CHRONICLE_SLOT_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_CHRONICLE_SLOT",
+  "action_record": {
+    "harness_error": "CLIENT_ACCEPTANCE_CLIENT_EXITED"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B6-CHRONICLE-0003/**"
+  ],
+  "base_commit_expected": "45f7c45aa590c7f625cfc9cabc17d0296700384c",
+  "blocker_code": "CLIENT_ACCEPTANCE_CLIENT_EXITED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "b2102803e8841503394ec1844327c70b3e58c60d",
+  "duration_seconds": 132.125,
+  "ending_commit_before_result_commit": "45f7c45aa590c7f625cfc9cabc17d0296700384c",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-13T17:56:29.352311+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-13T17:54:17.218534+00:00",
+  "starting_commit_actual": "45f7c45aa590c7f625cfc9cabc17d0296700384c",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B6-CHRONICLE-0003",
+  "task_id": "MMO-PHYSICAL-WEAPON-B6-CHRONICLE-0003",
+  "task_manifest_sha256": "4d79cc8aebe3d907534a21f0e064b9021fd2470f5e97102fb17294f0623f247a",
+  "unauthorized_writes": []
+}

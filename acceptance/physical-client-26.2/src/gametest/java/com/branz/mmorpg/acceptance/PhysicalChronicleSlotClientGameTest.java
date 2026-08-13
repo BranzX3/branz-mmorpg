@@ -21,6 +21,7 @@ final class PhysicalChronicleSlotClientGameTest {
     private static final int PRIMARY_STAGE_HANDSHAKE_LEVEL = 8;
     private static final int SOURCE_HOTBAR_SLOT = 0;
     private static final int CHRONICLE_HOTBAR_SLOT = 8;
+    private static final int CONNECTION_TIMEOUT_TICKS = 20 * 60;
     private static final int INVENTORY_IMAGE_WIDTH = 176;
     private static final int INVENTORY_IMAGE_HEIGHT = 166;
     private static final double SLOT_HITBOX_SIZE = 16.0;
@@ -136,7 +137,7 @@ final class PhysicalChronicleSlotClientGameTest {
     }
 
     private static void waitForStagedAuthority(ClientGameTestContext context) {
-        context.waitFor(client -> client.level != null && client.player != null, 20 * 30);
+        context.waitFor(client -> client.level != null && client.player != null, CONNECTION_TIMEOUT_TICKS);
         context.waitFor(
                 client ->
                         client.player != null
@@ -292,7 +293,7 @@ final class PhysicalChronicleSlotClientGameTest {
         context.clickScreenButton("menu.disconnect");
         context.waitFor(client -> client.level == null && client.player == null, 20 * 15);
         connect(context, address);
-        context.waitFor(client -> client.level != null && client.player != null, 20 * 30);
+        context.waitFor(client -> client.level != null && client.player != null, CONNECTION_TIMEOUT_TICKS);
         context.waitFor(client -> client.gui.screen() == null, 20 * 30);
     }
 

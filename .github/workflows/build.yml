@@ -26,6 +26,9 @@ jobs:
             # inside the disposable GitHub Actions checkout.
             git update-ref refs/remotes/origin/HARNESS_MMORPG_CONTROL HEAD
             python .mmorpg-harness/selftest.py
+            if [[ -f .mmorpg-harness/selftest_b7.py ]]; then
+              python .mmorpg-harness/selftest_b7.py
+            fi
           fi
       - name: Verify
         shell: bash

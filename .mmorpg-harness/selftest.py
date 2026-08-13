@@ -119,6 +119,50 @@ def main() -> int:
         broken_paper,
     )["primary_broken_rejection_message_client"]
 
+    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_CHRONICLE_SLOT_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_CHRONICLE_SLOT"
+    assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_CHRONICLE_SLOT_V1"].handler is R.action_client_acceptance_chronicle_slot
+
+    chronicle_client = "\n".join([
+        "PHYSICAL_AUTHORITY_CHRONICLE_STAGE_READY_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_STATUS_BEFORE_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_PRESENT_BEFORE_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_PICKUP_OBSERVED_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_SLOT9_MOUSE_SENT_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_REJECTION_MESSAGE_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_PRESENT_AFTER_REJECT_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_RECONCILED_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_STATUS_AFTER_CLOSE_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_AUTHORITY_STABLE_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_RECONNECT_PROJECTED_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_STATUS_RECONNECT_CLIENT",
+        "PHYSICAL_AUTHORITY_CHRONICLE_RECONNECT_STABLE_CLIENT",
+    ])
+    chronicle_paper = "\n".join([
+        "PHYSICAL_AUTHORITY_HOTBAR_STAGE_PROJECTED_SERVER player=Player0",
+        "Player0 issued server command: /mmo physical status",
+        "Player0 issued server command: /mmo physical status",
+        "Player0 issued server command: /mmo physical status",
+    ])
+    assert all(R.evaluate_chronicle_slot_log_checks(
+        chronicle_client, chronicle_paper
+    ).values())
+
+    chronicle_bad_commit = (
+        chronicle_paper
+        + "\nPHYSICAL_AUTHORITY_HOTBAR_MOVE_COMMITTED_SERVER "
+          "value=11111111-1111-1111-1111-111111111111 "
+          "source=0 destination=8"
+    )
+    assert not R.evaluate_chronicle_slot_log_checks(
+        chronicle_client, chronicle_bad_commit
+    )["chronicle_no_hotbar_commit_server"]
+
+    assert not R.evaluate_chronicle_slot_log_checks(
+        chronicle_client.replace(
+            "PHYSICAL_AUTHORITY_CHRONICLE_REJECTION_MESSAGE_CLIENT", ""
+        ),
+        chronicle_paper,
+    )["chronicle_rejection_message_once_client"]
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1"].identity == "PHYSICAL_CLIENT_ACCEPTANCE_HOTBAR_MOVES"
     assert R.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_HOTBAR_MOVES_V1"].handler is R.action_client_acceptance_hotbar_moves
 

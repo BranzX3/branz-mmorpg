@@ -1,5 +1,7 @@
 package com.branz.mmorpg.acceptance;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -14,7 +16,6 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
-import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Items;
 import org.lwjgl.glfw.GLFW;
@@ -49,9 +50,9 @@ final class PhysicalConsumableLotClientGameTest {
         waitForServerHandshake(context);
 
         openDevHub(context);
-        clickMenuEntry(context, DEV_MODULE_NAME, ClickType.PICKUP);
+        clickMenuEntry(context, DEV_MODULE_NAME, "PICKUP");
         context.waitFor(client -> menuContains(client.gui.screen(), GRANT_LABEL_PREFIX), 20 * 10);
-        clickMenuEntry(context, GRANT_LABEL_PREFIX, ClickType.QUICK_MOVE);
+        clickMenuEntry(context, GRANT_LABEL_PREFIX, "QUICK_MOVE");
         context.waitFor(
                 client ->
                         client.player != null
@@ -179,7 +180,7 @@ final class PhysicalConsumableLotClientGameTest {
     }
 
     private static void clickMenuEntry(
-            ClientGameTestContext context, String namePrefix, ClickType clickType) {
+            ClientGameTestContext context, String namePrefix, String clickTypeName) {
         context.runOnClient(
                 client -> {
                     if (!(client.gui.screen() instanceof AbstractContainerScreen<?> screen)
@@ -202,13 +203,36 @@ final class PhysicalConsumableLotClientGameTest {
                                             () ->
                                                     new AssertionError(
                                                             "Dev menu entry not found: " + namePrefix));
-                    client.gameMode.handleInventoryMouseClick(
-                            screen.getMenu().containerId,
-                            slot.index,
-                            0,
-                            clickType,
-                            client.player);
+                    try {
+                        Method click =
+                                Arrays.stream(client.gameMode.getClass().getMethods())
+                                        .filter(
+                                                candidate ->
+                                                        candidate.getName().equals("handleInventoryMouseClick")
+                                                                && candidate.getParameterCount() == 5
+                                                                && candidate.getParameterTypes()[3].isEnum())
+                                        .findFirst()
+                                        .orElseThrow(
+                                                () ->
+                                                        new AssertionError(
+                                                                "Client inventory click method is unavailable"));
+                        Object clickType = enumConstant(click.getParameterTypes()[3], clickTypeName);
+                        click.invoke(
+                                client.gameMode,
+                                screen.getMenu().containerId,
+                                slot.index,
+                                0,
+                                clickType,
+                                client.player);
+                    } catch (ReflectiveOperationException exception) {
+                        throw new AssertionError("Dev preparation inventory click failed", exception);
+                    }
                 });
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static Object enumConstant(Class<?> enumType, String name) {
+        return Enum.valueOf((Class) enumType, name);
     }
 
     private static boolean menuContains(Object screenValue, String namePrefix) {

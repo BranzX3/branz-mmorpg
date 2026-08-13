@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-WEAPON-B6-CHRONICLE-0003",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B6-CHRONICLE-0003",
+  "base_commit": "45f7c45aa590c7f625cfc9cabc17d0296700384c",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CHRONICLE_SLOT_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B6-CHRONICLE-0003/**"
+  ]
+}

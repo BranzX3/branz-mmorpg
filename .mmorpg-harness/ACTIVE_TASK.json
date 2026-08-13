@@ -1,5 +1,5 @@
 {
   "protocol_version": 1,
-  "state": "ACTIVE",
-  "task_path": ".mmorpg-harness/tasks/MMO-PHYSICAL-WEAPON-B7-RESTART-0001.json"
+  "state": "IDLE",
+  "task_path": null
 }

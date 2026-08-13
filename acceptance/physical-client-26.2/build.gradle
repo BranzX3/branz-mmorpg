@@ -44,4 +44,7 @@ tasks.withType(JavaExec).configureEach {
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalHotbarAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalHotbar', 'true'
     }
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalConsumableLotAcceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalConsumableLot', 'true'
+    }
 }

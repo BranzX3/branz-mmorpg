@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-CONSUMABLE-C12-0002",
+  "task_branch": "harness-task/MMO-PHYSICAL-CONSUMABLE-C12-0002",
+  "base_commit": "1cbe59ccf5b357fbc377b4a93fdb352014641e73",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CONSUMABLE-C12-0002/**"
+  ]
+}

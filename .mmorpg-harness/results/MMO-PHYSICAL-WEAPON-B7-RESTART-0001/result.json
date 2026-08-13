@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_BROKEN_RESTART_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_PRIMARY_BROKEN_RESTART",
+  "action_record": {
+    "harness_error": "CLIENT_ACCEPTANCE_JOIN_TIMEOUT"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B7-RESTART-0001/**"
+  ],
+  "base_commit_expected": "c045c5fefb5133839967e9d15b7b87b9ceb5cb7b",
+  "blocker_code": "CLIENT_ACCEPTANCE_JOIN_TIMEOUT",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "1308529e09bb554ef43ea15f42ec23aa198d3df9",
+  "duration_seconds": 345.031,
+  "ending_commit_before_result_commit": "c045c5fefb5133839967e9d15b7b87b9ceb5cb7b",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-13T18:43:43.165280+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-13T18:37:58.132063+00:00",
+  "starting_commit_actual": "c045c5fefb5133839967e9d15b7b87b9ceb5cb7b",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B7-RESTART-0001",
+  "task_id": "MMO-PHYSICAL-WEAPON-B7-RESTART-0001",
+  "task_manifest_sha256": "cef27421e9ca9a6bb0168fcdacc32d77c871ba646b78f595798ccff1cc9b33e3",
+  "unauthorized_writes": []
+}

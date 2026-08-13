@@ -1,7 +1,5 @@
 package com.branz.mmorpg.acceptance;
 
-import java.lang.reflect.Method;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,6 +28,8 @@ final class PhysicalConsumableLotClientGameTest {
     private static final int CONNECTION_TIMEOUT_TICKS = 20 * 60;
     private static final int INVENTORY_IMAGE_WIDTH = 176;
     private static final int INVENTORY_IMAGE_HEIGHT = 166;
+    private static final int DEV_CONTAINER_IMAGE_WIDTH = 176;
+    private static final int DEV_CONTAINER_IMAGE_HEIGHT = 222;
     private static final double SLOT_HITBOX_SIZE = 16.0;
     private static final double SLOT_CENTER_OFFSET = SLOT_HITBOX_SIZE / 2.0;
     private static final String DEFINITION_ID = "consumable.training_body_tonic";
@@ -50,9 +50,9 @@ final class PhysicalConsumableLotClientGameTest {
         prepareMainInventoryGrantSlot(context);
 
         openDevHub(context);
-        clickMenuEntry(context, DEV_MODULE_NAME, 0);
+        clickMenuEntry(context, DEV_MODULE_NAME, false);
         context.waitFor(client -> menuContains(client.gui.screen(), GRANT_LABEL_PREFIX), 20 * 10);
-        clickMenuEntry(context, GRANT_LABEL_PREFIX, 1);
+        clickMenuEntry(context, GRANT_LABEL_PREFIX, true);
         context.waitFor(
                 client ->
                         client.player != null
@@ -215,72 +215,82 @@ final class PhysicalConsumableLotClientGameTest {
     }
 
     private static void clickMenuEntry(
-            ClientGameTestContext context, String namePrefix, int clickTypeOrdinal) {
-        context.runOnClient(
-                client -> {
-                    if (!(client.gui.screen() instanceof AbstractContainerScreen<?> screen)
-                            || client.player == null
-                            || client.gameMode == null) {
-                        throw new AssertionError("Expected an open container screen for dev preparation");
-                    }
-                    Slot slot =
-                            screen.getMenu().slots.stream()
-                                    .filter(
-                                            candidate ->
-                                                    candidate.hasItem()
-                                                            && candidate
-                                                                    .getItem()
-                                                                    .getHoverName()
-                                                                    .getString()
-                                                                    .startsWith(namePrefix))
-                                    .findFirst()
-                                    .orElseThrow(
-                                            () ->
-                                                    new AssertionError(
-                                                            "Dev menu entry not found: " + namePrefix));
-                    try {
-                        List<Method> clickCandidates =
-                                Arrays.stream(client.gameMode.getClass().getMethods())
-                                        .filter(
-                                                candidate -> {
-                                                    Class<?>[] parameters = candidate.getParameterTypes();
-                                                    return parameters.length == 5
-                                                            && parameters[0] == int.class
-                                                            && parameters[1] == int.class
-                                                            && parameters[2] == int.class
-                                                            && parameters[3].isEnum()
-                                                            && parameters[4].isAssignableFrom(
-                                                                    client.player.getClass());
-                                                })
-                                        .toList();
-                        if (clickCandidates.size() != 1) {
-                            throw new AssertionError(
-                                    "Expected exactly one client inventory click method by signature; found "
-                                            + clickCandidates.size());
-                        }
-                        Method click = clickCandidates.get(0);
-                        Object clickType =
-                                enumConstant(click.getParameterTypes()[3], clickTypeOrdinal);
-                        click.invoke(
-                                client.gameMode,
-                                screen.getMenu().containerId,
-                                slot.index,
-                                0,
-                                clickType,
-                                client.player);
-                    } catch (ReflectiveOperationException exception) {
-                        throw new AssertionError("Dev preparation inventory click failed", exception);
-                    }
-                });
+            ClientGameTestContext context, String namePrefix, boolean shiftClick) {
+        setDevMenuCursor(context, namePrefix);
+        if (shiftClick) {
+            context.getInput().holdShift();
+            context.waitTicks(1);
+        }
+        try {
+            context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        } finally {
+            if (shiftClick) {
+                context.getInput().releaseShift();
+            }
+        }
     }
 
-    private static Object enumConstant(Class<?> enumType, int ordinal) {
-        Object[] constants = enumType.getEnumConstants();
-        if (constants == null || ordinal < 0 || ordinal >= constants.length) {
+    private static void setDevMenuCursor(ClientGameTestContext context, String namePrefix) {
+        double[] target =
+                context.computeOnClient(
+                        client -> {
+                            if (!(client.gui.screen() instanceof AbstractContainerScreen<?> screen)) {
+                                throw new AssertionError(
+                                        "Expected an open container screen for dev preparation");
+                            }
+                            Slot slot = findMenuEntry(screen, namePrefix);
+                            double guiWidth = client.getWindow().getGuiScaledWidth();
+                            double guiHeight = client.getWindow().getGuiScaledHeight();
+                            double screenWidth = client.getWindow().getScreenWidth();
+                            double screenHeight = client.getWindow().getScreenHeight();
+                            double left = (guiWidth - DEV_CONTAINER_IMAGE_WIDTH) / 2.0;
+                            double top = (guiHeight - DEV_CONTAINER_IMAGE_HEIGHT) / 2.0;
+                            double guiX = left + slot.x + SLOT_CENTER_OFFSET;
+                            double guiY = top + slot.y + SLOT_CENTER_OFFSET;
+                            double rawX = guiX * screenWidth / guiWidth;
+                            double rawY = guiY * screenHeight / guiHeight;
+                            return new double[] {rawX, rawY, slot.x, slot.y, left, top};
+                        });
+        context.getInput().setCursorPos(target[0], target[1]);
+        double[] observed =
+                context.computeOnClient(
+                        client -> {
+                            double rawX = client.mouseHandler.xpos();
+                            double rawY = client.mouseHandler.ypos();
+                            double guiX =
+                                    rawX
+                                            * client.getWindow().getGuiScaledWidth()
+                                            / client.getWindow().getScreenWidth();
+                            double guiY =
+                                    rawY
+                                            * client.getWindow().getGuiScaledHeight()
+                                            / client.getWindow().getScreenHeight();
+                            return new double[] {guiX, guiY};
+                        });
+        double slotLeft = target[4] + target[2];
+        double slotTop = target[5] + target[3];
+        if (observed[0] < slotLeft
+                || observed[0] >= slotLeft + SLOT_HITBOX_SIZE
+                || observed[1] < slotTop
+                || observed[1] >= slotTop + SLOT_HITBOX_SIZE) {
             throw new AssertionError(
-                    "Client inventory click enum ordinal is unavailable: " + ordinal);
+                    "Physical cursor did not land inside dev menu entry: " + namePrefix);
         }
-        return constants[ordinal];
+    }
+
+    private static Slot findMenuEntry(AbstractContainerScreen<?> screen, String namePrefix) {
+        return screen.getMenu().slots.stream()
+                .filter(
+                        candidate ->
+                                candidate.hasItem()
+                                        && candidate
+                                                .getItem()
+                                                .getHoverName()
+                                                .getString()
+                                                .startsWith(namePrefix))
+                .findFirst()
+                .orElseThrow(
+                        () -> new AssertionError("Dev menu entry not found: " + namePrefix));
     }
 
     private static boolean menuContains(Object screenValue, String namePrefix) {
@@ -387,7 +397,7 @@ final class PhysicalConsumableLotClientGameTest {
                             double guiY = top + slot.y + SLOT_CENTER_OFFSET;
                             double rawX = guiX * screenWidth / guiWidth;
                             double rawY = guiY * screenHeight / guiHeight;
-                            return new double[] {rawX, rawY, guiX, guiY, slot.x, slot.y, left, top};
+                            return new double[] {rawX, rawY, slot.x, slot.y, left, top};
                         });
         context.getInput().setCursorPos(target[0], target[1]);
         double[] observed =
@@ -405,8 +415,8 @@ final class PhysicalConsumableLotClientGameTest {
                                             / client.getWindow().getScreenHeight();
                             return new double[] {guiX, guiY};
                         });
-        double slotLeft = target[6] + target[4];
-        double slotTop = target[7] + target[5];
+        double slotLeft = target[4] + target[2];
+        double slotTop = target[5] + target[3];
         if (observed[0] < slotLeft
                 || observed[0] >= slotLeft + SLOT_HITBOX_SIZE
                 || observed[1] < slotTop

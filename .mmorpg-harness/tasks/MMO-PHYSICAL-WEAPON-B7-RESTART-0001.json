@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-WEAPON-B7-RESTART-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-WEAPON-B7-RESTART-0001",
+  "base_commit": "c045c5fefb5133839967e9d15b7b87b9ceb5cb7b",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_PRIMARY_BROKEN_RESTART_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-WEAPON-B7-RESTART-0001/**"
+  ]
+}

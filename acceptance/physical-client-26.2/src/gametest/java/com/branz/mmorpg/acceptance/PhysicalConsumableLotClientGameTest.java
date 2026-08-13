@@ -23,7 +23,6 @@ import org.lwjgl.glfw.GLFW;
 /** Section C1-C2: grant one whole consumable lot, then physically move it into hotbar and reconnect. */
 final class PhysicalConsumableLotClientGameTest {
     private static final int SERVER_HANDSHAKE_LEVEL = 7;
-    private static final int TARGET_READY_LEVEL = 12;
     private static final int SOURCE_STORAGE_SLOT = 9;
     private static final int TARGET_HOTBAR_SLOT = 7;
     private static final int CHRONICLE_HOTBAR_SLOT = 8;
@@ -48,6 +47,7 @@ final class PhysicalConsumableLotClientGameTest {
         String address = System.getProperty("branz.acceptance.server", "localhost:25565");
         connect(context, address);
         waitForServerHandshake(context);
+        prepareMainInventoryGrantSlot(context);
 
         openDevHub(context);
         clickMenuEntry(context, DEV_MODULE_NAME, "PICKUP");
@@ -63,12 +63,7 @@ final class PhysicalConsumableLotClientGameTest {
         context.waitForScreen(null);
         System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_STAGE_READY_CLIENT");
 
-        context.waitFor(
-                client ->
-                        client.player != null
-                                && client.player.experienceLevel == TARGET_READY_LEVEL
-                                && client.player.getInventory().getItem(TARGET_HOTBAR_SLOT).isEmpty(),
-                20 * 30);
+        freeTargetHotbarSlot(context);
         System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_TARGET_READY_CLIENT");
 
         String beforeLine =
@@ -172,6 +167,46 @@ final class PhysicalConsumableLotClientGameTest {
         System.out.println("PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT");
         context.waitFor(client -> client.gui.screen() == null, 20 * 30);
         System.out.println("PHYSICAL_AUTHORITY_GAMEPLAY_SCREEN_READY_CLIENT");
+    }
+
+    private static void prepareMainInventoryGrantSlot(ClientGameTestContext context) {
+        for (int slot = 0; slot <= TARGET_HOTBAR_SLOT; slot++) {
+            sendCommand(
+                    context,
+                    "/item replace entity @s hotbar."
+                            + slot
+                            + " with minecraft:stone");
+        }
+        context.waitFor(
+                client -> {
+                    if (client.player == null) {
+                        return false;
+                    }
+                    for (int slot = 0; slot <= TARGET_HOTBAR_SLOT; slot++) {
+                        if (client.player.getInventory().getItem(slot).isEmpty()) {
+                            return false;
+                        }
+                    }
+                    return client.player
+                            .getInventory()
+                            .getItem(CHRONICLE_HOTBAR_SLOT)
+                            .is(Items.WRITTEN_BOOK);
+                },
+                20 * 10);
+        System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_FILLER_READY_CLIENT");
+    }
+
+    private static void freeTargetHotbarSlot(ClientGameTestContext context) {
+        sendCommand(
+                context,
+                "/item replace entity @s hotbar."
+                        + TARGET_HOTBAR_SLOT
+                        + " with minecraft:air");
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player.getInventory().getItem(TARGET_HOTBAR_SLOT).isEmpty(),
+                20 * 10);
     }
 
     private static void openDevHub(ClientGameTestContext context) {

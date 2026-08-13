@@ -7,6 +7,10 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 public final class PhysicalAuthorityClientGameTestDispatcher implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
+        if (Boolean.getBoolean("branz.acceptance.physicalBrokenRestart")) {
+            new PhysicalBrokenWeaponRestartClientGameTest().runTest(context);
+            return;
+        }
         if (Boolean.getBoolean("branz.acceptance.physicalChronicleSlot")) {
             new PhysicalChronicleSlotClientGameTest().runTest(context);
             return;

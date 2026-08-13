@@ -50,9 +50,9 @@ final class PhysicalConsumableLotClientGameTest {
         prepareMainInventoryGrantSlot(context);
 
         openDevHub(context);
-        clickMenuEntry(context, DEV_MODULE_NAME, "PICKUP");
+        clickMenuEntry(context, DEV_MODULE_NAME, 0);
         context.waitFor(client -> menuContains(client.gui.screen(), GRANT_LABEL_PREFIX), 20 * 10);
-        clickMenuEntry(context, GRANT_LABEL_PREFIX, "QUICK_MOVE");
+        clickMenuEntry(context, GRANT_LABEL_PREFIX, 1);
         context.waitFor(
                 client ->
                         client.player != null
@@ -215,7 +215,7 @@ final class PhysicalConsumableLotClientGameTest {
     }
 
     private static void clickMenuEntry(
-            ClientGameTestContext context, String namePrefix, String clickTypeName) {
+            ClientGameTestContext context, String namePrefix, int clickTypeOrdinal) {
         context.runOnClient(
                 client -> {
                     if (!(client.gui.screen() instanceof AbstractContainerScreen<?> screen)
@@ -239,19 +239,28 @@ final class PhysicalConsumableLotClientGameTest {
                                                     new AssertionError(
                                                             "Dev menu entry not found: " + namePrefix));
                     try {
-                        Method click =
+                        List<Method> clickCandidates =
                                 Arrays.stream(client.gameMode.getClass().getMethods())
                                         .filter(
-                                                candidate ->
-                                                        candidate.getName().equals("handleInventoryMouseClick")
-                                                                && candidate.getParameterCount() == 5
-                                                                && candidate.getParameterTypes()[3].isEnum())
-                                        .findFirst()
-                                        .orElseThrow(
-                                                () ->
-                                                        new AssertionError(
-                                                                "Client inventory click method is unavailable"));
-                        Object clickType = enumConstant(click.getParameterTypes()[3], clickTypeName);
+                                                candidate -> {
+                                                    Class<?>[] parameters = candidate.getParameterTypes();
+                                                    return parameters.length == 5
+                                                            && parameters[0] == int.class
+                                                            && parameters[1] == int.class
+                                                            && parameters[2] == int.class
+                                                            && parameters[3].isEnum()
+                                                            && parameters[4].isAssignableFrom(
+                                                                    client.player.getClass());
+                                                })
+                                        .toList();
+                        if (clickCandidates.size() != 1) {
+                            throw new AssertionError(
+                                    "Expected exactly one client inventory click method by signature; found "
+                                            + clickCandidates.size());
+                        }
+                        Method click = clickCandidates.get(0);
+                        Object clickType =
+                                enumConstant(click.getParameterTypes()[3], clickTypeOrdinal);
                         click.invoke(
                                 client.gameMode,
                                 screen.getMenu().containerId,
@@ -265,9 +274,13 @@ final class PhysicalConsumableLotClientGameTest {
                 });
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private static Object enumConstant(Class<?> enumType, String name) {
-        return Enum.valueOf((Class) enumType, name);
+    private static Object enumConstant(Class<?> enumType, int ordinal) {
+        Object[] constants = enumType.getEnumConstants();
+        if (constants == null || ordinal < 0 || ordinal >= constants.length) {
+            throw new AssertionError(
+                    "Client inventory click enum ordinal is unavailable: " + ordinal);
+        }
+        return constants[ordinal];
     }
 
     private static boolean menuContains(Object screenValue, String namePrefix) {

@@ -327,7 +327,7 @@ final class PhysicalConsumableLotClientGameTest {
         context.waitFor(client -> client.gui.screen() instanceof ChatScreen, 20 * 5);
         context.getInput().typeChars(command);
         context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
-        context.waitFor(client -> client.gui.screen() == null, 20 * 5);
+        context.waitFor(client -> !(client.gui.screen() instanceof ChatScreen), 20 * 5);
     }
 
     private static String tonicStatusSince(int firstMessage) {

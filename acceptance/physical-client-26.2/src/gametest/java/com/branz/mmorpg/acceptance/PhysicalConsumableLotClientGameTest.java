@@ -53,18 +53,9 @@ final class PhysicalConsumableLotClientGameTest {
         clickMenuEntry(context, DEV_MODULE_NAME, false);
         context.waitFor(client -> menuContains(client.gui.screen(), GRANT_LABEL_PREFIX), 20 * 10);
         clickMenuEntry(context, GRANT_LABEL_PREFIX, true);
-        context.waitFor(
-                client ->
-                        client.player != null
-                                && client.player.getInventory().getItem(SOURCE_STORAGE_SLOT).getCount()
-                                        == EXPECTED_QUANTITY,
-                20 * 20);
+        context.waitTicks(20);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitForScreen(null);
-        System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_STAGE_READY_CLIENT");
-
-        freeTargetHotbarSlot(context);
-        System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_TARGET_READY_CLIENT");
 
         String beforeLine =
                 sendStatusAndCaptureTonic(
@@ -72,8 +63,14 @@ final class PhysicalConsumableLotClientGameTest {
         LotAuthority before = parseTonicStatus(beforeLine);
         if (!"CHARACTER_INVENTORY/slot:9".equals(before.location())
                 || before.quantity() != EXPECTED_QUANTITY) {
-            throw new AssertionError("C1 tonic was not staged as one x64 lot in main inventory: " + before);
+            throw new AssertionError(
+                    "C1 dev preparation did not create one authoritative x64 tonic lot in main inventory: "
+                            + before);
         }
+        System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_STAGE_READY_CLIENT");
+
+        freeTargetHotbarSlot(context);
+        System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_TARGET_READY_CLIENT");
 
         context.getInput().pressKey(options -> options.keyInventory);
         context.waitForScreen(InventoryScreen.class);

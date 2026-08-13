@@ -21,6 +21,10 @@ jobs:
         shell: bash
         run: |
           if [[ -f .mmorpg-harness/selftest.py ]]; then
+            # Control PRs must self-test the candidate checkout as the
+            # prospective reviewed control ref. This ref mutation exists only
+            # inside the disposable GitHub Actions checkout.
+            git update-ref refs/remotes/origin/HARNESS_MMORPG_CONTROL HEAD
             python .mmorpg-harness/selftest.py
           fi
       - name: Verify

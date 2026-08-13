@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE",
+  "action_record": {
+    "harness_error": "CLIENT_ACCEPTANCE_CLIENT_EXITED"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CONSUMABLE-C12-0002/**"
+  ],
+  "base_commit_expected": "1cbe59ccf5b357fbc377b4a93fdb352014641e73",
+  "blocker_code": "CLIENT_ACCEPTANCE_CLIENT_EXITED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "de273115007eea041d27c9a35a561088866156c5",
+  "duration_seconds": 91.828,
+  "ending_commit_before_result_commit": "1cbe59ccf5b357fbc377b4a93fdb352014641e73",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-13T20:56:53.555307+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-13T20:55:21.722972+00:00",
+  "starting_commit_actual": "1cbe59ccf5b357fbc377b4a93fdb352014641e73",
+  "task_branch": "harness-task/MMO-PHYSICAL-CONSUMABLE-C12-0002",
+  "task_id": "MMO-PHYSICAL-CONSUMABLE-C12-0002",
+  "task_manifest_sha256": "f0bcecbc0cab24d892b35cdb51d8a0030a6e9dedc83b5a88a548be988dd7582f",
+  "unauthorized_writes": []
+}

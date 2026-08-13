@@ -69,6 +69,7 @@ historical task manifests. New tasks must not select it. Removing the compiled a
 runner cleanup and must pass the harness self-test before control-branch promotion.
 
 Adding a capability requires changing and reviewing runner code on the control branch first.
+Candidate control-branch changes must pass the harness self-test against the candidate checkout before promotion.
 
 ## Deterministic task flow
 

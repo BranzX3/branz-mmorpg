@@ -13,9 +13,11 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.world.item.Items;
+import org.lwjgl.glfw.GLFW;
 
 /** Section B7 phase two: prove the same broken physical weapon reconstructs after Paper restart. */
 final class PhysicalBrokenWeaponRestartClientGameTest {
+    private static final int SERVER_HANDSHAKE_LEVEL = 7;
     private static final int SOURCE_HOTBAR_SLOT = 0;
     private static final int CHRONICLE_HOTBAR_SLOT = 8;
     private static final int TRAINING_BLADE_MAXIMUM = 100;
@@ -34,6 +36,12 @@ final class PhysicalBrokenWeaponRestartClientGameTest {
         context.waitFor(
                 client -> client.level != null && client.player != null,
                 CONNECTION_TIMEOUT_TICKS);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player.experienceLevel == SERVER_HANDSHAKE_LEVEL,
+                CONNECTION_TIMEOUT_TICKS);
+        System.out.println("PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT");
         context.waitFor(client -> client.gui.screen() == null, 20 * 30);
         context.waitFor(
                 client ->
@@ -82,7 +90,7 @@ final class PhysicalBrokenWeaponRestartClientGameTest {
         context.getInput().pressKey(options -> options.keyChat);
         context.waitFor(client -> client.gui.screen() instanceof ChatScreen, 20 * 5);
         context.getInput().typeChars("/mmo physical status");
-        context.getInput().pressKey(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER);
+        context.getInput().pressKey(GLFW.GLFW_KEY_ENTER);
         context.waitFor(client -> client.gui.screen() == null, 20 * 5);
         context.waitFor(client -> trainingBladeStatusSince(firstNewMessage) != null, 20 * 10);
         String status = trainingBladeStatusSince(firstNewMessage);

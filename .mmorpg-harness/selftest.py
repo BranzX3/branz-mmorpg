@@ -82,7 +82,7 @@ def main() -> int:
     assert not R.evaluate_primary_hit_log_checks(hit_client, duplicate_success)[
         "primary_hit_success_observer_once_server"
     ]
-    assert not R.evaluate_primary_hit_log_checks(client_text=hit_client, paper_text=hit_paper.replace(
+    assert not R.evaluate_primary_hit_log_checks(hit_client, hit_paper.replace(
         "PHYSICAL_AUTHORITY_B4_TARGET_B_CHANGED_SERVER", ""
     ))["primary_hit_target_b_changed_server"]
 

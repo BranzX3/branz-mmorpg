@@ -76,6 +76,22 @@ final class PhysicalConsumableLotClientGameTest {
 
         context.getInput().pressKey(options -> options.keyInventory);
         context.waitForScreen(InventoryScreen.class);
+        context.waitFor(
+                client -> {
+                    if (!(client.gui.screen() instanceof InventoryScreen screen)
+                            || client.player == null) {
+                        return false;
+                    }
+                    Slot source =
+                            findPlayerSlot(
+                                    screen,
+                                    client.player.getInventory(),
+                                    SOURCE_STORAGE_SLOT);
+                    return hasTonicProjection(source.getItem());
+                },
+                20 * 10);
+        System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_PROJECTED_BEFORE_PICKUP_CLIENT");
+
         setInventoryCursor(context, SOURCE_STORAGE_SLOT);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
         context.waitFor(
@@ -84,9 +100,13 @@ final class PhysicalConsumableLotClientGameTest {
                             || client.player == null) {
                         return false;
                     }
-                    Slot source = findPlayerSlot(screen, client.player.getInventory(), SOURCE_STORAGE_SLOT);
+                    Slot source =
+                            findPlayerSlot(
+                                    screen,
+                                    client.player.getInventory(),
+                                    SOURCE_STORAGE_SLOT);
                     return source.getItem().isEmpty()
-                            && screen.getMenu().getCarried().getCount() == EXPECTED_QUANTITY;
+                            && hasTonicProjection(screen.getMenu().getCarried());
                 },
                 20 * 5);
         System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_PICKUP_OBSERVED_CLIENT");
@@ -100,9 +120,13 @@ final class PhysicalConsumableLotClientGameTest {
                             || client.player == null) {
                         return false;
                     }
-                    Slot target = findPlayerSlot(screen, client.player.getInventory(), TARGET_HOTBAR_SLOT);
+                    Slot target =
+                            findPlayerSlot(
+                                    screen,
+                                    client.player.getInventory(),
+                                    TARGET_HOTBAR_SLOT);
                     return screen.getMenu().getCarried().isEmpty()
-                            && target.getItem().getCount() == EXPECTED_QUANTITY;
+                            && hasTonicProjection(target.getItem());
                 },
                 20 * 10);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
@@ -130,8 +154,10 @@ final class PhysicalConsumableLotClientGameTest {
         context.waitFor(
                 client ->
                         client.player != null
-                                && client.player.getInventory().getItem(TARGET_HOTBAR_SLOT).getCount()
-                                        == EXPECTED_QUANTITY
+                                && hasTonicProjection(
+                                        client.player
+                                                .getInventory()
+                                                .getItem(TARGET_HOTBAR_SLOT))
                                 && client.player
                                         .getInventory()
                                         .getItem(CHRONICLE_HOTBAR_SLOT)
@@ -316,6 +342,10 @@ final class PhysicalConsumableLotClientGameTest {
                                                 .getHoverName()
                                                 .getString()
                                                 .startsWith(namePrefix));
+    }
+
+    private static boolean hasTonicProjection(net.minecraft.world.item.ItemStack stack) {
+        return !stack.isEmpty() && DEFINITION_ID.equals(stack.getHoverName().getString());
     }
 
     private static void registerGameMessageCapture() {

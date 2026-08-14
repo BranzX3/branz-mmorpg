@@ -75,6 +75,11 @@ tasks.runServer {
     if (physicalHotbarAcceptance) {
         jvmArgs("-Dmmo.physical-hotbar-acceptance=true")
     }
+    val physicalConsumableLotAcceptance =
+        providers.gradleProperty("physicalConsumableLotAcceptance").orNull == "true"
+    if (physicalConsumableLotAcceptance) {
+        jvmArgs("-Dmmo.physical-consumable-lot-acceptance=true")
+    }
 
     val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"
     if (smokeTest) {

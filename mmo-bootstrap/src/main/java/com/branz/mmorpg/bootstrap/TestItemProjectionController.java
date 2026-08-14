@@ -19,6 +19,9 @@ import org.bukkit.inventory.ItemStack;
 
 /** Keeps local test projections isolated from every transfer/use path. */
 final class TestItemProjectionController implements Listener {
+    private static final String PHYSICAL_CONSUMABLE_ACCEPTANCE_PROPERTY =
+            "mmo.physical-consumable-lot-acceptance";
+
     private final TestItemProjectionService projections;
 
     TestItemProjectionController(TestItemProjectionService projections) {
@@ -34,14 +37,16 @@ final class TestItemProjectionController implements Listener {
                 event.getClick() == ClickType.NUMBER_KEY && event.getHotbarButton() >= 0
                         ? player.getInventory().getItem(event.getHotbarButton())
                         : null;
-        if (isTest(event.getCurrentItem()) || isTest(event.getCursor()) || isTest(hotbar)) {
+        if (blocksPhysicalAcceptancePath(event.getCurrentItem())
+                || blocksPhysicalAcceptancePath(event.getCursor())
+                || blocksPhysicalAcceptancePath(hotbar)) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (isTest(event.getOldCursor())) {
+        if (blocksPhysicalAcceptancePath(event.getOldCursor())) {
             event.setCancelled(true);
         }
     }
@@ -62,14 +67,14 @@ final class TestItemProjectionController implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
-        if (isTest(event.getItem())) {
+        if (blocksPhysicalAcceptancePath(event.getItem())) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onConsume(PlayerItemConsumeEvent event) {
-        if (isTest(event.getItem())) {
+        if (blocksPhysicalAcceptancePath(event.getItem())) {
             event.setCancelled(true);
         }
     }
@@ -88,6 +93,14 @@ final class TestItemProjectionController implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         projections.removeAll(event.getPlayer());
+    }
+
+    private boolean blocksPhysicalAcceptancePath(ItemStack item) {
+        if (!isTest(item)) {
+            return false;
+        }
+        return !Boolean.getBoolean(PHYSICAL_CONSUMABLE_ACCEPTANCE_PROPERTY)
+                || !projections.isPhysicalConsumableAcceptanceProjection(item);
     }
 
     private boolean isTest(ItemStack item) {

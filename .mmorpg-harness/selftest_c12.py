@@ -90,6 +90,63 @@ def main() -> int:
     assert R.status_probe_rows_safe(client, logical)
     assert all(R.evaluate_consumable_lot_checks(client, paper).values())
 
+    # The physical client can observe the slot placement before the asynchronous authority move
+    # commits. Bounded status polling may therefore return the exact pre-move row more than once
+    # before the first moved row. Those stale reads are safe because authority is still monotonic.
+    move_segment = "\n".join(
+        [
+            tonic_row(7, 2, 64, TX2),
+            "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT",
+        ]
+    )
+    stale_probe_segment = "\n".join(
+        [
+            tonic_row(9, 1, 64, TX1),
+            tonic_row(9, 1, 64, TX1),
+            tonic_row(7, 2, 64, TX2),
+            "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT",
+        ]
+    )
+    stale_before_probes = client.replace(move_segment, stale_probe_segment, 1)
+    stale_logical = R.logical_lot_rows(stale_before_probes)
+    assert len(stale_logical) == 3
+    assert R.status_probe_rows_safe(stale_before_probes, stale_logical)
+    stale_paper = paper + "\n" + "\n".join(
+        "Player0 issued server command: /mmo physical status" for _ in range(2)
+    )
+    assert all(R.evaluate_consumable_lot_checks(stale_before_probes, stale_paper).values())
+
+    # Once the moved authority has been observed, a later pre-move row would be a regression and
+    # must fail closed even if the final row before the marker returns to the expected moved state.
+    regressed_probe_segment = "\n".join(
+        [
+            tonic_row(7, 2, 64, TX2),
+            tonic_row(9, 1, 64, TX1),
+            tonic_row(7, 2, 64, TX2),
+            "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT",
+        ]
+    )
+    regressed_probe = client.replace(move_segment, regressed_probe_segment, 1)
+    regressed_logical = R.logical_lot_rows(regressed_probe)
+    assert len(regressed_logical) == 3
+    assert not R.status_probe_rows_safe(regressed_probe, regressed_logical)
+    assert not R.evaluate_consumable_lot_checks(regressed_probe, stale_paper)[
+        "consumable_status_rows_exact"
+    ]
+
+    # A third authority state during polling is neither an allowed stale read nor the expected move.
+    unexpected_probe_segment = "\n".join(
+        [
+            tonic_row(6, 2, 64, TX2),
+            tonic_row(7, 2, 64, TX2),
+            "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT",
+        ]
+    )
+    unexpected_probe = client.replace(move_segment, unexpected_probe_segment, 1)
+    unexpected_logical = R.logical_lot_rows(unexpected_probe)
+    assert len(unexpected_logical) == 3
+    assert not R.status_probe_rows_safe(unexpected_probe, unexpected_logical)
+
     # Base ingress may issue one final status probe after the client completion marker.
     # An exact repeat is not a fourth authority transition and must remain transparent in evidence.
     repeated_completion_probe = client + "\n" + tonic_row(7, 2, 64, TX2)

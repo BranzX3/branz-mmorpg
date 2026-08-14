@@ -1,5 +1,6 @@
 package com.branz.mmorpg.bootstrap;
 
+import com.branz.mmorpg.items.projection.ProjectionValueType;
 import java.util.Objects;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -10,6 +11,9 @@ import org.bukkit.inventory.PlayerInventory;
  * The database row remains authoritative when its Bukkit projection is cleared.
  */
 final class TestItemProjectionService {
+    private static final String PHYSICAL_CONSUMABLE_ACCEPTANCE_DEFINITION =
+            "consumable.training_body_tonic";
+
     private final BukkitItemProjectionCodec codec;
 
     TestItemProjectionService(BukkitItemProjectionCodec codec) {
@@ -18,6 +22,20 @@ final class TestItemProjectionService {
 
     boolean isTestProjection(ItemStack item) {
         return codec.isTestProjection(item);
+    }
+
+    boolean isPhysicalConsumableAcceptanceProjection(ItemStack item) {
+        if (!isTestProjection(item)) {
+            return false;
+        }
+        return codec.decode(item, 0)
+                .filter(projection -> projection.signatureValid())
+                .filter(projection -> projection.valueType() == ProjectionValueType.STACKABLE_LOT)
+                .filter(
+                        projection ->
+                                PHYSICAL_CONSUMABLE_ACCEPTANCE_DEFINITION.equals(
+                                        projection.definitionId().value()))
+                .isPresent();
     }
 
     void removeAll(Player player) {

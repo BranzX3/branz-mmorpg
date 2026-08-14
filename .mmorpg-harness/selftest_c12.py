@@ -57,6 +57,23 @@ def main() -> int:
     assert spec.identity == "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE"
     assert spec.handler is R.action_client_acceptance_consumable_lot
 
+    server = ["gradlew.bat", ":mmo-bootstrap:runServer"]
+    returned_server = R.augment_c12_argv(server)
+    assert returned_server is server
+    assert server.count(R.C12_ACCEPTANCE_FLAG) == 1
+    R.augment_c12_argv(server)
+    assert server.count(R.C12_ACCEPTANCE_FLAG) == 1
+
+    client_argv = ["gradlew.bat", "runClientGameTest"]
+    R.augment_c12_argv(client_argv)
+    assert client_argv.count(R.C12_ACCEPTANCE_FLAG) == 1
+
+    unrelated = ["gradlew.bat", "build"]
+    assert R.augment_c12_argv(unrelated) == ["gradlew.bat", "build"]
+    assert R.C12_ACCEPTANCE_FLAG not in unrelated
+    immutable = ("gradlew.bat", ":mmo-bootstrap:runServer")
+    assert R.augment_c12_argv(immutable) is immutable
+
     client = good_client()
     paper = good_paper()
     assert all(R.evaluate_consumable_lot_checks(client, paper).values())

@@ -85,21 +85,28 @@ def main() -> int:
 
     client = good_client()
     paper = good_paper()
+    logical = R.logical_lot_rows(client)
+    assert len(logical) == 3
+    assert R.status_probe_rows_safe(client, logical)
     assert all(R.evaluate_consumable_lot_checks(client, paper).values())
-    assert len(R.logical_lot_rows(client)) == 3
 
     # Base ingress may issue one final status probe after the client completion marker.
     # An exact repeat is not a fourth authority transition and must remain transparent in evidence.
     repeated_completion_probe = client + "\n" + tonic_row(7, 2, 64, TX2)
+    repeated_logical = R.logical_lot_rows(repeated_completion_probe)
     assert len(R.lot_rows(repeated_completion_probe)) == 4
-    assert len(R.logical_lot_rows(repeated_completion_probe)) == 3
+    assert len(repeated_logical) == 3
+    assert R.status_probe_rows_safe(repeated_completion_probe, repeated_logical)
     assert all(R.evaluate_consumable_lot_checks(repeated_completion_probe, paper).values())
 
-    # Any actual fourth state remains a hard failure; only field-for-field repeats collapse.
+    # Any actual fourth state remains a hard failure. Marker-bound logical snapshots stay three,
+    # but the raw probe-safety check rejects a changed post-reconnect authority row.
     changed_fourth = client + "\n" + tonic_row(
         7, 3, 63, "cccccccc-cccc-cccc-cccc-cccccccccccc"
     )
-    assert len(R.logical_lot_rows(changed_fourth)) == 4
+    changed_logical = R.logical_lot_rows(changed_fourth)
+    assert len(changed_logical) == 3
+    assert not R.status_probe_rows_safe(changed_fourth, changed_logical)
     assert not R.evaluate_consumable_lot_checks(changed_fourth, paper)[
         "consumable_status_rows_exact"
     ]

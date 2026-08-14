@@ -471,6 +471,7 @@ final class PhysicalConsumableLotClientGameTest {
         context.waitFor(client -> client.gui.screen() != null, 20 * 5);
         context.clickScreenButton("menu.disconnect");
         context.waitFor(client -> client.level == null && client.player == null, 20 * 15);
+        context.waitTicks(20);
         connect(context, address);
         context.waitFor(client -> client.level != null && client.player != null, CONNECTION_TIMEOUT_TICKS);
         context.waitFor(client -> client.gui.screen() == null, 20 * 30);

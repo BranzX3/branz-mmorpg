@@ -129,6 +129,7 @@ final class PhysicalConsumableLotClientGameTest {
                             && hasTonicProjection(target.getItem());
                 },
                 20 * 10);
+        context.waitTicks(20);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitForScreen(null);
 

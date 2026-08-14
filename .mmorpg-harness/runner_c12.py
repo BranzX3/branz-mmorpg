@@ -38,8 +38,17 @@ def lot_rows(client_text: str) -> list[dict[str, Any]]:
     ]
 
 
+def logical_lot_rows(client_text: str) -> list[dict[str, Any]]:
+    """Collapse only consecutive byte-equivalent authority snapshots from repeated status probes."""
+    logical: list[dict[str, Any]] = []
+    for row in lot_rows(client_text):
+        if not logical or row != logical[-1]:
+            logical.append(row)
+    return logical
+
+
 def evaluate_consumable_lot_checks(client_text: str, paper_text: str) -> dict[str, bool]:
-    rows = lot_rows(client_text)
+    rows = logical_lot_rows(client_text)
     exactly_three = len(rows) == 3
     if exactly_three:
         before, moved, reconnect = rows
@@ -104,7 +113,8 @@ def install(core: Any) -> None:
         paper_text = (result_dir / "paper.log").read_text(encoding="utf-8", errors="replace")
         checks = evaluate_consumable_lot_checks(client_text, paper_text)
         record.setdefault("checks", {}).update(checks)
-        record["lot_snapshots"] = lot_rows(client_text)
+        record["lot_snapshots_raw"] = lot_rows(client_text)
+        record["lot_snapshots"] = logical_lot_rows(client_text)
         record["fixed_command_id"] = "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE"
         passed = code == 0 and all(checks.values())
         record["action_status"] = "PASS" if passed else "FAIL"
@@ -119,6 +129,7 @@ def install(core: Any) -> None:
 
     core.C12_ACCEPTANCE_FLAG = C12_ACCEPTANCE_FLAG
     core.augment_c12_argv = augment_c12_argv
+    core.logical_lot_rows = logical_lot_rows
     core.evaluate_consumable_lot_checks = evaluate_consumable_lot_checks
     core.action_client_acceptance_consumable_lot = action_client_acceptance_consumable_lot
     core.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE_V1"] = core.ActionSpec(

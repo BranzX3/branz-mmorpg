@@ -1,0 +1,125 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE",
+  "action_record": {
+    "action_status": "PASS",
+    "checks": {
+      "client_exit_zero": true,
+      "consumable_content_stable": true,
+      "consumable_dev_command_once_server": true,
+      "consumable_filler_commands_server": true,
+      "consumable_filler_ready_client": true,
+      "consumable_moved_once_client": true,
+      "consumable_pickup_once_client": true,
+      "consumable_place_mouse_once_client": true,
+      "consumable_quantity_stable": true,
+      "consumable_reconnect_projected_client": true,
+      "consumable_reconnect_stable_client": true,
+      "consumable_same_uuid": true,
+      "consumable_slot_sequence": true,
+      "consumable_stage_ready_client": true,
+      "consumable_status_after_move_client": true,
+      "consumable_status_before_client": true,
+      "consumable_status_commands_server": true,
+      "consumable_status_reconnect_client": true,
+      "consumable_status_rows_exact": true,
+      "consumable_target_ready_client": true,
+      "consumable_transaction_sequence": true,
+      "consumable_version_sequence": true,
+      "server_exit_zero": true,
+      "server_handshake_client": true,
+      "status_command_logged_server": true,
+      "status_command_sent_client": true
+    },
+    "client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalConsumableLotAcceptance=true"
+    ],
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 122.375,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE",
+    "hotbar_snapshots": [],
+    "lot_snapshots": [
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 9,
+        "transaction_id": "aa9c608f-905b-417e-b972-6a7b465f04d5",
+        "uuid": "ab9a3b3b-0acc-48a7-945d-cbc2682cabb3",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "6f02f6cd-6c9e-433c-9788-6f287c73f011",
+        "uuid": "ab9a3b3b-0acc-48a7-945d-cbc2682cabb3",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "6f02f6cd-6c9e-433c-9788-6f287c73f011",
+        "uuid": "ab9a3b3b-0acc-48a7-945d-cbc2682cabb3",
+        "version": 2
+      }
+    ],
+    "lot_snapshots_raw": [
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 9,
+        "transaction_id": "aa9c608f-905b-417e-b972-6a7b465f04d5",
+        "uuid": "ab9a3b3b-0acc-48a7-945d-cbc2682cabb3",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "6f02f6cd-6c9e-433c-9788-6f287c73f011",
+        "uuid": "ab9a3b3b-0acc-48a7-945d-cbc2682cabb3",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "6f02f6cd-6c9e-433c-9788-6f287c73f011",
+        "uuid": "ab9a3b3b-0acc-48a7-945d-cbc2682cabb3",
+        "version": 2
+      }
+    ],
+    "player_name": "Player0",
+    "server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalConsumableLotAcceptance=true"
+    ]
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CONSUMABLE-C12-0014/**"
+  ],
+  "base_commit_expected": "dc6da3259dfd21c042aa0ba71be2d34468d46f78",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "7339f49396cd15bf0ac3a7ae49d165e0e242ea13",
+  "duration_seconds": 123.516,
+  "ending_commit_before_result_commit": "dc6da3259dfd21c042aa0ba71be2d34468d46f78",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-14T16:40:08.090586+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-14T16:38:04.568682+00:00",
+  "starting_commit_actual": "dc6da3259dfd21c042aa0ba71be2d34468d46f78",
+  "task_branch": "harness-task/MMO-PHYSICAL-CONSUMABLE-C12-0014",
+  "task_id": "MMO-PHYSICAL-CONSUMABLE-C12-0014",
+  "task_manifest_sha256": "78a496fcd293e82fdcad77824dec9fd719df7b8f988269374a76e1f888805a4c",
+  "unauthorized_writes": []
+}

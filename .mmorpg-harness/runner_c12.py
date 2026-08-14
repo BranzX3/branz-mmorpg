@@ -5,11 +5,23 @@ from __future__ import annotations
 import re
 from typing import Any
 
+C12_ACCEPTANCE_FLAG = "-PphysicalConsumableLotAcceptance=true"
 TONIC_STATUS = re.compile(
     r"LOT uuid=([0-9a-fA-F-]{36}) def=consumable\.training_body_tonic "
     r"loc=CHARACTER_INVENTORY/slot:(\d+) ver=(\d+) qty=(\d+) "
     r"tx=([0-9a-fA-F-]{36}) content=(\S+)"
 )
+
+
+def augment_c12_argv(argv: Any) -> Any:
+    """Append the reviewed fixed C12 flag only to the server/client acceptance commands."""
+    if not isinstance(argv, list):
+        return argv
+    is_server = ":mmo-bootstrap:runServer" in argv
+    is_client = "runClientGameTest" in argv
+    if (is_server or is_client) and C12_ACCEPTANCE_FLAG not in argv:
+        argv.append(C12_ACCEPTANCE_FLAG)
+    return argv
 
 
 def lot_rows(client_text: str) -> list[dict[str, Any]]:
@@ -76,11 +88,7 @@ def install(core: Any) -> None:
         original_popen = core.subprocess.Popen
 
         def c12_popen(argv, *args, **kwargs):
-            if isinstance(argv, list) and "runClientGameTest" in argv:
-                flag = "-PphysicalConsumableLotAcceptance=true"
-                if flag not in argv:
-                    argv.append(flag)
-            return original_popen(argv, *args, **kwargs)
+            return original_popen(augment_c12_argv(argv), *args, **kwargs)
 
         try:
             core.subprocess.Popen = c12_popen
@@ -109,6 +117,8 @@ def install(core: Any) -> None:
             record,
         )
 
+    core.C12_ACCEPTANCE_FLAG = C12_ACCEPTANCE_FLAG
+    core.augment_c12_argv = augment_c12_argv
     core.evaluate_consumable_lot_checks = evaluate_consumable_lot_checks
     core.action_client_acceptance_consumable_lot = action_client_acceptance_consumable_lot
     core.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE_V1"] = core.ActionSpec(

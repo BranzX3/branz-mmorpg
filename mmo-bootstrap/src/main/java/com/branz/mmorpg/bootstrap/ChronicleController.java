@@ -82,7 +82,7 @@ final class ChronicleController implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (!(event.getPlayer() instanceof Player player)) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
         boolean touchesSlotNine =

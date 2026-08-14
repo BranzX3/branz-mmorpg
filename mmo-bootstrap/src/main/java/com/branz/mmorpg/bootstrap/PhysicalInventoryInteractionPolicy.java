@@ -18,6 +18,13 @@ final class PhysicalInventoryInteractionPolicy {
     private PhysicalInventoryInteractionPolicy() {}
 
     static boolean supportsStorageAction(String actionName) {
-        return SUPPORTED_STORAGE_ACTIONS.contains(Objects.requireNonNull(actionName, "actionName"));
+        String checked = Objects.requireNonNull(actionName, "actionName");
+        boolean supported = SUPPORTED_STORAGE_ACTIONS.contains(checked);
+        System.out.println(
+                "PHYSICAL_AUTHORITY_C12_DIAG_POLICY_SERVER action="
+                        + checked
+                        + " supported="
+                        + supported);
+        return supported;
     }
 }

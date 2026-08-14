@@ -6,6 +6,11 @@ import re
 from typing import Any
 
 C12_ACCEPTANCE_FLAG = "-PphysicalConsumableLotAcceptance=true"
+STATUS_MARKERS = (
+    "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_BEFORE_CLIENT",
+    "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT",
+    "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_RECONNECT_CLIENT",
+)
 TONIC_STATUS = re.compile(
     r"LOT uuid=([0-9a-fA-F-]{36}) def=consumable\.training_body_tonic "
     r"loc=CHARACTER_INVENTORY/slot:(\d+) ver=(\d+) qty=(\d+) "
@@ -24,32 +29,62 @@ def augment_c12_argv(argv: Any) -> Any:
     return argv
 
 
+def _row(match: re.Match[str]) -> dict[str, Any]:
+    return {
+        "uuid": match.group(1).lower(),
+        "slot": int(match.group(2)),
+        "version": int(match.group(3)),
+        "quantity": int(match.group(4)),
+        "transaction_id": match.group(5).lower(),
+        "content_version": match.group(6),
+    }
+
+
 def lot_rows(client_text: str) -> list[dict[str, Any]]:
-    return [
-        {
-            "uuid": match.group(1).lower(),
-            "slot": int(match.group(2)),
-            "version": int(match.group(3)),
-            "quantity": int(match.group(4)),
-            "transaction_id": match.group(5).lower(),
-            "content_version": match.group(6),
-        }
-        for match in TONIC_STATUS.finditer(client_text)
-    ]
+    return [_row(match) for match in TONIC_STATUS.finditer(client_text)]
 
 
 def logical_lot_rows(client_text: str) -> list[dict[str, Any]]:
-    """Collapse only consecutive byte-equivalent authority snapshots from repeated status probes."""
+    """Return the authority row captured by each of the three client status markers."""
+    marker_positions: list[int] = []
+    for marker in STATUS_MARKERS:
+        if client_text.count(marker) != 1:
+            return []
+        marker_positions.append(client_text.index(marker))
+    if marker_positions != sorted(marker_positions):
+        return []
+
     logical: list[dict[str, Any]] = []
-    for row in lot_rows(client_text):
-        if not logical or row != logical[-1]:
-            logical.append(row)
+    for marker_position in marker_positions:
+        preceding = list(TONIC_STATUS.finditer(client_text, 0, marker_position))
+        if not preceding:
+            return []
+        logical.append(_row(preceding[-1]))
     return logical
+
+
+def status_probe_rows_safe(client_text: str, logical: list[dict[str, Any]]) -> bool:
+    """Allow repeated probes only when every raw row matches the authority expected in its phase."""
+    if len(logical) != 3:
+        return False
+    marker_positions = [client_text.index(marker) for marker in STATUS_MARKERS]
+    before, moved, reconnect = logical
+    for match in TONIC_STATUS.finditer(client_text):
+        position = match.start()
+        if position < marker_positions[0]:
+            expected = before
+        elif position < marker_positions[1]:
+            expected = moved
+        else:
+            expected = reconnect
+        if _row(match) != expected:
+            return False
+    return True
 
 
 def evaluate_consumable_lot_checks(client_text: str, paper_text: str) -> dict[str, bool]:
     rows = logical_lot_rows(client_text)
-    exactly_three = len(rows) == 3
+    exactly_three = len(rows) == 3 and status_probe_rows_safe(client_text, rows)
     if exactly_three:
         before, moved, reconnect = rows
         same_uuid = before["uuid"] == moved["uuid"] == reconnect["uuid"]
@@ -131,6 +166,7 @@ def install(core: Any) -> None:
     core.augment_c12_argv = augment_c12_argv
     core.lot_rows = lot_rows
     core.logical_lot_rows = logical_lot_rows
+    core.status_probe_rows_safe = status_probe_rows_safe
     core.evaluate_consumable_lot_checks = evaluate_consumable_lot_checks
     core.action_client_acceptance_consumable_lot = action_client_acceptance_consumable_lot
     core.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE_V1"] = core.ActionSpec(

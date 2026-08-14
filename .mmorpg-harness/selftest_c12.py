@@ -13,26 +13,35 @@ R = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = R
 SPEC.loader.exec_module(R)
 
+UUID = "11111111-1111-1111-1111-111111111111"
+TX1 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+TX2 = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+CONTENT = "v1.milestone-1.example.4"
+
+
+def tonic_row(slot: int, version: int, quantity: int, transaction_id: str) -> str:
+    return (
+        f"LOT uuid={UUID} def=consumable.training_body_tonic "
+        f"loc=CHARACTER_INVENTORY/slot:{slot} ver={version} qty={quantity} "
+        f"tx={transaction_id} content={CONTENT}"
+    )
+
 
 def good_client() -> str:
-    uuid = "11111111-1111-1111-1111-111111111111"
-    tx1 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    tx2 = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    content = "v1.milestone-1.example.4"
     return "\n".join(
         [
             "PHYSICAL_AUTHORITY_CONSUMABLE_FILLER_READY_CLIENT",
             "PHYSICAL_AUTHORITY_CONSUMABLE_STAGE_READY_CLIENT",
             "PHYSICAL_AUTHORITY_CONSUMABLE_TARGET_READY_CLIENT",
-            f"LOT uuid={uuid} def=consumable.training_body_tonic loc=CHARACTER_INVENTORY/slot:9 ver=1 qty=64 tx={tx1} content={content}",
+            tonic_row(9, 1, 64, TX1),
             "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_BEFORE_CLIENT",
             "PHYSICAL_AUTHORITY_CONSUMABLE_PICKUP_OBSERVED_CLIENT",
             "PHYSICAL_AUTHORITY_CONSUMABLE_PLACE_MOUSE_SENT_CLIENT",
-            f"LOT uuid={uuid} def=consumable.training_body_tonic loc=CHARACTER_INVENTORY/slot:7 ver=2 qty=64 tx={tx2} content={content}",
+            tonic_row(7, 2, 64, TX2),
             "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT",
             "PHYSICAL_AUTHORITY_CONSUMABLE_MOVED_ONCE_CLIENT",
             "PHYSICAL_AUTHORITY_CONSUMABLE_RECONNECT_PROJECTED_CLIENT",
-            f"LOT uuid={uuid} def=consumable.training_body_tonic loc=CHARACTER_INVENTORY/slot:7 ver=2 qty=64 tx={tx2} content={content}",
+            tonic_row(7, 2, 64, TX2),
             "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_RECONNECT_CLIENT",
             "PHYSICAL_AUTHORITY_CONSUMABLE_RECONNECT_STABLE_CLIENT",
         ]
@@ -77,6 +86,23 @@ def main() -> int:
     client = good_client()
     paper = good_paper()
     assert all(R.evaluate_consumable_lot_checks(client, paper).values())
+    assert len(R.logical_lot_rows(client)) == 3
+
+    # Base ingress may issue one final status probe after the client completion marker.
+    # An exact repeat is not a fourth authority transition and must remain transparent in evidence.
+    repeated_completion_probe = client + "\n" + tonic_row(7, 2, 64, TX2)
+    assert len(R.lot_rows(repeated_completion_probe)) == 4
+    assert len(R.logical_lot_rows(repeated_completion_probe)) == 3
+    assert all(R.evaluate_consumable_lot_checks(repeated_completion_probe, paper).values())
+
+    # Any actual fourth state remains a hard failure; only field-for-field repeats collapse.
+    changed_fourth = client + "\n" + tonic_row(
+        7, 3, 63, "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    )
+    assert len(R.logical_lot_rows(changed_fourth)) == 4
+    assert not R.evaluate_consumable_lot_checks(changed_fourth, paper)[
+        "consumable_status_rows_exact"
+    ]
 
     bad_quantity = client.replace("slot:7 ver=2 qty=64", "slot:7 ver=2 qty=63", 1)
     assert not R.evaluate_consumable_lot_checks(bad_quantity, paper)[

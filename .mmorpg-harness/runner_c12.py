@@ -117,6 +117,8 @@ def install(core: Any) -> None:
             record,
         )
 
+    core.C12_ACCEPTANCE_FLAG = C12_ACCEPTANCE_FLAG
+    core.augment_c12_argv = augment_c12_argv
     core.evaluate_consumable_lot_checks = evaluate_consumable_lot_checks
     core.action_client_acceptance_consumable_lot = action_client_acceptance_consumable_lot
     core.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE_V1"] = core.ActionSpec(

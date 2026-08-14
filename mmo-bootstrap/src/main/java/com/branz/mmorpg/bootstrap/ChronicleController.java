@@ -44,6 +44,11 @@ final class ChronicleController implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onC12DiagnosticBefore(InventoryClickEvent event) {
+        logC12Diagnostic("LOWEST", event);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) {
@@ -70,9 +75,14 @@ final class ChronicleController implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onC12DiagnosticAfter(InventoryClickEvent event) {
+        logC12Diagnostic("MONITOR", event);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) {
+        if (!(event.getPlayer() instanceof Player player)) {
             return;
         }
         boolean touchesSlotNine =
@@ -122,6 +132,38 @@ final class ChronicleController implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onRespawn(PlayerRespawnEvent event) {
         scheduleReconcile(event.getPlayer());
+    }
+
+    private static void logC12Diagnostic(String phase, InventoryClickEvent event) {
+        String clicked =
+                event.getClickedInventory() == null
+                        ? "null"
+                        : event.getClickedInventory().getType().name();
+        String current =
+                event.getCurrentItem() == null
+                        ? "null"
+                        : event.getCurrentItem().getType().name();
+        String cursor =
+                event.getCursor() == null ? "null" : event.getCursor().getType().name();
+        System.out.println(
+                "PHYSICAL_AUTHORITY_C12_DIAG_EVENT_SERVER phase="
+                        + phase
+                        + " cancelled="
+                        + event.isCancelled()
+                        + " action="
+                        + event.getAction().name()
+                        + " click="
+                        + event.getClick().name()
+                        + " rawSlot="
+                        + event.getRawSlot()
+                        + " slot="
+                        + event.getSlot()
+                        + " clicked="
+                        + clicked
+                        + " current="
+                        + current
+                        + " cursor="
+                        + cursor);
     }
 
     private void scheduleReconcile(Player player) {

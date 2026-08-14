@@ -196,29 +196,30 @@ final class PhysicalConsumableLotClientGameTest {
     }
 
     private static void prepareMainInventoryGrantSlot(ClientGameTestContext context) {
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player
+                                        .getInventory()
+                                        .getItem(CHRONICLE_HOTBAR_SLOT)
+                                        .is(Items.WRITTEN_BOOK),
+                20 * 30);
         for (int slot = 0; slot <= TARGET_HOTBAR_SLOT; slot++) {
             sendCommand(
                     context,
                     "/item replace entity @s hotbar."
                             + slot
                             + " with minecraft:stone");
+            int expectedSlot = slot;
+            context.waitFor(
+                    client ->
+                            client.player != null
+                                    && client.player
+                                            .getInventory()
+                                            .getItem(expectedSlot)
+                                            .is(Items.STONE),
+                    20 * 5);
         }
-        context.waitFor(
-                client -> {
-                    if (client.player == null) {
-                        return false;
-                    }
-                    for (int slot = 0; slot <= TARGET_HOTBAR_SLOT; slot++) {
-                        if (client.player.getInventory().getItem(slot).isEmpty()) {
-                            return false;
-                        }
-                    }
-                    return client.player
-                            .getInventory()
-                            .getItem(CHRONICLE_HOTBAR_SLOT)
-                            .is(Items.WRITTEN_BOOK);
-                },
-                20 * 10);
         System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_FILLER_READY_CLIENT");
     }
 

@@ -73,8 +73,7 @@ class SameServerLeaseRetryRepositoryTest {
         SessionId requestedSession = new SessionId(java.util.UUID.randomUUID());
         CharacterLease stale = lease(characterId, local, staleSession, 1);
         SequencedLeaseRepository delegate =
-                new SequencedLeaseRepository(
-                        List.of(new LeaseAcquireOutcome.Conflict(stale)));
+                new SequencedLeaseRepository(List.of(new LeaseAcquireOutcome.Conflict(stale)));
         SameServerLeaseRetryRepository repository =
                 new SameServerLeaseRetryRepository(delegate, 2, Duration.ZERO);
 
@@ -85,8 +84,7 @@ class SameServerLeaseRetryRepositoryTest {
         assertEquals(3, delegate.acquireCalls);
     }
 
-    private static LeaseAcquireOutcome success(
-            Result<LeaseAcquireOutcome, LeaseErrorCode> result) {
+    private static LeaseAcquireOutcome success(Result<LeaseAcquireOutcome, LeaseErrorCode> result) {
         if (result instanceof Result.Success<LeaseAcquireOutcome, LeaseErrorCode> success) {
             return success.value();
         }
@@ -102,13 +100,7 @@ class SameServerLeaseRetryRepositoryTest {
             long version) {
         Instant now = Instant.parse("2026-08-15T00:00:00Z");
         return new CharacterLease(
-                characterId,
-                serverInstanceId,
-                sessionId,
-                version,
-                now,
-                now,
-                now.plus(TTL));
+                characterId, serverInstanceId, sessionId, version, now, now, now.plus(TTL));
     }
 
     private static final class SequencedLeaseRepository implements CharacterLeaseRepository {

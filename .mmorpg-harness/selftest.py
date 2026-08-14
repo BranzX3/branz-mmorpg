@@ -187,6 +187,54 @@ def main() -> int:
         "hotbar_server_commit_sequence"
     ]
 
+    # Core daemon self-update gate must also exercise the C12 stale-probe contract. The dedicated
+    # selftest_c12.py carries the exhaustive cases; this keeps the live runtime gate coupled to the
+    # validator semantics even though only selftest.py is copied into the runtime directory.
+    c12_uuid = "11111111-1111-1111-1111-111111111111"
+    c12_tx1 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    c12_tx2 = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    c12_content = "v1.milestone-1.example.4"
+
+    def c12_row(slot: int, version: int, transaction_id: str) -> str:
+        return (
+            f"LOT uuid={c12_uuid} def=consumable.training_body_tonic "
+            f"loc=CHARACTER_INVENTORY/slot:{slot} ver={version} qty=64 "
+            f"tx={transaction_id} content={c12_content}"
+        )
+
+    c12_client = "\n".join([
+        c12_row(9, 1, c12_tx1),
+        "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_BEFORE_CLIENT",
+        c12_row(9, 1, c12_tx1),
+        c12_row(9, 1, c12_tx1),
+        c12_row(7, 2, c12_tx2),
+        "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT",
+        c12_row(7, 2, c12_tx2),
+        "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_RECONNECT_CLIENT",
+    ])
+    c12_logical = R.logical_lot_rows(c12_client)
+    assert len(c12_logical) == 3
+    assert R.status_probe_rows_safe(c12_client, c12_logical)
+
+    c12_regressed = c12_client.replace(
+        "\n".join([
+            c12_row(9, 1, c12_tx1),
+            c12_row(9, 1, c12_tx1),
+            c12_row(7, 2, c12_tx2),
+            "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT",
+        ]),
+        "\n".join([
+            c12_row(7, 2, c12_tx2),
+            c12_row(9, 1, c12_tx1),
+            c12_row(7, 2, c12_tx2),
+            "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT",
+        ]),
+        1,
+    )
+    c12_regressed_logical = R.logical_lot_rows(c12_regressed)
+    assert len(c12_regressed_logical) == 3
+    assert not R.status_probe_rows_safe(c12_regressed, c12_regressed_logical)
+
     bad = manifest(action="NOT_REAL")
     expect_code("ACTION_NOT_ALLOWLISTED", lambda: R.validate_manifest(bad))
 

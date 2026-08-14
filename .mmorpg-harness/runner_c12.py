@@ -64,22 +64,29 @@ def logical_lot_rows(client_text: str) -> list[dict[str, Any]]:
 
 
 def status_probe_rows_safe(client_text: str, logical: list[dict[str, Any]]) -> bool:
-    """Allow repeated probes only when every raw row matches the authority expected in its phase."""
+    """Allow bounded stale-before probes while requiring monotonic authority progression."""
     if len(logical) != 3:
         return False
     marker_positions = [client_text.index(marker) for marker in STATUS_MARKERS]
     before, moved, reconnect = logical
+    moved_observed = False
     for match in TONIC_STATUS.finditer(client_text):
         position = match.start()
+        row = _row(match)
         if position < marker_positions[0]:
-            expected = before
-        elif position < marker_positions[1]:
-            expected = moved
-        else:
-            expected = reconnect
-        if _row(match) != expected:
+            if row != before:
+                return False
+            continue
+        if position < marker_positions[1]:
+            if row == before and not moved_observed:
+                continue
+            if row == moved:
+                moved_observed = True
+                continue
             return False
-    return True
+        if row != reconnect:
+            return False
+    return moved_observed
 
 
 def evaluate_consumable_lot_checks(client_text: str, paper_text: str) -> dict[str, bool]:

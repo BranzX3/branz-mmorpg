@@ -55,7 +55,7 @@ for _name in dir(_runner_core):
         globals()[_name] = getattr(_runner_core, _name)
 
 RUNNER_EXTENSION_VERSION = (
-    "b5-broken-v1+b6-chronicle-v1+b7-broken-restart-v1+c12-consumable-lot-v1"
+    "b5-broken-v1+b6-chronicle-v1+b7-broken-restart-v1+c12-consumable-lot-v2"
 )
 
 if __name__ == "__main__":

@@ -40,9 +40,7 @@ class SameServerLeaseRetryRepositoryTest {
         Result<LeaseAcquireOutcome, LeaseErrorCode> result =
                 repository.acquire(characterId, local, nextSession, TTL);
 
-        Result.Success<LeaseAcquireOutcome, LeaseErrorCode> success =
-                assertInstanceOf(Result.Success.class, result);
-        assertInstanceOf(LeaseAcquireOutcome.Acquired.class, success.value());
+        assertInstanceOf(LeaseAcquireOutcome.Acquired.class, success(result));
         assertEquals(2, delegate.acquireCalls);
     }
 
@@ -63,9 +61,7 @@ class SameServerLeaseRetryRepositoryTest {
         Result<LeaseAcquireOutcome, LeaseErrorCode> result =
                 repository.acquire(characterId, local, requestedSession, TTL);
 
-        Result.Success<LeaseAcquireOutcome, LeaseErrorCode> success =
-                assertInstanceOf(Result.Success.class, result);
-        assertInstanceOf(LeaseAcquireOutcome.Conflict.class, success.value());
+        assertInstanceOf(LeaseAcquireOutcome.Conflict.class, success(result));
         assertEquals(1, delegate.acquireCalls);
     }
 
@@ -85,10 +81,18 @@ class SameServerLeaseRetryRepositoryTest {
         Result<LeaseAcquireOutcome, LeaseErrorCode> result =
                 repository.acquire(characterId, local, requestedSession, TTL);
 
-        Result.Success<LeaseAcquireOutcome, LeaseErrorCode> success =
-                assertInstanceOf(Result.Success.class, result);
-        assertInstanceOf(LeaseAcquireOutcome.Conflict.class, success.value());
+        assertInstanceOf(LeaseAcquireOutcome.Conflict.class, success(result));
         assertEquals(3, delegate.acquireCalls);
+    }
+
+    private static LeaseAcquireOutcome success(
+            Result<LeaseAcquireOutcome, LeaseErrorCode> result) {
+        if (result instanceof Result.Success<LeaseAcquireOutcome, LeaseErrorCode> success) {
+            return success.value();
+        }
+        Result.Failure<LeaseAcquireOutcome, LeaseErrorCode> failure =
+                (Result.Failure<LeaseAcquireOutcome, LeaseErrorCode>) result;
+        throw new AssertionError(failure.error().code() + ": " + failure.detail());
     }
 
     private static CharacterLease lease(

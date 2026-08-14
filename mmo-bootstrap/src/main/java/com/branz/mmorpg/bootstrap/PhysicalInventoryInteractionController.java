@@ -90,6 +90,20 @@ final class PhysicalInventoryInteractionController implements Listener {
                                     + " cursorProjection="
                                     + hasProjection(player.getItemOnCursor()));
         }
+        if (physicalInventoryAcceptanceDebug()) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_INVENTORY_CLICK_SERVER player="
+                                    + player.getName()
+                                    + " action="
+                                    + event.getAction()
+                                    + " slot="
+                                    + event.getSlot()
+                                    + " currentProjection="
+                                    + hasProjection(event.getCurrentItem())
+                                    + " cursorProjection="
+                                    + hasProjection(player.getItemOnCursor()));
+        }
         PendingInteraction interaction = pending.get(playerId);
         boolean touchesMmo =
                 hasProjection(event.getCurrentItem()) || hasProjection(player.getItemOnCursor());
@@ -182,17 +196,18 @@ final class PhysicalInventoryInteractionController implements Listener {
         if (!(event.getPlayer() instanceof Player player)) {
             return;
         }
-        PendingInteraction interaction = pending.get(player.getUniqueId());
+        UUID playerId = player.getUniqueId();
+        PendingInteraction interaction = pending.get(playerId);
         if (interaction == null || interaction.phase() != PendingPhase.INTERACTING) {
             return;
         }
-        pending.put(
-                player.getUniqueId(),
-                new PendingInteraction(
-                        interaction.session(), interaction.operationId(), PendingPhase.ABORTING));
-        plugin.getServer()
-                .getScheduler()
-                .runTask(plugin, () -> abortInteraction(player.getUniqueId(), null));
+        if (physicalInventoryAcceptanceDebug()) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_INVENTORY_CLOSE_DEFERRED_SERVER player="
+                                    + player.getName());
+        }
+        plugin.getServer().getScheduler().runTask(plugin, () -> abortAfterClose(playerId));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -217,6 +232,24 @@ final class PhysicalInventoryInteractionController implements Listener {
         plugin.getServer().getScheduler().runTask(plugin, () -> observe(playerId));
     }
 
+    private void abortAfterClose(UUID playerId) {
+        PendingInteraction interaction = pending.get(playerId);
+        if (interaction == null || interaction.phase() != PendingPhase.INTERACTING) {
+            return;
+        }
+        PendingInteraction aborting =
+                new PendingInteraction(
+                        interaction.session(), interaction.operationId(), PendingPhase.ABORTING);
+        if (!pending.replace(playerId, interaction, aborting)) {
+            return;
+        }
+        if (physicalInventoryAcceptanceDebug()) {
+            plugin.getLogger()
+                    .info("PHYSICAL_AUTHORITY_INVENTORY_CLOSE_ABORT_SERVER player=" + playerId);
+        }
+        abortInteraction(playerId, null);
+    }
+
     private void observe(UUID playerId) {
         PendingInteraction interaction = pending.get(playerId);
         if (interaction == null || interaction.phase() != PendingPhase.INTERACTING) {
@@ -231,6 +264,16 @@ final class PhysicalInventoryInteractionController implements Listener {
         if (observation
                 instanceof
                 Result.Failure<PhysicalInventoryObservation, ProjectionMoveErrorCode> failure) {
+            if (physicalInventoryAcceptanceDebug()) {
+                plugin.getLogger()
+                        .severe(
+                                "PHYSICAL_AUTHORITY_INVENTORY_OBSERVE_FAILED_SERVER player="
+                                        + player.getName()
+                                        + " code="
+                                        + failure.error().code()
+                                        + " detail="
+                                        + failure.detail());
+            }
             abortInteraction(playerId, failure.error().code() + ": " + failure.detail());
             return;
         }
@@ -267,6 +310,16 @@ final class PhysicalInventoryInteractionController implements Listener {
                                         + " detail="
                                         + failure.detail());
             }
+            if (physicalInventoryAcceptanceDebug()) {
+                plugin.getLogger()
+                        .severe(
+                                "PHYSICAL_AUTHORITY_INVENTORY_PLAN_FAILED_SERVER player="
+                                        + player.getName()
+                                        + " code="
+                                        + failure.error().code()
+                                        + " detail="
+                                        + failure.detail());
+            }
             abortInteraction(playerId, failure.error().code() + ": " + failure.detail());
             return;
         }
@@ -284,6 +337,26 @@ final class PhysicalInventoryInteractionController implements Listener {
                                             .map(
                                                     intent ->
                                                             intent.sourceSlot()
+                                                                    + "->"
+                                                                    + intent.destinationSlot()
+                                                                    + ":"
+                                                                    + intent.valueId())
+                                            .orElse("none"));
+        }
+        if (physicalInventoryAcceptanceDebug()) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_INVENTORY_PLAN_SERVER player="
+                                    + player.getName()
+                                    + " disposition="
+                                    + plan.disposition()
+                                    + " intent="
+                                    + plan.intent()
+                                            .map(
+                                                    intent ->
+                                                            intent.valueType()
+                                                                    + ":"
+                                                                    + intent.sourceSlot()
                                                                     + "->"
                                                                     + intent.destinationSlot()
                                                                     + ":"
@@ -338,6 +411,20 @@ final class PhysicalInventoryInteractionController implements Listener {
                     .info(
                             "PHYSICAL_AUTHORITY_HOTBAR_COMMIT_BEGIN_SERVER player="
                                     + player.getName()
+                                    + " source="
+                                    + intent.sourceSlot()
+                                    + " destination="
+                                    + intent.destinationSlot()
+                                    + " value="
+                                    + intent.valueId());
+        }
+        if (physicalInventoryAcceptanceDebug()) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_INVENTORY_COMMIT_BEGIN_SERVER player="
+                                    + player.getName()
+                                    + " type="
+                                    + intent.valueType()
                                     + " source="
                                     + intent.sourceSlot()
                                     + " destination="
@@ -429,6 +516,14 @@ final class PhysicalInventoryInteractionController implements Listener {
                             instanceof
                             Result.Failure<LoadedCharacterSession, CharacterSessionErrorCode>
                                     failure) {
+                        if (physicalInventoryAcceptanceDebug()) {
+                            plugin.getLogger()
+                                    .severe(
+                                            "PHYSICAL_AUTHORITY_INVENTORY_RELOAD_FAILED_SERVER player="
+                                                    + player.getName()
+                                                    + " detail="
+                                                    + failure.detail());
+                        }
                         player.kick(
                                 Component.text(
                                         "Inventory authority could not be reloaded: "
@@ -438,12 +533,42 @@ final class PhysicalInventoryInteractionController implements Listener {
                         return;
                     }
                     if (originalFailure != null) {
+                        if (physicalInventoryAcceptanceDebug()) {
+                            plugin.getLogger()
+                                    .severe(
+                                            "PHYSICAL_AUTHORITY_INVENTORY_COMMIT_REJECTED_SERVER player="
+                                                    + player.getName()
+                                                    + " type="
+                                                    + intent.valueType()
+                                                    + " source="
+                                                    + intent.sourceSlot()
+                                                    + " destination="
+                                                    + intent.destinationSlot()
+                                                    + " value="
+                                                    + intent.valueId()
+                                                    + " detail="
+                                                    + originalFailure);
+                        }
                         player.sendActionBar(
                                 Component.text(
                                         "Inventory move rejected and reconciled: "
                                                 + originalFailure,
                                         NamedTextColor.RED));
                         return;
+                    }
+                    if (physicalInventoryAcceptanceDebug()) {
+                        plugin.getLogger()
+                                .info(
+                                        "PHYSICAL_AUTHORITY_INVENTORY_COMMIT_SUCCESS_SERVER player="
+                                                + player.getName()
+                                                + " type="
+                                                + intent.valueType()
+                                                + " source="
+                                                + intent.sourceSlot()
+                                                + " destination="
+                                                + intent.destinationSlot()
+                                                + " value="
+                                                + intent.valueId());
                     }
                     if (Boolean.getBoolean("mmo.physical-hotbar-acceptance")
                             && completed
@@ -562,6 +687,14 @@ final class PhysicalInventoryInteractionController implements Listener {
         if (player != null) {
             clearMmoCursor(player);
         }
+        if (physicalInventoryAcceptanceDebug()) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_INVENTORY_ABORT_SERVER player="
+                                    + playerId
+                                    + " detail="
+                                    + (detail == null ? "none" : detail));
+        }
         characters.completeExternalValueMutation(
                 interaction.session(),
                 Result.success(interaction.session()),
@@ -586,6 +719,11 @@ final class PhysicalInventoryInteractionController implements Listener {
 
     private static boolean gameplayHotbarSlot(int slot) {
         return slot >= FIRST_GAMEPLAY_HOTBAR_SLOT && slot <= LAST_GAMEPLAY_HOTBAR_SLOT;
+    }
+
+    private static boolean physicalInventoryAcceptanceDebug() {
+        return Boolean.getBoolean("mmo.physical-hotbar-acceptance")
+                || Boolean.getBoolean("mmo.physical-consumable-lot-acceptance");
     }
 
     private boolean hasProjection(ItemStack stack) {
@@ -616,14 +754,6 @@ final class PhysicalInventoryInteractionController implements Listener {
             Objects.requireNonNull(session, "session");
             Objects.requireNonNull(operationId, "operationId");
             Objects.requireNonNull(phase, "phase");
-        }
-    }
-
-    private record PhysicalInventoryObservation(
-            List<ObservedProjection> storage, Optional<ObservedProjection> cursor) {
-        private PhysicalInventoryObservation {
-            storage = List.copyOf(Objects.requireNonNull(storage, "storage"));
-            Objects.requireNonNull(cursor, "cursor");
         }
     }
 }

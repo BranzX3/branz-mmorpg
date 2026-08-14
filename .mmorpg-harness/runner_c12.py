@@ -129,6 +129,7 @@ def install(core: Any) -> None:
 
     core.C12_ACCEPTANCE_FLAG = C12_ACCEPTANCE_FLAG
     core.augment_c12_argv = augment_c12_argv
+    core.lot_rows = lot_rows
     core.logical_lot_rows = logical_lot_rows
     core.evaluate_consumable_lot_checks = evaluate_consumable_lot_checks
     core.action_client_acceptance_consumable_lot = action_client_acceptance_consumable_lot

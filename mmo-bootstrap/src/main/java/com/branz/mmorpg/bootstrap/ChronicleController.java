@@ -140,11 +140,8 @@ final class ChronicleController implements Listener {
                         ? "null"
                         : event.getClickedInventory().getType().name();
         String current =
-                event.getCurrentItem() == null
-                        ? "null"
-                        : event.getCurrentItem().getType().name();
-        String cursor =
-                event.getCursor() == null ? "null" : event.getCursor().getType().name();
+                event.getCurrentItem() == null ? "null" : event.getCurrentItem().getType().name();
+        String cursor = event.getCursor() == null ? "null" : event.getCursor().getType().name();
         System.out.println(
                 "PHYSICAL_AUTHORITY_C12_DIAG_EVENT_SERVER phase="
                         + phase

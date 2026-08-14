@@ -1,0 +1,107 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE",
+  "action_record": {
+    "action_status": "FAIL",
+    "checks": {
+      "client_exit_zero": true,
+      "consumable_content_stable": false,
+      "consumable_dev_command_once_server": true,
+      "consumable_filler_commands_server": true,
+      "consumable_filler_ready_client": true,
+      "consumable_moved_once_client": true,
+      "consumable_pickup_once_client": true,
+      "consumable_place_mouse_once_client": true,
+      "consumable_quantity_stable": false,
+      "consumable_reconnect_projected_client": true,
+      "consumable_reconnect_stable_client": true,
+      "consumable_same_uuid": false,
+      "consumable_slot_sequence": false,
+      "consumable_stage_ready_client": true,
+      "consumable_status_after_move_client": true,
+      "consumable_status_before_client": true,
+      "consumable_status_commands_server": true,
+      "consumable_status_reconnect_client": true,
+      "consumable_status_rows_exact": false,
+      "consumable_target_ready_client": true,
+      "consumable_transaction_sequence": false,
+      "consumable_version_sequence": false,
+      "server_exit_zero": true,
+      "server_handshake_client": true,
+      "status_command_logged_server": true,
+      "status_command_sent_client": true
+    },
+    "client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalConsumableLotAcceptance=true"
+    ],
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 134.079,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_LOT_MOVE",
+    "hotbar_snapshots": [],
+    "lot_snapshots": [
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 9,
+        "transaction_id": "f264dab2-c497-4cc5-86b2-c590366637a9",
+        "uuid": "0c84c1eb-40b5-4b32-8863-ddc9e073c526",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "98db7e77-5573-4579-8f7a-ca8489b12098",
+        "uuid": "0c84c1eb-40b5-4b32-8863-ddc9e073c526",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "98db7e77-5573-4579-8f7a-ca8489b12098",
+        "uuid": "0c84c1eb-40b5-4b32-8863-ddc9e073c526",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "98db7e77-5573-4579-8f7a-ca8489b12098",
+        "uuid": "0c84c1eb-40b5-4b32-8863-ddc9e073c526",
+        "version": 2
+      }
+    ],
+    "player_name": "Player0",
+    "server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalConsumableLotAcceptance=true"
+    ]
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CONSUMABLE-C12-0013/**"
+  ],
+  "base_commit_expected": "dc6da3259dfd21c042aa0ba71be2d34468d46f78",
+  "blocker_code": "ACTION_FAILED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "ae7e47ffa71efc3a74050e101698720629df1031",
+  "duration_seconds": 135.203,
+  "ending_commit_before_result_commit": "dc6da3259dfd21c042aa0ba71be2d34468d46f78",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-14T16:27:28.320024+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-14T16:25:13.115570+00:00",
+  "starting_commit_actual": "dc6da3259dfd21c042aa0ba71be2d34468d46f78",
+  "task_branch": "harness-task/MMO-PHYSICAL-CONSUMABLE-C12-0013",
+  "task_id": "MMO-PHYSICAL-CONSUMABLE-C12-0013",
+  "task_manifest_sha256": "e9609f76a4202fa00ff36604638f7d2b0b02c29847fa941f4e2471e35b505374",
+  "unauthorized_writes": []
+}

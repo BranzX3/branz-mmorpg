@@ -129,20 +129,16 @@ final class PhysicalConsumableLotClientGameTest {
                             && hasTonicProjection(target.getItem());
                 },
                 20 * 10);
-        context.waitTicks(20);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitForScreen(null);
 
         String movedLine =
-                sendStatusAndCaptureTonic(
-                        context, "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT");
+                waitForMovedAuthority(
+                        context,
+                        before,
+                        "PHYSICAL_AUTHORITY_CONSUMABLE_STATUS_AFTER_MOVE_CLIENT");
         LotAuthority moved = parseTonicStatus(movedLine);
-        if (!before.uuid().equals(moved.uuid())
-                || !before.contentVersion().equals(moved.contentVersion())
-                || moved.quantity() != before.quantity()
-                || moved.version() != before.version() + 1
-                || before.transactionId().equals(moved.transactionId())
-                || !"CHARACTER_INVENTORY/slot:7".equals(moved.location())) {
+        if (!isExpectedMovedAuthority(before, moved)) {
             throw new AssertionError(
                     "C2 whole-lot move did not preserve quantity/identity with exactly one authority move: before="
                             + before
@@ -372,6 +368,49 @@ final class PhysicalConsumableLotClientGameTest {
             context.waitTicks(10);
         }
         throw new AssertionError("Timed out waiting for authoritative tonic lot status");
+    }
+
+    private static String waitForMovedAuthority(
+            ClientGameTestContext context, LotAuthority before, String marker) {
+        String lastStatus = null;
+        for (int attempt = 0; attempt < 12; attempt++) {
+            int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
+            sendCommand(context, "/mmo physical status");
+            context.waitTicks(10);
+            String status = tonicStatusSince(firstNewMessage);
+            if (status == null) {
+                context.waitTicks(10);
+                continue;
+            }
+            lastStatus = status;
+            LotAuthority candidate = parseTonicStatus(status);
+            if (isExpectedMovedAuthority(before, candidate)) {
+                System.out.println(marker);
+                return status;
+            }
+            if (!candidate.equals(before)) {
+                throw new AssertionError(
+                        "C2 authoritative lot changed to an unexpected state while waiting for the physical move: before="
+                                + before
+                                + " observed="
+                                + candidate);
+            }
+            context.waitTicks(10);
+        }
+        throw new AssertionError(
+                "Timed out waiting for authoritative tonic lot move to commit: before="
+                        + before
+                        + " lastStatus="
+                        + lastStatus);
+    }
+
+    private static boolean isExpectedMovedAuthority(LotAuthority before, LotAuthority moved) {
+        return before.uuid().equals(moved.uuid())
+                && before.contentVersion().equals(moved.contentVersion())
+                && moved.quantity() == before.quantity()
+                && moved.version() == before.version() + 1
+                && !before.transactionId().equals(moved.transactionId())
+                && "CHARACTER_INVENTORY/slot:7".equals(moved.location());
     }
 
     private static void sendCommand(ClientGameTestContext context, String command) {

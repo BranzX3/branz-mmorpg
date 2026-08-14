@@ -7,11 +7,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
+import net.fabricmc.fabric.mixin.client.gametest.input.MouseHandlerAccessor;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.world.inventory.Slot;
@@ -214,16 +216,27 @@ final class PhysicalConsumableLotClientGameTest {
     private static void clickMenuEntry(
             ClientGameTestContext context, String namePrefix, boolean shiftClick) {
         setDevMenuCursor(context, namePrefix);
-        if (shiftClick) {
-            context.getInput().holdShift();
-            context.waitTicks(1);
-        }
-        try {
+        if (!shiftClick) {
             context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+            return;
+        }
+
+        context.getInput().holdShift();
+        context.waitTicks(1);
+        try {
+            context.runOnClient(
+                    client -> {
+                        MouseHandlerAccessor mouse = (MouseHandlerAccessor) client.mouseHandler;
+                        MouseButtonInfo button =
+                                new MouseButtonInfo(
+                                        GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_MOD_SHIFT);
+                        long window = client.getWindow().handle();
+                        mouse.invokeOnButton(window, button, GLFW.GLFW_PRESS);
+                        mouse.invokeOnButton(window, button, GLFW.GLFW_RELEASE);
+                    });
+            context.waitTicks(1);
         } finally {
-            if (shiftClick) {
-                context.getInput().releaseShift();
-            }
+            context.getInput().releaseShift();
         }
     }
 

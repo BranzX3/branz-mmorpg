@@ -68,9 +68,7 @@ final class DatabaseRuntime implements AutoCloseable {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.embedded = embedded;
         this.pool = pool;
-        leases =
-                new SameServerLeaseRetryRepository(
-                        new JdbcCharacterLeaseRepository(dataSource));
+        leases = new SameServerLeaseRetryRepository(new JdbcCharacterLeaseRepository(dataSource));
         values = new JdbcValueTransactionService(dataSource);
         builds = new JdbcCharacterBuildRepository(dataSource);
         expeditionStates = new JdbcCharacterExpeditionStateRepository(dataSource);

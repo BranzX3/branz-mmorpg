@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-CONSUMABLE-C3-POSTMERGE-0001",
+  "task_branch": "harness-task/MMO-PHYSICAL-CONSUMABLE-C3-POSTMERGE-0001",
+  "base_commit": "0b68bf74c918487054df32ed4a32827949fcc19a",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CONSUMABLE_USE_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CONSUMABLE-C3-POSTMERGE-0001/**"
+  ]
+}

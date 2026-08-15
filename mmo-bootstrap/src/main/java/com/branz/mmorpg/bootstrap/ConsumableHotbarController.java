@@ -123,12 +123,16 @@ final class ConsumableHotbarController implements Listener {
                                 + player.getInventory().getHeldItemSlot());
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onUse(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND || !event.getAction().isRightClick()) {
             return;
         }
         Player player = event.getPlayer();
+        if (event.useItemInHand() == org.bukkit.event.Event.Result.DENY) {
+            debugUse(player, "REJECTED_SERVER reason=item-use-denied");
+            return;
+        }
         debugUse(player, "ROUTED_SERVER slot=" + player.getInventory().getHeldItemSlot());
         SelectedConsumable selected = selected(player);
         if (selected == null) {
@@ -143,7 +147,8 @@ final class ConsumableHotbarController implements Listener {
                         + selected.definitionId
                         + " category="
                         + selected.profile.category());
-        event.setCancelled(true);
+        event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
+        event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
         begin(player, selected);
     }
 
@@ -367,8 +372,7 @@ final class ConsumableHotbarController implements Listener {
         if (use == null || use.state.phase().terminal()) {
             return;
         }
-        DurableConsumableUseTransition transition =
-                uses.interrupt(use.state, plugin.getServer().getCurrentTick());
+        DurableConsumableUseTransition transition = uses.interrupt(use.state, plugin.getServer().getCurrentTick());
         use.state = transition.state();
         if (transition.commitNow()) {
             beginCommit(player, use);

@@ -119,8 +119,6 @@ final class ConsumableHotbarController implements Listener {
                                 + player.getName()
                                 + " action="
                                 + event.getAction()
-                                + " cancelled="
-                                + event.isCancelled()
                                 + " slot="
                                 + player.getInventory().getHeldItemSlot());
     }

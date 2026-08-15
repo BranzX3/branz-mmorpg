@@ -14,6 +14,7 @@ import com.branz.mmorpg.persistence.lease.LeaseReleaseOutcome;
 import com.branz.mmorpg.persistence.lease.ServerInstanceId;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,35 @@ class SameServerLeaseRetryRepositoryTest {
 
         assertInstanceOf(LeaseAcquireOutcome.Acquired.class, success(result));
         assertEquals(2, delegate.acquireCalls);
+    }
+
+    @Test
+    void defaultBudgetCoversMoreThanOneSecondOfSameServerCloseLag() {
+        CharacterId characterId = new CharacterId(java.util.UUID.randomUUID());
+        ServerInstanceId local = new ServerInstanceId("local-server");
+        SessionId staleSession = new SessionId(java.util.UUID.randomUUID());
+        SessionId nextSession = new SessionId(java.util.UUID.randomUUID());
+        CharacterLease stale = lease(characterId, local, staleSession, 1);
+        CharacterLease acquired = lease(characterId, local, nextSession, 2);
+        List<LeaseAcquireOutcome> outcomes = new ArrayList<>();
+        for (int conflict = 0; conflict < 12; conflict++) {
+            outcomes.add(new LeaseAcquireOutcome.Conflict(stale));
+        }
+        outcomes.add(new LeaseAcquireOutcome.Acquired(acquired));
+        SequencedLeaseRepository delegate = new SequencedLeaseRepository(outcomes);
+        SameServerLeaseRetryRepository repository =
+                new SameServerLeaseRetryRepository(
+                        delegate,
+                        SameServerLeaseRetryRepository.DEFAULT_MAX_RETRIES,
+                        Duration.ZERO);
+
+        Result<LeaseAcquireOutcome, LeaseErrorCode> result =
+                repository.acquire(characterId, local, nextSession, TTL);
+
+        assertInstanceOf(LeaseAcquireOutcome.Acquired.class, success(result));
+        assertEquals(13, delegate.acquireCalls);
+        assertEquals(50, SameServerLeaseRetryRepository.DEFAULT_MAX_RETRIES);
+        assertEquals(Duration.ofMillis(100), SameServerLeaseRetryRepository.DEFAULT_RETRY_DELAY);
     }
 
     @Test

@@ -35,6 +35,9 @@ jobs:
             if [[ -f .mmorpg-harness/selftest_c3.py ]]; then
               python .mmorpg-harness/selftest_c3.py
             fi
+            if [[ -f .mmorpg-harness/selftest_c4.py ]]; then
+              python .mmorpg-harness/selftest_c4.py
+            fi
           fi
       - name: Verify
         shell: bash

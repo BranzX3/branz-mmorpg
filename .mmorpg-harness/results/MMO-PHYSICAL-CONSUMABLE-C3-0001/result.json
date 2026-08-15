@@ -1,0 +1,165 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CONSUMABLE_USE_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_USE",
+  "action_record": {
+    "action_status": "PASS",
+    "checks": {
+      "client_exit_zero": true,
+      "consumable_use_committed_client": true,
+      "consumable_use_decremented_once_client": true,
+      "consumable_use_dev_command_once_server": true,
+      "consumable_use_filler_commands_server": true,
+      "consumable_use_handshake_client": true,
+      "consumable_use_hotbar_ready_client": true,
+      "consumable_use_mouse_once_client": true,
+      "consumable_use_physical_move_client": true,
+      "consumable_use_quantity_sequence": true,
+      "consumable_use_recovery_complete_client": true,
+      "consumable_use_same_content": true,
+      "consumable_use_same_uuid": true,
+      "consumable_use_selected_client": true,
+      "consumable_use_slot_sequence": true,
+      "consumable_use_stable_client": true,
+      "consumable_use_stage_ready_client": true,
+      "consumable_use_status_commands_server": true,
+      "consumable_use_status_rows_safe": true,
+      "consumable_use_transaction_sequence": true,
+      "consumable_use_version_sequence": true,
+      "consumable_use_windup_client": true,
+      "server_exit_zero": true,
+      "server_handshake_client": true,
+      "status_command_logged_server": true,
+      "status_command_sent_client": true
+    },
+    "client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalConsumableUseAcceptance=true"
+    ],
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 185.5,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_USE",
+    "hotbar_snapshots": [],
+    "lot_snapshots": [
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 9,
+        "transaction_id": "3b67274e-8631-4566-92fc-ff7fcbf27637",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "dae1afac-e25a-439f-ab2d-b288053d63ac",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "dae1afac-e25a-439f-ab2d-b288053d63ac",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "18ecb54f-5542-4329-a694-0ac4e26682e1",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 3
+      }
+    ],
+    "lot_snapshots_raw": [
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 9,
+        "transaction_id": "3b67274e-8631-4566-92fc-ff7fcbf27637",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "dae1afac-e25a-439f-ab2d-b288053d63ac",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "dae1afac-e25a-439f-ab2d-b288053d63ac",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "18ecb54f-5542-4329-a694-0ac4e26682e1",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "18ecb54f-5542-4329-a694-0ac4e26682e1",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "18ecb54f-5542-4329-a694-0ac4e26682e1",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "18ecb54f-5542-4329-a694-0ac4e26682e1",
+        "uuid": "941fbc7c-13ca-4b32-9c69-3a568affd267",
+        "version": 3
+      }
+    ],
+    "player_name": "Player0",
+    "server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalConsumableUseAcceptance=true"
+    ]
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CONSUMABLE-C3-0001/**"
+  ],
+  "base_commit_expected": "a4f48d755d0ae575bdd6c63ec4759a35cc211406",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "f70b2ecac317b277f8449dce411bb10d2d8902ef",
+  "duration_seconds": 189.593,
+  "ending_commit_before_result_commit": "a4f48d755d0ae575bdd6c63ec4759a35cc211406",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-15T15:10:03.301987+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-15T15:06:53.704965+00:00",
+  "starting_commit_actual": "a4f48d755d0ae575bdd6c63ec4759a35cc211406",
+  "task_branch": "harness-task/MMO-PHYSICAL-CONSUMABLE-C3-0001",
+  "task_id": "MMO-PHYSICAL-CONSUMABLE-C3-0001",
+  "task_manifest_sha256": "e844d132317253b2d7274c667dadcb79e9f401744fe16186310f6e186bea5c3f",
+  "unauthorized_writes": []
+}

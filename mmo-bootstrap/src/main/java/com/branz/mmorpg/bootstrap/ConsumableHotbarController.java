@@ -388,8 +388,7 @@ final class ConsumableHotbarController implements Listener {
         combat.endConsumableUse(player, expected.state.operationId());
         if (expected.state.phase() == DurableFlaskUsePhase.COMPLETE) {
             sendTimelineActionBar(
-                    player,
-                    Component.text("CONSUMABLE RECOVERY COMPLETE", NamedTextColor.GREEN));
+                    player, Component.text("CONSUMABLE RECOVERY COMPLETE", NamedTextColor.GREEN));
         }
     }
 

@@ -80,9 +80,14 @@ tasks.runServer {
     val physicalConsumableUseAcceptance =
         providers.gradleProperty("physicalConsumableUseAcceptance").orNull == "true"
     if (physicalConsumableLotAcceptance || physicalConsumableUseAcceptance) {
-        // The existing consumable-lot flag controls physical inventory diagnostics only.
-        // Reuse it for C3 so pickup/place ordering is visible without changing gameplay policy.
+        // The existing consumable-lot flag controls the exact Body Tonic physical acceptance path.
         jvmArgs("-Dmmo.physical-consumable-lot-acceptance=true")
+    }
+    val physicalConsumableC4Acceptance =
+        providers.gradleProperty("physicalConsumableC4Acceptance").orNull == "true"
+    if (physicalConsumableC4Acceptance) {
+        // C4 opens only the exact signed training coating projection in the test quarantine.
+        jvmArgs("-Dmmo.physical-consumable-c4-acceptance=true")
     }
 
     val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"

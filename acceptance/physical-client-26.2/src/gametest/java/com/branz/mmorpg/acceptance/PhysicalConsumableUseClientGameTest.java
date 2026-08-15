@@ -18,6 +18,7 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.HitResult;
 import org.lwjgl.glfw.GLFW;
 
 /** Section C3: physically select and use one authoritative consumable from the gameplay hotbar. */
@@ -104,6 +105,12 @@ final class PhysicalConsumableUseClientGameTest {
                             + " selected="
                             + selectedAuthority);
         }
+
+        context.getInput().lookAt(0.0F, -90.0F);
+        context.waitFor(
+                client -> client.hitResult != null && client.hitResult.getType() == HitResult.Type.MISS,
+                20 * 5);
+        System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_AIR_TARGET_CLIENT");
 
         int firstUseMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);

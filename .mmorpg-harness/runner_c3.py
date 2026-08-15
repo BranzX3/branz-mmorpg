@@ -159,7 +159,49 @@ def evaluate_consumable_use_checks(client_text: str, paper_text: str) -> dict[st
     }
 
 
+def runtime_selfcheck() -> None:
+    uuid = "11111111-1111-1111-1111-111111111111"
+    tx1 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    tx2 = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    tx3 = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    content = "v1.milestone-1.example.4"
+
+    def row(slot: int, version: int, quantity: int, transaction_id: str) -> str:
+        return (
+            f"LOT uuid={uuid} def=consumable.training_body_tonic "
+            f"loc=CHARACTER_INVENTORY/slot:{slot} ver={version} qty={quantity} "
+            f"tx={transaction_id} content={content}"
+        )
+
+    good = "\n".join(
+        [
+            row(9, 1, 64, tx1),
+            STATUS_MARKERS[0],
+            row(9, 1, 64, tx1),
+            row(7, 2, 64, tx2),
+            STATUS_MARKERS[1],
+            row(7, 2, 64, tx2),
+            STATUS_MARKERS[2],
+            row(7, 2, 64, tx2),
+            row(7, 3, 63, tx3),
+            STATUS_MARKERS[3],
+            row(7, 3, 63, tx3),
+        ]
+    )
+    logical = c3_logical_lot_rows(good)
+    if len(logical) != 4 or not c3_probe_rows_safe(good, logical):
+        raise RuntimeError("C3 runtime self-check rejected the valid authority progression")
+
+    second_decrement = good + "\n" + row(
+        7, 4, 62, "dddddddd-dddd-dddd-dddd-dddddddddddd"
+    )
+    if c3_probe_rows_safe(second_decrement, logical):
+        raise RuntimeError("C3 runtime self-check accepted a second authoritative decrement")
+
+
 def install(core: Any) -> None:
+    runtime_selfcheck()
+
     def action_client_acceptance_consumable_use(repo, result_dir, manifest):
         original_popen = core.subprocess.Popen
 

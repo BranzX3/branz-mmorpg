@@ -28,6 +28,8 @@ final class PhysicalConsumableUseClientGameTest {
     private static final int CHRONICLE_HOTBAR_SLOT = 8;
     private static final int EXPECTED_QUANTITY = 64;
     private static final int CONNECTION_TIMEOUT_TICKS = 20 * 60;
+    private static final int PREPARATION_CLICK_ATTEMPTS = 4;
+    private static final int PREPARATION_CLICK_SETTLE_TICKS = 2;
     private static final int INVENTORY_IMAGE_WIDTH = 176;
     private static final int INVENTORY_IMAGE_HEIGHT = 166;
     private static final int DEV_CONTAINER_IMAGE_WIDTH = 176;
@@ -201,43 +203,115 @@ final class PhysicalConsumableUseClientGameTest {
                                     .getItem());
                 },
                 20 * 10);
-        setInventoryCursor(context, SOURCE_STORAGE_SLOT);
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        context.waitFor(
+        pickupTonicWithRetry(context);
+        placeTonicWithRetry(context);
+        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+        context.waitForScreen(null);
+        System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PHYSICAL_MOVE_CLIENT");
+    }
+
+    private static void pickupTonicWithRetry(ClientGameTestContext context) {
+        for (int attempt = 1; attempt <= PREPARATION_CLICK_ATTEMPTS; attempt++) {
+            int state = inventoryMoveState(context);
+            if (state == 1) {
+                System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PICKUP_OBSERVED_CLIENT");
+                return;
+            }
+            if (state != 0) {
+                throw new AssertionError(
+                        "C3 pickup entered an unexpected physical inventory state before retry: "
+                                + state);
+            }
+            setInventoryCursor(context, SOURCE_STORAGE_SLOT);
+            context.waitTicks(1);
+            context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+            context.waitTicks(PREPARATION_CLICK_SETTLE_TICKS);
+            state = inventoryMoveState(context);
+            if (state == 1) {
+                System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PICKUP_OBSERVED_CLIENT");
+                return;
+            }
+            if (state != 0) {
+                throw new AssertionError(
+                        "C3 pickup produced an unexpected physical inventory state: " + state);
+            }
+            System.out.println(
+                    "PHYSICAL_AUTHORITY_CONSUMABLE_USE_PICKUP_RETRY_CLIENT attempt=" + attempt);
+        }
+        throw new AssertionError(
+                "C3 physical pickup did not register after "
+                        + PREPARATION_CLICK_ATTEMPTS
+                        + " state-aware attempts");
+    }
+
+    private static void placeTonicWithRetry(ClientGameTestContext context) {
+        for (int attempt = 1; attempt <= PREPARATION_CLICK_ATTEMPTS; attempt++) {
+            int state = inventoryMoveState(context);
+            if (state == 2) {
+                System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PLACE_OBSERVED_CLIENT");
+                return;
+            }
+            if (state != 1) {
+                throw new AssertionError(
+                        "C3 placement entered an unexpected physical inventory state before retry: "
+                                + state);
+            }
+            setInventoryCursor(context, TARGET_HOTBAR_SLOT);
+            context.waitTicks(1);
+            context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+            context.waitTicks(PREPARATION_CLICK_SETTLE_TICKS);
+            state = inventoryMoveState(context);
+            if (state == 2) {
+                System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PLACE_OBSERVED_CLIENT");
+                return;
+            }
+            if (state != 1) {
+                throw new AssertionError(
+                        "C3 placement produced an unexpected physical inventory state: " + state);
+            }
+            System.out.println(
+                    "PHYSICAL_AUTHORITY_CONSUMABLE_USE_PLACE_RETRY_CLIENT attempt=" + attempt);
+        }
+        throw new AssertionError(
+                "C3 physical placement did not register after "
+                        + PREPARATION_CLICK_ATTEMPTS
+                        + " state-aware attempts");
+    }
+
+    private static int inventoryMoveState(ClientGameTestContext context) {
+        return context.computeOnClient(
                 client -> {
                     if (!(client.gui.screen() instanceof InventoryScreen screen)
                             || client.player == null) {
-                        return false;
+                        return -1;
                     }
                     Slot source =
                             findPlayerSlot(
                                     screen,
                                     client.player.getInventory(),
                                     SOURCE_STORAGE_SLOT);
-                    return source.getItem().isEmpty()
-                            && hasTonicProjection(screen.getMenu().getCarried());
-                },
-                20 * 5);
-        setInventoryCursor(context, TARGET_HOTBAR_SLOT);
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        context.waitFor(
-                client -> {
-                    if (!(client.gui.screen() instanceof InventoryScreen screen)
-                            || client.player == null) {
-                        return false;
-                    }
                     Slot target =
                             findPlayerSlot(
                                     screen,
                                     client.player.getInventory(),
                                     TARGET_HOTBAR_SLOT);
-                    return screen.getMenu().getCarried().isEmpty()
-                            && hasTonicProjection(target.getItem());
-                },
-                20 * 10);
-        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
-        context.waitForScreen(null);
-        System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PHYSICAL_MOVE_CLIENT");
+                    boolean sourceTonic = hasTonicProjection(source.getItem());
+                    boolean targetTonic = hasTonicProjection(target.getItem());
+                    boolean carriedTonic = hasTonicProjection(screen.getMenu().getCarried());
+                    boolean sourceEmpty = source.getItem().isEmpty();
+                    boolean targetEmpty = target.getItem().isEmpty();
+                    boolean carriedEmpty = screen.getMenu().getCarried().isEmpty();
+                    if (sourceTonic && targetEmpty && carriedEmpty) {
+                        return 0;
+                    }
+                    if (sourceEmpty && targetEmpty && carriedTonic) {
+                        return 1;
+                    }
+                    if (sourceEmpty && targetTonic && carriedEmpty) {
+                        return 2;
+                    }
+                    return -2;
+                });
     }
 
     private static LotAuthority waitForMovedAuthority(

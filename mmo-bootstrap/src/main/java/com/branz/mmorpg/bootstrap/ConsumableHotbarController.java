@@ -105,17 +105,50 @@ final class ConsumableHotbarController implements Listener {
         interrupt(player, reason);
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void observeUseIngress(PlayerInteractEvent event) {
+        if (!physicalConsumableUseAcceptanceDebug()
+                || event.getHand() != EquipmentSlot.HAND
+                || !event.getAction().isRightClick()) {
+            return;
+        }
+        Player player = event.getPlayer();
+        plugin.getLogger()
+                .info(
+                        "PHYSICAL_AUTHORITY_CONSUMABLE_USE_INTERACT_SERVER player="
+                                + player.getName()
+                                + " action="
+                                + event.getAction()
+                                + " slot="
+                                + player.getInventory().getHeldItemSlot());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onUse(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND || !event.getAction().isRightClick()) {
             return;
         }
         Player player = event.getPlayer();
-        SelectedConsumable selected = selected(player);
-        if (selected == null) {
+        if (event.useItemInHand() == org.bukkit.event.Event.Result.DENY) {
+            debugUse(player, "REJECTED_SERVER reason=item-use-denied");
             return;
         }
-        event.setCancelled(true);
+        debugUse(player, "ROUTED_SERVER slot=" + player.getInventory().getHeldItemSlot());
+        SelectedConsumable selected = selected(player);
+        if (selected == null) {
+            debugUse(player, "REJECTED_SERVER reason=selected-null");
+            return;
+        }
+        debugUse(
+                player,
+                "SELECTED_SERVER lot="
+                        + selected.lotId
+                        + " definition="
+                        + selected.definitionId
+                        + " category="
+                        + selected.profile.category());
+        event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
+        event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
         begin(player, selected);
     }
 
@@ -178,7 +211,9 @@ final class ConsumableHotbarController implements Listener {
     }
 
     private void begin(Player player, SelectedConsumable selected) {
+        debugUse(player, "BEGIN_ENTER_SERVER lot=" + selected.lotId);
         if (active.containsKey(player.getUniqueId())) {
+            debugUse(player, "REJECTED_SERVER reason=active-use");
             player.sendActionBar(
                     Component.text("Consumable use is already active.", NamedTextColor.RED));
             return;
@@ -187,6 +222,7 @@ final class ConsumableHotbarController implements Listener {
                 && combat.status(player)
                         .map(status -> status.engagementState() == EngagementState.ENGAGED)
                         .orElse(true)) {
+            debugUse(player, "REJECTED_SERVER reason=meal-engaged");
             player.sendActionBar(
                     Component.text("Meals require exploration state.", NamedTextColor.RED));
             return;
@@ -209,6 +245,7 @@ final class ConsumableHotbarController implements Listener {
                                                                         && effect.rare()))
                         .orElse(false);
         if (replacesRare && !player.isSneaking()) {
+            debugUse(player, "REJECTED_SERVER reason=rare-replace-confirmation");
             player.sendActionBar(
                     Component.text(
                             "Sneak + right-click to confirm replacing the active rare effect.",
@@ -217,6 +254,7 @@ final class ConsumableHotbarController implements Listener {
         }
         UUID operationId = UUID.randomUUID();
         if (!combat.beginConsumableUse(player, operationId)) {
+            debugUse(player, "REJECTED_SERVER reason=combat-busy");
             player.sendActionBar(
                     Component.text(
                             "Wait for the weapon to sheathe and finish the active action.",
@@ -237,7 +275,16 @@ final class ConsumableHotbarController implements Listener {
                         selected.profile,
                         replacesRare && player.isSneaking()));
         player.setSprinting(false);
-        player.sendActionBar(
+        debugUse(
+                player,
+                "BEGIN_SERVER lot="
+                        + selected.lotId
+                        + " operation="
+                        + operationId
+                        + " category="
+                        + selected.profile.category());
+        sendTimelineActionBar(
+                player,
                 Component.text(
                         "CONSUMABLE "
                                 + selected.profile.category()
@@ -309,7 +356,8 @@ final class ConsumableHotbarController implements Listener {
             finish(player, current);
             return;
         }
-        player.sendActionBar(
+        sendTimelineActionBar(
+                player,
                 Component.text(
                         "CONSUMABLE "
                                 + committed.effect().category()
@@ -344,8 +392,8 @@ final class ConsumableHotbarController implements Listener {
         }
         combat.endConsumableUse(player, expected.state.operationId());
         if (expected.state.phase() == DurableFlaskUsePhase.COMPLETE) {
-            player.sendActionBar(
-                    Component.text("CONSUMABLE RECOVERY COMPLETE", NamedTextColor.GREEN));
+            sendTimelineActionBar(
+                    player, Component.text("CONSUMABLE RECOVERY COMPLETE", NamedTextColor.GREEN));
         }
     }
 
@@ -507,6 +555,29 @@ final class ConsumableHotbarController implements Listener {
             return null;
         }
         return new SelectedConsumable(lot.lotId(), lot.definitionId(), profile);
+    }
+
+    private static boolean physicalConsumableUseAcceptanceDebug() {
+        return Boolean.getBoolean("mmo.physical-consumable-lot-acceptance")
+                || Boolean.getBoolean("mmo.physical-consumable-use-acceptance");
+    }
+
+    private void sendTimelineActionBar(Player player, Component message) {
+        player.sendActionBar(message);
+        if (physicalConsumableUseAcceptanceDebug()) {
+            player.sendMessage(message);
+        }
+    }
+
+    private void debugUse(Player player, String detail) {
+        if (physicalConsumableUseAcceptanceDebug()) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_CONSUMABLE_USE_"
+                                    + detail
+                                    + " player="
+                                    + player.getName());
+        }
     }
 
     private record SelectedConsumable(

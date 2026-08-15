@@ -1,0 +1,165 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CONSUMABLE_USE_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_USE",
+  "action_record": {
+    "action_status": "PASS",
+    "checks": {
+      "client_exit_zero": true,
+      "consumable_use_committed_client": true,
+      "consumable_use_decremented_once_client": true,
+      "consumable_use_dev_command_once_server": true,
+      "consumable_use_filler_commands_server": true,
+      "consumable_use_handshake_client": true,
+      "consumable_use_hotbar_ready_client": true,
+      "consumable_use_mouse_once_client": true,
+      "consumable_use_physical_move_client": true,
+      "consumable_use_quantity_sequence": true,
+      "consumable_use_recovery_complete_client": true,
+      "consumable_use_same_content": true,
+      "consumable_use_same_uuid": true,
+      "consumable_use_selected_client": true,
+      "consumable_use_slot_sequence": true,
+      "consumable_use_stable_client": true,
+      "consumable_use_stage_ready_client": true,
+      "consumable_use_status_commands_server": true,
+      "consumable_use_status_rows_safe": true,
+      "consumable_use_transaction_sequence": true,
+      "consumable_use_version_sequence": true,
+      "consumable_use_windup_client": true,
+      "server_exit_zero": true,
+      "server_handshake_client": true,
+      "status_command_logged_server": true,
+      "status_command_sent_client": true
+    },
+    "client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalConsumableUseAcceptance=true"
+    ],
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 109.937,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_USE",
+    "hotbar_snapshots": [],
+    "lot_snapshots": [
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 9,
+        "transaction_id": "c0b94768-70b3-439f-9506-8e35efa21d98",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "91263787-e5f6-4031-85d8-740e8982e3ef",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "91263787-e5f6-4031-85d8-740e8982e3ef",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "d3145edf-fcd5-4e96-bea8-07c4fa7421b9",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 3
+      }
+    ],
+    "lot_snapshots_raw": [
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 9,
+        "transaction_id": "c0b94768-70b3-439f-9506-8e35efa21d98",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "91263787-e5f6-4031-85d8-740e8982e3ef",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "91263787-e5f6-4031-85d8-740e8982e3ef",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "d3145edf-fcd5-4e96-bea8-07c4fa7421b9",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "d3145edf-fcd5-4e96-bea8-07c4fa7421b9",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "d3145edf-fcd5-4e96-bea8-07c4fa7421b9",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 63,
+        "slot": 7,
+        "transaction_id": "d3145edf-fcd5-4e96-bea8-07c4fa7421b9",
+        "uuid": "05fe164c-92bc-4ee8-a3ca-cb368e198680",
+        "version": 3
+      }
+    ],
+    "player_name": "Player0",
+    "server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalConsumableUseAcceptance=true"
+    ]
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CONSUMABLE-C3-0037/**"
+  ],
+  "base_commit_expected": "a4f48d755d0ae575bdd6c63ec4759a35cc211406",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "76ee087f6b1a326b728da68f72c5896088889743",
+  "duration_seconds": 110.953,
+  "ending_commit_before_result_commit": "a4f48d755d0ae575bdd6c63ec4759a35cc211406",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-15T13:12:55.901602+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-15T13:11:04.938770+00:00",
+  "starting_commit_actual": "a4f48d755d0ae575bdd6c63ec4759a35cc211406",
+  "task_branch": "harness-task/MMO-PHYSICAL-CONSUMABLE-C3-0037",
+  "task_id": "MMO-PHYSICAL-CONSUMABLE-C3-0037",
+  "task_manifest_sha256": "a4144292359ddcf97fdaa44fa154e8aab5bdb51c57d77a102fdbc6fcc9137a5c",
+  "unauthorized_writes": []
+}

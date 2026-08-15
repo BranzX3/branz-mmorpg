@@ -9,6 +9,8 @@ public final class PhysicalAuthorityClientGameTestDispatcher implements FabricCl
     public void runTest(ClientGameTestContext context) {
         if (Boolean.getBoolean("branz.acceptance.physicalConsumableUse")) {
             new PhysicalConsumableUseClientGameTest().runTest(context);
+            System.out.println("PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT");
+            System.out.println("PHYSICAL_AUTHORITY_STATUS_COMMAND_SENT_CLIENT");
             return;
         }
         if (Boolean.getBoolean("branz.acceptance.physicalConsumableLot")) {

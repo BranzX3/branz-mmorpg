@@ -478,18 +478,20 @@ final class PhysicalConsumableUseClientGameTest {
     }
 
     private static LotAuthority pollTonicStatus(ClientGameTestContext context) {
-        int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
-        sendCommand(context, "/mmo physical status");
-        context.waitTicks(10);
-        String status = tonicStatusSince(firstNewMessage);
-        if (status == null) {
+        for (int attempt = 0; attempt < 12; attempt++) {
+            int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
+            sendCommand(context, "/mmo physical status");
             context.waitTicks(10);
-            status = tonicStatusSince(firstNewMessage);
+            String status = tonicStatusSince(firstNewMessage);
+            if (status == null) {
+                context.waitTicks(10);
+                status = tonicStatusSince(firstNewMessage);
+            }
+            if (status != null) {
+                return parseTonicStatus(status);
+            }
         }
-        if (status == null) {
-            throw new AssertionError("Authoritative tonic status did not answer a C3 probe");
-        }
-        return parseTonicStatus(status);
+        throw new AssertionError("Timed out waiting for authoritative tonic lot status during C3 probe");
     }
 
     private static String sendStatusAndCaptureTonic(

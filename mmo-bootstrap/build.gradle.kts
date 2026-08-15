@@ -77,7 +77,11 @@ tasks.runServer {
     }
     val physicalConsumableLotAcceptance =
         providers.gradleProperty("physicalConsumableLotAcceptance").orNull == "true"
-    if (physicalConsumableLotAcceptance) {
+    val physicalConsumableUseAcceptance =
+        providers.gradleProperty("physicalConsumableUseAcceptance").orNull == "true"
+    if (physicalConsumableLotAcceptance || physicalConsumableUseAcceptance) {
+        // The existing consumable-lot flag controls physical inventory diagnostics only.
+        // Reuse it for C3 so pickup/place ordering is visible without changing gameplay policy.
         jvmArgs("-Dmmo.physical-consumable-lot-acceptance=true")
     }
 

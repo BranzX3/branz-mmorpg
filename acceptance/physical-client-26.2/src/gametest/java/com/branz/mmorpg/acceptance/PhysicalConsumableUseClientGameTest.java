@@ -204,8 +204,52 @@ final class PhysicalConsumableUseClientGameTest {
                                     .getItem());
                 },
                 20 * 10);
-        pickupTonicWithRetry(context);
-        placeTonicWithRetry(context);
+
+        for (int moveAttempt = 1; moveAttempt <= PREPARATION_CLICK_ATTEMPTS; moveAttempt++) {
+            int state = inventoryMoveState(context);
+            if (state == 2) {
+                finishPhysicalMove(context);
+                return;
+            }
+            if (state != 0) {
+                throw new AssertionError(
+                        "C3 whole-move attempt did not begin from canonical source state: "
+                                + inventoryMoveDescription(context));
+            }
+
+            pickupTonicWithRetry(context);
+            context.waitTicks(PREPARATION_RETRY_STABLE_TICKS);
+            state = inventoryMoveState(context);
+            if (state == 0) {
+                System.out.println(
+                        "PHYSICAL_AUTHORITY_CONSUMABLE_USE_MOVE_RESTART_CLIENT attempt="
+                                + moveAttempt
+                                + " phase=post-pickup-reconcile");
+                continue;
+            }
+            if (state != 1) {
+                throw new AssertionError(
+                        "C3 pickup did not remain stable before placement: "
+                                + inventoryMoveDescription(context));
+            }
+
+            if (placeTonicWithRetry(context)) {
+                finishPhysicalMove(context);
+                return;
+            }
+            System.out.println(
+                    "PHYSICAL_AUTHORITY_CONSUMABLE_USE_MOVE_RESTART_CLIENT attempt="
+                            + moveAttempt
+                            + " phase=post-place-reconcile");
+        }
+        throw new AssertionError(
+                "C3 whole physical move did not commit after "
+                        + PREPARATION_CLICK_ATTEMPTS
+                        + " bounded attempts; final="
+                        + inventoryMoveDescription(context));
+    }
+
+    private static void finishPhysicalMove(ClientGameTestContext context) {
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitForScreen(null);
         System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PHYSICAL_MOVE_CLIENT");
@@ -245,12 +289,15 @@ final class PhysicalConsumableUseClientGameTest {
                         + " state-aware attempts");
     }
 
-    private static void placeTonicWithRetry(ClientGameTestContext context) {
+    private static boolean placeTonicWithRetry(ClientGameTestContext context) {
         for (int attempt = 1; attempt <= PREPARATION_CLICK_ATTEMPTS; attempt++) {
             int state = inventoryMoveState(context);
             if (state == 2) {
                 System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PLACE_OBSERVED_CLIENT");
-                return;
+                return true;
+            }
+            if (state == 0) {
+                return false;
             }
             if (state != 1) {
                 throw new AssertionError(
@@ -263,7 +310,10 @@ final class PhysicalConsumableUseClientGameTest {
             state = waitForPreparationTransition(context, 2, 1);
             if (state == 2) {
                 System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PLACE_OBSERVED_CLIENT");
-                return;
+                return true;
+            }
+            if (state == 0) {
+                return false;
             }
             if (state != 1) {
                 throw new AssertionError(

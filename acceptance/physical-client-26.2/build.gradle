@@ -50,4 +50,10 @@ tasks.withType(JavaExec).configureEach {
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalConsumableUseAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalConsumableUse', 'true'
     }
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalConsumableC4Acceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalConsumableC4', 'true'
+    }
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalConsumableC4RestartAcceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalConsumableC4Restart', 'true'
+    }
 }

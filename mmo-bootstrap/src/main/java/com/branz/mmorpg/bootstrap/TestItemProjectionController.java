@@ -21,6 +21,8 @@ import org.bukkit.inventory.ItemStack;
 final class TestItemProjectionController implements Listener {
     private static final String PHYSICAL_CONSUMABLE_ACCEPTANCE_PROPERTY =
             "mmo.physical-consumable-lot-acceptance";
+    private static final String PHYSICAL_CONSUMABLE_C4_ACCEPTANCE_PROPERTY =
+            "mmo.physical-consumable-c4-acceptance";
 
     private final TestItemProjectionService projections;
 
@@ -99,8 +101,13 @@ final class TestItemProjectionController implements Listener {
         if (!isTest(item)) {
             return false;
         }
-        return !Boolean.getBoolean(PHYSICAL_CONSUMABLE_ACCEPTANCE_PROPERTY)
-                || !projections.isPhysicalConsumableAcceptanceProjection(item);
+        boolean c12Allowed =
+                Boolean.getBoolean(PHYSICAL_CONSUMABLE_ACCEPTANCE_PROPERTY)
+                        && projections.isPhysicalConsumableAcceptanceProjection(item);
+        boolean c4Allowed =
+                Boolean.getBoolean(PHYSICAL_CONSUMABLE_C4_ACCEPTANCE_PROPERTY)
+                        && projections.isPhysicalConsumableC4AcceptanceProjection(item);
+        return !c12Allowed && !c4Allowed;
     }
 
     private boolean isTest(ItemStack item) {

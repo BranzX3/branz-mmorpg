@@ -372,7 +372,8 @@ final class ConsumableHotbarController implements Listener {
         if (use == null || use.state.phase().terminal()) {
             return;
         }
-        DurableConsumableUseTransition transition = uses.interrupt(use.state, plugin.getServer().getCurrentTick());
+        DurableConsumableUseTransition transition =
+                uses.interrupt(use.state, plugin.getServer().getCurrentTick());
         use.state = transition.state();
         if (transition.commitNow()) {
             beginCommit(player, use);

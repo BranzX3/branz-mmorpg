@@ -278,7 +278,8 @@ final class ConsumableHotbarController implements Listener {
                         + operationId
                         + " category="
                         + selected.profile.category());
-        player.sendActionBar(
+        sendTimelineActionBar(
+                player,
                 Component.text(
                         "CONSUMABLE "
                                 + selected.profile.category()
@@ -350,7 +351,8 @@ final class ConsumableHotbarController implements Listener {
             finish(player, current);
             return;
         }
-        player.sendActionBar(
+        sendTimelineActionBar(
+                player,
                 Component.text(
                         "CONSUMABLE "
                                 + committed.effect().category()
@@ -385,7 +387,8 @@ final class ConsumableHotbarController implements Listener {
         }
         combat.endConsumableUse(player, expected.state.operationId());
         if (expected.state.phase() == DurableFlaskUsePhase.COMPLETE) {
-            player.sendActionBar(
+            sendTimelineActionBar(
+                    player,
                     Component.text("CONSUMABLE RECOVERY COMPLETE", NamedTextColor.GREEN));
         }
     }
@@ -553,6 +556,13 @@ final class ConsumableHotbarController implements Listener {
     private static boolean physicalConsumableUseAcceptanceDebug() {
         return Boolean.getBoolean("mmo.physical-consumable-lot-acceptance")
                 || Boolean.getBoolean("mmo.physical-consumable-use-acceptance");
+    }
+
+    private void sendTimelineActionBar(Player player, Component message) {
+        player.sendActionBar(message);
+        if (physicalConsumableUseAcceptanceDebug()) {
+            player.sendMessage(message);
+        }
     }
 
     private void debugUse(Player player, String detail) {

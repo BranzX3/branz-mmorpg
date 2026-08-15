@@ -19,7 +19,7 @@ import java.util.Optional;
  * so cross-server ownership remains fail-closed.
  */
 final class SameServerLeaseRetryRepository implements CharacterLeaseRepository {
-    static final int DEFAULT_MAX_RETRIES = 10;
+    static final int DEFAULT_MAX_RETRIES = 50;
     static final Duration DEFAULT_RETRY_DELAY = Duration.ofMillis(100);
 
     private final CharacterLeaseRepository delegate;

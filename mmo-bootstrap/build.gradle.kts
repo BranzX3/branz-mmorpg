@@ -87,7 +87,12 @@ tasks.runServer {
         providers.gradleProperty("physicalConsumableC4Acceptance").orNull == "true"
     if (physicalConsumableC4Acceptance) {
         // C4 opens only the exact signed training coating projection in the test quarantine.
-        jvmArgs("-Dmmo.physical-consumable-c4-acceptance=true")
+        jvmArgs(
+            "-Dmmo.physical-consumable-c4-acceptance=true",
+            // Reuse existing inventory diagnostic markers so the harness proves the invalid clicks
+            // reached the production physical move controller. Quarantine admission is still C4-exact.
+            "-Dmmo.physical-consumable-lot-acceptance=true",
+        )
     }
 
     val smokeTest = providers.gradleProperty("smokeTest").orNull == "true"

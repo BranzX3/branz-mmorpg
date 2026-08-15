@@ -38,9 +38,7 @@ class SameServerLeaseRetryBudgetTest {
         Result<LeaseAcquireOutcome, LeaseErrorCode> result =
                 repository.acquire(characterId, local, nextSession, TTL);
 
-        assertInstanceOf(
-                LeaseAcquireOutcome.Acquired.class,
-                ((Result.Success<LeaseAcquireOutcome, LeaseErrorCode>) result).value());
+        assertInstanceOf(LeaseAcquireOutcome.Acquired.class, success(result));
         assertEquals(13, delegate.acquireCalls);
     }
 
@@ -48,6 +46,15 @@ class SameServerLeaseRetryBudgetTest {
     void defaultBudgetRemainsBounded() {
         assertEquals(50, SameServerLeaseRetryRepository.DEFAULT_MAX_RETRIES);
         assertEquals(Duration.ofMillis(100), SameServerLeaseRetryRepository.DEFAULT_RETRY_DELAY);
+    }
+
+    private static LeaseAcquireOutcome success(Result<LeaseAcquireOutcome, LeaseErrorCode> result) {
+        if (result instanceof Result.Success<LeaseAcquireOutcome, LeaseErrorCode> success) {
+            return success.value();
+        }
+        Result.Failure<LeaseAcquireOutcome, LeaseErrorCode> failure =
+                (Result.Failure<LeaseAcquireOutcome, LeaseErrorCode>) result;
+        throw new AssertionError(failure.error().code() + ": " + failure.detail());
     }
 
     private static CharacterLease lease(

@@ -29,7 +29,8 @@ final class PhysicalConsumableUseClientGameTest {
     private static final int EXPECTED_QUANTITY = 64;
     private static final int CONNECTION_TIMEOUT_TICKS = 20 * 60;
     private static final int PREPARATION_CLICK_ATTEMPTS = 4;
-    private static final int PREPARATION_CLICK_SETTLE_TICKS = 2;
+    private static final int PREPARATION_RETRY_STABLE_TICKS = 6;
+    private static final int PREPARATION_TRANSITION_TIMEOUT_TICKS = 20 * 5;
     private static final int INVENTORY_IMAGE_WIDTH = 176;
     private static final int INVENTORY_IMAGE_HEIGHT = 166;
     private static final int DEV_CONTAINER_IMAGE_WIDTH = 176;
@@ -220,20 +221,20 @@ final class PhysicalConsumableUseClientGameTest {
             if (state != 0) {
                 throw new AssertionError(
                         "C3 pickup entered an unexpected physical inventory state before retry: "
-                                + state);
+                                + inventoryMoveDescription(context));
             }
             setInventoryCursor(context, SOURCE_STORAGE_SLOT);
             context.waitTicks(1);
             context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-            context.waitTicks(PREPARATION_CLICK_SETTLE_TICKS);
-            state = inventoryMoveState(context);
+            state = waitForPreparationTransition(context, 1, 0);
             if (state == 1) {
                 System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PICKUP_OBSERVED_CLIENT");
                 return;
             }
             if (state != 0) {
                 throw new AssertionError(
-                        "C3 pickup produced an unexpected physical inventory state: " + state);
+                        "C3 pickup did not settle into a safe state: "
+                                + inventoryMoveDescription(context));
             }
             System.out.println(
                     "PHYSICAL_AUTHORITY_CONSUMABLE_USE_PICKUP_RETRY_CLIENT attempt=" + attempt);
@@ -254,20 +255,20 @@ final class PhysicalConsumableUseClientGameTest {
             if (state != 1) {
                 throw new AssertionError(
                         "C3 placement entered an unexpected physical inventory state before retry: "
-                                + state);
+                                + inventoryMoveDescription(context));
             }
             setInventoryCursor(context, TARGET_HOTBAR_SLOT);
             context.waitTicks(1);
             context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-            context.waitTicks(PREPARATION_CLICK_SETTLE_TICKS);
-            state = inventoryMoveState(context);
+            state = waitForPreparationTransition(context, 2, 1);
             if (state == 2) {
                 System.out.println("PHYSICAL_AUTHORITY_CONSUMABLE_USE_PLACE_OBSERVED_CLIENT");
                 return;
             }
             if (state != 1) {
                 throw new AssertionError(
-                        "C3 placement produced an unexpected physical inventory state: " + state);
+                        "C3 placement did not settle into a safe state: "
+                                + inventoryMoveDescription(context));
             }
             System.out.println(
                     "PHYSICAL_AUTHORITY_CONSUMABLE_USE_PLACE_RETRY_CLIENT attempt=" + attempt);
@@ -276,6 +277,28 @@ final class PhysicalConsumableUseClientGameTest {
                 "C3 physical placement did not register after "
                         + PREPARATION_CLICK_ATTEMPTS
                         + " state-aware attempts");
+    }
+
+    private static int waitForPreparationTransition(
+            ClientGameTestContext context, int desiredState, int retryState) {
+        int retryStableTicks = 0;
+        int state = inventoryMoveState(context);
+        for (int tick = 0; tick < PREPARATION_TRANSITION_TIMEOUT_TICKS; tick++) {
+            if (state == desiredState) {
+                return state;
+            }
+            if (state == retryState) {
+                retryStableTicks++;
+                if (retryStableTicks >= PREPARATION_RETRY_STABLE_TICKS) {
+                    return state;
+                }
+            } else {
+                retryStableTicks = 0;
+            }
+            context.waitTicks(1);
+            state = inventoryMoveState(context);
+        }
+        return state;
     }
 
     private static int inventoryMoveState(ClientGameTestContext context) {
@@ -312,6 +335,44 @@ final class PhysicalConsumableUseClientGameTest {
                     }
                     return -2;
                 });
+    }
+
+    private static String inventoryMoveDescription(ClientGameTestContext context) {
+        return context.computeOnClient(
+                client -> {
+                    if (!(client.gui.screen() instanceof InventoryScreen screen)
+                            || client.player == null) {
+                        return "screen="
+                                + (client.gui.screen() == null
+                                        ? "null"
+                                        : client.gui.screen().getClass().getSimpleName())
+                                + " player="
+                                + (client.player != null);
+                    }
+                    Slot source =
+                            findPlayerSlot(
+                                    screen,
+                                    client.player.getInventory(),
+                                    SOURCE_STORAGE_SLOT);
+                    Slot target =
+                            findPlayerSlot(
+                                    screen,
+                                    client.player.getInventory(),
+                                    TARGET_HOTBAR_SLOT);
+                    return "source="
+                            + stackDescription(source.getItem())
+                            + " target="
+                            + stackDescription(target.getItem())
+                            + " carried="
+                            + stackDescription(screen.getMenu().getCarried());
+                });
+    }
+
+    private static String stackDescription(net.minecraft.world.item.ItemStack stack) {
+        if (stack.isEmpty()) {
+            return "empty";
+        }
+        return stack.getHoverName().getString() + "x" + stack.getCount();
     }
 
     private static LotAuthority waitForMovedAuthority(

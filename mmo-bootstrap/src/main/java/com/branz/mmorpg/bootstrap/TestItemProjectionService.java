@@ -13,6 +13,8 @@ import org.bukkit.inventory.PlayerInventory;
 final class TestItemProjectionService {
     private static final String PHYSICAL_CONSUMABLE_ACCEPTANCE_DEFINITION =
             "consumable.training_body_tonic";
+    private static final String PHYSICAL_CONSUMABLE_C4_ACCEPTANCE_DEFINITION =
+            "consumable.training_weapon_coating";
 
     private final BukkitItemProjectionCodec codec;
 
@@ -25,16 +27,21 @@ final class TestItemProjectionService {
     }
 
     boolean isPhysicalConsumableAcceptanceProjection(ItemStack item) {
+        return isExactStackableLot(item, PHYSICAL_CONSUMABLE_ACCEPTANCE_DEFINITION);
+    }
+
+    boolean isPhysicalConsumableC4AcceptanceProjection(ItemStack item) {
+        return isExactStackableLot(item, PHYSICAL_CONSUMABLE_C4_ACCEPTANCE_DEFINITION);
+    }
+
+    private boolean isExactStackableLot(ItemStack item, String definitionId) {
         if (!isTestProjection(item)) {
             return false;
         }
         return codec.decode(item, 0)
                 .filter(projection -> projection.signatureValid())
                 .filter(projection -> projection.valueType() == ProjectionValueType.STACKABLE_LOT)
-                .filter(
-                        projection ->
-                                PHYSICAL_CONSUMABLE_ACCEPTANCE_DEFINITION.equals(
-                                        projection.definitionId().value()))
+                .filter(projection -> definitionId.equals(projection.definitionId().value()))
                 .isPresent();
     }
 

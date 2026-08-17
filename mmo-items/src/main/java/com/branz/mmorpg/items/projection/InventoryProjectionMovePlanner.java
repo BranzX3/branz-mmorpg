@@ -138,6 +138,16 @@ public final class InventoryProjectionMovePlanner {
                         ProjectionMoveErrorCode.PROJECTION_MOVE_PERMUTATION_UNSUPPORTED,
                         "Cursor state contains more than one additional MMO value movement.");
             }
+            if (changed.size() == 1) {
+                PlacementChange change = changed.getFirst();
+                ExpectedProjection cursorAuthoritative = expectedById.get(cursor.valueId());
+                if (change.valueType() == ProjectionValueType.STACKABLE_LOT
+                        || cursorAuthoritative.valueType() == ProjectionValueType.STACKABLE_LOT) {
+                    return Result.failure(
+                            ProjectionMoveErrorCode.PROJECTION_MOVE_STACKABLE_UNSUPPORTED,
+                            "Stackable lot swap, merge or mixed cursor permutation is unsupported.");
+                }
+            }
             return Result.success(ProjectionMovePlan.transientCursor());
         }
         if (changed.isEmpty()) {

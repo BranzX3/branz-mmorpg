@@ -158,6 +158,18 @@ class InventoryProjectionMovePlannerTest {
     }
 
     @Test
+    void stackableLotOccupiedSwapIntermediateIsRejected() {
+        ExpectedProjection first = lot(ORE, 14, 20, 4);
+        ExpectedProjection second = lot(ORE, 2, 10, 5);
+
+        assertFailure(
+                List.of(first, second),
+                List.of(observed(first, 2)),
+                Optional.of(observed(second, 1000)),
+                ProjectionMoveErrorCode.PROJECTION_MOVE_STACKABLE_UNSUPPORTED);
+    }
+
+    @Test
     void partialStackableLotCursorIdentityIsRejected() {
         ExpectedProjection ore = lot(ORE, 14, 20, 4);
         ObservedProjection partial =

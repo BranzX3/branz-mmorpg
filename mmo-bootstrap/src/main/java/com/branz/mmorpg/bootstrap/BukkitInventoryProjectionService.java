@@ -12,8 +12,10 @@ import com.branz.mmorpg.items.projection.ProjectionValueType;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
 import com.branz.mmorpg.persistence.transaction.ValueLocationType;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.bukkit.entity.Player;
@@ -96,6 +98,7 @@ final class BukkitInventoryProjectionService {
         }
 
         Set<Integer> authoritativeSlots = new HashSet<>();
+        Map<Integer, ExpectedProjection> expectedBySlot = new HashMap<>();
         for (ExpectedProjection projection : expected) {
             if (projection.slot() < 0
                     || projection.slot() >= planned.length
@@ -115,6 +118,29 @@ final class BukkitInventoryProjectionService {
                 return Result.failure(
                         ProjectionApplyErrorCode.PROJECTION_CLASS_MISMATCH,
                         projection.definitionId() + " database value type does not match content");
+            }
+            expectedBySlot.put(projection.slot(), projection);
+        }
+
+        // A vanilla split clones the signed projection metadata into both halves. The generic
+        // reconciler therefore sees the source half as the correct authoritative value even though
+        // its visible Bukkit amount is now non-canonical. Re-render kept stackable lots whose
+        // visible amount differs from the authority projection so fail-closed split rejection also
+        // repairs the physical client state.
+        int canonicalizedKept = 0;
+        for (int slot : plan.keepSlots()) {
+            ExpectedProjection projection = expectedBySlot.get(slot);
+            if (projection == null || projection.valueType() != ProjectionValueType.STACKABLE_LOT) {
+                continue;
+            }
+            ItemDefinition definition = itemEngine.find(projection.definitionId()).orElseThrow();
+            ItemStack canonical = codec.render(projection, definition);
+            ItemStack current = planned[slot];
+            if (current == null
+                    || current.getType().isAir()
+                    || current.getAmount() != canonical.getAmount()) {
+                planned[slot] = canonical;
+                canonicalizedKept++;
             }
         }
 
@@ -199,9 +225,9 @@ final class BukkitInventoryProjectionService {
                                 : plannedOffHand);
         return Result.success(
                 new ProjectionApplyReport(
-                        plan.keepSlots().size() + nativeKept,
+                        plan.keepSlots().size() - canonicalizedKept + nativeKept,
                         removeSlots.size() + nativeRemoved,
-                        plan.materialize().size() + nativeMaterialized,
+                        plan.materialize().size() + canonicalizedKept + nativeMaterialized,
                         relocated));
     }
 

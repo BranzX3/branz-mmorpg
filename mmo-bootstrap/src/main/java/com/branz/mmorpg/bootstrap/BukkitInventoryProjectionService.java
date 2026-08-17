@@ -136,7 +136,9 @@ final class BukkitInventoryProjectionService {
             ItemDefinition definition = itemEngine.find(projection.definitionId()).orElseThrow();
             ItemStack canonical = codec.render(projection, definition);
             ItemStack current = planned[slot];
-            if (current == null || current.getType().isAir() || current.getAmount() != canonical.getAmount()) {
+            if (current == null
+                    || current.getType().isAir()
+                    || current.getAmount() != canonical.getAmount()) {
                 planned[slot] = canonical;
                 canonicalizedKept++;
             }

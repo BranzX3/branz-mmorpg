@@ -197,7 +197,7 @@ final class PhysicalConsumableC4ClientGameTest {
                                             .getInventory()
                                             .getItem(expectedSlot)
                                             .is(Items.STONE),
-                    20 * 5);
+                    20 * 15);
         }
     }
 

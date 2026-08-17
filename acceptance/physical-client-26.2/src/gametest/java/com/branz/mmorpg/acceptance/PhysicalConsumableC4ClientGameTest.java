@@ -92,10 +92,12 @@ final class PhysicalConsumableC4ClientGameTest {
         waitForSplitTransient(context);
         System.out.println("PHYSICAL_AUTHORITY_C4_SPLIT_TRANSIENT_CLIENT");
         waitForCanonicalInventory(context);
+        closeInventory(context);
         Map<String, LotAuthority> afterSplit =
                 captureCoatingSnapshot(context, 2, "PHYSICAL_AUTHORITY_C4_STATUS_AFTER_SPLIT_CLIENT");
         assertAuthoritySetEquals(staged, afterSplit, "split rejection");
         System.out.println("PHYSICAL_AUTHORITY_C4_SPLIT_RECONCILED_CLIENT");
+        openInventory(context);
 
         // Pick the full first lot up, then physically click the occupied second-lot slot. This is a
         // signed-lot swap/merge attempt and must also fail closed with both lots restored.
@@ -109,10 +111,12 @@ final class PhysicalConsumableC4ClientGameTest {
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
         System.out.println("PHYSICAL_AUTHORITY_C4_SWAP_MOUSE_SENT_CLIENT");
         waitForCanonicalInventory(context);
+        closeInventory(context);
         Map<String, LotAuthority> afterSwap =
                 captureCoatingSnapshot(context, 2, "PHYSICAL_AUTHORITY_C4_STATUS_AFTER_SWAP_CLIENT");
         assertAuthoritySetEquals(staged, afterSwap, "swap rejection");
         System.out.println("PHYSICAL_AUTHORITY_C4_SWAP_RECONCILED_CLIENT");
+        openInventory(context);
 
         // The valid control case: move the first lot as one whole signed stack into gameplay slot 7.
         moveWholeFirstLot(context);
@@ -223,6 +227,11 @@ final class PhysicalConsumableC4ClientGameTest {
         context.getInput().pressKey(options -> options.keyInventory);
         context.waitForScreen(InventoryScreen.class);
         waitForCanonicalInventory(context);
+    }
+
+    private static void closeInventory(ClientGameTestContext context) {
+        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+        context.waitForScreen(null);
     }
 
     private static void waitForCanonicalInventory(ClientGameTestContext context) {

@@ -57,6 +57,8 @@ _runner_c4_status_retry = _load_control_module(
     "runner_c4_status_retry", ".mmorpg-harness/runner_c4_status_retry.py"
 )
 _runner_c4_status_retry.install(_runner_c4)
+_runner_d13 = _load_control_module("runner_d13", ".mmorpg-harness/runner_d13.py")
+_runner_d13.install(_runner_core)
 
 for _name in dir(_runner_core):
     if not _name.startswith("__"):
@@ -65,7 +67,7 @@ for _name in dir(_runner_core):
 RUNNER_EXTENSION_VERSION = (
     "b5-broken-v1+b6-chronicle-v1+b7-broken-restart-v1+"
     "c12-consumable-lot-v2+c3-consumable-use-v1+c4-consumable-restart-v1+"
-    "c4-status-retry-v1"
+    "c4-status-retry-v1+d13-shield-offhand-v1"
 )
 
 if __name__ == "__main__":

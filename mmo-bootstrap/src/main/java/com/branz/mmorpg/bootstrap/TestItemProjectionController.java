@@ -19,6 +19,7 @@ import org.bukkit.inventory.ItemStack;
 
 /** Keeps local test projections isolated from every transfer/use path. */
 final class TestItemProjectionController implements Listener {
+    private static final int PHYSICAL_SHIELD_D13_UNEQUIP_HOTBAR_SLOT = 6;
     private static final String PHYSICAL_CONSUMABLE_ACCEPTANCE_PROPERTY =
             "mmo.physical-consumable-lot-acceptance";
     private static final String PHYSICAL_CONSUMABLE_C4_ACCEPTANCE_PROPERTY =
@@ -92,7 +93,11 @@ final class TestItemProjectionController implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
-        projections.removeAll(event.getPlayer());
+        Player player = event.getPlayer();
+        projections.removeAll(player);
+        if (Boolean.getBoolean(PHYSICAL_SHIELD_D13_ACCEPTANCE_PROPERTY)) {
+            player.getInventory().setItem(PHYSICAL_SHIELD_D13_UNEQUIP_HOTBAR_SLOT, null);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

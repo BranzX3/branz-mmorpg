@@ -1,5 +1,5 @@
 {
   "protocol_version": 1,
-  "state": "ACTIVE",
-  "task_path": ".mmorpg-harness/tasks/MMO-PHYSICAL-CONSUMABLE-C4-0012.json"
+  "state": "IDLE",
+  "task_path": null
 }

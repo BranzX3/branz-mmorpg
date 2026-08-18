@@ -1,0 +1,46 @@
+{
+  "captured_at_utc": "2026-08-18T20:22:29.499118+00:00",
+  "cpu_count": 12,
+  "daemon_control_commit": "591f2402fc0ef455b18187cf56959065a742ed94",
+  "git": {
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "git version 2.55.0.windows.2"
+  },
+  "gradle_wrapper": {
+    "path": "gradlew.bat",
+    "sha256": "fedad02c18e266ec094995a5751b7fe1eb6e74f66bf75db64fae2e50eb22c234",
+    "version_probe": {
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "------------------------------------------------------------\nGradle 9.1.0\n------------------------------------------------------------\n\nBuild time:    2025-09-18 13:05:56 UTC\nRevision:      e45a8dbf2470c2e2474ccc25be9f49331406a07e\n\nKotlin:        2.2.0\nGroovy:        4.0.28\nAnt:           Apache Ant(TM) version 1.10.15 compiled on August 25 2024\nLauncher JVM:  25.0.3 (Eclipse Adoptium 25.0.3+9-LTS)\nDaemon JVM:    C:\\Program Files\\Eclipse Adoptium\\jdk-25.0.3.9-hotspot (no JDK specified, using current Java home)\nOS:            Windows 11 10.0 amd64"
+    }
+  },
+  "java": {
+    "exit_code": 0,
+    "stderr": "openjdk version \"25.0.3\" 2026-04-21 LTS\nOpenJDK Runtime Environment Temurin-25.0.3+9 (build 25.0.3+9-LTS)\nOpenJDK 64-Bit Server VM Temurin-25.0.3+9 (build 25.0.3+9-LTS, mixed mode, sharing)",
+    "stdout": ""
+  },
+  "java_home": "C:\\Program Files\\Eclipse Adoptium\\jdk-25.0.3.9-hotspot",
+  "machine": "AMD64",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "project_files": {
+    "build.gradle.kts": {
+      "sha256": "528d2a6346ba0d159d78e28edc70d3528f379dfb917547074a34f3e5e09f9aae",
+      "size": 1915
+    },
+    "gradle/wrapper/gradle-wrapper.properties": {
+      "sha256": "f726f87639e985586ed7d17e73afcf758f5b47cbd3c7a06d62caed76094aba04",
+      "size": 259
+    },
+    "settings.gradle.kts": {
+      "sha256": "39c776f6af02ae02f43edcf3b257da37336a5297f21c8ca34ec8ef89373e1e70",
+      "size": 634
+    }
+  },
+  "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "python_executable": "C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+  "repo_head": "f95a5aef3248dbe510a68d6c492694341165b933",
+  "repo_remote": "https://github.com/BranzX3/branz-mmorpg.git",
+  "runner_sha256": "766a759b977d40b0453eadcdf81cd71bedf1bd0384e171beead4c04d26db0ec1"
+}

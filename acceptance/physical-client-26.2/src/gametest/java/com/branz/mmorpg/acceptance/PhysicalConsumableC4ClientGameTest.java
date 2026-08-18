@@ -349,22 +349,20 @@ final class PhysicalConsumableC4ClientGameTest {
 
     private static Map<String, LotAuthority> pollCoatingSnapshot(
             ClientGameTestContext context, int expectedCount) {
-        for (int attempt = 0; attempt < 12; attempt++) {
-            int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
-            sendCommand(context, "/mmo physical status");
-            context.waitTicks(10);
-            Map<String, LotAuthority> snapshot = coatingStatusesSince(firstNewMessage);
-            if (snapshot.size() == expectedCount) {
-                return snapshot;
-            }
-            context.waitTicks(10);
-            snapshot = coatingStatusesSince(firstNewMessage);
-            if (snapshot.size() == expectedCount) {
-                return snapshot;
-            }
+        int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
+        sendCommand(context, "/mmo physical status");
+        context.waitFor(
+                client -> coatingStatusesSince(firstNewMessage).size() == expectedCount,
+                20 * 10);
+        Map<String, LotAuthority> snapshot = coatingStatusesSince(firstNewMessage);
+        if (snapshot.size() != expectedCount) {
+            throw new AssertionError(
+                    "Expected "
+                            + expectedCount
+                            + " authoritative C4 coating lots but observed "
+                            + snapshot.size());
         }
-        throw new AssertionError(
-                "Timed out waiting for " + expectedCount + " authoritative C4 coating lots");
+        return snapshot;
     }
 
     private static Map<String, LotAuthority> coatingStatusesSince(int firstMessage) {

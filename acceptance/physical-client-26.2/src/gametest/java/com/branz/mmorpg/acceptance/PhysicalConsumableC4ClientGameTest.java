@@ -160,7 +160,7 @@ final class PhysicalConsumableC4ClientGameTest {
         System.out.println("PHYSICAL_AUTHORITY_C4_RESTART_PROJECTED_CLIENT");
 
         Map<String, LotAuthority> snapshot =
-                captureCoatingSnapshot(
+                captureCoatingSnapshotOnce(
                         context, 2, "PHYSICAL_AUTHORITY_C4_RESTART_STATUS_CLIENT");
         boolean movedLot = snapshot.values().stream().anyMatch(
                 row -> row.quantity() == EXPECTED_QUANTITY
@@ -173,7 +173,7 @@ final class PhysicalConsumableC4ClientGameTest {
         if (!movedLot || !untouchedLot) {
             throw new AssertionError("C4 restart authority locations are invalid: " + snapshot);
         }
-        assertAuthorityStable(context, snapshot, 2);
+        assertAuthorityStableOnce(context, snapshot, 2);
         System.out.println("PHYSICAL_AUTHORITY_C4_RESTART_STABLE_CLIENT");
         disconnectToTitle(context);
     }
@@ -340,9 +340,24 @@ final class PhysicalConsumableC4ClientGameTest {
         }
     }
 
+    private static void assertAuthorityStableOnce(
+            ClientGameTestContext context, Map<String, LotAuthority> expected, int probes) {
+        for (int probe = 0; probe < probes; probe++) {
+            Map<String, LotAuthority> observed = pollCoatingSnapshotOnce(context, expected.size());
+            assertAuthoritySetEquals(expected, observed, "restart stability probe " + probe);
+        }
+    }
+
     private static Map<String, LotAuthority> captureCoatingSnapshot(
             ClientGameTestContext context, int expectedCount, String marker) {
         Map<String, LotAuthority> snapshot = pollCoatingSnapshot(context, expectedCount);
+        System.out.println(marker);
+        return snapshot;
+    }
+
+    private static Map<String, LotAuthority> captureCoatingSnapshotOnce(
+            ClientGameTestContext context, int expectedCount, String marker) {
+        Map<String, LotAuthority> snapshot = pollCoatingSnapshotOnce(context, expectedCount);
         System.out.println(marker);
         return snapshot;
     }
@@ -365,6 +380,24 @@ final class PhysicalConsumableC4ClientGameTest {
         }
         throw new AssertionError(
                 "Timed out waiting for " + expectedCount + " authoritative C4 coating lots");
+    }
+
+    private static Map<String, LotAuthority> pollCoatingSnapshotOnce(
+            ClientGameTestContext context, int expectedCount) {
+        int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
+        sendCommand(context, "/mmo physical status");
+        context.waitFor(
+                client -> coatingStatusesSince(firstNewMessage).size() == expectedCount,
+                20 * 10);
+        Map<String, LotAuthority> snapshot = coatingStatusesSince(firstNewMessage);
+        if (snapshot.size() != expectedCount) {
+            throw new AssertionError(
+                    "Expected "
+                            + expectedCount
+                            + " authoritative C4 coating lots but observed "
+                            + snapshot.size());
+        }
+        return snapshot;
     }
 
     private static Map<String, LotAuthority> coatingStatusesSince(int firstMessage) {

@@ -56,4 +56,7 @@ tasks.withType(JavaExec).configureEach {
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalConsumableC4RestartAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalConsumableC4Restart', 'true'
     }
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalShieldD13Acceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalShieldD13', 'true'
+    }
 }

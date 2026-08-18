@@ -1,0 +1,385 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CONSUMABLE_C4_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_C4_RESTART",
+  "action_record": {
+    "action_status": "PASS",
+    "checks": {
+      "c4_first_identity_preserved_on_second_grant": true,
+      "c4_phase_pass": true,
+      "c4_pre_restart_authority_stable": true,
+      "c4_restart_client_exit_zero": true,
+      "c4_restart_database_preserved_after": true,
+      "c4_restart_database_preserved_before": true,
+      "c4_restart_exact_authority": true,
+      "c4_restart_handshake_client": true,
+      "c4_restart_no_dev_restage_server": true,
+      "c4_restart_pre_snapshot_two": true,
+      "c4_restart_projected_client": true,
+      "c4_restart_server_exit_zero": true,
+      "c4_restart_stable_authority": true,
+      "c4_restart_stable_client": true,
+      "c4_restart_status_client": true,
+      "c4_restart_status_commands_server": true,
+      "c4_restart_status_two": true,
+      "c4_server_expected_lot_commit": true,
+      "c4_server_nine_filler_commands": true,
+      "c4_server_observed_pickup_half": true,
+      "c4_server_observed_swap_with_cursor": true,
+      "c4_server_plan_failures_at_least_two": true,
+      "c4_server_single_lot_commit": true,
+      "c4_server_split_duplicate_rejected": true,
+      "c4_server_status_commands": true,
+      "c4_server_swap_stackable_rejected": true,
+      "c4_server_two_dev_commands": true,
+      "c4_split_authority_byte_stable": true,
+      "c4_staged_locations_and_quantity": true,
+      "c4_status_markers_exact": true,
+      "c4_swap_authority_byte_stable": true,
+      "c4_whole_lot_move_exact": true,
+      "physical_authority_c4_first_lot_ready_client": true,
+      "physical_authority_c4_handshake_client": true,
+      "physical_authority_c4_pre_restart_stable_client": true,
+      "physical_authority_c4_second_lot_ready_client": true,
+      "physical_authority_c4_split_mouse_sent_client": true,
+      "physical_authority_c4_split_reconciled_client": true,
+      "physical_authority_c4_split_transient_client": true,
+      "physical_authority_c4_swap_mouse_sent_client": true,
+      "physical_authority_c4_swap_pickup_client": true,
+      "physical_authority_c4_swap_reconciled_client": true,
+      "physical_authority_c4_whole_move_client": true
+    },
+    "duration_seconds": 130.937,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_C4_RESTART",
+    "phase_record": {
+      "action_status": "PASS",
+      "c4_snapshots": {
+        "after_split": {
+          "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 9,
+            "transaction_id": "37d987c9-5064-4906-a4f8-6a54d6a877a2",
+            "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+            "version": 1
+          },
+          "e41181d2-70e1-4ff7-a436-526c971a146b": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 10,
+            "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+            "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+            "version": 1
+          }
+        },
+        "after_swap": {
+          "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 9,
+            "transaction_id": "37d987c9-5064-4906-a4f8-6a54d6a877a2",
+            "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+            "version": 1
+          },
+          "e41181d2-70e1-4ff7-a436-526c971a146b": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 10,
+            "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+            "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+            "version": 1
+          }
+        },
+        "first": {
+          "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 9,
+            "transaction_id": "37d987c9-5064-4906-a4f8-6a54d6a877a2",
+            "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+            "version": 1
+          }
+        },
+        "moved": {
+          "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 7,
+            "transaction_id": "afc132c7-1b2f-42d3-aad0-5e62545ffd98",
+            "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+            "version": 2
+          },
+          "e41181d2-70e1-4ff7-a436-526c971a146b": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 10,
+            "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+            "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+            "version": 1
+          }
+        },
+        "stable": {
+          "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 7,
+            "transaction_id": "afc132c7-1b2f-42d3-aad0-5e62545ffd98",
+            "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+            "version": 2
+          },
+          "e41181d2-70e1-4ff7-a436-526c971a146b": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 10,
+            "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+            "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+            "version": 1
+          }
+        },
+        "staged": {
+          "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 9,
+            "transaction_id": "37d987c9-5064-4906-a4f8-6a54d6a877a2",
+            "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+            "version": 1
+          },
+          "e41181d2-70e1-4ff7-a436-526c971a146b": {
+            "content_version": "v1.milestone-1.example.4",
+            "quantity": 64,
+            "slot": 10,
+            "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+            "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+            "version": 1
+          }
+        }
+      },
+      "checks": {
+        "c4_first_identity_preserved_on_second_grant": true,
+        "c4_pre_restart_authority_stable": true,
+        "c4_server_expected_lot_commit": true,
+        "c4_server_nine_filler_commands": true,
+        "c4_server_observed_pickup_half": true,
+        "c4_server_observed_swap_with_cursor": true,
+        "c4_server_plan_failures_at_least_two": true,
+        "c4_server_single_lot_commit": true,
+        "c4_server_split_duplicate_rejected": true,
+        "c4_server_status_commands": true,
+        "c4_server_swap_stackable_rejected": true,
+        "c4_server_two_dev_commands": true,
+        "c4_split_authority_byte_stable": true,
+        "c4_staged_locations_and_quantity": true,
+        "c4_status_markers_exact": true,
+        "c4_swap_authority_byte_stable": true,
+        "c4_whole_lot_move_exact": true,
+        "client_exit_zero": true,
+        "physical_authority_c4_first_lot_ready_client": true,
+        "physical_authority_c4_handshake_client": true,
+        "physical_authority_c4_pre_restart_stable_client": true,
+        "physical_authority_c4_second_lot_ready_client": true,
+        "physical_authority_c4_split_mouse_sent_client": true,
+        "physical_authority_c4_split_reconciled_client": true,
+        "physical_authority_c4_split_transient_client": true,
+        "physical_authority_c4_swap_mouse_sent_client": true,
+        "physical_authority_c4_swap_pickup_client": true,
+        "physical_authority_c4_swap_reconciled_client": true,
+        "physical_authority_c4_whole_move_client": true,
+        "server_exit_zero": true,
+        "server_handshake_client": true,
+        "status_command_logged_server": true,
+        "status_command_sent_client": true
+      },
+      "client_argv": [
+        "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+        "--no-daemon",
+        "--console=plain",
+        "runClientGameTest",
+        "-PphysicalConsumableC4Acceptance=true"
+      ],
+      "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+      "duration_seconds": 76.437,
+      "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_CONSUMABLE_C4",
+      "hotbar_snapshots": [],
+      "player_name": "Player0",
+      "server_argv": [
+        "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+        "--no-daemon",
+        "--console=plain",
+        ":mmo-bootstrap:runServer",
+        "-PphysicalConsumableC4Acceptance=true"
+      ]
+    },
+    "phase_snapshots": {
+      "after_split": {
+        "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 9,
+          "transaction_id": "37d987c9-5064-4906-a4f8-6a54d6a877a2",
+          "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+          "version": 1
+        },
+        "e41181d2-70e1-4ff7-a436-526c971a146b": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 10,
+          "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+          "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+          "version": 1
+        }
+      },
+      "after_swap": {
+        "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 9,
+          "transaction_id": "37d987c9-5064-4906-a4f8-6a54d6a877a2",
+          "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+          "version": 1
+        },
+        "e41181d2-70e1-4ff7-a436-526c971a146b": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 10,
+          "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+          "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+          "version": 1
+        }
+      },
+      "first": {
+        "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 9,
+          "transaction_id": "37d987c9-5064-4906-a4f8-6a54d6a877a2",
+          "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+          "version": 1
+        }
+      },
+      "moved": {
+        "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 7,
+          "transaction_id": "afc132c7-1b2f-42d3-aad0-5e62545ffd98",
+          "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+          "version": 2
+        },
+        "e41181d2-70e1-4ff7-a436-526c971a146b": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 10,
+          "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+          "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+          "version": 1
+        }
+      },
+      "stable": {
+        "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 7,
+          "transaction_id": "afc132c7-1b2f-42d3-aad0-5e62545ffd98",
+          "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+          "version": 2
+        },
+        "e41181d2-70e1-4ff7-a436-526c971a146b": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 10,
+          "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+          "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+          "version": 1
+        }
+      },
+      "staged": {
+        "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 9,
+          "transaction_id": "37d987c9-5064-4906-a4f8-6a54d6a877a2",
+          "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+          "version": 1
+        },
+        "e41181d2-70e1-4ff7-a436-526c971a146b": {
+          "content_version": "v1.milestone-1.example.4",
+          "quantity": 64,
+          "slot": 10,
+          "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+          "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+          "version": 1
+        }
+      }
+    },
+    "restart_client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalConsumableC4RestartAcceptance=true"
+    ],
+    "restart_player_name": "Player0",
+    "restart_server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalConsumableC4Acceptance=true"
+    ],
+    "restart_stable_snapshot": {
+      "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "afc132c7-1b2f-42d3-aad0-5e62545ffd98",
+        "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+        "version": 2
+      },
+      "e41181d2-70e1-4ff7-a436-526c971a146b": {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 10,
+        "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+        "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+        "version": 1
+      }
+    },
+    "restart_status_snapshot": {
+      "2022a33c-50fa-4b43-88cc-134a409dca5f": {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 7,
+        "transaction_id": "afc132c7-1b2f-42d3-aad0-5e62545ffd98",
+        "uuid": "2022a33c-50fa-4b43-88cc-134a409dca5f",
+        "version": 2
+      },
+      "e41181d2-70e1-4ff7-a436-526c971a146b": {
+        "content_version": "v1.milestone-1.example.4",
+        "quantity": 64,
+        "slot": 10,
+        "transaction_id": "c808064c-750e-4b97-a1bb-f1ca169410a8",
+        "uuid": "e41181d2-70e1-4ff7-a436-526c971a146b",
+        "version": 1
+      }
+    }
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CONSUMABLE-C4-0013/**"
+  ],
+  "base_commit_expected": "79d560413b7b0bc7783742477caf33eb76f311f8",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "0ecf981e77600ed99ccc37a63f42a84f9188cc15",
+  "duration_seconds": 131.047,
+  "ending_commit_before_result_commit": "79d560413b7b0bc7783742477caf33eb76f311f8",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-18T20:06:45.372467+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-18T20:04:34.324213+00:00",
+  "starting_commit_actual": "79d560413b7b0bc7783742477caf33eb76f311f8",
+  "task_branch": "harness-task/MMO-PHYSICAL-CONSUMABLE-C4-0013",
+  "task_id": "MMO-PHYSICAL-CONSUMABLE-C4-0013",
+  "task_manifest_sha256": "206ffd112ae7da1610a66e8f61b901400af8647e012bd2095c30c834c26ddc82",
+  "unauthorized_writes": []
+}

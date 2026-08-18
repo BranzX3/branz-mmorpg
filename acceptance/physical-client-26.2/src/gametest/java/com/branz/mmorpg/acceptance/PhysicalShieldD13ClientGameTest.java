@@ -201,6 +201,7 @@ final class PhysicalShieldD13ClientGameTest {
         }
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D13_RECONNECT_STABLE_CLIENT");
 
+        freeHotbarSlot(context, UNEQUIP_HOTBAR_SLOT);
         selectEmptyUnequipHotbar(context);
         context.getInput().pressKey(options -> options.keySwapOffhand);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D13_UNEQUIP_F_SENT_CLIENT");
@@ -341,7 +342,7 @@ final class PhysicalShieldD13ClientGameTest {
     }
 
     private static void selectShieldHotbar(ClientGameTestContext context) {
-        context.getInput().pressKey(GLFW.GLFW_KEY_8);
+        context.getInput().pressKey(options -> options.keyHotbarSlots[SHIELD_HOTBAR_SLOT]);
         context.waitFor(
                 client -> client.player != null && hasShieldProjection(client.player.getMainHandItem()),
                 20 * 10);
@@ -349,7 +350,7 @@ final class PhysicalShieldD13ClientGameTest {
     }
 
     private static void selectEmptyUnequipHotbar(ClientGameTestContext context) {
-        context.getInput().pressKey(GLFW.GLFW_KEY_7);
+        context.getInput().pressKey(options -> options.keyHotbarSlots[UNEQUIP_HOTBAR_SLOT]);
         context.waitFor(
                 client -> client.player != null && client.player.getMainHandItem().isEmpty(),
                 20 * 10);

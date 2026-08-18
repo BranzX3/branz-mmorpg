@@ -97,6 +97,7 @@ final class TestItemProjectionController implements Listener {
         projections.removeAll(player);
         if (Boolean.getBoolean(PHYSICAL_SHIELD_D13_ACCEPTANCE_PROPERTY)) {
             player.getInventory().setItem(PHYSICAL_SHIELD_D13_UNEQUIP_HOTBAR_SLOT, null);
+            player.getInventory().setHeldItemSlot(PHYSICAL_SHIELD_D13_UNEQUIP_HOTBAR_SLOT);
         }
     }
 

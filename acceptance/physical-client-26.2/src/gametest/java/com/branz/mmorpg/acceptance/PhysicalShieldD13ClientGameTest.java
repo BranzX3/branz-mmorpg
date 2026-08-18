@@ -201,7 +201,6 @@ final class PhysicalShieldD13ClientGameTest {
         }
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D13_RECONNECT_STABLE_CLIENT");
 
-        freeHotbarSlot(context, UNEQUIP_HOTBAR_SLOT);
         selectEmptyUnequipHotbar(context);
         context.getInput().pressKey(options -> options.keySwapOffhand);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D13_UNEQUIP_F_SENT_CLIENT");

@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_SHIELD_D13_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D13",
+  "action_record": {
+    "harness_error": "CLIENT_ACCEPTANCE_CLIENT_EXITED"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-SHIELD-D13-0008/**"
+  ],
+  "base_commit_expected": "a747ec267666051cf91a4f05d3b8080253141642",
+  "blocker_code": "CLIENT_ACCEPTANCE_CLIENT_EXITED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "7ed7e8b99286c5bcca8d37d28e74eee3ab702470",
+  "duration_seconds": 78.594,
+  "ending_commit_before_result_commit": "a747ec267666051cf91a4f05d3b8080253141642",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-08-18T20:37:17.071160+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-18T20:35:58.470382+00:00",
+  "starting_commit_actual": "a747ec267666051cf91a4f05d3b8080253141642",
+  "task_branch": "harness-task/MMO-PHYSICAL-SHIELD-D13-0008",
+  "task_id": "MMO-PHYSICAL-SHIELD-D13-0008",
+  "task_manifest_sha256": "fe31ebd03788dcb2f84eafe10e2fb6a90b42f8a435a30188dae16ea767d4c8fd",
+  "unauthorized_writes": []
+}

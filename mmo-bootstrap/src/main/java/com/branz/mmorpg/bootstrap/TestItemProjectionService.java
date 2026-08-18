@@ -15,6 +15,8 @@ final class TestItemProjectionService {
             "consumable.training_body_tonic";
     private static final String PHYSICAL_CONSUMABLE_C4_ACCEPTANCE_DEFINITION =
             "consumable.training_weapon_coating";
+    private static final String PHYSICAL_SHIELD_D13_ACCEPTANCE_DEFINITION =
+            "equipment.training_shield";
 
     private final BukkitItemProjectionCodec codec;
 
@@ -34,6 +36,10 @@ final class TestItemProjectionService {
         return isExactStackableLot(item, PHYSICAL_CONSUMABLE_C4_ACCEPTANCE_DEFINITION);
     }
 
+    boolean isPhysicalShieldD13AcceptanceProjection(ItemStack item) {
+        return isExactUniqueItem(item, PHYSICAL_SHIELD_D13_ACCEPTANCE_DEFINITION);
+    }
+
     private boolean isExactStackableLot(ItemStack item, String definitionId) {
         if (!isTestProjection(item)) {
             return false;
@@ -41,6 +47,17 @@ final class TestItemProjectionService {
         return codec.decode(item, 0)
                 .filter(projection -> projection.signatureValid())
                 .filter(projection -> projection.valueType() == ProjectionValueType.STACKABLE_LOT)
+                .filter(projection -> definitionId.equals(projection.definitionId().value()))
+                .isPresent();
+    }
+
+    private boolean isExactUniqueItem(ItemStack item, String definitionId) {
+        if (!isTestProjection(item)) {
+            return false;
+        }
+        return codec.decode(item, 0)
+                .filter(projection -> projection.signatureValid())
+                .filter(projection -> projection.valueType() == ProjectionValueType.UNIQUE_ITEM)
                 .filter(projection -> definitionId.equals(projection.definitionId().value()))
                 .isPresent();
     }

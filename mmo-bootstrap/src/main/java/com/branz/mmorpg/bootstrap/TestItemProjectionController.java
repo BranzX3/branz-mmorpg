@@ -19,10 +19,13 @@ import org.bukkit.inventory.ItemStack;
 
 /** Keeps local test projections isolated from every transfer/use path. */
 final class TestItemProjectionController implements Listener {
+    private static final int PHYSICAL_SHIELD_D13_UNEQUIP_HOTBAR_SLOT = 6;
     private static final String PHYSICAL_CONSUMABLE_ACCEPTANCE_PROPERTY =
             "mmo.physical-consumable-lot-acceptance";
     private static final String PHYSICAL_CONSUMABLE_C4_ACCEPTANCE_PROPERTY =
             "mmo.physical-consumable-c4-acceptance";
+    private static final String PHYSICAL_SHIELD_D13_ACCEPTANCE_PROPERTY =
+            "mmo.physical-shield-d13-acceptance";
 
     private final TestItemProjectionService projections;
 
@@ -39,9 +42,9 @@ final class TestItemProjectionController implements Listener {
                 event.getClick() == ClickType.NUMBER_KEY && event.getHotbarButton() >= 0
                         ? player.getInventory().getItem(event.getHotbarButton())
                         : null;
-        if (blocksPhysicalAcceptancePath(event.getCurrentItem())
-                || blocksPhysicalAcceptancePath(event.getCursor())
-                || blocksPhysicalAcceptancePath(hotbar)) {
+        if (blocksInventoryAcceptancePath(event.getCurrentItem())
+                || blocksInventoryAcceptancePath(event.getCursor())
+                || blocksInventoryAcceptancePath(hotbar)) {
             event.setCancelled(true);
         }
     }
@@ -62,7 +65,8 @@ final class TestItemProjectionController implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onSwap(PlayerSwapHandItemsEvent event) {
-        if (isTest(event.getMainHandItem()) || isTest(event.getOffHandItem())) {
+        if (blocksShieldSwapAcceptancePath(event.getMainHandItem())
+                || blocksShieldSwapAcceptancePath(event.getOffHandItem())) {
             event.setCancelled(true);
         }
     }
@@ -89,12 +93,27 @@ final class TestItemProjectionController implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
-        projections.removeAll(event.getPlayer());
+        Player player = event.getPlayer();
+        projections.removeAll(player);
+        if (Boolean.getBoolean(PHYSICAL_SHIELD_D13_ACCEPTANCE_PROPERTY)) {
+            player.getInventory().setItem(PHYSICAL_SHIELD_D13_UNEQUIP_HOTBAR_SLOT, null);
+            player.getInventory().setHeldItemSlot(PHYSICAL_SHIELD_D13_UNEQUIP_HOTBAR_SLOT);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         projections.removeAll(event.getPlayer());
+    }
+
+    private boolean blocksInventoryAcceptancePath(ItemStack item) {
+        if (!isTest(item)) {
+            return false;
+        }
+        boolean shieldAllowed =
+                Boolean.getBoolean(PHYSICAL_SHIELD_D13_ACCEPTANCE_PROPERTY)
+                        && projections.isPhysicalShieldD13AcceptanceProjection(item);
+        return !shieldAllowed && blocksPhysicalAcceptancePath(item);
     }
 
     private boolean blocksPhysicalAcceptancePath(ItemStack item) {
@@ -108,6 +127,14 @@ final class TestItemProjectionController implements Listener {
                 Boolean.getBoolean(PHYSICAL_CONSUMABLE_C4_ACCEPTANCE_PROPERTY)
                         && projections.isPhysicalConsumableC4AcceptanceProjection(item);
         return !c12Allowed && !c4Allowed;
+    }
+
+    private boolean blocksShieldSwapAcceptancePath(ItemStack item) {
+        if (!isTest(item)) {
+            return false;
+        }
+        return !(Boolean.getBoolean(PHYSICAL_SHIELD_D13_ACCEPTANCE_PROPERTY)
+                && projections.isPhysicalShieldD13AcceptanceProjection(item));
     }
 
     private boolean isTest(ItemStack item) {

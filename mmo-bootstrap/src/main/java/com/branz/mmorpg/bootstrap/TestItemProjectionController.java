@@ -1,6 +1,7 @@
 package com.branz.mmorpg.bootstrap;
 
 import java.util.Objects;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -71,6 +72,30 @@ final class TestItemProjectionController implements Listener {
                 || blocksShieldSwapAcceptancePath(event.getOffHandItem())) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onSwapMonitor(PlayerSwapHandItemsEvent event) {
+        if (!Boolean.getBoolean(PHYSICAL_SHIELD_D46_ACCEPTANCE_PROPERTY)) {
+            return;
+        }
+        Player player = event.getPlayer();
+        Bukkit.getLogger()
+                .info(
+                        "PHYSICAL_AUTHORITY_SHIELD_D46_SWAP_FINAL_SERVER player="
+                                + player.getName()
+                                + " cancelled="
+                                + event.isCancelled()
+                                + " held-slot="
+                                + player.getInventory().getHeldItemSlot()
+                                + " current-main="
+                                + player.getInventory().getItemInMainHand().getType()
+                                + " current-off="
+                                + player.getInventory().getItemInOffHand().getType()
+                                + " event-to-main="
+                                + event.getMainHandItem().getType()
+                                + " event-to-off="
+                                + event.getOffHandItem().getType());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

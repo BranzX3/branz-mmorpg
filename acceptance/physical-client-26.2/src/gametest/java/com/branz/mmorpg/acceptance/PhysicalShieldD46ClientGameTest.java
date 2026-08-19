@@ -36,7 +36,6 @@ final class PhysicalShieldD46ClientGameTest {
     private static final String DEV_MODULE_NAME = "Persisted Test Item";
     private static final String GRANT_SUCCESS_MESSAGE =
             "Persisted test value x1 granted and projected.";
-    private static final String GUARD_READY_MESSAGE = "WEAPON GUARD";
     private static final String STAFF_EMPTY_MESSAGE = "ATTUNE A STAFF SPELL AT REST";
     private static final String SOURCE_TAG = "branz_d46_source";
     private static final Pattern SHIELD_STATUS =
@@ -160,7 +159,6 @@ final class PhysicalShieldD46ClientGameTest {
         System.out.println(
                 "PHYSICAL_AUTHORITY_SHIELD_D46_PRE_GUARD_STATE_CLIENT "
                         + messageStartingSince(firstHealthMessage, "Combat session: "));
-        int firstGuardMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
         context.waitTicks(2);
         int firstPostGuardHealthMessage = RECEIVED_GAME_MESSAGES.size();
@@ -170,12 +168,16 @@ final class PhysicalShieldD46ClientGameTest {
                         messageStartingSince(firstPostGuardHealthMessage, "Combat session: ")
                                 != null,
                 20 * 5);
+        String postGuardState =
+                messageStartingSince(firstPostGuardHealthMessage, "Combat session: ");
         System.out.println(
-                "PHYSICAL_AUTHORITY_SHIELD_D46_POST_GUARD_STATE_CLIENT "
-                        + messageStartingSince(
-                                firstPostGuardHealthMessage, "Combat session: "));
-        context.waitFor(
-                client -> messageEqualsSince(firstGuardMessage, GUARD_READY_MESSAGE), 20 * 10);
+                "PHYSICAL_AUTHORITY_SHIELD_D46_POST_GUARD_STATE_CLIENT " + postGuardState);
+        if (postGuardState == null
+                || (!postGuardState.contains("guard=PERFECT(")
+                        && !postGuardState.contains("guard=GUARDING("))) {
+            throw new AssertionError(
+                    "Physical RMB did not activate authoritative guard: " + postGuardState);
+        }
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_GUARD_ACTIVE_CLIENT");
 
         ItemAuthority beforeImpact =

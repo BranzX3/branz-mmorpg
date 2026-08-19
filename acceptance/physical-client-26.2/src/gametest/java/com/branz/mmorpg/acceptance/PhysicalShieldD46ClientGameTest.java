@@ -121,6 +121,14 @@ final class PhysicalShieldD46ClientGameTest {
         context.waitTicks(40);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_SOURCE_STAGED_CLIENT");
 
+        // Guard is intentionally legal only while ENGAGED. A mob acquiring threat moves the
+        // session into ALERT; commit one normal physical sword opener while the frozen Husk is
+        // safely out of range so production hostileActivity() promotes the session to ENGAGED.
+        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_ENGAGE_LMB_SENT_CLIENT");
+        context.waitTicks(20);
+        System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_ENGAGE_ACTION_SETTLED_CLIENT");
+
         int firstGuardMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
         context.waitFor(

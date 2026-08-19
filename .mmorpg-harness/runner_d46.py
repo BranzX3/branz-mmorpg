@@ -55,18 +55,23 @@ def _row(match: re.Match[str]) -> dict[str, Any]:
     }
 
 
+def _marker_matches(text: str, marker: str) -> list[re.Match[str]]:
+    return list(re.finditer(re.escape(marker) + r"(?=\r?$)", text, re.MULTILINE))
+
+
 def snapshots(client_text: str) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     lower = 0
     for marker in SNAPSHOT_MARKERS:
-        if client_text.count(marker) != 1:
+        marker_matches = [match for match in _marker_matches(client_text, marker) if match.start() >= lower]
+        if len(marker_matches) != 1:
             return []
-        marker_pos = client_text.index(marker, lower)
+        marker_pos = marker_matches[0].start()
         matches = list(SHIELD_STATUS.finditer(client_text, lower, marker_pos))
         if not matches:
             return []
         result.append(_row(matches[-1]))
-        lower = marker_pos + len(marker)
+        lower = marker_matches[0].end()
     return result
 
 
@@ -127,7 +132,10 @@ def evaluate(client_text: str, paper_text: str) -> dict[str, bool]:
             "d46_no_double_spend": False,
             "d46_staff_f_shield_stable": False,
         }
-    checks = {f"d46_marker_{i:02d}": client_text.count(marker) == 1 for i, marker in enumerate(CLIENT_MARKERS, 1)}
+    checks = {
+        f"d46_marker_{i:02d}": len(_marker_matches(client_text, marker)) == 1
+        for i, marker in enumerate(CLIENT_MARKERS, 1)
+    }
     checks.update(progression)
     checks.update(
         {
@@ -147,8 +155,10 @@ def evaluate(client_text: str, paper_text: str) -> dict[str, bool]:
 def runtime_selfcheck() -> None:
     uuid = "11111111-1111-1111-1111-111111111111"
     content = "v1.milestone-1.example.4"
+
     def row(location: str, version: int, current: int, tx: str) -> str:
         return f"ITEM uuid={uuid} def=equipment.training_shield loc={location} ver={version} durability={current}/180 tx={tx} content={content}"
+
     tx1 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
     tx2 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"
     tx3 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3"
@@ -172,7 +182,12 @@ def runtime_selfcheck() -> None:
         ["/mmo dev"] * 3
         + ["/item replace entity @s hotbar."] * 11
         + ["/mmo physical status"] * 9
-        + ["summon minecraft:husk", "minecraft:slowness infinite 255 true", "tp @e[tag=branz_d46_source,limit=1]", "/kill @e[tag=branz_d46_source]"]
+        + [
+            "summon minecraft:husk",
+            "minecraft:slowness infinite 255 true",
+            "tp @e[tag=branz_d46_source,limit=1]",
+            "/kill @e[tag=branz_d46_source]",
+        ]
     )
     checks = evaluate(client, paper)
     failed = sorted(name for name, passed in checks.items() if not passed)
@@ -213,7 +228,9 @@ def install(core: Any) -> None:
         record["action_status"] = "PASS" if passed else "FAIL"
         return (
             0 if passed else 1,
-            "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_PASS\n" if passed else "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_FAIL\n",
+            "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_PASS\n"
+            if passed
+            else "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_FAIL\n",
             stderr,
             record,
         )

@@ -52,7 +52,8 @@ final class PhysicalOffHandInteractionController implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPhysicalShieldUseTrace(PlayerInteractEvent event) {
-        if (!Boolean.getBoolean("mmo.physical-shield-d13-acceptance")
+        if ((!Boolean.getBoolean("mmo.physical-shield-d13-acceptance")
+                        && !Boolean.getBoolean("mmo.physical-shield-d46-acceptance"))
                 || (event.getAction() != Action.RIGHT_CLICK_AIR
                         && event.getAction() != Action.RIGHT_CLICK_BLOCK)) {
             return;

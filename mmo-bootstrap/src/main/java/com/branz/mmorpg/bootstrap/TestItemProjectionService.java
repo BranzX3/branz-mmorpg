@@ -17,6 +17,8 @@ final class TestItemProjectionService {
             "consumable.training_weapon_coating";
     private static final String PHYSICAL_SHIELD_D13_ACCEPTANCE_DEFINITION =
             "equipment.training_shield";
+    private static final String PHYSICAL_SHIELD_D46_STAFF_ACCEPTANCE_DEFINITION =
+            "weapon.training_staff";
 
     private final BukkitItemProjectionCodec codec;
 
@@ -38,6 +40,10 @@ final class TestItemProjectionService {
 
     boolean isPhysicalShieldD13AcceptanceProjection(ItemStack item) {
         return isExactUniqueItem(item, PHYSICAL_SHIELD_D13_ACCEPTANCE_DEFINITION);
+    }
+
+    boolean isPhysicalShieldD46StaffAcceptanceProjection(ItemStack item) {
+        return isExactUniqueItem(item, PHYSICAL_SHIELD_D46_STAFF_ACCEPTANCE_DEFINITION);
     }
 
     private boolean isExactStackableLot(ItemStack item, String definitionId) {

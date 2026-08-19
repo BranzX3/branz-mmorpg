@@ -212,17 +212,69 @@ final class PhysicalOffHandInteractionController implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onSwapHands(PlayerSwapHandItemsEvent event) {
         Player player = event.getPlayer();
+        boolean d46Trace = Boolean.getBoolean("mmo.physical-shield-d46-acceptance");
+        if (d46Trace) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_SHIELD_D46_SWAP_ENTER_SERVER player="
+                                    + player.getName()
+                                    + " cancelled="
+                                    + event.isCancelled()
+                                    + " ready="
+                                    + characters.ready(player)
+                                    + " held-slot="
+                                    + player.getInventory().getHeldItemSlot()
+                                    + " current-main="
+                                    + player.getInventory().getItemInMainHand().getType()
+                                    + " current-off="
+                                    + player.getInventory().getItemInOffHand().getType()
+                                    + " event-to-main="
+                                    + event.getMainHandItem().getType()
+                                    + " event-to-off="
+                                    + event.getOffHandItem().getType());
+        }
         if (!characters.ready(player)) {
             return;
         }
         ResolvedPhysicalItem selected = characters.selectedPhysicalItem(player).orElse(null);
+        if (d46Trace) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_SHIELD_D46_SWAP_RESOLVE_SERVER player="
+                                    + player.getName()
+                                    + " selected="
+                                    + (selected == null ? "NONE" : selected.definition().id().value())
+                                    + " selected-family="
+                                    + (selected == null
+                                            ? "NONE"
+                                            : selected.definition()
+                                                    .weaponProfile()
+                                                    .map(profile -> profile.family())
+                                                    .orElse("NONE"))
+                                    + " mutation="
+                                    + characters.valueMutationInFlight(player));
+        }
         if (selected != null
                 && selected.definition().weaponProfile().stream()
                         .anyMatch(profile -> profile.family().equals("STAFF"))) {
+            if (d46Trace) {
+                plugin.getLogger()
+                        .info(
+                                "PHYSICAL_AUTHORITY_SHIELD_D46_SWAP_ROUTE_SERVER player="
+                                        + player.getName()
+                                        + " owner=STAFF");
+            }
             return;
         }
         LoadedCharacterSession active = characters.active(player).orElse(null);
         if (active == null) {
+            if (d46Trace) {
+                plugin.getLogger()
+                        .info(
+                                "PHYSICAL_AUTHORITY_SHIELD_D46_SWAP_ROUTE_SERVER player="
+                                        + player.getName()
+                                        + " owner=NONE reason=NO_ACTIVE_SESSION");
+            }
             return;
         }
         ItemId committedOffHandId =
@@ -232,7 +284,21 @@ final class PhysicalOffHandInteractionController implements Listener {
                         || committedOffHandId != null
                         || codec.hasProjectionMarker(player.getInventory().getItemInOffHand());
         if (!touchesMmo) {
+            if (d46Trace) {
+                plugin.getLogger()
+                        .info(
+                                "PHYSICAL_AUTHORITY_SHIELD_D46_SWAP_ROUTE_SERVER player="
+                                        + player.getName()
+                                        + " owner=NONE reason=NO_MMO_TOUCH");
+            }
             return;
+        }
+        if (d46Trace) {
+            plugin.getLogger()
+                    .info(
+                            "PHYSICAL_AUTHORITY_SHIELD_D46_SWAP_ROUTE_SERVER player="
+                                    + player.getName()
+                                    + " owner=SHIELD");
         }
         event.setCancelled(true);
 

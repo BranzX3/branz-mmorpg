@@ -64,12 +64,7 @@ final class PhysicalShieldD46ClientGameTest {
 
         ItemAuthority staged =
                 captureShield(context, "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_STAGED_CLIENT");
-        requireShield(
-                staged,
-                inventoryLocation(SHIELD_HOTBAR_SLOT),
-                180,
-                180,
-                "staged");
+        requireShield(staged, inventoryLocation(SHIELD_HOTBAR_SLOT), 180, 180, "staged");
         context.waitFor(
                 client ->
                         client.player != null
@@ -99,8 +94,7 @@ final class PhysicalShieldD46ClientGameTest {
                         context,
                         staged,
                         candidate ->
-                                isLocationMove(
-                                        staged, candidate, "NATIVE_EQUIPPED/OFF_HAND"),
+                                isLocationMove(staged, candidate, "NATIVE_EQUIPPED/OFF_HAND"),
                         "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_EQUIPPED_CLIENT");
         waitForShieldOffhand(context);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_EQUIPPED_CLIENT");
@@ -210,6 +204,15 @@ final class PhysicalShieldD46ClientGameTest {
 
         selectHotbar(context, STAFF_HOTBAR_SLOT, STAFF_ID);
         context.waitTicks(20);
+        int firstStaffHealthMessage = RECEIVED_GAME_MESSAGES.size();
+        sendCommand(context, "/mmo health");
+        context.waitFor(
+                client ->
+                        messageStartingSince(firstStaffHealthMessage, "Combat session: ") != null,
+                20 * 5);
+        System.out.println(
+                "PHYSICAL_AUTHORITY_SHIELD_D46_PRE_STAFF_STATE_CLIENT "
+                        + messageStartingSince(firstStaffHealthMessage, "Combat session: "));
         int firstStaffMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressKey(options -> options.keySwapOffhand);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_STAFF_F_SENT_CLIENT");
@@ -273,31 +276,8 @@ final class PhysicalShieldD46ClientGameTest {
         clickMenuEntry(context, DEV_MODULE_NAME);
         context.waitFor(client -> menuContains(client.gui.screen(), definitionId), 20 * 10);
         int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
-        boolean confirmed = false;
-        for (int attempt = 0; attempt < 3; attempt++) {
-            clickMenuEntry(context, definitionId);
-            context.waitTicks(40);
-            confirmed =
-                    grantSucceededSince(firstNewMessage)
-                            || context.computeOnClient(
-                                    client ->
-                                            client.player != null
-                                                    && hasProjection(
-                                                            client.player
-                                                                    .getInventory()
-                                                                    .getItem(expectedSlot),
-                                                            definitionId));
-            if (confirmed) {
-                break;
-            }
-        }
-        if (!confirmed) {
-            throw new AssertionError(
-                    "D4-D6 persisted grant was not confirmed: definition="
-                            + definitionId
-                            + " slot="
-                            + expectedSlot);
-        }
+        clickMenuEntry(context, definitionId);
+        context.waitFor(client -> grantSucceededSince(firstNewMessage), 20 * 15);
         context.waitFor(
                 client ->
                         client.player != null
@@ -305,6 +285,7 @@ final class PhysicalShieldD46ClientGameTest {
                                         client.player.getInventory().getItem(expectedSlot),
                                         definitionId),
                 20 * 10);
+        context.waitTicks(2);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitForScreen(null);
     }

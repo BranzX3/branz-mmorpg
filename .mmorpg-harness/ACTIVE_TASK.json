@@ -1,5 +1,5 @@
 {
   "protocol_version": 1,
-  "state": "IDLE",
-  "task_path": null
+  "state": "ACTIVE",
+  "task_path": ".mmorpg-harness/tasks/MMO-PHYSICAL-SHIELD-D46-0009.json"
 }

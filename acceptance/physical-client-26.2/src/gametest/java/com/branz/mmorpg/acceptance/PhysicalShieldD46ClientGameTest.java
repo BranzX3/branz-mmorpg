@@ -152,6 +152,14 @@ final class PhysicalShieldD46ClientGameTest {
         // The primer applies 35 poise against the training player's 30-point threshold, so the
         // normal 6-tick CC must expire before RMB can pass the hard-control input gate.
         context.waitTicks(10);
+        int firstHealthMessage = RECEIVED_GAME_MESSAGES.size();
+        sendCommand(context, "/mmo health");
+        context.waitFor(
+                client -> messageStartingSince(firstHealthMessage, "Combat session: ") != null,
+                20 * 5);
+        System.out.println(
+                "PHYSICAL_AUTHORITY_SHIELD_D46_PRE_GUARD_STATE_CLIENT "
+                        + messageStartingSince(firstHealthMessage, "Combat session: "));
         int firstGuardMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
         context.waitFor(
@@ -454,6 +462,16 @@ final class PhysicalShieldD46ClientGameTest {
             }
         }
         return false;
+    }
+
+    private static String messageStartingSince(int firstMessage, String prefix) {
+        for (int index = firstMessage; index < RECEIVED_GAME_MESSAGES.size(); index++) {
+            String message = RECEIVED_GAME_MESSAGES.get(index);
+            if (message.startsWith(prefix)) {
+                return message;
+            }
+        }
+        return null;
     }
 
     private static boolean messageEqualsSince(int firstMessage, String expected) {

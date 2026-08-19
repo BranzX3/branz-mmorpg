@@ -69,7 +69,7 @@ for _name in dir(_runner_core):
 RUNNER_EXTENSION_VERSION = (
     "b5-broken-v1+b6-chronicle-v1+b7-broken-restart-v1+"
     "c12-consumable-lot-v2+c3-consumable-use-v1+c4-consumable-restart-v1+"
-    "c4-status-retry-v1+d13-shield-offhand-v1+d46-shield-wear-staff-v2"
+    "c4-status-retry-v1+d13-shield-offhand-v1+d46-shield-wear-staff-v3"
 )
 
 if __name__ == "__main__":

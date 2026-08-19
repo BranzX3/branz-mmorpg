@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-SHIELD-D46-0009",
+  "task_branch": "harness-task/MMO-PHYSICAL-SHIELD-D46-0009",
+  "base_commit": "cab26be90d724431990609bc99eade09d91ba89c",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_SHIELD_D46_V2",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-SHIELD-D46-0009/**"
+  ]
+}

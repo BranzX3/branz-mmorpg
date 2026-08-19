@@ -67,13 +67,22 @@ final class PhysicalOffHandInteractionController implements Listener {
         ItemDefinition offHandDefinition =
                 active == null
                         ? null
-                        : active.snapshot().equipment().item(EquipmentSlot.OFF_HAND)
+                        : active.snapshot()
+                                .equipment()
+                                .item(EquipmentSlot.OFF_HAND)
                                 .flatMap(
                                         itemId ->
                                                 active.snapshot().itemRecords().stream()
-                                                        .filter(record -> record.itemId().equals(itemId))
+                                                        .filter(
+                                                                record ->
+                                                                        record.itemId()
+                                                                                .equals(itemId))
                                                         .findFirst()
-                                                        .flatMap(record -> items.find(record.definitionId())))
+                                                        .flatMap(
+                                                                record ->
+                                                                        items.find(
+                                                                                record
+                                                                                        .definitionId())))
                                 .orElse(null);
         String loadout = "NO_SELECTED";
         String weaponDurability = "NO_SELECTED";
@@ -82,9 +91,13 @@ final class PhysicalOffHandInteractionController implements Listener {
                     WeaponLoadoutPolicy.resolve(
                             selected.definition(), Optional.ofNullable(offHandDefinition));
             loadout =
-                    resolved instanceof Result.Success<WeaponLoadoutResolution, WeaponLoadoutErrorCode>
+                    resolved
+                                    instanceof
+                                    Result.Success<
+                                            WeaponLoadoutResolution, WeaponLoadoutErrorCode>
                             ? "OK"
-                            : ((Result.Failure<WeaponLoadoutResolution, WeaponLoadoutErrorCode>) resolved)
+                            : ((Result.Failure<WeaponLoadoutResolution, WeaponLoadoutErrorCode>)
+                                            resolved)
                                     .error()
                                     .code();
             weaponDurability =
@@ -108,13 +121,12 @@ final class PhysicalOffHandInteractionController implements Listener {
                                 + " material="
                                 + event.getMaterial()
                                 + " selected="
-                                + (selected == null
-                                        ? "NONE"
-                                        : selected.definition().id().value())
+                                + (selected == null ? "NONE" : selected.definition().id().value())
                                 + " selected-family="
                                 + (selected == null
                                         ? "NONE"
-                                        : selected.definition().weaponProfile()
+                                        : selected.definition()
+                                                .weaponProfile()
                                                 .map(profile -> profile.family())
                                                 .orElse("NONE"))
                                 + " mutation="

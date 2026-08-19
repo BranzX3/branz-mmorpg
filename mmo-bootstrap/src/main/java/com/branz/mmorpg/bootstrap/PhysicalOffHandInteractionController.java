@@ -93,8 +93,7 @@ final class PhysicalOffHandInteractionController implements Listener {
             loadout =
                     resolved
                                     instanceof
-                                    Result.Success<
-                                            WeaponLoadoutResolution, WeaponLoadoutErrorCode>
+                                    Result.Success<WeaponLoadoutResolution, WeaponLoadoutErrorCode>
                             ? "OK"
                             : ((Result.Failure<WeaponLoadoutResolution, WeaponLoadoutErrorCode>)
                                             resolved)

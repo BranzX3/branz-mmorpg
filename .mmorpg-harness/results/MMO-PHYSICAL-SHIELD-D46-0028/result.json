@@ -1,0 +1,136 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_SHIELD_D46_V2",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_V2",
+  "action_record": {
+    "action_status": "PASS",
+    "checks": {
+      "client_exit_zero": true,
+      "d46_eleven_item_replace_commands_server": true,
+      "d46_equip_exact": true,
+      "d46_guard_did_not_mutate": true,
+      "d46_husk_cleanup_server": true,
+      "d46_husk_slow_once_server": true,
+      "d46_husk_summon_once_server": true,
+      "d46_husk_three_teleports_server": true,
+      "d46_marker_01": true,
+      "d46_marker_02": true,
+      "d46_marker_03": true,
+      "d46_marker_04": true,
+      "d46_marker_05": true,
+      "d46_marker_06": true,
+      "d46_marker_07": true,
+      "d46_marker_08": true,
+      "d46_marker_09": true,
+      "d46_marker_10": true,
+      "d46_marker_11": true,
+      "d46_marker_12": true,
+      "d46_marker_13": true,
+      "d46_marker_14": true,
+      "d46_no_double_spend": true,
+      "d46_one_point_wear_exact": true,
+      "d46_snapshots_complete": true,
+      "d46_staff_f_shield_stable": true,
+      "d46_staged_exact": true,
+      "d46_status_commands_bounded_server": true,
+      "d46_three_dev_commands_server": true,
+      "server_exit_zero": true,
+      "server_handshake_client": true,
+      "status_command_logged_server": true,
+      "status_command_sent_client": true
+    },
+    "client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalShieldD46Acceptance=true"
+    ],
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 146.515,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_V2",
+    "hotbar_snapshots": [],
+    "player_name": "Player0",
+    "server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalShieldD46Acceptance=true"
+    ],
+    "shield_snapshots": [
+      {
+        "content": "v1.milestone-1.example.4",
+        "current": 180,
+        "location": "CHARACTER_INVENTORY/slot:6",
+        "maximum": 180,
+        "tx": "1e0d5c06-4aa1-446b-96cb-fe8ef90f09b3",
+        "uuid": "972eab30-9be6-45bd-9ca2-1f812c279c63",
+        "version": 1
+      },
+      {
+        "content": "v1.milestone-1.example.4",
+        "current": 180,
+        "location": "NATIVE_EQUIPPED/OFF_HAND",
+        "maximum": 180,
+        "tx": "643322c9-b6a5-4dad-be3f-0235ff334000",
+        "uuid": "972eab30-9be6-45bd-9ca2-1f812c279c63",
+        "version": 2
+      },
+      {
+        "content": "v1.milestone-1.example.4",
+        "current": 180,
+        "location": "NATIVE_EQUIPPED/OFF_HAND",
+        "maximum": 180,
+        "tx": "643322c9-b6a5-4dad-be3f-0235ff334000",
+        "uuid": "972eab30-9be6-45bd-9ca2-1f812c279c63",
+        "version": 2
+      },
+      {
+        "content": "v1.milestone-1.example.4",
+        "current": 179,
+        "location": "NATIVE_EQUIPPED/OFF_HAND",
+        "maximum": 180,
+        "tx": "47ae4301-052d-4970-8130-9e9893a78447",
+        "uuid": "972eab30-9be6-45bd-9ca2-1f812c279c63",
+        "version": 3
+      },
+      {
+        "content": "v1.milestone-1.example.4",
+        "current": 179,
+        "location": "NATIVE_EQUIPPED/OFF_HAND",
+        "maximum": 180,
+        "tx": "47ae4301-052d-4970-8130-9e9893a78447",
+        "uuid": "972eab30-9be6-45bd-9ca2-1f812c279c63",
+        "version": 3
+      },
+      {
+        "content": "v1.milestone-1.example.4",
+        "current": 179,
+        "location": "NATIVE_EQUIPPED/OFF_HAND",
+        "maximum": 180,
+        "tx": "47ae4301-052d-4970-8130-9e9893a78447",
+        "uuid": "972eab30-9be6-45bd-9ca2-1f812c279c63",
+        "version": 3
+      }
+    ]
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-SHIELD-D46-0028/**"
+  ],
+  "base_commit_expected": "ccd017ee8baaeba552e66791883122f83f0afef2",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "828484f6f09194f49eabbbdf9205284f60f4d2e2",
+  "duration_seconds": 147.468,
+  "ending_commit_before_result_commit": "ccd017ee8baaeba552e66791883122f83f0afef2",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-19T18:44:09.223954+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-19T18:41:41.754391+00:00",
+  "starting_commit_actual": "ccd017ee8baaeba552e66791883122f83f0afef2",
+  "task_branch": "harness-task/MMO-PHYSICAL-SHIELD-D46-0028",
+  "task_id": "MMO-PHYSICAL-SHIELD-D46-0028",
+  "task_manifest_sha256": "3d9880961197fbf64c624bdb754279a8fe6eb88a9c08fa450987ad3c2e27793e",
+  "unauthorized_writes": []
+}

@@ -127,22 +127,34 @@ final class PhysicalShieldD46ClientGameTest {
                 context,
                 "/effect clear @e[tag=" + SOURCE_TAG + ",limit=1] minecraft:slowness");
         context.waitTicks(2);
-        int firstPrimerMessage = RECEIVED_GAME_MESSAGES.size();
+        float primerHealth =
+                context.computeOnClient(
+                        client -> {
+                            if (client.player == null) {
+                                throw new AssertionError(
+                                        "Player disappeared before D4-D6 engagement primer");
+                            }
+                            return client.player.getHealth();
+                        });
         sendCommand(
                 context,
                 "/execute at @s run tp @e[tag=" + SOURCE_TAG + ",limit=1] ^ ^ ^1.5");
-        context.waitFor(client -> hitOutcomeSince(firstPrimerMessage), 20 * 15);
+        context.waitFor(
+                client -> client.player != null && client.player.getHealth() < primerHealth,
+                20 * 10);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_ENGAGEMENT_PRIMER_HIT_CLIENT");
-        sendCommand(
-                context,
-                "/execute at @s run tp @e[tag=" + SOURCE_TAG + ",limit=1] ^ ^ ^12");
-        context.waitTicks(10);
 
+        // Arm guard immediately while the authoritative hostile activity is fresh. Retreat only
+        // after the guard transition so the engagement gate cannot decay before RMB is routed.
         int firstGuardMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
         context.waitFor(
                 client -> messageEqualsSince(firstGuardMessage, GUARD_READY_MESSAGE), 20 * 10);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_GUARD_ACTIVE_CLIENT");
+        sendCommand(
+                context,
+                "/execute at @s run tp @e[tag=" + SOURCE_TAG + ",limit=1] ^ ^ ^12");
+        context.waitTicks(2);
 
         ItemAuthority beforeImpact =
                 captureShield(
@@ -416,15 +428,6 @@ final class PhysicalShieldD46ClientGameTest {
         if (!expected.equals(actual)) {
             throw new AssertionError(detail + ": expected=" + expected + " actual=" + actual);
         }
-    }
-
-    private static boolean hitOutcomeSince(int firstMessage) {
-        for (int index = firstMessage; index < RECEIVED_GAME_MESSAGES.size(); index++) {
-            if (RECEIVED_GAME_MESSAGES.get(index).startsWith("HIT ")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean guardedOutcomeSince(int firstMessage) {

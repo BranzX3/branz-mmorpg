@@ -162,6 +162,18 @@ final class PhysicalShieldD46ClientGameTest {
                         + messageStartingSince(firstHealthMessage, "Combat session: "));
         int firstGuardMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+        context.waitTicks(2);
+        int firstPostGuardHealthMessage = RECEIVED_GAME_MESSAGES.size();
+        sendCommand(context, "/mmo health");
+        context.waitFor(
+                client ->
+                        messageStartingSince(firstPostGuardHealthMessage, "Combat session: ")
+                                != null,
+                20 * 5);
+        System.out.println(
+                "PHYSICAL_AUTHORITY_SHIELD_D46_POST_GUARD_STATE_CLIENT "
+                        + messageStartingSince(
+                                firstPostGuardHealthMessage, "Combat session: "));
         context.waitFor(
                 client -> messageEqualsSince(firstGuardMessage, GUARD_READY_MESSAGE), 20 * 10);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_GUARD_ACTIVE_CLIENT");

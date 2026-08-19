@@ -38,6 +38,8 @@ final class PhysicalShieldD13ClientGameTest {
     private static final double SLOT_CENTER_OFFSET = SLOT_HITBOX_SIZE / 2.0;
     private static final String DEFINITION_ID = "equipment.training_shield";
     private static final String DEV_MODULE_NAME = "Persisted Test Item";
+    private static final String GRANT_SUCCESS_MESSAGE =
+            "Persisted test value x1 granted and projected.";
     private static final Pattern SHIELD_STATUS =
             Pattern.compile(
                     "^ITEM uuid=([0-9a-fA-F-]{36}) def=equipment\\.training_shield loc=([^ ]+) ver=(\\d+) durability=(\\d+)/(\\d+) tx=([0-9a-fA-F-]{36}) content=(\\S+)$");
@@ -52,7 +54,7 @@ final class PhysicalShieldD13ClientGameTest {
         waitForServerHandshake(context);
         prepareMainInventoryGrantSlots(context);
 
-        grantShield(context);
+        grantShield(context, FIRST_STORAGE_SLOT);
         Map<String, ItemAuthority> firstOnly =
                 captureShieldSnapshot(context, 1, "PHYSICAL_AUTHORITY_SHIELD_D13_STATUS_FIRST_CLIENT");
         ItemAuthority first = only(firstOnly);
@@ -60,7 +62,7 @@ final class PhysicalShieldD13ClientGameTest {
         requireFreshShield(first, "first");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D13_FIRST_READY_CLIENT");
 
-        grantShield(context);
+        grantShield(context, SECOND_STORAGE_SLOT);
         Map<String, ItemAuthority> staged =
                 captureShieldSnapshot(context, 2, "PHYSICAL_AUTHORITY_SHIELD_D13_STATUS_STAGED_CLIENT");
         ItemAuthority stagedFirst = staged.get(first.uuid());
@@ -275,15 +277,50 @@ final class PhysicalShieldD13ClientGameTest {
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D13_FILLER_READY_CLIENT");
     }
 
-    private static void grantShield(ClientGameTestContext context) {
+    private static void grantShield(ClientGameTestContext context, int expectedSlot) {
         sendCommand(context, "/mmo dev");
         context.waitFor(client -> menuContains(client.gui.screen(), DEV_MODULE_NAME), 20 * 10);
         clickMenuEntry(context, DEV_MODULE_NAME);
         context.waitFor(client -> menuContains(client.gui.screen(), DEFINITION_ID), 20 * 10);
-        clickMenuEntry(context, DEFINITION_ID);
-        context.waitTicks(20);
+        int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
+        boolean confirmed = false;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            clickMenuEntry(context, DEFINITION_ID);
+            context.waitTicks(40);
+            confirmed =
+                    grantSucceededSince(firstNewMessage)
+                            || context.computeOnClient(
+                                    client ->
+                                            client.player != null
+                                                    && hasShieldProjection(
+                                                            client.player
+                                                                    .getInventory()
+                                                                    .getItem(expectedSlot)));
+            if (confirmed) {
+                break;
+            }
+        }
+        if (!confirmed) {
+            throw new AssertionError(
+                    "D1-D3 shield grant was not confirmed in storage slot " + expectedSlot);
+        }
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && hasShieldProjection(
+                                        client.player.getInventory().getItem(expectedSlot)),
+                20 * 10);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitForScreen(null);
+    }
+
+    private static boolean grantSucceededSince(int firstMessage) {
+        for (int index = firstMessage; index < RECEIVED_GAME_MESSAGES.size(); index++) {
+            if (GRANT_SUCCESS_MESSAGE.equals(RECEIVED_GAME_MESSAGES.get(index))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void freeHotbarSlot(ClientGameTestContext context, int slot) {

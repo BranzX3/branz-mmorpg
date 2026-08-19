@@ -27,6 +27,7 @@ CLIENT_MARKERS = (
     "PHYSICAL_AUTHORITY_SHIELD_D46_EQUIP_F_SENT_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_EQUIPPED_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_SOURCE_STAGED_CLIENT",
+    "PHYSICAL_AUTHORITY_SHIELD_D46_ENGAGEMENT_PRIMER_HIT_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_GUARD_ACTIVE_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_REAL_BLOCKED_IMPACT_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_WORN_ONCE_CLIENT",
@@ -140,8 +141,8 @@ def evaluate(client_text: str, paper_text: str) -> dict[str, bool]:
             "d46_husk_slow_once_server": (
                 paper_text.count("minecraft:slowness infinite 255 true") == 1
             ),
-            "d46_husk_teleport_once_server": (
-                paper_text.count("tp @e[tag=branz_d46_source,limit=1]") == 1
+            "d46_husk_three_teleports_server": (
+                paper_text.count("tp @e[tag=branz_d46_source,limit=1]") == 3
             ),
             "d46_husk_cleanup_server": (
                 paper_text.count("/kill @e[tag=branz_d46_source]") in (1, 2)
@@ -186,9 +187,9 @@ def runtime_selfcheck() -> None:
         + [
             "summon minecraft:husk",
             "minecraft:slowness infinite 255 true",
-            "tp @e[tag=branz_d46_source,limit=1]",
-            "/kill @e[tag=branz_d46_source]",
         ]
+        + ["tp @e[tag=branz_d46_source,limit=1]"] * 3
+        + ["/kill @e[tag=branz_d46_source]"]
     )
     checks = evaluate(client, paper)
     failed = sorted(name for name, passed in checks.items() if not passed)

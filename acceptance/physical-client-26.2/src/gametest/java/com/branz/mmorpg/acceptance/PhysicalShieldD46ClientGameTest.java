@@ -121,13 +121,18 @@ final class PhysicalShieldD46ClientGameTest {
         context.waitTicks(40);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_SOURCE_STAGED_CLIENT");
 
-        // Guard is intentionally legal only while ENGAGED. A mob acquiring threat moves the
-        // session into ALERT; commit one normal physical sword opener while the frozen Husk is
-        // safely out of range so production hostileActivity() promotes the session to ENGAGED.
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_ENGAGE_LMB_SENT_CLIENT");
-        context.waitTicks(20);
-        System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_ENGAGE_ACTION_SETTLED_CLIENT");
+        // Guard is legal only while ENGAGED. Let the real hostile produce one ordinary melee HIT,
+        // which production records as hostile activity, then move it back out before arming guard.
+        int firstPrimerMessage = RECEIVED_GAME_MESSAGES.size();
+        sendCommand(
+                context,
+                "/execute at @s run tp @e[tag=" + SOURCE_TAG + ",limit=1] ^ ^ ^1.5");
+        context.waitFor(client -> hitOutcomeSince(firstPrimerMessage), 20 * 15);
+        System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_ENGAGEMENT_PRIMER_HIT_CLIENT");
+        sendCommand(
+                context,
+                "/execute at @s run tp @e[tag=" + SOURCE_TAG + ",limit=1] ^ ^ ^12");
+        context.waitTicks(10);
 
         int firstGuardMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
@@ -407,6 +412,15 @@ final class PhysicalShieldD46ClientGameTest {
         if (!expected.equals(actual)) {
             throw new AssertionError(detail + ": expected=" + expected + " actual=" + actual);
         }
+    }
+
+    private static boolean hitOutcomeSince(int firstMessage) {
+        for (int index = firstMessage; index < RECEIVED_GAME_MESSAGES.size(); index++) {
+            if (RECEIVED_GAME_MESSAGES.get(index).startsWith("HIT ")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean guardedOutcomeSince(int firstMessage) {

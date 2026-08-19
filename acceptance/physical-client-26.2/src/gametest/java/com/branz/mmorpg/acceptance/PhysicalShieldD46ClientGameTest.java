@@ -149,7 +149,9 @@ final class PhysicalShieldD46ClientGameTest {
         sendCommand(
                 context,
                 "/execute at @s run tp @e[tag=" + SOURCE_TAG + ",limit=1] ^ ^ ^12");
-        context.waitTicks(2);
+        // The primer applies 35 poise against the training player's 30-point threshold, so the
+        // normal 6-tick CC must expire before RMB can pass the hard-control input gate.
+        context.waitTicks(10);
         int firstGuardMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
         context.waitFor(

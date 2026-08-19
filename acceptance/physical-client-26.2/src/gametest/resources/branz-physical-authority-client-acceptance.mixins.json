@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.branz.mmorpg.acceptance",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "DedicatedActionBarCaptureMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

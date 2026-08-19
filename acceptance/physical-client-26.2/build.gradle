@@ -59,4 +59,7 @@ tasks.withType(JavaExec).configureEach {
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalShieldD13Acceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalShieldD13', 'true'
     }
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalShieldD46Acceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalShieldD46', 'true'
+    }
 }

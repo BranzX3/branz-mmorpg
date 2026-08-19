@@ -26,6 +26,8 @@ final class TestItemProjectionController implements Listener {
             "mmo.physical-consumable-c4-acceptance";
     private static final String PHYSICAL_SHIELD_D13_ACCEPTANCE_PROPERTY =
             "mmo.physical-shield-d13-acceptance";
+    private static final String PHYSICAL_SHIELD_D46_ACCEPTANCE_PROPERTY =
+            "mmo.physical-shield-d46-acceptance";
 
     private final TestItemProjectionService projections;
 
@@ -133,8 +135,14 @@ final class TestItemProjectionController implements Listener {
         if (!isTest(item)) {
             return false;
         }
-        return !(Boolean.getBoolean(PHYSICAL_SHIELD_D13_ACCEPTANCE_PROPERTY)
-                && projections.isPhysicalShieldD13AcceptanceProjection(item));
+        boolean shieldAllowed =
+                (Boolean.getBoolean(PHYSICAL_SHIELD_D13_ACCEPTANCE_PROPERTY)
+                                || Boolean.getBoolean(PHYSICAL_SHIELD_D46_ACCEPTANCE_PROPERTY))
+                        && projections.isPhysicalShieldD13AcceptanceProjection(item);
+        boolean staffAllowed =
+                Boolean.getBoolean(PHYSICAL_SHIELD_D46_ACCEPTANCE_PROPERTY)
+                        && projections.isPhysicalShieldD46StaffAcceptanceProjection(item);
+        return !shieldAllowed && !staffAllowed;
     }
 
     private boolean isTest(ItemStack item) {

@@ -40,7 +40,8 @@ final class PhysicalShieldD46ClientGameTest {
     private static final String SHIELD_ID = "equipment.training_shield";
     private static final String STAFF_ID = "weapon.training_staff";
     private static final String DEV_MODULE_NAME = "Persisted Test Item";
-    private static final String GRANT_SUCCESS_MESSAGE = "Persisted test value x1 granted and projected.";
+    private static final String GRANT_SUCCESS_MESSAGE =
+            "Persisted test value x1 granted and projected.";
     private static final String GUARD_READY_MESSAGE = "WEAPON GUARD";
     private static final String STAFF_EMPTY_MESSAGE = "ATTUNE A STAFF SPELL AT REST";
     private static final String SOURCE_TAG = "branz_d46_source";
@@ -61,8 +62,14 @@ final class PhysicalShieldD46ClientGameTest {
         grantItem(context, SWORD_ID, SWORD_STORAGE_SLOT);
         grantItem(context, SHIELD_ID, SHIELD_STORAGE_SLOT);
         grantItem(context, STAFF_ID, STAFF_STORAGE_SLOT);
-        ItemAuthority staged = captureShield(context, "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_STAGED_CLIENT");
-        requireShield(staged, "CHARACTER_INVENTORY/slot:" + SHIELD_STORAGE_SLOT, 180, 180, "staged");
+        ItemAuthority staged =
+                captureShield(context, "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_STAGED_CLIENT");
+        requireShield(
+                staged,
+                "CHARACTER_INVENTORY/slot:" + SHIELD_STORAGE_SLOT,
+                180,
+                180,
+                "staged");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_ITEMS_READY_CLIENT");
 
         freeHotbarSlot(context, SWORD_HOTBAR_SLOT);
@@ -70,31 +77,46 @@ final class PhysicalShieldD46ClientGameTest {
         freeHotbarSlot(context, STAFF_HOTBAR_SLOT);
 
         moveItem(context, SWORD_ID, SWORD_STORAGE_SLOT, SWORD_HOTBAR_SLOT);
-        ItemAuthority afterSwordMove = captureShield(context, "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_AFTER_SWORD_MOVE_CLIENT");
+        ItemAuthority afterSwordMove =
+                captureShield(
+                        context,
+                        "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_AFTER_SWORD_MOVE_CLIENT");
         requireSameAuthority(staged, afterSwordMove, "moving the sword changed shield authority");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_SWORD_MOVED_CLIENT");
 
         moveItem(context, SHIELD_ID, SHIELD_STORAGE_SLOT, SHIELD_HOTBAR_SLOT);
-        ItemAuthority movedShield = waitForShieldTransition(
-                context,
-                staged,
-                candidate -> isLocationMove(staged, candidate, "CHARACTER_INVENTORY/slot:" + SHIELD_HOTBAR_SLOT),
-                "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_SHIELD_MOVED_CLIENT");
+        ItemAuthority movedShield =
+                waitForShieldTransition(
+                        context,
+                        staged,
+                        candidate ->
+                                isLocationMove(
+                                        staged,
+                                        candidate,
+                                        "CHARACTER_INVENTORY/slot:" + SHIELD_HOTBAR_SLOT),
+                        "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_SHIELD_MOVED_CLIENT");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_SHIELD_MOVED_CLIENT");
 
         moveItem(context, STAFF_ID, STAFF_STORAGE_SLOT, STAFF_HOTBAR_SLOT);
-        ItemAuthority afterStaffMove = captureShield(context, "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_AFTER_STAFF_MOVE_CLIENT");
-        requireSameAuthority(movedShield, afterStaffMove, "moving the staff changed shield authority");
+        ItemAuthority afterStaffMove =
+                captureShield(
+                        context,
+                        "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_AFTER_STAFF_MOVE_CLIENT");
+        requireSameAuthority(
+                movedShield, afterStaffMove, "moving the staff changed shield authority");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_STAFF_MOVED_CLIENT");
 
         selectHotbar(context, SHIELD_HOTBAR_SLOT, SHIELD_ID);
         context.getInput().pressKey(options -> options.keySwapOffhand);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_EQUIP_F_SENT_CLIENT");
-        ItemAuthority equipped = waitForShieldTransition(
-                context,
-                movedShield,
-                candidate -> isLocationMove(movedShield, candidate, "NATIVE_EQUIPPED/OFF_HAND"),
-                "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_EQUIPPED_CLIENT");
+        ItemAuthority equipped =
+                waitForShieldTransition(
+                        context,
+                        movedShield,
+                        candidate ->
+                                isLocationMove(
+                                        movedShield, candidate, "NATIVE_EQUIPPED/OFF_HAND"),
+                        "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_EQUIPPED_CLIENT");
         waitForShieldOffhand(context);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_EQUIPPED_CLIENT");
 
@@ -107,16 +129,22 @@ final class PhysicalShieldD46ClientGameTest {
                         + "\"]}");
         sendCommand(
                 context,
-                "/effect give @e[tag=" + SOURCE_TAG + ",limit=1] minecraft:slowness infinite 255 true");
+                "/effect give @e[tag="
+                        + SOURCE_TAG
+                        + ",limit=1] minecraft:slowness infinite 255 true");
         context.waitTicks(40);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_SOURCE_STAGED_CLIENT");
 
         int firstGuardMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
-        context.waitFor(client -> messageEqualsSince(firstGuardMessage, GUARD_READY_MESSAGE), 20 * 10);
+        context.waitFor(
+                client -> messageEqualsSince(firstGuardMessage, GUARD_READY_MESSAGE), 20 * 10);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_GUARD_ACTIVE_CLIENT");
 
-        ItemAuthority beforeImpact = captureShield(context, "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_BEFORE_IMPACT_CLIENT");
+        ItemAuthority beforeImpact =
+                captureShield(
+                        context,
+                        "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_BEFORE_IMPACT_CLIENT");
         requireSameAuthority(equipped, beforeImpact, "guard activation changed shield authority");
         int firstImpactMessage = RECEIVED_GAME_MESSAGES.size();
         sendCommand(
@@ -126,15 +154,22 @@ final class PhysicalShieldD46ClientGameTest {
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_REAL_BLOCKED_IMPACT_CLIENT");
         sendCommand(context, "/kill @e[tag=" + SOURCE_TAG + "]");
 
-        ItemAuthority worn = waitForShieldTransition(
-                context,
-                beforeImpact,
-                candidate -> isOnePointWear(beforeImpact, candidate),
-                "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_WORN_CLIENT");
+        ItemAuthority worn =
+                waitForShieldTransition(
+                        context,
+                        beforeImpact,
+                        candidate -> isOnePointWear(beforeImpact, candidate),
+                        "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_WORN_CLIENT");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_WORN_ONCE_CLIENT");
         context.waitTicks(40);
-        ItemAuthority stableAfterImpact = captureShield(context, "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_WORN_STABLE_CLIENT");
-        requireSameAuthority(worn, stableAfterImpact, "one real blocked impact spent shield durability more than once");
+        ItemAuthority stableAfterImpact =
+                captureShield(
+                        context,
+                        "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_WORN_STABLE_CLIENT");
+        requireSameAuthority(
+                worn,
+                stableAfterImpact,
+                "one real blocked impact spent shield durability more than once");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_NO_DOUBLE_SPEND_CLIENT");
 
         selectHotbar(context, STAFF_HOTBAR_SLOT, STAFF_ID);
@@ -149,7 +184,10 @@ final class PhysicalShieldD46ClientGameTest {
                                 && hasProjection(client.player.getMainHandItem(), STAFF_ID)
                                 && hasProjection(client.player.getOffhandItem(), SHIELD_ID),
                 20 * 10);
-        ItemAuthority afterStaffF = captureShield(context, "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_AFTER_STAFF_F_CLIENT");
+        ItemAuthority afterStaffF =
+                captureShield(
+                        context,
+                        "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_AFTER_STAFF_F_CLIENT");
         requireSameAuthority(worn, afterStaffF, "Staff F changed authoritative shield OFF_HAND state");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_STAFF_OWNS_F_CLIENT");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_COMPLETE_CLIENT");
@@ -157,15 +195,21 @@ final class PhysicalShieldD46ClientGameTest {
     }
 
     private static void waitForServerHandshake(ClientGameTestContext context) {
-        context.waitFor(client -> client.level != null && client.player != null, CONNECTION_TIMEOUT_TICKS);
         context.waitFor(
-                client -> client.player != null && client.player.experienceLevel == SERVER_HANDSHAKE_LEVEL,
+                client -> client.level != null && client.player != null, CONNECTION_TIMEOUT_TICKS);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && client.player.experienceLevel == SERVER_HANDSHAKE_LEVEL,
                 20 * 30);
         context.waitFor(client -> client.gui.screen() == null, 20 * 30);
         context.waitFor(
                 client ->
                         client.player != null
-                                && client.player.getInventory().getItem(CHRONICLE_HOTBAR_SLOT).is(Items.WRITTEN_BOOK),
+                                && client.player
+                                        .getInventory()
+                                        .getItem(CHRONICLE_HOTBAR_SLOT)
+                                        .is(Items.WRITTEN_BOOK),
                 20 * 30);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_HANDSHAKE_CLIENT");
     }
@@ -177,13 +221,17 @@ final class PhysicalShieldD46ClientGameTest {
             context.waitFor(
                     client ->
                             client.player != null
-                                    && client.player.getInventory().getItem(expectedSlot).is(Items.STONE),
+                                    && client.player
+                                            .getInventory()
+                                            .getItem(expectedSlot)
+                                            .is(Items.STONE),
                     20 * 15);
         }
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_FILLER_READY_CLIENT");
     }
 
-    private static void grantItem(ClientGameTestContext context, String definitionId, int expectedSlot) {
+    private static void grantItem(
+            ClientGameTestContext context, String definitionId, int expectedSlot) {
         sendCommand(context, "/mmo dev");
         context.waitFor(client -> menuContains(client.gui.screen(), DEV_MODULE_NAME), 20 * 10);
         clickMenuEntry(context, DEV_MODULE_NAME);
@@ -199,7 +247,9 @@ final class PhysicalShieldD46ClientGameTest {
                                     client ->
                                             client.player != null
                                                     && hasProjection(
-                                                            client.player.getInventory().getItem(expectedSlot),
+                                                            client.player
+                                                                    .getInventory()
+                                                                    .getItem(expectedSlot),
                                                             definitionId));
             if (confirmed) {
                 break;
@@ -215,7 +265,9 @@ final class PhysicalShieldD46ClientGameTest {
         context.waitFor(
                 client ->
                         client.player != null
-                                && hasProjection(client.player.getInventory().getItem(expectedSlot), definitionId),
+                                && hasProjection(
+                                        client.player.getInventory().getItem(expectedSlot),
+                                        definitionId),
                 20 * 10);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitForScreen(null);
@@ -233,59 +285,166 @@ final class PhysicalShieldD46ClientGameTest {
     }
 
     private static void moveItem(
-            ClientGameTestContext context, String definitionId, int sourceSlot, int destinationSlot) {
+            ClientGameTestContext context,
+            String definitionId,
+            int sourceSlot,
+            int destinationSlot) {
         context.getInput().pressKey(options -> options.keyInventory);
         context.waitForScreen(InventoryScreen.class);
         context.waitFor(
-                client -> {
-                    if (!(client.gui.screen() instanceof InventoryScreen screen) || client.player == null) {
-                        return false;
-                    }
-                    Slot source = findPlayerSlot(screen, client.player.getInventory(), sourceSlot);
-                    Slot destination = findPlayerSlot(screen, client.player.getInventory(), destinationSlot);
-                    return hasProjection(source.getItem(), definitionId) && destination.getItem().isEmpty();
-                },
+                client ->
+                        inventorySourceReady(client, definitionId, sourceSlot, destinationSlot),
                 20 * 10);
-        setInventoryCursor(context, sourceSlot);
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        context.waitFor(
-                client -> {
-                    if (!(client.gui.screen() instanceof InventoryScreen screen) || client.player == null) {
-                        return false;
-                    }
-                    Slot source = findPlayerSlot(screen, client.player.getInventory(), sourceSlot);
-                    return source.getItem().isEmpty()
-                            && hasProjection(screen.getMenu().getCarried(), definitionId);
-                },
-                20 * 10);
-        setInventoryCursor(context, destinationSlot);
-        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-        context.waitFor(
-                client -> {
-                    if (!(client.gui.screen() instanceof InventoryScreen screen) || client.player == null) {
-                        return false;
-                    }
-                    Slot destination = findPlayerSlot(screen, client.player.getInventory(), destinationSlot);
-                    return hasProjection(destination.getItem(), definitionId)
-                            && screen.getMenu().getCarried().isEmpty();
-                },
-                20 * 10);
-        context.waitTicks(2);
+
+        pickupWithRetry(context, definitionId, sourceSlot);
+        placeWithRetry(context, definitionId, destinationSlot);
+
+        context.waitTicks(5);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitForScreen(null);
+        context.waitTicks(5);
     }
 
-    private static void selectHotbar(ClientGameTestContext context, int slot, String definitionId) {
+    private static void pickupWithRetry(
+            ClientGameTestContext context, String definitionId, int sourceSlot) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            if (context.computeOnClient(
+                    client -> inventoryPickupComplete(client, definitionId, sourceSlot))) {
+                return;
+            }
+            if (!context.computeOnClient(
+                    client -> inventorySourcePresent(client, definitionId, sourceSlot))) {
+                throw new AssertionError(
+                        "D4-D6 pickup entered an unexpected transient state: definition="
+                                + definitionId
+                                + " source="
+                                + sourceSlot);
+            }
+            setInventoryCursor(context, sourceSlot);
+            context.waitTicks(2);
+            context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+            context.waitTicks(10);
+        }
+        if (!context.computeOnClient(
+                client -> inventoryPickupComplete(client, definitionId, sourceSlot))) {
+            throw new AssertionError(
+                    "D4-D6 physical pickup was not observed after bounded retries: definition="
+                            + definitionId
+                            + " source="
+                            + sourceSlot);
+        }
+    }
+
+    private static void placeWithRetry(
+            ClientGameTestContext context, String definitionId, int destinationSlot) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            if (context.computeOnClient(
+                    client -> inventoryPlacementComplete(client, definitionId, destinationSlot))) {
+                return;
+            }
+            if (!context.computeOnClient(
+                    client -> inventoryCursorCarries(client, definitionId, destinationSlot))) {
+                throw new AssertionError(
+                        "D4-D6 placement entered an unexpected transient state: definition="
+                                + definitionId
+                                + " destination="
+                                + destinationSlot);
+            }
+            setInventoryCursor(context, destinationSlot);
+            context.waitTicks(2);
+            context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+            context.waitTicks(10);
+        }
+        if (!context.computeOnClient(
+                client -> inventoryPlacementComplete(client, definitionId, destinationSlot))) {
+            throw new AssertionError(
+                    "D4-D6 physical placement was not observed after bounded retries: definition="
+                            + definitionId
+                            + " destination="
+                            + destinationSlot);
+        }
+    }
+
+    private static boolean inventorySourceReady(
+            Object clientValue, String definitionId, int sourceSlot, int destinationSlot) {
+        if (!(clientValue instanceof net.minecraft.client.Minecraft client)
+                || !(client.gui.screen() instanceof InventoryScreen screen)
+                || client.player == null) {
+            return false;
+        }
+        Slot source = findPlayerSlot(screen, client.player.getInventory(), sourceSlot);
+        Slot destination = findPlayerSlot(screen, client.player.getInventory(), destinationSlot);
+        return hasProjection(source.getItem(), definitionId)
+                && destination.getItem().isEmpty()
+                && screen.getMenu().getCarried().isEmpty();
+    }
+
+    private static boolean inventorySourcePresent(
+            Object clientValue, String definitionId, int sourceSlot) {
+        if (!(clientValue instanceof net.minecraft.client.Minecraft client)
+                || !(client.gui.screen() instanceof InventoryScreen screen)
+                || client.player == null) {
+            return false;
+        }
+        return hasProjection(
+                        findPlayerSlot(screen, client.player.getInventory(), sourceSlot).getItem(),
+                        definitionId)
+                && screen.getMenu().getCarried().isEmpty();
+    }
+
+    private static boolean inventoryPickupComplete(
+            Object clientValue, String definitionId, int sourceSlot) {
+        if (!(clientValue instanceof net.minecraft.client.Minecraft client)
+                || !(client.gui.screen() instanceof InventoryScreen screen)
+                || client.player == null) {
+            return false;
+        }
+        return findPlayerSlot(screen, client.player.getInventory(), sourceSlot).getItem().isEmpty()
+                && hasProjection(screen.getMenu().getCarried(), definitionId);
+    }
+
+    private static boolean inventoryCursorCarries(
+            Object clientValue, String definitionId, int destinationSlot) {
+        if (!(clientValue instanceof net.minecraft.client.Minecraft client)
+                || !(client.gui.screen() instanceof InventoryScreen screen)
+                || client.player == null) {
+            return false;
+        }
+        return findPlayerSlot(screen, client.player.getInventory(), destinationSlot)
+                        .getItem()
+                        .isEmpty()
+                && hasProjection(screen.getMenu().getCarried(), definitionId);
+    }
+
+    private static boolean inventoryPlacementComplete(
+            Object clientValue, String definitionId, int destinationSlot) {
+        if (!(clientValue instanceof net.minecraft.client.Minecraft client)
+                || !(client.gui.screen() instanceof InventoryScreen screen)
+                || client.player == null) {
+            return false;
+        }
+        return hasProjection(
+                        findPlayerSlot(screen, client.player.getInventory(), destinationSlot).getItem(),
+                        definitionId)
+                && screen.getMenu().getCarried().isEmpty();
+    }
+
+    private static void selectHotbar(
+            ClientGameTestContext context, int slot, String definitionId) {
         context.getInput().pressKey(options -> options.keyHotbarSlots[slot]);
         context.waitFor(
-                client -> client.player != null && hasProjection(client.player.getMainHandItem(), definitionId),
+                client ->
+                        client.player != null
+                                && hasProjection(client.player.getMainHandItem(), definitionId),
                 20 * 10);
         context.waitTicks(2);
     }
 
     private static void waitForShieldOffhand(ClientGameTestContext context) {
         context.waitFor(
-                client -> client.player != null && hasProjection(client.player.getOffhandItem(), SHIELD_ID),
+                client ->
+                        client.player != null
+                                && hasProjection(client.player.getOffhandItem(), SHIELD_ID),
                 20 * 15);
     }
 
@@ -336,7 +495,8 @@ final class PhysicalShieldD46ClientGameTest {
     private static String shieldStatusSince(int firstMessage) {
         for (int index = RECEIVED_GAME_MESSAGES.size() - 1; index >= firstMessage; index--) {
             String message = RECEIVED_GAME_MESSAGES.get(index);
-            if (message.startsWith("ITEM uuid=") && message.contains(" def=" + SHIELD_ID + " ")) {
+            if (message.startsWith("ITEM uuid=")
+                    && message.contains(" def=" + SHIELD_ID + " ")) {
                 return message;
             }
         }
@@ -358,7 +518,8 @@ final class PhysicalShieldD46ClientGameTest {
                 match.group(7));
     }
 
-    private static boolean isLocationMove(ItemAuthority before, ItemAuthority after, String location) {
+    private static boolean isLocationMove(
+            ItemAuthority before, ItemAuthority after, String location) {
         return before.uuid().equals(after.uuid())
                 && before.contentVersion().equals(after.contentVersion())
                 && before.currentDurability() == after.currentDurability()
@@ -387,7 +548,8 @@ final class PhysicalShieldD46ClientGameTest {
         }
     }
 
-    private static void requireSameAuthority(ItemAuthority expected, ItemAuthority actual, String detail) {
+    private static void requireSameAuthority(
+            ItemAuthority expected, ItemAuthority actual, String detail) {
         if (!expected.equals(actual)) {
             throw new AssertionError(detail + ": expected=" + expected + " actual=" + actual);
         }
@@ -435,7 +597,8 @@ final class PhysicalShieldD46ClientGameTest {
         double[] target =
                 context.computeOnClient(
                         client -> {
-                            if (!(client.gui.screen() instanceof AbstractContainerScreen<?> screen)) {
+                            if (!(client.gui.screen()
+                                    instanceof AbstractContainerScreen<?> screen)) {
                                 throw new AssertionError("Expected an open dev container");
                             }
                             Slot slot = findMenuEntry(screen, namePrefix);
@@ -460,14 +623,19 @@ final class PhysicalShieldD46ClientGameTest {
         assertCursorInsideSlot(context, target, namePrefix);
     }
 
-    private static Slot findMenuEntry(AbstractContainerScreen<?> screen, String namePrefix) {
+    private static Slot findMenuEntry(
+            AbstractContainerScreen<?> screen, String namePrefix) {
         return screen.getMenu().slots.stream()
                 .filter(
                         slot ->
                                 slot.hasItem()
-                                        && slot.getItem().getHoverName().getString().startsWith(namePrefix))
+                                        && slot.getItem()
+                                                .getHoverName()
+                                                .getString()
+                                                .startsWith(namePrefix))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Dev menu entry not found: " + namePrefix));
+                .orElseThrow(
+                        () -> new AssertionError("Dev menu entry not found: " + namePrefix));
     }
 
     private static boolean menuContains(Object screenValue, String namePrefix) {
@@ -478,24 +646,38 @@ final class PhysicalShieldD46ClientGameTest {
                 .anyMatch(
                         slot ->
                                 slot.hasItem()
-                                        && slot.getItem().getHoverName().getString().startsWith(namePrefix));
+                                        && slot.getItem()
+                                                .getHoverName()
+                                                .getString()
+                                                .startsWith(namePrefix));
     }
 
-    private static Slot findPlayerSlot(InventoryScreen screen, Object inventory, int storageSlot) {
+    private static Slot findPlayerSlot(
+            InventoryScreen screen, Object inventory, int storageSlot) {
         return screen.getMenu().slots.stream()
-                .filter(slot -> slot.container == inventory && slot.getContainerSlot() == storageSlot)
+                .filter(
+                        slot ->
+                                slot.container == inventory
+                                        && slot.getContainerSlot() == storageSlot)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Player storage slot not found: " + storageSlot));
+                .orElseThrow(
+                        () ->
+                                new AssertionError(
+                                        "Player storage slot not found: " + storageSlot));
     }
 
     private static void setInventoryCursor(ClientGameTestContext context, int storageSlot) {
         double[] target =
                 context.computeOnClient(
                         client -> {
-                            if (!(client.gui.screen() instanceof InventoryScreen screen) || client.player == null) {
-                                throw new AssertionError("InventoryScreen and player are required");
+                            if (!(client.gui.screen() instanceof InventoryScreen screen)
+                                    || client.player == null) {
+                                throw new AssertionError(
+                                        "InventoryScreen and player are required");
                             }
-                            Slot slot = findPlayerSlot(screen, client.player.getInventory(), storageSlot);
+                            Slot slot =
+                                    findPlayerSlot(
+                                            screen, client.player.getInventory(), storageSlot);
                             double guiWidth = client.getWindow().getGuiScaledWidth();
                             double guiHeight = client.getWindow().getGuiScaledHeight();
                             double screenWidth = client.getWindow().getScreenWidth();
@@ -524,8 +706,14 @@ final class PhysicalShieldD46ClientGameTest {
                         client -> {
                             double rawX = client.mouseHandler.xpos();
                             double rawY = client.mouseHandler.ypos();
-                            double guiX = rawX * client.getWindow().getGuiScaledWidth() / client.getWindow().getScreenWidth();
-                            double guiY = rawY * client.getWindow().getGuiScaledHeight() / client.getWindow().getScreenHeight();
+                            double guiX =
+                                    rawX
+                                            * client.getWindow().getGuiScaledWidth()
+                                            / client.getWindow().getScreenWidth();
+                            double guiY =
+                                    rawY
+                                            * client.getWindow().getGuiScaledHeight()
+                                            / client.getWindow().getScreenHeight();
                             return new double[] {guiX, guiY};
                         });
         double slotLeft = target[4] + target[2];

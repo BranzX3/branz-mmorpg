@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-SERVER_FLAG = "-PphysicalShieldD13Acceptance=true"
+SERVER_FLAG = "-PphysicalShieldD46Acceptance=true"
 CLIENT_FLAG = "-PphysicalShieldD46Acceptance=true"
 SHIELD_STATUS = re.compile(
     r"ITEM uuid=([0-9a-fA-F-]{36}) def=equipment\.training_shield "

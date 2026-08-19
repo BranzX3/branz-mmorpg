@@ -144,17 +144,17 @@ final class PhysicalShieldD46ClientGameTest {
                 20 * 10);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_ENGAGEMENT_PRIMER_HIT_CLIENT");
 
-        // Arm guard immediately while the authoritative hostile activity is fresh. Retreat only
-        // after the guard transition so the engagement gate cannot decay before RMB is routed.
+        // Move the hostile out of entity-interaction range immediately after one real hit. The
+        // authoritative ENGAGED window remains fresh while RMB can now route as guard use.
+        sendCommand(
+                context,
+                "/execute at @s run tp @e[tag=" + SOURCE_TAG + ",limit=1] ^ ^ ^12");
+        context.waitTicks(2);
         int firstGuardMessage = RECEIVED_GAME_MESSAGES.size();
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
         context.waitFor(
                 client -> messageEqualsSince(firstGuardMessage, GUARD_READY_MESSAGE), 20 * 10);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_GUARD_ACTIVE_CLIENT");
-        sendCommand(
-                context,
-                "/execute at @s run tp @e[tag=" + SOURCE_TAG + ",limit=1] ^ ^ ^12");
-        context.waitTicks(2);
 
         ItemAuthority beforeImpact =
                 captureShield(

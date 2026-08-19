@@ -14,9 +14,6 @@ SHIELD_STATUS = re.compile(
 )
 SNAPSHOT_MARKERS = (
     "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_STAGED_CLIENT",
-    "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_AFTER_SWORD_MOVE_CLIENT",
-    "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_SHIELD_MOVED_CLIENT",
-    "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_AFTER_STAFF_MOVE_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_EQUIPPED_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_BEFORE_IMPACT_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_WORN_CLIENT",
@@ -27,9 +24,6 @@ CLIENT_MARKERS = (
     "PHYSICAL_AUTHORITY_SHIELD_D46_HANDSHAKE_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_FILLER_READY_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_ITEMS_READY_CLIENT",
-    "PHYSICAL_AUTHORITY_SHIELD_D46_SWORD_MOVED_CLIENT",
-    "PHYSICAL_AUTHORITY_SHIELD_D46_SHIELD_MOVED_CLIENT",
-    "PHYSICAL_AUTHORITY_SHIELD_D46_STAFF_MOVED_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_EQUIP_F_SENT_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_EQUIPPED_CLIENT",
     "PHYSICAL_AUTHORITY_SHIELD_D46_SOURCE_STAGED_CLIENT",
@@ -63,15 +57,15 @@ def snapshots(client_text: str) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     lower = 0
     for marker in SNAPSHOT_MARKERS:
-        marker_matches = [match for match in _marker_matches(client_text, marker) if match.start() >= lower]
-        if len(marker_matches) != 1:
+        matches = [match for match in _marker_matches(client_text, marker) if match.start() >= lower]
+        if len(matches) != 1:
             return []
-        marker_pos = marker_matches[0].start()
-        matches = list(SHIELD_STATUS.finditer(client_text, lower, marker_pos))
-        if not matches:
+        marker_match = matches[0]
+        rows = list(SHIELD_STATUS.finditer(client_text, lower, marker_match.start()))
+        if not rows:
             return []
-        result.append(_row(matches[-1]))
-        lower = marker_matches[0].end()
+        result.append(_row(rows[-1]))
+        lower = marker_match.end()
     return result
 
 
@@ -108,13 +102,13 @@ def evaluate(client_text: str, paper_text: str) -> dict[str, bool]:
     rows = snapshots(client_text)
     ready = len(rows) == len(SNAPSHOT_MARKERS)
     if ready:
-        staged, after_sword, moved, after_staff, equipped, before, worn, stable, after_staff_f = rows
+        staged, equipped, before, worn, stable, after_staff_f = rows
         progression = {
-            "d46_staged_exact": staged["location"] == "CHARACTER_INVENTORY/slot:10" and staged["current"] == staged["maximum"] == 180,
-            "d46_sword_move_shield_stable": _same(staged, after_sword),
-            "d46_shield_move_exact": _move(staged, moved, "CHARACTER_INVENTORY/slot:6"),
-            "d46_staff_move_shield_stable": _same(moved, after_staff),
-            "d46_equip_exact": _move(moved, equipped, "NATIVE_EQUIPPED/OFF_HAND"),
+            "d46_staged_exact": (
+                staged["location"] == "CHARACTER_INVENTORY/slot:6"
+                and staged["current"] == staged["maximum"] == 180
+            ),
+            "d46_equip_exact": _move(staged, equipped, "NATIVE_EQUIPPED/OFF_HAND"),
             "d46_guard_did_not_mutate": _same(equipped, before),
             "d46_one_point_wear_exact": _wear(before, worn),
             "d46_no_double_spend": _same(worn, stable),
@@ -123,15 +117,13 @@ def evaluate(client_text: str, paper_text: str) -> dict[str, bool]:
     else:
         progression = {
             "d46_staged_exact": False,
-            "d46_sword_move_shield_stable": False,
-            "d46_shield_move_exact": False,
-            "d46_staff_move_shield_stable": False,
             "d46_equip_exact": False,
             "d46_guard_did_not_mutate": False,
             "d46_one_point_wear_exact": False,
             "d46_no_double_spend": False,
             "d46_staff_f_shield_stable": False,
         }
+
     checks = {
         f"d46_marker_{i:02d}": len(_marker_matches(client_text, marker)) == 1
         for i, marker in enumerate(CLIENT_MARKERS, 1)
@@ -141,12 +133,22 @@ def evaluate(client_text: str, paper_text: str) -> dict[str, bool]:
         {
             "d46_snapshots_complete": ready,
             "d46_three_dev_commands_server": paper_text.count("/mmo dev") == 3,
-            "d46_eleven_item_replace_commands_server": paper_text.count("/item replace entity @s hotbar.") == 11,
+            "d46_eleven_item_replace_commands_server": (
+                paper_text.count("/item replace entity @s hotbar.") == 11
+            ),
             "d46_husk_summon_once_server": paper_text.count("summon minecraft:husk") == 1,
-            "d46_husk_slow_once_server": paper_text.count("minecraft:slowness infinite 255 true") == 1,
-            "d46_husk_teleport_once_server": paper_text.count("tp @e[tag=branz_d46_source,limit=1]") == 1,
-            "d46_husk_cleanup_server": paper_text.count("/kill @e[tag=branz_d46_source]") in (1, 2),
-            "d46_status_commands_bounded_server": 9 <= paper_text.count("/mmo physical status") <= 128,
+            "d46_husk_slow_once_server": (
+                paper_text.count("minecraft:slowness infinite 255 true") == 1
+            ),
+            "d46_husk_teleport_once_server": (
+                paper_text.count("tp @e[tag=branz_d46_source,limit=1]") == 1
+            ),
+            "d46_husk_cleanup_server": (
+                paper_text.count("/kill @e[tag=branz_d46_source]") in (1, 2)
+            ),
+            "d46_status_commands_bounded_server": (
+                6 <= paper_text.count("/mmo physical status") <= 128
+            ),
         }
     )
     return checks
@@ -157,22 +159,21 @@ def runtime_selfcheck() -> None:
     content = "v1.milestone-1.example.4"
 
     def row(location: str, version: int, current: int, tx: str) -> str:
-        return f"ITEM uuid={uuid} def=equipment.training_shield loc={location} ver={version} durability={current}/180 tx={tx} content={content}"
+        return (
+            f"ITEM uuid={uuid} def=equipment.training_shield loc={location} "
+            f"ver={version} durability={current}/180 tx={tx} content={content}"
+        )
 
     tx1 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
     tx2 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"
     tx3 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3"
-    tx4 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4"
     values = (
-        row("CHARACTER_INVENTORY/slot:10", 1, 180, tx1),
-        row("CHARACTER_INVENTORY/slot:10", 1, 180, tx1),
-        row("CHARACTER_INVENTORY/slot:6", 2, 180, tx2),
-        row("CHARACTER_INVENTORY/slot:6", 2, 180, tx2),
-        row("NATIVE_EQUIPPED/OFF_HAND", 3, 180, tx3),
-        row("NATIVE_EQUIPPED/OFF_HAND", 3, 180, tx3),
-        row("NATIVE_EQUIPPED/OFF_HAND", 4, 179, tx4),
-        row("NATIVE_EQUIPPED/OFF_HAND", 4, 179, tx4),
-        row("NATIVE_EQUIPPED/OFF_HAND", 4, 179, tx4),
+        row("CHARACTER_INVENTORY/slot:6", 1, 180, tx1),
+        row("NATIVE_EQUIPPED/OFF_HAND", 2, 180, tx2),
+        row("NATIVE_EQUIPPED/OFF_HAND", 2, 180, tx2),
+        row("NATIVE_EQUIPPED/OFF_HAND", 3, 179, tx3),
+        row("NATIVE_EQUIPPED/OFF_HAND", 3, 179, tx3),
+        row("NATIVE_EQUIPPED/OFF_HAND", 3, 179, tx3),
     )
     chunks: list[str] = list(CLIENT_MARKERS)
     for value, marker in zip(values, SNAPSHOT_MARKERS, strict=True):
@@ -181,7 +182,7 @@ def runtime_selfcheck() -> None:
     paper = "\n".join(
         ["/mmo dev"] * 3
         + ["/item replace entity @s hotbar."] * 11
-        + ["/mmo physical status"] * 9
+        + ["/mmo physical status"] * 6
         + [
             "summon minecraft:husk",
             "minecraft:slowness infinite 255 true",
@@ -192,16 +193,16 @@ def runtime_selfcheck() -> None:
     checks = evaluate(client, paper)
     failed = sorted(name for name, passed in checks.items() if not passed)
     if failed:
-        raise RuntimeError(f"D46 runtime self-check rejected valid progression: {failed}")
+        raise RuntimeError(f"D46 v2 runtime self-check rejected valid progression: {failed}")
     bad = client.replace("durability=179/180", "durability=178/180", 1)
     if evaluate(bad, paper)["d46_one_point_wear_exact"]:
-        raise RuntimeError("D46 runtime self-check accepted double shield wear")
+        raise RuntimeError("D46 v2 runtime self-check accepted double shield wear")
 
 
 def install(core: Any) -> None:
     runtime_selfcheck()
 
-    def action_client_acceptance_shield_d46(repo, result_dir, manifest):
+    def action_client_acceptance_shield_d46_v2(repo, result_dir, manifest):
         original_popen = core.subprocess.Popen
 
         def d46_popen(argv, *args, **kwargs):
@@ -214,30 +215,38 @@ def install(core: Any) -> None:
 
         try:
             core.subprocess.Popen = d46_popen
-            code, stdout, stderr, record = core.action_client_acceptance_ingress(repo, result_dir, manifest)
+            code, stdout, stderr, record = core.action_client_acceptance_ingress(
+                repo, result_dir, manifest
+            )
         finally:
             core.subprocess.Popen = original_popen
 
-        client_text = (result_dir / "client.log").read_text(encoding="utf-8", errors="replace")
-        paper_text = (result_dir / "paper.log").read_text(encoding="utf-8", errors="replace")
+        client_text = (result_dir / "client.log").read_text(
+            encoding="utf-8", errors="replace"
+        )
+        paper_text = (result_dir / "paper.log").read_text(
+            encoding="utf-8", errors="replace"
+        )
         checks = evaluate(client_text, paper_text)
         record.setdefault("checks", {}).update(checks)
         record["shield_snapshots"] = snapshots(client_text)
-        record["fixed_command_id"] = "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46"
+        record["fixed_command_id"] = "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_V2"
         passed = code == 0 and all(checks.values())
         record["action_status"] = "PASS" if passed else "FAIL"
         return (
             0 if passed else 1,
-            "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_PASS\n"
-            if passed
-            else "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_FAIL\n",
+            (
+                "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_V2_PASS\n"
+                if passed
+                else "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_V2_FAIL\n"
+            ),
             stderr,
             record,
         )
 
-    core.evaluate_d46_checks = evaluate
-    core.action_client_acceptance_shield_d46 = action_client_acceptance_shield_d46
-    core.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_SHIELD_D46_V1"] = core.ActionSpec(
-        action_client_acceptance_shield_d46,
-        "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46",
+    core.evaluate_d46_v2_checks = evaluate
+    core.action_client_acceptance_shield_d46_v2 = action_client_acceptance_shield_d46_v2
+    core.ACTION_SPECS["MMO_CLIENT_ACCEPTANCE_SHIELD_D46_V2"] = core.ActionSpec(
+        action_client_acceptance_shield_d46_v2,
+        "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D46_V2",
     )

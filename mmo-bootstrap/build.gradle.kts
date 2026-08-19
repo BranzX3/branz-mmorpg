@@ -98,7 +98,10 @@ tasks.runServer {
         providers.gradleProperty("physicalShieldD13Acceptance").orNull == "true"
     if (physicalShieldD13Acceptance) {
         // D1-D3 opens only the exact signed Training Shield projection for inventory/F-key input.
-        jvmArgs("-Dmmo.physical-shield-d13-acceptance=true")
+        jvmArgs(
+            "-Dmmo.physical-shield-d13-acceptance=true",
+            "-Dmmo.physical-shield-d46-acceptance=true",
+        )
     }
     val physicalShieldD46Acceptance =
         providers.gradleProperty("physicalShieldD46Acceptance").orNull == "true"

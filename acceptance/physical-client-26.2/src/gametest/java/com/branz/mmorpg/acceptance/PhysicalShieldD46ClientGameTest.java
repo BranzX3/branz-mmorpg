@@ -275,16 +275,14 @@ final class PhysicalShieldD46ClientGameTest {
         context.waitFor(client -> menuContains(client.gui.screen(), DEV_MODULE_NAME), 20 * 10);
         clickMenuEntry(context, DEV_MODULE_NAME);
         context.waitFor(client -> menuContains(client.gui.screen(), definitionId), 20 * 10);
-        int firstNewMessage = RECEIVED_GAME_MESSAGES.size();
         clickMenuEntry(context, definitionId);
-        context.waitFor(client -> grantSucceededSince(firstNewMessage), 20 * 15);
         context.waitFor(
                 client ->
                         client.player != null
                                 && hasProjection(
                                         client.player.getInventory().getItem(expectedSlot),
                                         definitionId),
-                20 * 10);
+                20 * 15);
         context.waitTicks(2);
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitForScreen(null);

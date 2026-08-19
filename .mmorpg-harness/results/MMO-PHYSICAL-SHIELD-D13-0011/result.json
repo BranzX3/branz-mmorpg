@@ -1,0 +1,425 @@
+{
+  "action_exit_code": 0,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_SHIELD_D13_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D13",
+  "action_record": {
+    "action_status": "PASS",
+    "checks": {
+      "client_exit_zero": true,
+      "d13_atomic_shield_swap_exact": true,
+      "d13_final_byte_stable": true,
+      "d13_first_inventory_move_exact": true,
+      "d13_first_offhand_equip_exact": true,
+      "d13_marker_01": true,
+      "d13_marker_02": true,
+      "d13_marker_03": true,
+      "d13_marker_04": true,
+      "d13_marker_05": true,
+      "d13_marker_06": true,
+      "d13_marker_07": true,
+      "d13_marker_08": true,
+      "d13_marker_09": true,
+      "d13_marker_10": true,
+      "d13_marker_11": true,
+      "d13_marker_12": true,
+      "d13_marker_13": true,
+      "d13_marker_14": true,
+      "d13_marker_15": true,
+      "d13_reconnect_byte_stable": true,
+      "d13_second_inventory_move_exact": true,
+      "d13_snapshots_complete": true,
+      "d13_staged_exact": true,
+      "d13_status_commands_bounded_server": true,
+      "d13_ten_item_replace_commands_server": true,
+      "d13_two_dev_commands_server": true,
+      "d13_unequip_exact": true,
+      "server_exit_zero": true,
+      "server_handshake_client": true,
+      "status_command_logged_server": true,
+      "status_command_sent_client": true
+    },
+    "client_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\acceptance\\physical-client-26.2\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      "runClientGameTest",
+      "-PphysicalShieldD13Acceptance=true"
+    ],
+    "client_wrapper_sha256": "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52",
+    "duration_seconds": 168.953,
+    "fixed_command_id": "PHYSICAL_CLIENT_ACCEPTANCE_SHIELD_D13",
+    "hotbar_snapshots": [],
+    "player_name": "Player0",
+    "server_argv": [
+      "C:\\Users\\User\\AppData\\Local\\BranzMMORPGHarness\\repo\\gradlew.bat",
+      "--no-daemon",
+      "--console=plain",
+      ":mmo-bootstrap:runServer",
+      "-PphysicalShieldD13Acceptance=true"
+    ],
+    "shield_snapshots": [
+      {
+        "eaca9350-a55f-4b92-acc8-e16c688226df": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:9",
+          "maximum_durability": 180,
+          "transaction_id": "b6b9d875-eefc-47eb-8093-e1dbea8ebcbc",
+          "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+          "version": 1
+        }
+      },
+      {
+        "4091fdee-49d1-440d-ab69-88e37d50c933": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:10",
+          "maximum_durability": 180,
+          "transaction_id": "a76dc4f1-0a70-42bb-b099-3a624dee27af",
+          "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+          "version": 1
+        },
+        "eaca9350-a55f-4b92-acc8-e16c688226df": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:9",
+          "maximum_durability": 180,
+          "transaction_id": "b6b9d875-eefc-47eb-8093-e1dbea8ebcbc",
+          "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+          "version": 1
+        }
+      },
+      {
+        "4091fdee-49d1-440d-ab69-88e37d50c933": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:10",
+          "maximum_durability": 180,
+          "transaction_id": "a76dc4f1-0a70-42bb-b099-3a624dee27af",
+          "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+          "version": 1
+        },
+        "eaca9350-a55f-4b92-acc8-e16c688226df": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:7",
+          "maximum_durability": 180,
+          "transaction_id": "4c4d9a73-9fa3-45e3-9c70-7aaf0ba3f954",
+          "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+          "version": 2
+        }
+      },
+      {
+        "4091fdee-49d1-440d-ab69-88e37d50c933": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:10",
+          "maximum_durability": 180,
+          "transaction_id": "a76dc4f1-0a70-42bb-b099-3a624dee27af",
+          "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+          "version": 1
+        },
+        "eaca9350-a55f-4b92-acc8-e16c688226df": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "NATIVE_EQUIPPED/OFF_HAND",
+          "maximum_durability": 180,
+          "transaction_id": "af108e03-c6f6-4b41-851b-27e9dc4cf0f8",
+          "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+          "version": 3
+        }
+      },
+      {
+        "4091fdee-49d1-440d-ab69-88e37d50c933": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:7",
+          "maximum_durability": 180,
+          "transaction_id": "93bf76f5-a276-4c4b-9c13-4c14dffcf211",
+          "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+          "version": 2
+        },
+        "eaca9350-a55f-4b92-acc8-e16c688226df": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "NATIVE_EQUIPPED/OFF_HAND",
+          "maximum_durability": 180,
+          "transaction_id": "af108e03-c6f6-4b41-851b-27e9dc4cf0f8",
+          "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+          "version": 3
+        }
+      },
+      {
+        "4091fdee-49d1-440d-ab69-88e37d50c933": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "NATIVE_EQUIPPED/OFF_HAND",
+          "maximum_durability": 180,
+          "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+          "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+          "version": 3
+        },
+        "eaca9350-a55f-4b92-acc8-e16c688226df": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:7",
+          "maximum_durability": 180,
+          "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+          "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+          "version": 4
+        }
+      },
+      {
+        "4091fdee-49d1-440d-ab69-88e37d50c933": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "NATIVE_EQUIPPED/OFF_HAND",
+          "maximum_durability": 180,
+          "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+          "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+          "version": 3
+        },
+        "eaca9350-a55f-4b92-acc8-e16c688226df": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:7",
+          "maximum_durability": 180,
+          "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+          "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+          "version": 4
+        }
+      },
+      {
+        "4091fdee-49d1-440d-ab69-88e37d50c933": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:6",
+          "maximum_durability": 180,
+          "transaction_id": "927c0bf0-51ef-4348-9aa2-a639f72fcf11",
+          "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+          "version": 4
+        },
+        "eaca9350-a55f-4b92-acc8-e16c688226df": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:7",
+          "maximum_durability": 180,
+          "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+          "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+          "version": 4
+        }
+      },
+      {
+        "4091fdee-49d1-440d-ab69-88e37d50c933": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:6",
+          "maximum_durability": 180,
+          "transaction_id": "927c0bf0-51ef-4348-9aa2-a639f72fcf11",
+          "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+          "version": 4
+        },
+        "eaca9350-a55f-4b92-acc8-e16c688226df": {
+          "content_version": "v1.milestone-1.example.4",
+          "current_durability": 180,
+          "location": "CHARACTER_INVENTORY/slot:7",
+          "maximum_durability": 180,
+          "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+          "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+          "version": 4
+        }
+      }
+    ],
+    "shield_status_rows_raw": [
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:9",
+        "maximum_durability": 180,
+        "transaction_id": "b6b9d875-eefc-47eb-8093-e1dbea8ebcbc",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:10",
+        "maximum_durability": 180,
+        "transaction_id": "a76dc4f1-0a70-42bb-b099-3a624dee27af",
+        "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:9",
+        "maximum_durability": 180,
+        "transaction_id": "b6b9d875-eefc-47eb-8093-e1dbea8ebcbc",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:10",
+        "maximum_durability": 180,
+        "transaction_id": "a76dc4f1-0a70-42bb-b099-3a624dee27af",
+        "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:7",
+        "maximum_durability": 180,
+        "transaction_id": "4c4d9a73-9fa3-45e3-9c70-7aaf0ba3f954",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:10",
+        "maximum_durability": 180,
+        "transaction_id": "a76dc4f1-0a70-42bb-b099-3a624dee27af",
+        "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:7",
+        "maximum_durability": 180,
+        "transaction_id": "4c4d9a73-9fa3-45e3-9c70-7aaf0ba3f954",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:10",
+        "maximum_durability": 180,
+        "transaction_id": "a76dc4f1-0a70-42bb-b099-3a624dee27af",
+        "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+        "version": 1
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "NATIVE_EQUIPPED/OFF_HAND",
+        "maximum_durability": 180,
+        "transaction_id": "af108e03-c6f6-4b41-851b-27e9dc4cf0f8",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:7",
+        "maximum_durability": 180,
+        "transaction_id": "93bf76f5-a276-4c4b-9c13-4c14dffcf211",
+        "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+        "version": 2
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "NATIVE_EQUIPPED/OFF_HAND",
+        "maximum_durability": 180,
+        "transaction_id": "af108e03-c6f6-4b41-851b-27e9dc4cf0f8",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "NATIVE_EQUIPPED/OFF_HAND",
+        "maximum_durability": 180,
+        "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+        "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:7",
+        "maximum_durability": 180,
+        "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 4
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "NATIVE_EQUIPPED/OFF_HAND",
+        "maximum_durability": 180,
+        "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+        "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+        "version": 3
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:7",
+        "maximum_durability": 180,
+        "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 4
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:6",
+        "maximum_durability": 180,
+        "transaction_id": "927c0bf0-51ef-4348-9aa2-a639f72fcf11",
+        "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+        "version": 4
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:7",
+        "maximum_durability": 180,
+        "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 4
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:6",
+        "maximum_durability": 180,
+        "transaction_id": "927c0bf0-51ef-4348-9aa2-a639f72fcf11",
+        "uuid": "4091fdee-49d1-440d-ab69-88e37d50c933",
+        "version": 4
+      },
+      {
+        "content_version": "v1.milestone-1.example.4",
+        "current_durability": 180,
+        "location": "CHARACTER_INVENTORY/slot:7",
+        "maximum_durability": 180,
+        "transaction_id": "072da05d-78ea-49ee-ae85-cf39ade7d83a",
+        "uuid": "eaca9350-a55f-4b92-acc8-e16c688226df",
+        "version": 4
+      }
+    ]
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-SHIELD-D13-0011/**"
+  ],
+  "base_commit_expected": "50384a223630fc234629718c7568893ccf0d645d",
+  "blocker_code": null,
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "732ed64da62bffa1b9fe562c7c47782c5c1e49f6",
+  "duration_seconds": 170.453,
+  "ending_commit_before_result_commit": "50384a223630fc234629718c7568893ccf0d645d",
+  "execution_status": "PASS",
+  "finished_at_utc": "2026-08-19T10:30:51.725947+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-08-19T10:28:01.266311+00:00",
+  "starting_commit_actual": "50384a223630fc234629718c7568893ccf0d645d",
+  "task_branch": "harness-task/MMO-PHYSICAL-SHIELD-D13-0011",
+  "task_id": "MMO-PHYSICAL-SHIELD-D13-0011",
+  "task_manifest_sha256": "2417749fc743a928c0a2f189293d2207d2fca2e17c38511fada1194a1949036e",
+  "unauthorized_writes": []
+}

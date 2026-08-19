@@ -121,8 +121,12 @@ final class PhysicalShieldD46ClientGameTest {
         context.waitTicks(40);
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_SOURCE_STAGED_CLIENT");
 
-        // Guard is legal only while ENGAGED. Let the real hostile produce one ordinary melee HIT,
-        // which production records as hostile activity, then move it back out before arming guard.
+        // Guard is legal only while ENGAGED. Slowness 255 is used only to freeze the staging
+        // phase; clear it before the real melee primer so vanilla hostile AI can actually attack.
+        sendCommand(
+                context,
+                "/effect clear @e[tag=" + SOURCE_TAG + ",limit=1] minecraft:slowness");
+        context.waitTicks(2);
         int firstPrimerMessage = RECEIVED_GAME_MESSAGES.size();
         sendCommand(
                 context,

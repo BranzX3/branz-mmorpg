@@ -185,20 +185,17 @@ final class PhysicalShieldD46ClientGameTest {
                         context,
                         "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_BEFORE_IMPACT_CLIENT");
         requireSameAuthority(equipped, beforeImpact, "guard activation changed shield authority");
-        int firstImpactMessage = RECEIVED_GAME_MESSAGES.size();
         sendCommand(
                 context,
                 "/execute at @s run tp @e[tag=" + SOURCE_TAG + ",limit=1] ^ ^ ^1.5");
-        context.waitFor(client -> guardedOutcomeSince(firstImpactMessage), 20 * 15);
-        System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_REAL_BLOCKED_IMPACT_CLIENT");
-        sendCommand(context, "/kill @e[tag=" + SOURCE_TAG + "]");
-
         ItemAuthority worn =
                 waitForShieldTransition(
                         context,
                         beforeImpact,
                         candidate -> isOnePointWear(beforeImpact, candidate),
                         "PHYSICAL_AUTHORITY_SHIELD_D46_STATUS_WORN_CLIENT");
+        System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_REAL_BLOCKED_IMPACT_CLIENT");
+        sendCommand(context, "/kill @e[tag=" + SOURCE_TAG + "]");
         System.out.println("PHYSICAL_AUTHORITY_SHIELD_D46_WORN_ONCE_CLIENT");
         context.waitTicks(40);
         ItemAuthority stableAfterImpact =

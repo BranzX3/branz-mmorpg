@@ -4,6 +4,9 @@ import com.branz.mmorpg.api.identity.ItemId;
 import com.branz.mmorpg.api.result.Result;
 import com.branz.mmorpg.items.definition.ItemDefinition;
 import com.branz.mmorpg.items.definition.ItemEngine;
+import com.branz.mmorpg.items.definition.WeaponLoadoutErrorCode;
+import com.branz.mmorpg.items.definition.WeaponLoadoutPolicy;
+import com.branz.mmorpg.items.definition.WeaponLoadoutResolution;
 import com.branz.mmorpg.items.equipment.EquipmentSlot;
 import com.branz.mmorpg.items.projection.ObservedProjection;
 import com.branz.mmorpg.persistence.transaction.ItemLocationRecord;
@@ -58,16 +61,74 @@ final class PhysicalOffHandInteractionController implements Listener {
                         && event.getAction() != Action.RIGHT_CLICK_BLOCK)) {
             return;
         }
+        Player player = event.getPlayer();
+        ResolvedPhysicalItem selected = characters.selectedPhysicalItem(player).orElse(null);
+        LoadedCharacterSession active = characters.active(player).orElse(null);
+        ItemDefinition offHandDefinition =
+                active == null
+                        ? null
+                        : active.snapshot().equipment().item(EquipmentSlot.OFF_HAND)
+                                .flatMap(
+                                        itemId ->
+                                                active.snapshot().itemRecords().stream()
+                                                        .filter(record -> record.itemId().equals(itemId))
+                                                        .findFirst()
+                                                        .flatMap(record -> items.find(record.definitionId())))
+                                .orElse(null);
+        String loadout = "NO_SELECTED";
+        String weaponDurability = "NO_SELECTED";
+        if (selected != null) {
+            Result<WeaponLoadoutResolution, WeaponLoadoutErrorCode> resolved =
+                    WeaponLoadoutPolicy.resolve(
+                            selected.definition(), Optional.ofNullable(offHandDefinition));
+            loadout =
+                    resolved instanceof Result.Success<WeaponLoadoutResolution, WeaponLoadoutErrorCode>
+                            ? "OK"
+                            : ((Result.Failure<WeaponLoadoutResolution, WeaponLoadoutErrorCode>) resolved)
+                                    .error()
+                                    .code();
+            weaponDurability =
+                    WeaponCombatReadiness.durabilityFailure(
+                                    selected.definition(), selected.record().payloadJson())
+                            .orElse("OK");
+        }
+        String shieldDurability =
+                active == null || offHandDefinition == null
+                        ? "NO_OFFHAND"
+                        : ShieldCombatReadiness.durabilityFailure(active, offHandDefinition)
+                                .orElse("OK");
         plugin.getLogger()
                 .info(
                         "PHYSICAL_AUTHORITY_SHIELD_D46_USE_SERVER player="
-                                + event.getPlayer().getName()
+                                + player.getName()
                                 + " hand="
                                 + event.getHand()
                                 + " action="
                                 + event.getAction()
                                 + " material="
-                                + event.getMaterial());
+                                + event.getMaterial()
+                                + " selected="
+                                + (selected == null
+                                        ? "NONE"
+                                        : selected.definition().id().value())
+                                + " selected-family="
+                                + (selected == null
+                                        ? "NONE"
+                                        : selected.definition().weaponProfile()
+                                                .map(profile -> profile.family())
+                                                .orElse("NONE"))
+                                + " mutation="
+                                + characters.valueMutationInFlight(player)
+                                + " offhand="
+                                + (offHandDefinition == null
+                                        ? "NONE"
+                                        : offHandDefinition.id().value())
+                                + " loadout="
+                                + loadout
+                                + " weapon-durability="
+                                + weaponDurability
+                                + " shield-durability="
+                                + shieldDurability);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

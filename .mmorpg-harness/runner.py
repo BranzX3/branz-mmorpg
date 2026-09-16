@@ -61,6 +61,8 @@ _runner_d13 = _load_control_module("runner_d13", ".mmorpg-harness/runner_d13.py"
 _runner_d13.install(_runner_core)
 _runner_d46 = _load_control_module("runner_d46", ".mmorpg-harness/runner_d46.py")
 _runner_d46.install(_runner_core)
+_runner_f = _load_control_module("runner_f", ".mmorpg-harness/runner_f.py")
+_runner_f.install(_runner_core)
 
 for _name in dir(_runner_core):
     if not _name.startswith("__"):
@@ -69,7 +71,8 @@ for _name in dir(_runner_core):
 RUNNER_EXTENSION_VERSION = (
     "b5-broken-v1+b6-chronicle-v1+b7-broken-restart-v1+"
     "c12-consumable-lot-v2+c3-consumable-use-v1+c4-consumable-restart-v1+"
-    "c4-status-retry-v1+d13-shield-offhand-v1+d46-shield-wear-staff-v3"
+    "c4-status-retry-v1+d13-shield-offhand-v1+d46-shield-wear-staff-v3+"
+    "f-chronicle-boundary-v1"
 )
 
 if __name__ == "__main__":

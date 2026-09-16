@@ -7,6 +7,10 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 public final class PhysicalAuthorityClientGameTestDispatcher implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
+        if (Boolean.getBoolean("branz.acceptance.physicalChronicleBoundary")) {
+            new PhysicalChronicleBoundaryClientGameTest().runTest(context);
+            return;
+        }
         if (Boolean.getBoolean("branz.acceptance.physicalShieldD46")) {
             new PhysicalShieldD46ClientGameTest().runTest(context);
             System.out.println("PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT");

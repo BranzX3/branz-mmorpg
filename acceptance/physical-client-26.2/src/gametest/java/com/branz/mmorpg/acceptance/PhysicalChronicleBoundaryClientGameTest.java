@@ -35,8 +35,6 @@ final class PhysicalChronicleBoundaryClientGameTest {
     private static final String DEV_MODULE_NAME = "Persisted Test Item";
     private static final String EQUIPMENT_PAGE = "Character & Equipment";
     private static final String CONFIRM_SCENE = "Confirm Scene transaction";
-    private static final String NATIVE_REJECTION =
-            "Native weapon, shield and armor slots are physical gameplay authority and cannot be changed from Chronicle.";
     private static final String EQUIPMENT_COMMITTED = "Equipment committed.";
 
     private static final List<String> RECEIVED_GAME_MESSAGES = new CopyOnWriteArrayList<>();
@@ -59,35 +57,35 @@ final class PhysicalChronicleBoundaryClientGameTest {
                         context,
                         QUIVER_ID,
                         "PHYSICAL_AUTHORITY_CHRONICLE_F_QUIVER_BEFORE_CLIENT");
-        requireLocation(quiverBefore, "CHARACTER_INVENTORY/slot:" + QUIVER_HOTBAR_SLOT, "staged quiver");
+        requireLocation(
+                quiverBefore,
+                "CHARACTER_INVENTORY/slot:" + QUIVER_HOTBAR_SLOT,
+                "staged quiver");
 
         openChronicle(context);
         clickMenuEntry(context, EQUIPMENT_PAGE);
-        context.waitFor(
-                client ->
-                        menuContains(client.gui.screen(), SWORD_ID)
-                                && menuContains(client.gui.screen(), SHIELD_ID)
-                                && menuContains(client.gui.screen(), QUIVER_ID),
-                20 * 10);
-
-        clickMenuEntry(context, SWORD_ID);
-        context.waitFor(client -> menuContains(client.gui.screen(), CONFIRM_SCENE), 20 * 10);
-        clickMenuEntry(context, SHIELD_ID);
-        context.waitFor(client -> menuContains(client.gui.screen(), CONFIRM_SCENE), 20 * 10);
-
-        int rejectionStart = RECEIVED_GAME_MESSAGES.size();
-        clickMenuEntry(context, CONFIRM_SCENE);
-        context.waitFor(client -> messageContainingSince(rejectionStart, NATIVE_REJECTION), 20 * 15);
-        System.out.println("PHYSICAL_AUTHORITY_CHRONICLE_F_NATIVE_REJECTED_CLIENT");
+        context.waitFor(client -> menuContains(client.gui.screen(), QUIVER_ID), 20 * 10);
+        context.waitTicks(5);
+        boolean nativeEntryExposed =
+                context.computeOnClient(
+                        client ->
+                                menuContains(client.gui.screen(), SWORD_ID)
+                                        || menuContains(client.gui.screen(), SHIELD_ID));
+        if (nativeEntryExposed) {
+            throw new AssertionError(
+                    "Chronicle exposed a native physical sword/shield entry in its commit menu");
+        }
+        System.out.println(
+                "PHYSICAL_AUTHORITY_CHRONICLE_F_NATIVE_REJECTED_CLIENT mode=not-exposed");
 
         closeContainer(context);
-        PhysicalAuthority afterNativeReject =
+        PhysicalAuthority afterNativeBoundary =
                 capturePhysicalAuthority(
                         context, "PHYSICAL_AUTHORITY_CHRONICLE_F_STATUS_AFTER_NATIVE_REJECT_CLIENT");
         requireSamePhysical(
                 baseline,
-                afterNativeReject,
-                "Rejected Chronicle native-slot transaction changed physical authority");
+                afterNativeBoundary,
+                "Chronicle native-slot UI boundary changed physical authority");
 
         openChronicle(context);
         clickMenuEntry(context, EQUIPMENT_PAGE);
@@ -292,15 +290,6 @@ final class PhysicalChronicleBoundaryClientGameTest {
         if (!expected.equals(actual)) {
             throw new AssertionError(detail + ": expected=" + expected + " actual=" + actual);
         }
-    }
-
-    private static boolean messageContainingSince(int firstMessage, String needle) {
-        for (int index = RECEIVED_GAME_MESSAGES.size() - 1; index >= firstMessage; index--) {
-            if (RECEIVED_GAME_MESSAGES.get(index).contains(needle)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean messageEqualsSince(int firstMessage, String expected) {

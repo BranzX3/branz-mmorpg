@@ -23,6 +23,7 @@ final class PhysicalChronicleBoundaryClientGameTest {
     private static final int SHIELD_HOTBAR_SLOT = 6;
     private static final int QUIVER_HOTBAR_SLOT = 5;
     private static final int CHRONICLE_HOTBAR_SLOT = 8;
+    private static final int CHRONICLE_TOP_INVENTORY_SIZE = 54;
     private static final int CONNECTION_TIMEOUT_TICKS = 20 * 60;
     private static final int CONTAINER_IMAGE_WIDTH = 176;
     private static final int CONTAINER_IMAGE_HEIGHT = 222;
@@ -65,30 +66,18 @@ final class PhysicalChronicleBoundaryClientGameTest {
         openChronicle(context);
         clickChronicleMenuEntry(context, EQUIPMENT_PAGE);
         context.waitFor(
-                client ->
-                        client.player != null
-                                && chronicleMenuContains(
-                                        client.gui.screen(),
-                                        client.player.getInventory(),
-                                        QUIVER_ID),
+                client -> chronicleMenuContains(client.gui.screen(), QUIVER_ID),
                 20 * 10);
         context.waitTicks(5);
         boolean nativeEntryExposed =
                 context.computeOnClient(
-                        client -> {
-                            if (client.player == null) {
-                                throw new AssertionError(
-                                        "Player must be present while checking Chronicle entries");
-                            }
-                            Object playerInventory = client.player.getInventory();
-                            return chronicleMenuContains(
-                                            client.gui.screen(), playerInventory, SWORD_ID)
-                                    || chronicleMenuContains(
-                                            client.gui.screen(), playerInventory, SHIELD_ID);
-                        });
+                        client ->
+                                chronicleMenuContains(client.gui.screen(), SWORD_ID)
+                                        || chronicleMenuContains(
+                                                client.gui.screen(), SHIELD_ID));
         if (nativeEntryExposed) {
             throw new AssertionError(
-                    "Chronicle exposed a native physical sword/shield entry in its owned menu slots");
+                    "Chronicle exposed a native physical sword/shield entry in its top inventory");
         }
         System.out.println(
                 "PHYSICAL_AUTHORITY_CHRONICLE_F_NATIVE_REJECTED_CLIENT mode=not-exposed");
@@ -105,21 +94,11 @@ final class PhysicalChronicleBoundaryClientGameTest {
         openChronicle(context);
         clickChronicleMenuEntry(context, EQUIPMENT_PAGE);
         context.waitFor(
-                client ->
-                        client.player != null
-                                && chronicleMenuContains(
-                                        client.gui.screen(),
-                                        client.player.getInventory(),
-                                        QUIVER_ID),
+                client -> chronicleMenuContains(client.gui.screen(), QUIVER_ID),
                 20 * 10);
         clickChronicleMenuEntry(context, QUIVER_ID);
         context.waitFor(
-                client ->
-                        client.player != null
-                                && chronicleMenuContains(
-                                        client.gui.screen(),
-                                        client.player.getInventory(),
-                                        CONFIRM_SCENE),
+                client -> chronicleMenuContains(client.gui.screen(), CONFIRM_SCENE),
                 20 * 10);
 
         int commitStart = RECEIVED_GAME_MESSAGES.size();
@@ -255,12 +234,7 @@ final class PhysicalChronicleBoundaryClientGameTest {
                 20 * 10);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
         context.waitFor(
-                client ->
-                        client.player != null
-                                && chronicleMenuContains(
-                                        client.gui.screen(),
-                                        client.player.getInventory(),
-                                        EQUIPMENT_PAGE),
+                client -> chronicleMenuContains(client.gui.screen(), EQUIPMENT_PAGE),
                 20 * 10);
         System.out.println("PHYSICAL_AUTHORITY_CHRONICLE_F_OPENED_CLIENT");
     }
@@ -344,16 +318,13 @@ final class PhysicalChronicleBoundaryClientGameTest {
         return screen.getMenu().slots.stream().anyMatch(slot -> menuEntryMatches(slot, namePrefix));
     }
 
-    private static boolean chronicleMenuContains(
-            Object candidate, Object playerInventory, String namePrefix) {
-        if (!(candidate instanceof AbstractContainerScreen<?> screen) || playerInventory == null) {
+    private static boolean chronicleMenuContains(Object candidate, String namePrefix) {
+        if (!(candidate instanceof AbstractContainerScreen<?> screen)
+                || screen.getMenu().slots.size() < CHRONICLE_TOP_INVENTORY_SIZE) {
             return false;
         }
-        return screen.getMenu().slots.stream()
-                .anyMatch(
-                        slot ->
-                                slot.container != playerInventory
-                                        && menuEntryMatches(slot, namePrefix));
+        return screen.getMenu().slots.subList(0, CHRONICLE_TOP_INVENTORY_SIZE).stream()
+                .anyMatch(slot -> menuEntryMatches(slot, namePrefix));
     }
 
     private static boolean menuEntryMatches(Slot slot, String namePrefix) {
@@ -393,14 +364,11 @@ final class PhysicalChronicleBoundaryClientGameTest {
                 context.computeOnClient(
                         client -> {
                             if (!(client.gui.screen()
-                                    instanceof AbstractContainerScreen<?> screen)
-                                    || client.player == null) {
+                                    instanceof AbstractContainerScreen<?> screen)) {
                                 throw new AssertionError(
                                         "Expected an open Chronicle container for " + namePrefix);
                             }
-                            Slot slot =
-                                    findChronicleMenuEntry(
-                                            screen, client.player.getInventory(), namePrefix);
+                            Slot slot = findChronicleMenuEntry(screen, namePrefix);
                             return cursorTarget(client, slot);
                         });
         context.getInput().setCursorPos(target[0], target[1]);
@@ -437,17 +405,20 @@ final class PhysicalChronicleBoundaryClientGameTest {
     }
 
     private static Slot findChronicleMenuEntry(
-            AbstractContainerScreen<?> screen, Object playerInventory, String namePrefix) {
-        return screen.getMenu().slots.stream()
-                .filter(
-                        slot ->
-                                slot.container != playerInventory
-                                        && menuEntryMatches(slot, namePrefix))
+            AbstractContainerScreen<?> screen, String namePrefix) {
+        if (screen.getMenu().slots.size() < CHRONICLE_TOP_INVENTORY_SIZE) {
+            throw new AssertionError(
+                    "Chronicle menu has fewer than "
+                            + CHRONICLE_TOP_INVENTORY_SIZE
+                            + " top-inventory slots");
+        }
+        return screen.getMenu().slots.subList(0, CHRONICLE_TOP_INVENTORY_SIZE).stream()
+                .filter(slot -> menuEntryMatches(slot, namePrefix))
                 .findFirst()
                 .orElseThrow(
                         () ->
                                 new AssertionError(
-                                        "Chronicle-owned menu entry not found: " + namePrefix));
+                                        "Chronicle top-inventory entry not found: " + namePrefix));
     }
 
     private static void assertCursorInsideSlot(

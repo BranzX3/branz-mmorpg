@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "task_id": "MMO-PHYSICAL-CHRONICLE-F-0004",
+  "task_branch": "harness-task/MMO-PHYSICAL-CHRONICLE-F-0004",
+  "base_commit": "6bb83e9fe531c335f7763c92038a715a4df07009",
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CHRONICLE_BOUNDARY_F_V1",
+  "writable_paths": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CHRONICLE-F-0004/**"
+  ]
+}

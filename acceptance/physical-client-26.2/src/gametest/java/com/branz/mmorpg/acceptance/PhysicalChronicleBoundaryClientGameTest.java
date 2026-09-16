@@ -63,17 +63,32 @@ final class PhysicalChronicleBoundaryClientGameTest {
                 "staged quiver");
 
         openChronicle(context);
-        clickMenuEntry(context, EQUIPMENT_PAGE);
-        context.waitFor(client -> menuContains(client.gui.screen(), QUIVER_ID), 20 * 10);
+        clickChronicleMenuEntry(context, EQUIPMENT_PAGE);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && chronicleMenuContains(
+                                        client.gui.screen(),
+                                        client.player.getInventory(),
+                                        QUIVER_ID),
+                20 * 10);
         context.waitTicks(5);
         boolean nativeEntryExposed =
                 context.computeOnClient(
-                        client ->
-                                menuContains(client.gui.screen(), SWORD_ID)
-                                        || menuContains(client.gui.screen(), SHIELD_ID));
+                        client -> {
+                            if (client.player == null) {
+                                throw new AssertionError(
+                                        "Player must be present while checking Chronicle entries");
+                            }
+                            Object playerInventory = client.player.getInventory();
+                            return chronicleMenuContains(
+                                            client.gui.screen(), playerInventory, SWORD_ID)
+                                    || chronicleMenuContains(
+                                            client.gui.screen(), playerInventory, SHIELD_ID);
+                        });
         if (nativeEntryExposed) {
             throw new AssertionError(
-                    "Chronicle exposed a native physical sword/shield entry in its commit menu");
+                    "Chronicle exposed a native physical sword/shield entry in its owned menu slots");
         }
         System.out.println(
                 "PHYSICAL_AUTHORITY_CHRONICLE_F_NATIVE_REJECTED_CLIENT mode=not-exposed");
@@ -88,13 +103,27 @@ final class PhysicalChronicleBoundaryClientGameTest {
                 "Chronicle native-slot UI boundary changed physical authority");
 
         openChronicle(context);
-        clickMenuEntry(context, EQUIPMENT_PAGE);
-        context.waitFor(client -> menuContains(client.gui.screen(), QUIVER_ID), 20 * 10);
-        clickMenuEntry(context, QUIVER_ID);
-        context.waitFor(client -> menuContains(client.gui.screen(), CONFIRM_SCENE), 20 * 10);
+        clickChronicleMenuEntry(context, EQUIPMENT_PAGE);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && chronicleMenuContains(
+                                        client.gui.screen(),
+                                        client.player.getInventory(),
+                                        QUIVER_ID),
+                20 * 10);
+        clickChronicleMenuEntry(context, QUIVER_ID);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && chronicleMenuContains(
+                                        client.gui.screen(),
+                                        client.player.getInventory(),
+                                        CONFIRM_SCENE),
+                20 * 10);
 
         int commitStart = RECEIVED_GAME_MESSAGES.size();
-        clickMenuEntry(context, CONFIRM_SCENE);
+        clickChronicleMenuEntry(context, CONFIRM_SCENE);
         context.waitFor(client -> messageEqualsSince(commitStart, EQUIPMENT_COMMITTED), 20 * 15);
         System.out.println("PHYSICAL_AUTHORITY_CHRONICLE_F_VIRTUAL_COMMIT_CLIENT");
 
@@ -225,7 +254,14 @@ final class PhysicalChronicleBoundaryClientGameTest {
                                 && client.player.getMainHandItem().is(Items.WRITTEN_BOOK),
                 20 * 10);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
-        context.waitFor(client -> menuContains(client.gui.screen(), EQUIPMENT_PAGE), 20 * 10);
+        context.waitFor(
+                client ->
+                        client.player != null
+                                && chronicleMenuContains(
+                                        client.gui.screen(),
+                                        client.player.getInventory(),
+                                        EQUIPMENT_PAGE),
+                20 * 10);
         System.out.println("PHYSICAL_AUTHORITY_CHRONICLE_F_OPENED_CLIENT");
     }
 
@@ -305,18 +341,34 @@ final class PhysicalChronicleBoundaryClientGameTest {
         if (!(candidate instanceof AbstractContainerScreen<?> screen)) {
             return false;
         }
+        return screen.getMenu().slots.stream().anyMatch(slot -> menuEntryMatches(slot, namePrefix));
+    }
+
+    private static boolean chronicleMenuContains(
+            Object candidate, Object playerInventory, String namePrefix) {
+        if (!(candidate instanceof AbstractContainerScreen<?> screen) || playerInventory == null) {
+            return false;
+        }
         return screen.getMenu().slots.stream()
                 .anyMatch(
                         slot ->
-                                slot.hasItem()
-                                        && slot.getItem()
-                                                .getHoverName()
-                                                .getString()
-                                                .startsWith(namePrefix));
+                                slot.container != playerInventory
+                                        && menuEntryMatches(slot, namePrefix));
+    }
+
+    private static boolean menuEntryMatches(Slot slot, String namePrefix) {
+        return slot.hasItem()
+                && slot.getItem().getHoverName().getString().startsWith(namePrefix);
     }
 
     private static void clickMenuEntry(ClientGameTestContext context, String namePrefix) {
         setMenuCursor(context, namePrefix);
+        context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    }
+
+    private static void clickChronicleMenuEntry(
+            ClientGameTestContext context, String namePrefix) {
+        setChronicleMenuCursor(context, namePrefix);
         context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
     }
 
@@ -329,40 +381,73 @@ final class PhysicalChronicleBoundaryClientGameTest {
                                 throw new AssertionError("Expected an open container for " + namePrefix);
                             }
                             Slot slot = findMenuEntry(screen, namePrefix);
-                            double guiWidth = client.getWindow().getGuiScaledWidth();
-                            double guiHeight = client.getWindow().getGuiScaledHeight();
-                            double screenWidth = client.getWindow().getScreenWidth();
-                            double screenHeight = client.getWindow().getScreenHeight();
-                            double left = (guiWidth - CONTAINER_IMAGE_WIDTH) / 2.0;
-                            double top = (guiHeight - CONTAINER_IMAGE_HEIGHT) / 2.0;
-                            double guiX = left + slot.x + SLOT_CENTER_OFFSET;
-                            double guiY = top + slot.y + SLOT_CENTER_OFFSET;
-                            return new double[] {
-                                guiX * screenWidth / guiWidth,
-                                guiY * screenHeight / guiHeight,
-                                guiX,
-                                guiY,
-                                slot.x,
-                                slot.y,
-                                left,
-                                top
-                            };
+                            return cursorTarget(client, slot);
                         });
         context.getInput().setCursorPos(target[0], target[1]);
         assertCursorInsideSlot(context, target, namePrefix);
     }
 
+    private static void setChronicleMenuCursor(
+            ClientGameTestContext context, String namePrefix) {
+        double[] target =
+                context.computeOnClient(
+                        client -> {
+                            if (!(client.gui.screen()
+                                    instanceof AbstractContainerScreen<?> screen)
+                                    || client.player == null) {
+                                throw new AssertionError(
+                                        "Expected an open Chronicle container for " + namePrefix);
+                            }
+                            Slot slot =
+                                    findChronicleMenuEntry(
+                                            screen, client.player.getInventory(), namePrefix);
+                            return cursorTarget(client, slot);
+                        });
+        context.getInput().setCursorPos(target[0], target[1]);
+        assertCursorInsideSlot(context, target, namePrefix);
+    }
+
+    private static double[] cursorTarget(
+            net.minecraft.client.Minecraft client, Slot slot) {
+        double guiWidth = client.getWindow().getGuiScaledWidth();
+        double guiHeight = client.getWindow().getGuiScaledHeight();
+        double screenWidth = client.getWindow().getScreenWidth();
+        double screenHeight = client.getWindow().getScreenHeight();
+        double left = (guiWidth - CONTAINER_IMAGE_WIDTH) / 2.0;
+        double top = (guiHeight - CONTAINER_IMAGE_HEIGHT) / 2.0;
+        double guiX = left + slot.x + SLOT_CENTER_OFFSET;
+        double guiY = top + slot.y + SLOT_CENTER_OFFSET;
+        return new double[] {
+            guiX * screenWidth / guiWidth,
+            guiY * screenHeight / guiHeight,
+            guiX,
+            guiY,
+            slot.x,
+            slot.y,
+            left,
+            top
+        };
+    }
+
     private static Slot findMenuEntry(AbstractContainerScreen<?> screen, String namePrefix) {
+        return screen.getMenu().slots.stream()
+                .filter(slot -> menuEntryMatches(slot, namePrefix))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Menu entry not found: " + namePrefix));
+    }
+
+    private static Slot findChronicleMenuEntry(
+            AbstractContainerScreen<?> screen, Object playerInventory, String namePrefix) {
         return screen.getMenu().slots.stream()
                 .filter(
                         slot ->
-                                slot.hasItem()
-                                        && slot.getItem()
-                                                .getHoverName()
-                                                .getString()
-                                                .startsWith(namePrefix))
+                                slot.container != playerInventory
+                                        && menuEntryMatches(slot, namePrefix))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Menu entry not found: " + namePrefix));
+                .orElseThrow(
+                        () ->
+                                new AssertionError(
+                                        "Chronicle-owned menu entry not found: " + namePrefix));
     }
 
     private static void assertCursorInsideSlot(

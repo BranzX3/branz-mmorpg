@@ -11,6 +11,10 @@ public final class PhysicalAuthorityClientGameTestDispatcher implements FabricCl
             new PhysicalWorldMobClientGameTest().runTest(context);
             return;
         }
+        if (Boolean.getBoolean("branz.acceptance.physicalChronicleBoundary")) {
+            new PhysicalChronicleBoundaryClientGameTest().runTest(context);
+            return;
+        }
         if (Boolean.getBoolean("branz.acceptance.physicalShieldD46")) {
             new PhysicalShieldD46ClientGameTest().runTest(context);
             System.out.println("PHYSICAL_AUTHORITY_SERVER_HANDSHAKE_CLIENT");

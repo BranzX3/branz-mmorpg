@@ -26,14 +26,14 @@ java {
     targetCompatibility = JavaVersion.VERSION_25
 }
 tasks.withType(JavaExec).configureEach {
-    if (name == 'runClientGameTest' && providers.gradleProperty('physicalWorldMobEAcceptance').orNull == 'true') {
-        systemProperty 'branz.acceptance.physicalWorldMobE', 'true'
-    }
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalPrimaryInputAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalPrimaryInput', 'true'
     }
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalPrimaryHitAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalPrimaryHit', 'true'
+    }
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalWorldMobEAcceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalWorldMobE', 'true'
     }
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalPrimaryBrokenAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalPrimaryBroken', 'true'
@@ -43,6 +43,9 @@ tasks.withType(JavaExec).configureEach {
     }
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalChronicleSlotAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalChronicleSlot', 'true'
+    }
+    if (name == 'runClientGameTest' && providers.gradleProperty('physicalChronicleBoundaryAcceptance').orNull == 'true') {
+        systemProperty 'branz.acceptance.physicalChronicleBoundary', 'true'
     }
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalHotbarAcceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalHotbar', 'true'

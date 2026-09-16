@@ -2,6 +2,7 @@
 """Offline regression tests for the fixed Section A legacy MAIN_HAND migration harness."""
 from __future__ import annotations
 
+import copy
 import importlib.util
 import sys
 from pathlib import Path
@@ -17,6 +18,7 @@ LEGACY_UUID = "11111111-1111-1111-1111-111111111111"
 OTHER_UUID = "22222222-2222-2222-2222-222222222222"
 TX = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 CONTENT = "v1.milestone-1.example.4"
+OWNER = "33333333-3333-3333-3333-333333333333"
 
 
 def legacy_probe(version: int = 7, uuid: str = LEGACY_UUID) -> str:
@@ -67,6 +69,27 @@ def good_negative() -> tuple[str, str, str, str]:
         "PHYSICAL_AUTHORITY_A_NEGATIVE_TARGET_LOCKED_CLIENT",
         "PHYSICAL_AUTHORITY_A_NEGATIVE_TARGET_LOCKED_CLIENT",
     )
+
+
+def integrity_rows() -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for index in range(36):
+        rows.append(
+            {
+                "item_uuid": f"00000000-0000-0000-0000-{index:012d}",
+                "definition_id": "weapon.training_sword",
+                "owner_character_id": OWNER,
+                "location_type": (
+                    "NATIVE_EQUIPPED" if index == 0 else "CHARACTER_INVENTORY"
+                ),
+                "location_ref": "MAIN_HAND" if index == 0 else f"slot:{index - 1}",
+                "payload": '{"durability": 120}',
+                "content_version": CONTENT,
+                "version": "7",
+                "last_transaction_id": TX,
+            }
+        )
+    return rows
 
 
 def main() -> int:
@@ -173,6 +196,64 @@ def main() -> int:
     assert not R.evaluate_section_a_negative_evidence(
         negative_prep, negative_fill, success_in_negative, negative_restart
     )["a_negative_no_target_success_status"]
+
+    baseline = integrity_rows()
+    integrity = R.evaluate_section_a_negative_integrity(
+        baseline, copy.deepcopy(baseline), copy.deepcopy(baseline)
+    )
+    assert all(integrity.values()), [name for name, ok in integrity.items() if not ok]
+
+    row_loss = copy.deepcopy(baseline)
+    row_loss.pop()
+    assert not R.evaluate_section_a_negative_integrity(
+        baseline, row_loss, copy.deepcopy(baseline)
+    )["a_negative_integrity_no_row_loss_or_invention"]
+
+    duplicate_uuid = copy.deepcopy(baseline)
+    duplicate_uuid[1]["item_uuid"] = duplicate_uuid[0]["item_uuid"]
+    duplicate_checks = R.evaluate_section_a_negative_integrity(
+        baseline, duplicate_uuid, copy.deepcopy(baseline)
+    )
+    assert not duplicate_checks["a_negative_integrity_uuid_unique"]
+    assert not duplicate_checks["a_negative_integrity_no_duplicate_training_sword"]
+
+    location_mutation = copy.deepcopy(baseline)
+    location_mutation[1]["location_ref"] = "slot:35"
+    assert not R.evaluate_section_a_negative_integrity(
+        baseline, location_mutation, copy.deepcopy(baseline)
+    )["a_negative_integrity_no_invented_destination"]
+
+    invented_destination = copy.deepcopy(baseline)
+    invented_destination[2]["location_type"] = "NATIVE_EQUIPPED"
+    invented_destination[2]["location_ref"] = "OFF_HAND"
+    assert not R.evaluate_section_a_negative_integrity(
+        baseline, invented_destination, copy.deepcopy(baseline)
+    )["a_negative_integrity_no_invented_destination"]
+
+    version_mutation = copy.deepcopy(baseline)
+    version_mutation[3]["version"] = "8"
+    assert not R.evaluate_section_a_negative_integrity(
+        baseline, version_mutation, copy.deepcopy(baseline)
+    )["a_negative_integrity_version_content_payload_stable"]
+
+    content_mutation = copy.deepcopy(baseline)
+    content_mutation[4]["content_version"] = "unexpected"
+    assert not R.evaluate_section_a_negative_integrity(
+        baseline, content_mutation, copy.deepcopy(baseline)
+    )["a_negative_integrity_version_content_payload_stable"]
+
+    payload_mutation = copy.deepcopy(baseline)
+    payload_mutation[5]["payload"] = '{"durability": 119}'
+    assert not R.evaluate_section_a_negative_integrity(
+        baseline, payload_mutation, copy.deepcopy(baseline)
+    )["a_negative_integrity_version_content_payload_stable"]
+
+    main_hand_mutation = copy.deepcopy(baseline)
+    main_hand_mutation[0]["location_type"] = "CHARACTER_INVENTORY"
+    main_hand_mutation[0]["location_ref"] = "slot:35"
+    assert not R.evaluate_section_a_negative_integrity(
+        baseline, main_hand_mutation, copy.deepcopy(baseline)
+    )["a_negative_integrity_main_hand_uuid_stable"]
 
     print("MMORPG_HARNESS_SECTION_A_SELFTEST_PASS")
     return 0

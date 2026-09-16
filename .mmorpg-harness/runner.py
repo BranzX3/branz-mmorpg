@@ -43,6 +43,10 @@ _runner_core = _load_control_module("runner_core", ".mmorpg-harness/runner_core.
 _runner_core.__file__ = __file__
 _runner_a = _load_control_module("runner_a", ".mmorpg-harness/runner_a.py")
 _runner_a.install(_runner_core)
+_runner_a_integrity = _load_control_module(
+    "runner_a_integrity", ".mmorpg-harness/runner_a_integrity.py"
+)
+_runner_a_integrity.install(_runner_core, _runner_a)
 _runner_b5 = _load_control_module("runner_b5", ".mmorpg-harness/runner_b5.py")
 _runner_b5.install(_runner_core)
 _runner_b6 = _load_control_module("runner_b6", ".mmorpg-harness/runner_b6.py")
@@ -205,7 +209,7 @@ for _name in dir(_runner_core):
         globals()[_name] = getattr(_runner_core, _name)
 
 RUNNER_EXTENSION_VERSION = (
-    "a-legacy-main-hand-v1+"
+    "a-legacy-main-hand-v1+a-negative-integrity-v1+"
     "b5-broken-v1+b6-chronicle-v1+b7-broken-restart-v1+"
     "c12-consumable-lot-v2+c3-consumable-use-v1+c4-consumable-restart-v1+"
     "c4-status-retry-v1+d13-shield-offhand-v1+d46-shield-wear-staff-v3+"

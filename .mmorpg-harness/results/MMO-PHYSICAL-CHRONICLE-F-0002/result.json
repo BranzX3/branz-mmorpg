@@ -1,0 +1,26 @@
+{
+  "action_exit_code": 1,
+  "action_id": "MMO_CLIENT_ACCEPTANCE_CHRONICLE_BOUNDARY_F_V1",
+  "action_identity": "PHYSICAL_CLIENT_ACCEPTANCE_CHRONICLE_BOUNDARY_F_V1",
+  "action_record": {
+    "harness_error": "CLIENT_ACCEPTANCE_CLIENT_EXITED"
+  },
+  "allowed_writes": [
+    ".mmorpg-harness/results/MMO-PHYSICAL-CHRONICLE-F-0002/**"
+  ],
+  "base_commit_expected": "ad1ac605621edb922b482fcea07cedca6916e043",
+  "blocker_code": "CLIENT_ACCEPTANCE_CLIENT_EXITED",
+  "control_branch": "HARNESS_MMORPG_CONTROL",
+  "control_commit": "bfb21d4de82667c00ee93c74244038707ec7350f",
+  "duration_seconds": 121.219,
+  "ending_commit_before_result_commit": "ad1ac605621edb922b482fcea07cedca6916e043",
+  "execution_status": "FAIL",
+  "finished_at_utc": "2026-09-16T11:28:00.653572+00:00",
+  "protocol_version": 1,
+  "started_at_utc": "2026-09-16T11:25:59.433606+00:00",
+  "starting_commit_actual": "ad1ac605621edb922b482fcea07cedca6916e043",
+  "task_branch": "harness-task/MMO-PHYSICAL-CHRONICLE-F-0002",
+  "task_id": "MMO-PHYSICAL-CHRONICLE-F-0002",
+  "task_manifest_sha256": "7ded530b03ef8bc2e1d1cfdedf105b2a19e30d5739c29d59ad731fc87306310a",
+  "unauthorized_writes": []
+}

@@ -7,6 +7,10 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 public final class PhysicalAuthorityClientGameTestDispatcher implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
+        if (!System.getProperty("branz.acceptance.physicalLegacyMainHandPhase", "").isBlank()) {
+            new PhysicalLegacyMainHandClientGameTest().runTest(context);
+            return;
+        }
         if (Boolean.getBoolean("branz.acceptance.physicalWorldMobE")) {
             new PhysicalWorldMobClientGameTest().runTest(context);
             return;

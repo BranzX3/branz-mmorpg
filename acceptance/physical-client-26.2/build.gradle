@@ -68,4 +68,22 @@ tasks.withType(JavaExec).configureEach {
     if (name == 'runClientGameTest' && providers.gradleProperty('physicalShieldD46Acceptance').orNull == 'true') {
         systemProperty 'branz.acceptance.physicalShieldD46', 'true'
     }
+    if (name == 'runClientGameTest') {
+        def legacyMainHandPhase = providers.gradleProperty('physicalLegacyMainHandPhase').orNull
+        if (legacyMainHandPhase != null) {
+            def allowedLegacyMainHandPhases = [
+                'legacy-seed',
+                'legacy-probe',
+                'target-verify',
+                'target-stable',
+                'negative-prep',
+                'negative-fill',
+                'negative-fail'
+            ]
+            if (!allowedLegacyMainHandPhases.contains(legacyMainHandPhase)) {
+                throw new GradleException("Unsupported fixed Section A legacy MAIN_HAND phase: ${legacyMainHandPhase}")
+            }
+            systemProperty 'branz.acceptance.physicalLegacyMainHandPhase', legacyMainHandPhase
+        }
+    }
 }

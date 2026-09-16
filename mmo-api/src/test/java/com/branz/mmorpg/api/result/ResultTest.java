@@ -46,12 +46,16 @@ class ResultTest {
 
     @Test
     void failureRejectsNullError() {
-        assertThrows(NullPointerException.class, () -> Result.<String, TestError>failure(null, "detail"));
+        assertThrows(
+                NullPointerException.class,
+                () -> Result.<String, TestError>failure(null, "detail"));
     }
 
     @Test
     void failureRejectsNullDetail() {
-        assertThrows(NullPointerException.class, () -> Result.<String, TestError>failure(TestError.FAILED, null));
+        assertThrows(
+                NullPointerException.class,
+                () -> Result.<String, TestError>failure(TestError.FAILED, null));
     }
 
     @Test

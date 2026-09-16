@@ -1,0 +1,14 @@
+{
+  "before_task_switch": {
+    "entries": [],
+    "ephemeral": [],
+    "safe_to_continue": true,
+    "substantive": []
+  },
+  "task_branch": {
+    "entries": [],
+    "ephemeral": [],
+    "safe_to_continue": true,
+    "substantive": []
+  }
+}
